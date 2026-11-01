@@ -1,0 +1,39 @@
+{
+  "description": "A deferred_sessions watermark gives the boundary (first surviving record after it) even when every record predates last_analyzed; the closed session is no longer deferred. Its key is listed in watermarks_to_clear.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "sessions": [
+            {
+              "id": "sess_k1000000-0000-4000-8000-000000000001",
+              "kind": "normal",
+              "boundary": "L4"
+            }
+          ]
+        }
+      },
+      "watermarks_to_clear": [
+        "kiro:sess_k1000000-0000-4000-8000-000000000001"
+      ]
+    },
+    "stripped": {
+      "sess_k1000000-0000-4000-8000-000000000001": {
+        "order": [
+          "L1 [user] first part",
+          "=== NEW TURNS BEGIN ===",
+          "L4 [user] second part"
+        ]
+      }
+    }
+  }
+}

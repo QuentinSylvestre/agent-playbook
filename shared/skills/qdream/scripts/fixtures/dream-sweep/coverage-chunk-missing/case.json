@@ -1,0 +1,34 @@
+{
+  "description": "SC-8: a split project is stamped only when every chunk returned: alpha's second chunk (A03) is missing, so s2 is unread too; beta's three labels all returned and together read every session.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "coverage"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/coverage.json": {
+          "projects": {
+            "{ROOT}/proj/alpha": {
+              "stamp": false,
+              "labels": [
+                "A01",
+                "A02",
+                "A03"
+              ],
+              "reasons": [
+                "no return from A03",
+                "session s2 not read"
+              ]
+            },
+            "{ROOT}/proj/beta": {
+              "stamp": true,
+              "reasons": []
+            }
+          }
+        }
+      }
+    }
+  ]
+}

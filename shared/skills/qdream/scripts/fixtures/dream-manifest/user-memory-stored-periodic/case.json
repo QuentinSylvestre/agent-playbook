@@ -1,0 +1,28 @@
+{
+  "description": "D24: a stored quiet_sweeps.user_memory of 4 (not the seed 2) makes the user memory's pass periodic. Its quiet-state unit checks invalid and malformed quiet_sweeps values (errors[] line, seeded value) and that a project's seed uses its state_key.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "user_memory": {
+        "quiet_sweeps": 4,
+        "memory_pass": "periodic",
+        "memory_flags": [],
+        "file_flags": {}
+      }
+    }
+  },
+  "git": [
+    "repo"
+  ],
+  "units": [
+    "quiet-state"
+  ]
+}

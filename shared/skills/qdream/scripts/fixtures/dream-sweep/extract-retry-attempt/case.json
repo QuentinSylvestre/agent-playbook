@@ -1,0 +1,185 @@
+{
+  "description": "F5 (D15 Retry, D22 Resume): a retried child's return is attempt 2 (returns/A02.a2.json, create-once per attempt) beside attempt 1, which stays; an identical re-run is a no-op and different content for the same attempt is exit 3. coverage reads the highest attempt (beta stamps once the retry returned without error); a verifier brief re-rendered as attempt 2 writes V01.a2.* and verifier-index.a2.json, and aggregate reads that index. --attempt 0 is a usage error. An attempt-N inbox file is <label>.a<N>.txt: attempt 1's <label>.txt filed as attempt 2 is exit 3 (G1).",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "verifier"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/briefs/verifier-index.json": {
+          "verifiers": []
+        }
+      }
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/inbox/A02.a2.txt": "```json\n{\n  \"memory_proposals\": [\n    {\n      \"type\": \"feedback\",\n      \"heading\": \"Retry proposal\",\n      \"why\": \"w\",\n      \"how_to_apply\": \"h\",\n      \"source\": \"s\",\n      \"target\": \"project\",\n      \"sessions_observed_in\": [],\n      \"evidence_quote\": \"q\"\n    }\n  ],\n  \"unrelated\": [],\n  \"not_a_conflict\": [],\n  \"subsumed_entries\": [],\n  \"stale_entries\": [],\n  \"governance_conflicts\": [],\n  \"verified\": [],\n  \"task4_status\": \"checked\",\n  \"improvement_signals\": [],\n  \"user_skipped\": [],\n  \"saved_in_session\": [],\n  \"new_skill_candidates\": [],\n  \"insights_signals\": [],\n  \"sessions_read\": [\n    \"b1\"\n  ],\n  \"checkpoint_collapsed\": 0,\n  \"project_accessible\": true,\n  \"error\": null,\n  \"scope\": \"all tasks\",\n  \"notes\": null,\n  \"sessions_unreadable\": []\n}\n```\n"
+      }
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/inbox/A02.txt": "```json\n{\n  \"memory_proposals\": [\n    {\n      \"type\": \"feedback\",\n      \"heading\": \"Retry proposal\",\n      \"why\": \"w\",\n      \"how_to_apply\": \"h\",\n      \"source\": \"s\",\n      \"target\": \"project\",\n      \"sessions_observed_in\": [],\n      \"evidence_quote\": \"q\"\n    }\n  ],\n  \"unrelated\": [],\n  \"not_a_conflict\": [],\n  \"subsumed_entries\": [],\n  \"stale_entries\": [],\n  \"governance_conflicts\": [],\n  \"verified\": [],\n  \"task4_status\": \"checked\",\n  \"improvement_signals\": [],\n  \"user_skipped\": [],\n  \"saved_in_session\": [],\n  \"new_skill_candidates\": [],\n  \"insights_signals\": [],\n  \"sessions_read\": [\n    \"b1\"\n  ],\n  \"checkpoint_collapsed\": 0,\n  \"project_accessible\": true,\n  \"error\": null,\n  \"scope\": \"all tasks\",\n  \"notes\": null,\n  \"sessions_unreadable\": []\n}\n```\n"
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A02",
+        "--attempt",
+        "2",
+        "--from-file",
+        "inbox/A02.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not A02's inbox file for attempt 2 (A02.a2.txt)"
+      ],
+      "absent": [
+        "sweep/returns/A02.a2.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A02",
+        "--attempt",
+        "2",
+        "--from-file",
+        "inbox/A02.a2.txt"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/returns/A02.a2.json": {
+          "attempt": 2,
+          "return": {
+            "error": null
+          }
+        }
+      },
+      "text_contains": {
+        "sweep/returns/A02.json": [
+          "Notes, not failures"
+        ]
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A02",
+        "--attempt",
+        "2",
+        "--from-file",
+        "inbox/A02.a2.txt"
+      ],
+      "exit": 0,
+      "unchanged": true
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/inbox/A02.a2.txt": "```json\n{\"memory_proposals\": [{\"type\": \"feedback\", \"heading\": \"Retry proposal\", \"why\": \"w\", \"how_to_apply\": \"h\", \"source\": \"s\", \"target\": \"project\", \"sessions_observed_in\": [], \"evidence_quote\": \"q\"}], \"unrelated\": [], \"not_a_conflict\": [], \"subsumed_entries\": [], \"stale_entries\": [], \"governance_conflicts\": [], \"verified\": [], \"task4_status\": \"checked\", \"improvement_signals\": [], \"user_skipped\": [], \"saved_in_session\": [], \"new_skill_candidates\": [], \"insights_signals\": [], \"sessions_read\": [\"b1\"], \"checkpoint_collapsed\": 0, \"project_accessible\": true, \"error\": null, \"scope\": \"all tasks\", \"notes\": \"changed\", \"sessions_unreadable\": []}\n```\n"
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A02",
+        "--attempt",
+        "2",
+        "--from-file",
+        "inbox/A02.a2.txt"
+      ],
+      "exit": 3,
+      "unchanged": true,
+      "stdout_contains": [
+        "already exists with different content"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A02",
+        "--attempt",
+        "0",
+        "--from-file",
+        "inbox/A02.a2.txt"
+      ],
+      "exit": 2,
+      "unchanged": true
+    },
+    {
+      "argv": [
+        "coverage"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/coverage.json": {
+          "projects": {
+            "{ROOT}/proj/beta": {
+              "stamp": true,
+              "reasons": []
+            }
+          }
+        }
+      }
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "verifier",
+        "--attempt",
+        "2"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "Dream Verifier Brief V01. Read and follow ",
+        "V01.a2.md."
+      ],
+      "present": [
+        "sweep/briefs/V01.a2.md",
+        "sweep/briefs/V01.a2.data.json",
+        "sweep/briefs/verifier-index.a2.json"
+      ],
+      "absent": [
+        "sweep/briefs/V01.md"
+      ]
+    },
+    {
+      "argv": [
+        "aggregate"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/synth.json": {
+          "counts": {
+            "missing": 1
+          }
+        }
+      },
+      "text_contains": {
+        "sweep/synth.txt": [
+          "V01-001\tmemory_proposals\tmissing\tRetry proposal"
+        ]
+      }
+    }
+  ]
+}

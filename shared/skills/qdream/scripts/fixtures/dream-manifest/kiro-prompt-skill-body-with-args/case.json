@@ -1,0 +1,39 @@
+{
+  "description": "An expanded skill body inside a user record is replaced by a marker; the user's own text before and after it and the substituted arguments survive.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "sessions": [
+            {
+              "id": "sess_k1100000-0000-4000-8000-000000000001"
+            }
+          ]
+        }
+      }
+    },
+    "stripped": {
+      "sess_k1100000-0000-4000-8000-000000000001": {
+        "order": [
+          "L1 [user] please run this on the parser",
+          "[skill body: qfixture] --scope parser",
+          "and keep it short"
+        ],
+        "not_contains": [
+          "Read every file the caller names",
+          "Walk the directory",
+          "## Process"
+        ]
+      }
+    }
+  }
+}

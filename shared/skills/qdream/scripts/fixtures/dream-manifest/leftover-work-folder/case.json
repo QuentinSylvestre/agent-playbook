@@ -1,0 +1,17 @@
+{
+  "description": "An existing work folder stops manifest with exit 5 and its snapshot_at, touching nothing.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 5,
+    "stdout_contains": [
+      "snapshot_at=2026-09-23T08:00:00Z"
+    ]
+  }
+}

@@ -1,0 +1,53 @@
+{
+ "description": "User memory behind the config repo's sanctioned `memory` link (store repo user/memory/): dirty lists each user-memory candidate under its lexical config-repo path, but records the store repo as its repository and git state, because git sees the file only there.",
+ "now": "2026-10-12T12:00:00Z",
+ "store_repo": "stores",
+ "write": {
+  "repo/inventory.tsv": "# schema-version: 1\n",
+  "repo/shared/AGENTS.md": "# Agents\n",
+  "repo/.gitignore": "/memory\n",
+  "stores/user/memory/MEMORY.md": "# Memory\n",
+  "stores/user/memory/.dream-state.json": "{}\n",
+  "stores/.gitignore": "user/memory/.dream-journal.jsonl\n"
+ },
+ "git": [
+  "repo",
+  "stores"
+ ],
+ "setup": [
+  {
+   "link": [
+    {
+     "src": "stores/user/memory",
+     "dst": "repo/memory",
+     "dir": true
+    }
+   ]
+  }
+ ],
+ "steps": [
+  {
+   "argv": [
+    "dirty",
+    "--repo",
+    "{ROOT}/repo"
+   ],
+   "exit": 0,
+   "files": {
+    "sweep/dirty-at-orient.json": {
+     "repo": "{ROOT}/repo",
+     "candidates": {
+      "{ROOT}/repo/memory/MEMORY.md": {
+       "repo": "{ROOT}/stores",
+       "git": "tracked"
+      },
+      "{ROOT}/repo/memory/.dream-state.json": {
+       "repo": "{ROOT}/stores",
+       "git": "tracked"
+      }
+     }
+    }
+   }
+  }
+ ]
+}

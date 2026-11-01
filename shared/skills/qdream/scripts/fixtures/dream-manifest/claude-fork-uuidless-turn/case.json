@@ -1,0 +1,38 @@
+{
+  "description": "A fork whose every record uuid is shared but which holds a conversation turn without a uuid keeps that turn: it is listed from that turn, not collapsed (review finding 2).",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "sessions": [
+            {
+              "id": "f0000000-0000-4000-8000-000000000211",
+              "boundary": "L1"
+            },
+            {
+              "id": "f0000000-0000-4000-8000-000000000212",
+              "boundary": "L3"
+            }
+          ],
+          "fork_collapsed": []
+        }
+      }
+    },
+    "stripped": {
+      "f0000000-0000-4000-8000-000000000212": {
+        "contains": [
+          "fork turn without a record uuid"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "description": "Sub-agent transcripts under <session>/subagents/*.jsonl are summed with the session; the .meta.json beside them is not a transcript.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "baseline",
+    "--session",
+    "{ROOT}/home/.claude/projects/-ROOT-proj/b5a00000-0000-4000-8000-000000000001.jsonl"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_contains": [
+      "files: 1 session + 1 sub-agent transcript(s)",
+      "usage records: 3, deduplicated by message.id to 2 message(s)",
+      "tokens: 7152",
+      "model claude-opus-5-5: 6102",
+      "model claude-sonnet-5: 1050",
+      "agents: 1"
+    ]
+  }
+}

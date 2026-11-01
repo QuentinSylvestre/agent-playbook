@@ -1,0 +1,218 @@
+{
+  "description": "orient.json: every key required; confirmed a list of strings, dirty_at_orient a bool (a string is not), since a string or null, model_routing an object. plan 261027 SC-6: an orchestrator_sessions entry must be the absolute path of a .jsonl transcript; a session id (the 2026-10-22 null-cost cause) or a relative path is refused, an absolute .jsonl path and the empty list (kiro) pass. Review R8 (plan 261027): the .jsonl path must also exist as a file (a missing one is refused); an existing file that is not .jsonl is refused; the extension is matched without regard to case.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/orient.json": "{\n  \"snapshot_at\": \"2026-10-12T12:00:00Z\",\n  \"since\": \"2026-10-01T00:00:00Z\",\n  \"confirmed\": [\n    \"/p/alpha\"\n  ],\n  \"model_routing\": {\n    \"task4\": \"model-a\"\n  },\n  \"dirty_at_orient\": true,\n  \"repos\": [\n    \"/r/one\"\n  ],\n  \"recover_lines\": [],\n  \"orchestrator_sessions\": []\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "orient.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check orient.json: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/orient.json": "{\n  \"snapshot_at\": \"2026-10-12T12:00:00Z\",\n  \"since\": null,\n  \"confirmed\": [\n    \"/p/alpha\"\n  ],\n  \"model_routing\": {\n    \"task4\": \"model-a\"\n  },\n  \"dirty_at_orient\": true,\n  \"repos\": [\n    \"/r/one\"\n  ],\n  \"recover_lines\": [],\n  \"orchestrator_sessions\": []\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "orient.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check orient.json: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/orient.json": "{\n  \"snapshot_at\": \"2026-10-12T12:00:00Z\",\n  \"since\": \"2026-10-01T00:00:00Z\",\n  \"confirmed\": [\n    \"/p/alpha\"\n  ],\n  \"model_routing\": {\n    \"task4\": \"model-a\"\n  },\n  \"dirty_at_orient\": true,\n  \"repos\": [\n    \"/r/one\"\n  ],\n  \"orchestrator_sessions\": []\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "orient.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "missing key 'recover_lines'"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/orient.json": "{\n  \"snapshot_at\": \"2026-10-12T12:00:00Z\",\n  \"since\": \"2026-10-01T00:00:00Z\",\n  \"confirmed\": [\n    \"/p/alpha\",\n    3\n  ],\n  \"model_routing\": {\n    \"task4\": \"model-a\"\n  },\n  \"dirty_at_orient\": true,\n  \"repos\": [\n    \"/r/one\"\n  ],\n  \"recover_lines\": [],\n  \"orchestrator_sessions\": []\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "orient.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "key 'confirmed': expected list:str"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/orient.json": "{\n  \"snapshot_at\": \"2026-10-12T12:00:00Z\",\n  \"since\": \"2026-10-01T00:00:00Z\",\n  \"confirmed\": [\n    \"/p/alpha\"\n  ],\n  \"model_routing\": {\n    \"task4\": \"model-a\"\n  },\n  \"dirty_at_orient\": \"true\",\n  \"repos\": [\n    \"/r/one\"\n  ],\n  \"recover_lines\": [],\n  \"orchestrator_sessions\": []\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "orient.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "key 'dirty_at_orient': expected bool"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/orient.json": "{\n  \"snapshot_at\": \"2026-10-12T12:00:00Z\",\n  \"since\": 5,\n  \"confirmed\": [\n    \"/p/alpha\"\n  ],\n  \"model_routing\": {\n    \"task4\": \"model-a\"\n  },\n  \"dirty_at_orient\": true,\n  \"repos\": [\n    \"/r/one\"\n  ],\n  \"recover_lines\": [],\n  \"orchestrator_sessions\": []\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "orient.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "key 'since': expected str?"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/orient.json": "{\n  \"snapshot_at\": \"2026-10-12T12:00:00Z\",\n  \"since\": \"2026-10-01T00:00:00Z\",\n  \"confirmed\": [\n    \"/p/alpha\"\n  ],\n  \"model_routing\": [\n    \"model-a\"\n  ],\n  \"dirty_at_orient\": true,\n  \"repos\": [\n    \"/r/one\"\n  ],\n  \"recover_lines\": [],\n  \"orchestrator_sessions\": []\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "orient.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "key 'model_routing': expected obj"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/orient.json": "{\n  \"snapshot_at\": \"2026-10-12T12:00:00Z\",\n  \"since\": \"2026-10-01T00:00:00Z\",\n  \"confirmed\": [\n    \"/p/alpha\"\n  ],\n  \"model_routing\": {\n    \"task4\": \"model-a\"\n  },\n  \"dirty_at_orient\": true,\n  \"repos\": [\n    \"/r/one\"\n  ],\n  \"recover_lines\": [],\n  \"orchestrator_sessions\": [\n    \"5e550000-0000-4000-8000-000000000001\"\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "orient.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "orchestrator_sessions entry '5e550000-0000-4000-8000-000000000001' is not the absolute path of a .jsonl transcript"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/orient.json": "{\n  \"snapshot_at\": \"2026-10-12T12:00:00Z\",\n  \"since\": \"2026-10-01T00:00:00Z\",\n  \"confirmed\": [\n    \"/p/alpha\"\n  ],\n  \"model_routing\": {\n    \"task4\": \"model-a\"\n  },\n  \"dirty_at_orient\": true,\n  \"repos\": [\n    \"/r/one\"\n  ],\n  \"recover_lines\": [],\n  \"orchestrator_sessions\": [\n    \"transcripts/s1.jsonl\"\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "orient.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "orchestrator_sessions entry 'transcripts/s1.jsonl' is not the absolute path"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/orient.json": "{\n  \"snapshot_at\": \"2026-10-12T12:00:00Z\",\n  \"since\": \"2026-10-01T00:00:00Z\",\n  \"confirmed\": [\n    \"/p/alpha\"\n  ],\n  \"model_routing\": {\n    \"task4\": \"model-a\"\n  },\n  \"dirty_at_orient\": true,\n  \"repos\": [\n    \"/r/one\"\n  ],\n  \"recover_lines\": [],\n  \"orchestrator_sessions\": [\n    \"{ROOT}/home/transcripts/s1.jsonl\"\n  ]\n}\n",
+        "home/transcripts/s1.jsonl": "{}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "orient.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check orient.json: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/orient.json": "{\n  \"snapshot_at\": \"2026-10-12T12:00:00Z\",\n  \"since\": \"2026-10-01T00:00:00Z\",\n  \"confirmed\": [\n    \"/p/alpha\"\n  ],\n  \"model_routing\": {\n    \"task4\": \"model-a\"\n  },\n  \"dirty_at_orient\": true,\n  \"repos\": [\n    \"/r/one\"\n  ],\n  \"recover_lines\": [],\n  \"orchestrator_sessions\": [\n    \"{ROOT}/home/transcripts/missing.jsonl\"\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "orient.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        
+        "is not an existing file"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/orient.json": "{\n  \"snapshot_at\": \"2026-10-12T12:00:00Z\",\n  \"since\": \"2026-10-01T00:00:00Z\",\n  \"confirmed\": [\n    \"/p/alpha\"\n  ],\n  \"model_routing\": {\n    \"task4\": \"model-a\"\n  },\n  \"dirty_at_orient\": true,\n  \"repos\": [\n    \"/r/one\"\n  ],\n  \"recover_lines\": [],\n  \"orchestrator_sessions\": [\n    \"{ROOT}/home/transcripts/s1.txt\"\n  ]\n}\n",
+        "home/transcripts/s1.txt": "{}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "orient.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not the absolute path of a .jsonl transcript"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/orient.json": "{\n  \"snapshot_at\": \"2026-10-12T12:00:00Z\",\n  \"since\": \"2026-10-01T00:00:00Z\",\n  \"confirmed\": [\n    \"/p/alpha\"\n  ],\n  \"model_routing\": {\n    \"task4\": \"model-a\"\n  },\n  \"dirty_at_orient\": true,\n  \"repos\": [\n    \"/r/one\"\n  ],\n  \"recover_lines\": [],\n  \"orchestrator_sessions\": [\n    \"{ROOT}/home/transcripts/s1.JSONL\"\n  ]\n}\n",
+        "home/transcripts/s1.JSONL": "{}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "orient.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check orient.json: ok"
+      ]
+    }
+  ]
+}

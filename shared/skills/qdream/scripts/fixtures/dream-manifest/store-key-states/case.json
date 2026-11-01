@@ -1,0 +1,65 @@
+{
+  "description": "plan 261016 Phase 5 review F2 and cycle-2 fix 4: a `store:` state key is a store, not a folder. Served by a checkout that has its own state entry: removed, \"superseded by\" the checkout. Served by a checkout with no state entry: kept (known) with the checkout named. Attached to a store directory nobody serves: a known store-only project. Its store directory gone from a readable store repo: removed, with no probe error.",
+  "now": "2026-09-24T12:00:00Z",
+  "store_repo": "stores",
+  "git": [
+    "proj/a",
+    "proj/c"
+  ],
+  "git_origin": {
+    "proj/a": "https://example.com/Org/Proj.git",
+    "proj/c": "https://example.com/Org/Proj2.git"
+  },
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo",
+    "--add",
+    "{ROOT}/proj/c"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/a": {
+          "status": "known",
+          "memory_file": "{ROOT}/stores/proj-aaaaaa/memory/MEMORY.md"
+        },
+        "store:remote example.com/org/proj": {
+          "status": "removed",
+          "memory_file": null,
+          "sessions": [],
+          "errors": [
+            "$contains:superseded by {ROOT}/proj/a"
+          ]
+        },
+        "store:remote example.com/org/ghost": {
+          "status": "known",
+          "memory_file": "{ROOT}/stores/ghost-bbbbbb/memory/MEMORY.md",
+          "errors": []
+        },
+        "store:remote example.com/org/gone": {
+          "status": "removed",
+          "memory_file": null,
+          "sessions": [],
+          "errors": []
+        },
+        "store:remote example.com/org/proj2": {
+          "status": "known",
+          "memory_file": null,
+          "sessions": [],
+          "errors": [
+            "$contains:the checkout {ROOT}/proj/c now serves this store"
+          ]
+        }
+      }
+    },
+    "json_not_contains": [
+      "cannot probe",
+      "store lookup failed"
+    ]
+  },
+  "normal_folders": true
+}

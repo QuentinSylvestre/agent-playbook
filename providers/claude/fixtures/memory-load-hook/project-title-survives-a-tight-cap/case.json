@@ -1,0 +1,20 @@
+{
+  "description": "plan 261016 Step 9b (H2): a cap too small for the indexes and the project tier together cuts the indexes above the project tier first; the project tier's title, path and store identity always survive.",
+  "git": [
+    "proj",
+    "outside"
+  ],
+  "git_date": "2026-09-15T12:00:00",
+  "time_cap": 20,
+  "cwd": "{{ROOT}}/proj/src",
+  "cap": 1100,
+  "contains": [
+    "heading index only",
+    "Project memory comes from the store whose STORE file reads"
+  ],
+  "regex": [
+    "^Project memory \\(.*proj-ffffff.*MEMORY\\.md\\) — heading index only"
+  ],
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores"
+}

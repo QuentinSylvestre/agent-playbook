@@ -1,0 +1,54 @@
+{
+  "description": "working-map-seed.json: pairs a list.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/working-map-seed.json": "{\n  \"pairs\": [\n    [\n      \"user memory § A\",\n      \"user memory § B\"\n    ]\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "working-map-seed.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check working-map-seed.json: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/working-map-seed.json": "{\n  \"pairs\": {\n    \"user memory § A\": \"user memory § B\"\n  }\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "working-map-seed.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "key 'pairs': expected list"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/working-map-seed.json": "{\n  \"records\": []\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "working-map-seed.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "missing key 'pairs'"
+      ]
+    }
+  ]
+}

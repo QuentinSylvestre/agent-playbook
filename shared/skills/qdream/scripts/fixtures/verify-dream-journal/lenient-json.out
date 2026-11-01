@@ -1,0 +1,5 @@
+FAIL: line 1: JSON parse error on interior line
+FAIL: line 2: JSON parse error on interior line
+FAIL: line 3: JSON parse error on interior line
+ok: line 4: valid remove record
+verify-dream-journal: ok=1 fail=3 warn=0

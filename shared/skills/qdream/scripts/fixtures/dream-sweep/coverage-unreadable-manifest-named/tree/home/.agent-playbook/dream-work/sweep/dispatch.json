@@ -1,0 +1,75 @@
+{
+  "snapshot_at": "2026-10-12T12:00:00Z",
+  "chunk_bytes": 450000,
+  "confirmed": [
+    "{ROOT}/proj/alpha",
+    "{ROOT}/proj/beta",
+    "{ROOT}/proj/gamma",
+    "{ROOT}/proj/delta",
+    "{ROOT}/proj/q"
+  ],
+  "agents": [
+    {
+      "label": "A01",
+      "project": "{ROOT}/proj/alpha",
+      "scope": "all tasks",
+      "part": "1/1",
+      "memory_file": "{ROOT}/proj/alpha/memory/MEMORY.md",
+      "sessions": [
+        "s1",
+        "s2"
+      ],
+      "bytes": 0,
+      "plans_task": true
+    },
+    {
+      "label": "A02",
+      "project": "{ROOT}/proj/beta",
+      "scope": "all tasks",
+      "part": "1/1",
+      "memory_file": "{ROOT}/proj/beta/memory/MEMORY.md",
+      "sessions": [
+        "b1"
+      ],
+      "bytes": 0,
+      "plans_task": true
+    },
+    {
+      "label": "A03",
+      "project": "{ROOT}/proj/gamma",
+      "scope": "all tasks",
+      "part": "1/1",
+      "memory_file": "{ROOT}/proj/gamma/memory/MEMORY.md",
+      "sessions": [
+        "g1"
+      ],
+      "bytes": 0,
+      "plans_task": true
+    },
+    {
+      "label": "A04",
+      "project": "{ROOT}/proj/delta",
+      "scope": "all tasks",
+      "part": "1/1",
+      "memory_file": "{ROOT}/proj/delta/memory/MEMORY.md",
+      "sessions": [
+        "d1"
+      ],
+      "bytes": 0,
+      "plans_task": true
+    },
+    {
+      "label": "A05",
+      "project": "{ROOT}/proj/q",
+      "scope": "Tasks 4-5 only",
+      "part": "1/1",
+      "memory_file": "{ROOT}/proj/q/memory/MEMORY.md",
+      "sessions": [],
+      "bytes": 0,
+      "plans_task": true
+    }
+  ],
+  "quiet": [],
+  "not_dispatched": [],
+  "harvest": []
+}

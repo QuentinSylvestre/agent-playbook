@@ -1,0 +1,8 @@
+{
+  "description": "S8: every git command the script runs in a repository carries --no-optional-locks (status, rev-parse, config, ls-files, check-ignore, log), so a read never refreshes a project repository's index.",
+  "now": "2026-10-12T12:00:00Z",
+  "units": [
+    "git-read-locks"
+  ],
+  "steps": []
+}

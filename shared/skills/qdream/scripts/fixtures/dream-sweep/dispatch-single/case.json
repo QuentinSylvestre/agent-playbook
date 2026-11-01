@@ -1,0 +1,127 @@
+{
+  "description": "One confirmed project with two sessions under the chunk budget gets one `all tasks` agent A01 with both sessions in manifest order and its state baseline; the unconfirmed project gets nothing. A re-run is a no-op; a re-run on a changed orient.json is exit 3 (dispatch.json is create-once). With --snapshot-sha the snapshot is bound (another sha is exit 3); without it the summary says it is not bound (G2).",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/memory/.dream-state.json": "{\n  \"schema_version\": 3,\n  \"last_run\": \"2026-10-01T00:00:00Z\",\n  \"projects\": {\n    \"{ROOT}/proj/alpha\": {\n      \"last_analyzed\": \"2026-10-03T04:05:06Z\"\n    }\n  },\n  \"rejected_lessons\": [],\n  \"outcome_tags\": [],\n  \"episodic_ledger\": [],\n  \"cost_records\": [],\n  \"model_routing\": {},\n  \"deferred_sessions\": {},\n  \"quiet_sweeps\": {}\n}\n"
+  },
+  "git": [
+    "repo"
+  ],
+  "steps": [
+    {
+      "argv": [
+        "dispatch",
+        "--confirmed",
+        "orient.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "dispatch: 1 agent(s): all tasks 1",
+        "snapshot not bound"
+      ],
+      "files": {
+        "sweep/dispatch.json": {
+          "confirmed": [
+            "{ROOT}/proj/alpha"
+          ],
+          "agents": [
+            {
+              "label": "A01",
+              "project": "{ROOT}/proj/alpha",
+              "scope": "all tasks",
+              "part": "1/1",
+              "sessions": [
+                "s-a1",
+                "s-a2"
+              ],
+              "bytes": 2000,
+              "plans_task": true
+            }
+          ],
+          "quiet": []
+        },
+        "sweep/agents/A01/input.json": {
+          "baseline": "2026-10-03T04:05:06Z",
+          "scope": "all tasks",
+          "memory_file": "{ROOT}/proj/alpha/memory/MEMORY.md",
+          "sessions": [
+            {
+              "id": "s-a1",
+              "stripped": "{ROOT}/home/.agent-playbook/dream-work/sessions/claude-s-a1.txt"
+            },
+            {
+              "id": "s-a2",
+              "stripped": "{ROOT}/home/.agent-playbook/dream-work/sessions/claude-s-a2.txt"
+            }
+          ],
+          "entry_flags": [
+            {
+              "heading": "Alpha one",
+              "ordinal": 1,
+              "flags": []
+            }
+          ]
+        }
+      },
+      "absent": [
+        "sweep/agents/A02"
+      ]
+    },
+    {
+      "argv": [
+        "dispatch",
+        "--confirmed",
+        "orient.json"
+      ],
+      "exit": 0,
+      "unchanged": true,
+      "stdout_contains": [
+        "harvest by the Gather agent: "
+      ]
+    },
+    {
+      "argv": [
+        "dispatch",
+        "--confirmed",
+        "orient.json",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "exit": 0,
+      "unchanged": true,
+      "stdout_not_contains": [
+        "not bound"
+      ]
+    },
+    {
+      "argv": [
+        "dispatch",
+        "--confirmed",
+        "orient.json",
+        "--snapshot-sha",
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ],
+      "exit": 3,
+      "unchanged": true,
+      "stdout_contains": [
+        "the snapshot changed after Orient"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/orient.json": "{\n  \"snapshot_at\": \"2026-10-12T12:00:00Z\",\n  \"since\": \"2026-10-01T00:00:00Z\",\n  \"confirmed\": [\n    \"{ROOT}/proj/alpha\",\n    \"{ROOT}/proj/beta\"\n  ],\n  \"model_routing\": {\n    \"task4\": \"model-a\",\n    \"verifier\": \"model-a\"\n  },\n  \"dirty_at_orient\": true,\n  \"repos\": [],\n  \"recover_lines\": [],\n  \"orchestrator_sessions\": []\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "dispatch",
+        "--confirmed",
+        "orient.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "already exists with different content"
+      ]
+    }
+  ]
+}

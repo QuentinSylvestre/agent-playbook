@@ -1,0 +1,25 @@
+{
+  "description": "F16: brief --kind verifier prints how many dispatched labels have no return, and which, and records them in verifier-index.json.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "verifier"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "1 return(s) missing: A03"
+      ],
+      "files": {
+        "sweep/briefs/verifier-index.json": {
+          "returns_missing": 1,
+          "returns_missing_labels": [
+            "A03"
+          ]
+        }
+      }
+    }
+  ]
+}

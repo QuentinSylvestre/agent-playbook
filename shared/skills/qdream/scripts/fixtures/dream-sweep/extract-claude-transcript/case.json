@@ -1,0 +1,92 @@
+{
+  "description": "--claude-agent reads the child's transcript under the session's subagents/: the SubagentHandback input.message (stop_reason null), else a final end_turn text; the JSON is the last fenced block or the whole text. A text that stopped for a tool call is no final message (exit 3). The return's content is never printed.",
+  "now": "2026-10-12T12:00:00Z",
+  "env": {
+    "CLAUDE_CODE_SESSION_ID": "5e550000-0000-4000-8000-000000000001"
+  },
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--claude-agent",
+        "a1111111111111111"
+      ],
+      "exit": 0,
+      "stdout_not_contains": [
+        "SENTINEL-RET-5K"
+      ],
+      "files": {
+        "sweep/returns/A01.json": {
+          "label": "A01",
+          "via": "claude-transcript:handback",
+          "agent_id": "a1111111111111111",
+          "session_id": "5e550000-0000-4000-8000-000000000001",
+          "return": {
+            "error": null,
+            "notes": null,
+            "sessions_unreadable": [],
+            "task4_status": "checked",
+            "unrelated": [
+              "Alpha one"
+            ],
+            "sessions_read": [
+              "s-a1"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--claude-agent",
+        "a1111111111111111"
+      ],
+      "exit": 0,
+      "unchanged": true
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A02",
+        "--claude-agent",
+        "a2222222222222222"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/returns/A02.json": {
+          "via": "claude-transcript:text"
+        }
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A03",
+        "--claude-agent",
+        "a3333333333333333"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no final message"
+      ],
+      "absent": [
+        "sweep/returns/A03.json"
+      ]
+    }
+  ]
+}

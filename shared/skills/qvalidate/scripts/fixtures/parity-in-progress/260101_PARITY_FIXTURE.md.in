@@ -1,0 +1,29 @@
+# Parity Fixture
+
+> **Status**: In Progress
+
+## Intent
+
+### Success criteria
+
+- SC-1: first criterion
+- SC-2: second criterion
+
+### Scope
+
+boundary line
+
+## Phases
+
+### Phase 1: Alpha [P:2]
+
+**Covers**: SC-1
+
+- [x] done one
+- [ ] not done yet
+
+### Phase 2: Beta [P:1]
+
+**Covers**: SC-2
+
+- [x] done two

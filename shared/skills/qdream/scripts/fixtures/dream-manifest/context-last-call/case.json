@@ -1,0 +1,23 @@
+{
+  "description": "plan 261027 SC-2: `context --session` reports the last model call of the session file itself (msg_A, the largest of its two message iterations: 502, not the top-level 1003 or the advisor's 700), never a sub-agent's; --limit 501 is exceeded, so `over limit: yes`.",
+  "now": "2026-10-27T12:00:00Z",
+  "argv": [
+    "context",
+    "--session",
+    "{ROOT}/home/.claude/projects/-ROOT-proj/b5a00000-0000-4000-8000-000000000031.jsonl",
+    "--limit",
+    "501"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_contains": [
+      "context: 502 tokens at the last model call (2026-10-27T10:00:02Z)\n",
+      "over limit: yes (limit 501)\n"
+    ],
+    "stdout_not_contains": [
+      "1003",
+      "700 tokens",
+      "90 tokens"
+    ]
+  }
+}

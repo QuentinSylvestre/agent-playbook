@@ -1,0 +1,37 @@
+{
+  "description": "A header `> **Memory relied on**: none` (written by /qclose when no session recorded any) gives memory_relied_on [] -- known to be empty, distinct from an absent line; `None` in any case, with a trailing `.` or in backticks, reads the same.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "counts": {
+            "new_plans": 2
+          },
+          "plans": {
+            "new_plans": [
+              {
+                "file": "260923-0900_NONE_PLAN.md",
+                "memory_relied_on": [],
+                "memory_relied_on_truncated": false
+              },
+              {
+                "file": "260923-1000_NONE_CAPS_PLAN.md",
+                "memory_relied_on": [],
+                "memory_relied_on_truncated": false
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

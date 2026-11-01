@@ -1,0 +1,13 @@
+{
+  "description": "A project memory path that cannot be read (a directory): that tier gets a notice, the rest still loads.",
+  "cwd": "{{ROOT}}/proj",
+  "contains": [
+    "/stores/proj-iiiiii/memory/MEMORY.md): could not be read",
+    "- User entry one"
+  ],
+  "absent": [
+    "delivered in full"
+  ],
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores"
+}

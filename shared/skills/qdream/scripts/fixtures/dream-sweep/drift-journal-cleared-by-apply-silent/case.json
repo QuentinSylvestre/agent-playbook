@@ -1,0 +1,44 @@
+{
+  "description": "A journal `state apply` cleared, and a state file it rewrote, match their last recorded sha in hashes.json: no finding, exit 0.",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/.gitignore": "memory/.dream-journal.jsonl\n",
+    "repo/memory/MEMORY.md": "# Memory\n",
+    "repo/memory/.dream-state.json": "{\"state\": \"orient\"}\n",
+    "repo/memory/.dream-journal.jsonl": "{\"rename\":[\"user memory § A\",\"user memory § B\"]}\n"
+  },
+  "git": [
+    "repo"
+  ],
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0
+    },
+    {
+      "write": {
+        "repo/memory/.dream-journal.jsonl": "",
+        "repo/memory/.dream-state.json": "{\"state\": \"applied\"}\n",
+        "home/.agent-playbook/dream-work/sweep/hashes.json": "{\n  \"version\": 1,\n  \"files\": {\n    \"{ROOT}/repo/memory/.dream-journal.jsonl\": {\n      \"sha256\": \"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855\",\n      \"kind\": \"journal\",\n      \"by\": \"state apply\",\n      \"at\": \"2026-10-12T12:30:00Z\",\n      \"foreign_edit\": false\n    },\n    \"{ROOT}/repo/memory/.dream-state.json\": {\n      \"sha256\": \"7d1976af52f320cfecef034232fae68363e9787ea95ad47c6c417eba16aa87f2\",\n      \"kind\": \"state\",\n      \"by\": \"state apply\",\n      \"at\": \"2026-10-12T12:30:00Z\",\n      \"foreign_edit\": false\n    }\n  }\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "apply"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/drift-apply.json": {
+          "incident": false,
+          "entries": []
+        }
+      }
+    }
+  ]
+}

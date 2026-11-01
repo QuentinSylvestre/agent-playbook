@@ -1,0 +1,60 @@
+{
+  "description": "Recency comes from per-record timestamps: a session whose file mtime is recent but whose records are all older than last_analyzed is not selected; a session with an old mtime and a newer genuine record is, with its boundary at that record; the running sweep's own session (--exclude-session) is never listed. The work folder and its sessions/ directory are created 0700 and every file in them 0600.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo",
+    "--exclude-session",
+    "c1a00000-0000-4000-8000-00000000000f"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "status": "known",
+          "sessions": [
+            {
+              "id": "c1a00000-0000-4000-8000-000000000002",
+              "provider": "claude",
+              "kind": "normal",
+              "boundary": "L4"
+            }
+          ]
+        }
+      }
+    },
+    "stripped": {
+      "c1a00000-0000-4000-8000-000000000002": {
+        "order": [
+          "L2 [user] earlier question about the cache layer",
+          "=== NEW TURNS BEGIN ===",
+          "L4 [user] no, use the per-record timestamps instead",
+          "L5 [assistant] Switched to per-record timestamps."
+        ],
+        "not_contains": [
+          "PRIVATE THINKING BLOCK",
+          "TOOL INPUT LS",
+          "queue-operation"
+        ]
+      }
+    },
+    "stdout_contains": [
+      "project {ROOT}/proj/alpha: status=known new=1"
+    ],
+    "modes": {
+      "home/.agent-playbook": "0o700",
+      "home/.agent-playbook/dream-work": "0o700",
+      "home/.agent-playbook/dream-work/sessions": "0o700",
+      "home/.agent-playbook/dream-work/manifest.json": "0o600",
+      "home/.agent-playbook/dream-work/sessions/*.txt": "0o600"
+    }
+  },
+  "mtimes": {
+    "home/.claude/projects/-ROOT-proj-alpha/c1a00000-0000-4000-8000-000000000001.jsonl": "2026-09-24T11:00:00Z",
+    "home/.claude/projects/-ROOT-proj-alpha/c1a00000-0000-4000-8000-000000000002.jsonl": "2026-09-10T00:00:00Z"
+  }
+}

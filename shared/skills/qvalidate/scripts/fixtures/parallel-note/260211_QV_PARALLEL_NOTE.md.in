@@ -1,0 +1,42 @@
+# QV fixture: a [P:N] tag carrying extra text (decision 5)
+
+> **Status**: In Progress — phase 1 under way <!-- lifecycle: Exploring -> Draft -> In Progress -> Complete -->
+
+## Intent
+
+### Success criteria
+
+- SC-1: the first criterion
+- SC-2: the second criterion
+
+### Scope
+
+boundary line
+
+## Phases
+
+### Phase 1: Alpha [P:3 note]
+
+**Covers**: SC-1
+
+- [x] a
+
+### Phase 2: Beta [P:3 note]
+
+**Covers**: SC-2
+
+- [x] b
+
+### Phase 3: Gamma
+
+- [ ] c
+
+## 8) Documentation Updates
+
+| Document | Change | Phase |
+|---|---|---|
+| `done.md` | updated | 1 |
+
+## Harness Improvement Opportunities
+
+- none observed — cost: none — suggested change: none

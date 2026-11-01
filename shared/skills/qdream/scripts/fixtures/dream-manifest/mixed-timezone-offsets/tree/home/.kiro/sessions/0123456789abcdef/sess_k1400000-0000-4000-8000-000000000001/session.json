@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0.0",
+  "dataModelVersion": 1,
+  "id": "sess_k1400000-0000-4000-8000-000000000001",
+  "title": "fixture",
+  "agentMode": "kiro_default",
+  "workspacePaths": [
+    "{ROOT}/proj/alpha"
+  ],
+  "createdAt": "2026-09-22T09:00:00+05:00",
+  "lastModifiedAt": "2026-09-22T09:00:00+05:00",
+  "modelId": "fixture-model",
+  "status": "idle"
+}

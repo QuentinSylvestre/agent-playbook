@@ -1,0 +1,32 @@
+{
+  "description": "plan 261016 Phase 10, the other side of store-repo-unreadable: with a readable store repo that holds no store for it, a path-keyed state project whose folder exists but holds no marker (no AGENTS.md, no memory/MEMORY.md) and has no live discovery (no session, no Method A/B/C hit) is removed, as before Phase 10; no store repo error is reported.",
+  "now": "2026-09-24T12:00:00Z",
+  "store_repo": "stores",
+  "git": [
+    "proj/a"
+  ],
+  "git_origin": {
+    "proj/a": "https://example.com/Org/Proj.git"
+  },
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/a": {
+          "status": "removed",
+          "memory_file": null
+        }
+      }
+    },
+    "json_not_contains": [
+      "store repo unreadable:"
+    ]
+  }
+}

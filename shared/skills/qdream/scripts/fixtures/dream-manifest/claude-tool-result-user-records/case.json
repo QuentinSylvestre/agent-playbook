@@ -1,0 +1,38 @@
+{
+  "description": "A type:user record holding only tool_result blocks is not user speech: it neither makes a session new nor appears in the stripped text.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "sessions": [
+            {
+              "id": "c3a00000-0000-4000-8000-000000000002",
+              "boundary": "L1"
+            }
+          ]
+        }
+      }
+    },
+    "stripped": {
+      "c3a00000-0000-4000-8000-000000000002": {
+        "contains": [
+          "L1 [user] check the build output",
+          "L3 [assistant] The build is clean."
+        ],
+        "not_contains": [
+          "BUILD OUTPUT",
+          "L2 ["
+        ]
+      }
+    }
+  }
+}

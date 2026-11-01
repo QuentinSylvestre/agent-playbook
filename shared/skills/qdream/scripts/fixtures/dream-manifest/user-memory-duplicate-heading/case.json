@@ -1,0 +1,25 @@
+{
+  "description": "A heading in both memory/MEMORY.md and a topic file (a user-tier Move interrupted between its two writes) is a file-level error naming both files (memory-rules.md § Session-start memory context budget).",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "errors": [
+        "$contains:duplicate heading across user-memory files: 'Keep answers short'"
+      ],
+      "user_memory": {
+        "files": [
+          "{ROOT}/repo/memory/MEMORY.md",
+          "{ROOT}/repo/memory/topics/authoring.md"
+        ]
+      }
+    }
+  }
+}

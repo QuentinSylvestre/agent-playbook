@@ -1,0 +1,429 @@
+{
+  "description": "--kind drafter with the repository context (Phase 6 review F1, F2, E1, E7, E8): each blast edit's path must be a .md file with no memory, .git or '..' component, inside the config repository or a manifest project root, and the proposal's target_file or a hit of its blast output (D01 and D07 accepted; D02 the memory hit the blast output lists, D03 its tsv-row hit, D04 a .md that is no hit, D05 an absolute path outside, D06 '..', D15 a `Memory` component, all refused). An after_heading with a trailing newline (D08), a numeric notes (D09) or handoff_prompt (D12), an after_heading beside a set current_text on the proposal (D10) or a blast edit (D13) and a blank behaviour (D11) are refused; a null current_text with an after_heading on the target_file is accepted (D14); a .git component (D16), a drive-relative path (D17) and a hit-listed .md that the manifest user-memory list names (D18) are refused.",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/shared/skills/demo/SKILL.md": "# Demo\n\n## Target Section\n\nSee `shared/skills/demo/SKILL.md § Target Section` for the rule.\n",
+    "repo/shared/AGENTS.md": "# Shared\n\nCite § Target Section here.\nNothing on this line.\n",
+    "repo/providers/kiro/skills/demo/OVERLAY.md": "# Overlay\n\nPer `shared/skills/demo/SKILL.md § Target Section`.\n",
+    "repo/shared/skills/qconfig-sync/scripts/citation-checks.tsv": "# a comment naming shared/skills/demo/SKILL.md\nTarget Section\tTarget Section\tshared/skills/demo/SKILL.md\tshared/AGENTS.md\nOther\tOther\tshared/x.md\n",
+    "repo/memory/MEMORY.md": "# Memory\n\nmentions § Target Section\n",
+    "repo/notes/outside.md": "§ Target Section outside the scanned roots\n"
+  },
+  "git": [
+    "repo"
+  ],
+  "setup": [
+    {
+      "write": {
+        "repo/shared/untracked.md": "§ Target Section, untracked\n"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "argv": [
+        "blast",
+        "--file",
+        "shared/skills/demo/SKILL.md",
+        "--heading",
+        "## Target Section"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "blast: 6 hit(s)"
+      ],
+      "present": [
+        "sweep/blast/shared-skills-demo-SKILL-md-Target-Section-ff779e3f.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D01",
+        "--from-file",
+        "inbox/D01.txt"
+      ],
+      "exit": 0,
+      "present": [
+        "sweep/drafts/D01.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D02",
+        "--from-file",
+        "inbox/D02.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "has a memory component"
+      ],
+      "absent": [
+        "sweep/drafts/D02.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D03",
+        "--from-file",
+        "inbox/D03.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not a .md file"
+      ],
+      "absent": [
+        "sweep/drafts/D03.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D04",
+        "--from-file",
+        "inbox/D04.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "neither a hit of this proposal's blast output nor its target_file"
+      ],
+      "absent": [
+        "sweep/drafts/D04.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D05",
+        "--from-file",
+        "inbox/D05.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "outside the config repository and the manifest's project roots"
+      ],
+      "absent": [
+        "sweep/drafts/D05.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D06",
+        "--from-file",
+        "inbox/D06.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "has a '..' component"
+      ],
+      "absent": [
+        "sweep/drafts/D06.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D07",
+        "--from-file",
+        "inbox/D07.txt"
+      ],
+      "exit": 0,
+      "present": [
+        "sweep/drafts/D07.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D08",
+        "--from-file",
+        "inbox/D08.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "after_heading must be one Markdown heading line"
+      ],
+      "absent": [
+        "sweep/drafts/D08.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D09",
+        "--from-file",
+        "inbox/D09.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "notes must be null or a string"
+      ],
+      "absent": [
+        "sweep/drafts/D09.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D10",
+        "--from-file",
+        "inbox/D10.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "after_heading must be null when current_text is set"
+      ],
+      "absent": [
+        "sweep/drafts/D10.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D11",
+        "--from-file",
+        "inbox/D11.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "behaviour must not be blank"
+      ],
+      "absent": [
+        "sweep/drafts/D11.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D12",
+        "--from-file",
+        "inbox/D12.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "handoff_prompt must be null or a string"
+      ],
+      "absent": [
+        "sweep/drafts/D12.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D13",
+        "--from-file",
+        "inbox/D13.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "blast_edits[0]: after_heading must be null when current_text is set"
+      ],
+      "absent": [
+        "sweep/drafts/D13.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D14",
+        "--from-file",
+        "inbox/D14.txt"
+      ],
+      "exit": 0,
+      "present": [
+        "sweep/drafts/D14.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D15",
+        "--from-file",
+        "inbox/D15.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "has a memory component"
+      ],
+      "absent": [
+        "sweep/drafts/D15.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D16",
+        "--from-file",
+        "inbox/D16.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "has a .git component"
+      ],
+      "absent": [
+        "sweep/drafts/D16.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D17",
+        "--from-file",
+        "inbox/D17.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "neither absolute nor relative"
+      ],
+      "absent": [
+        "sweep/drafts/D17.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D18",
+        "--from-file",
+        "inbox/D18.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is a memory file"
+      ],
+      "absent": [
+        "sweep/drafts/D18.json"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"{ROOT}/proj/alpha/AGENTS.md\",\n      \"heading\": \"## Target Section\",\n      \"proposal\": \"p\",\n      \"blast\": null,\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 0
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"## Target Section\",\n      \"proposal\": \"p\",\n      \"blast\": \"sweep/blast/shared-skills-demo-SKILL-md-Target-Section-ff779e3f.json\",\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 0
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"memory/MEMORY.md\",\n      \"heading\": \"## Target Section\",\n      \"proposal\": \"p\",\n      \"blast\": null,\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "target_file has a memory component"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"scripts/dream-write.py\",\n      \"heading\": \"## Target Section\",\n      \"proposal\": \"p\",\n      \"blast\": null,\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "target_file is not a .md file"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"{ROOT}/elsewhere/AGENTS.md\",\n      \"heading\": \"## Target Section\",\n      \"proposal\": \"p\",\n      \"blast\": null,\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "target_file is outside the config repository"
+      ]
+    }
+  ]
+}

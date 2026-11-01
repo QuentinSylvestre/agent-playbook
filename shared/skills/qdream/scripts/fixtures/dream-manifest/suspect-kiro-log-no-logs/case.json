@@ -1,0 +1,51 @@
+{
+  "description": "Plan 261009 Phase 2: with no ~/.kiro/logs folder (the home holds only ~/.kiro/README.txt) the kiro-cli version is unknown and the condition is stale_when_unknown (informational: not fired, not a suspect); the read fails open and adds nothing to errors[]. A claude-code control entry fires, which shows the manifest ran.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "git": [
+    "repo"
+  ],
+  "mtimes": {
+    "home/.claude/projects/-ROOT-proj-alpha/c1a00000-0000-4000-8000-0000000000a1.jsonl": "2026-09-20T09:00:00Z"
+  },
+  "expect": {
+    "exit": 0,
+    "index": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "memory_flags": [
+            "stale_when_fired",
+            "stale_when_unknown"
+          ],
+          "memory_pass": "flagged"
+        }
+      }
+    },
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "entries": [
+            {
+              "heading": "Claude control fires",
+              "stale_when_fired": true,
+              "stale_when_unknown": false,
+              "suspect": true
+            },
+            {
+              "heading": "Kiro version stays unknown",
+              "stale_when_fired": false,
+              "stale_when_unknown": true,
+              "suspect": false
+            }
+          ]
+        }
+      }
+    }
+  }
+}

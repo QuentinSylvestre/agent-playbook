@@ -1,0 +1,52 @@
+{
+  "description": "The ancestry rule applies only to a project the sweep behind the state commit stamped (its last_analyzed equals last_run). The config repo (its own plans/, plan 261016 Q11) was not stamped (last_analyzed 2026-09-10): a plan archived after that and already in the state commit is still new by the time rule; one archived before it is not. The stamped side is plans-ancestry-not-clock.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/repo": {
+          "plans": {
+            "new_plans": [
+              {
+                "file": "260914-1000_ALPHA_UNCOVERED.md",
+                "title": "Alpha Uncovered"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "git_steps": [
+    {
+      "dir": "repo",
+      "date": "2026-09-05T10:00:00Z",
+      "paths": [
+        "AGENTS.md",
+        "plans/done/260904-1000_ALPHA_BEFORE.md"
+      ]
+    },
+    {
+      "dir": "repo",
+      "date": "2026-09-15T10:00:00Z",
+      "paths": [
+        "plans/done/260914-1000_ALPHA_UNCOVERED.md"
+      ]
+    },
+    {
+      "dir": "repo",
+      "date": "2026-09-22T06:00:00Z",
+      "paths": [
+        "memory/.dream-state.json"
+      ]
+    }
+  ]
+}

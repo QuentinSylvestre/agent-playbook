@@ -1,0 +1,23 @@
+{
+  "description": "--until <record uuid> sums the session file up to and including that record (msg_A once; msg_B at its value on line 5, its larger repeat on line 8 and msg_C are after the cutoff) plus the sub-agent transcript starting exactly at the cutoff record's time; the one starting later is left out. Without --until the sum is 5025.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "baseline",
+    "--session",
+    "{ROOT}/home/.claude/projects/-ROOT-proj/b5a00000-0000-4000-8000-000000000002.jsonl",
+    "--until",
+    "11111111-0000-4000-8000-000000000005"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_contains": [
+      "files: 1 session + 1 sub-agent transcript(s)",
+      "1 started after the cutoff, 0 undated (of 2)",
+      "input_tokens=35 output_tokens=761 cache_creation_input_tokens=0 cache_read_input_tokens=1301",
+      "tokens: 2097",
+      "model claude-opus-5-5: 1661",
+      "model claude-sonnet-5: 436",
+      "agents: 1"
+    ]
+  }
+}

@@ -1,0 +1,12 @@
+# Topic memory — improvement signals
+
+> Fixture signal file.
+
+## Pattern
+
+### [improvement_signal] Fixture governance gap
+
+**Target**: `shared/AGENTS.md`
+**Why**: the observed friction.
+**Frequency**: 1 (below threshold) | **Sessions**: in-session 2026-10-01, fixture | **Last observed**: 2026-10-01
+**Evidence-quote**: "we hit this yesterday"

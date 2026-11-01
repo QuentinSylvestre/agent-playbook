@@ -1,0 +1,20 @@
+{
+  "description": "--until naming a uuid no record of the session carries is a usage error, never a silent full sum.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "baseline",
+    "--session",
+    "{ROOT}/home/.claude/projects/-ROOT-proj/b5a00000-0000-4000-8000-000000000002.jsonl",
+    "--until",
+    "11111111-0000-4000-8000-00000000dead"
+  ],
+  "expect": {
+    "exit": 2,
+    "stderr_contains": [
+      "no record with that uuid"
+    ],
+    "stdout_not_contains": [
+      "tokens:"
+    ]
+  }
+}

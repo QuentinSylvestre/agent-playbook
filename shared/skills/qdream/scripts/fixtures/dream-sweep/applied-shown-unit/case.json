@@ -1,0 +1,10 @@
+{
+  "description": "Review R15 (plan 261027): applied_shown reports each Applied text of a decisions item that is not in its gate.md block: a new file, a located current text, a new section, the new text and each blast edit's new text.",
+  "now": "2026-10-23T12:00:00Z",
+  "write": {
+    "repo/.gitkeep": ""
+  },
+  "units": [
+    "applied-shown"
+  ]
+}

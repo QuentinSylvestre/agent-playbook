@@ -1,0 +1,491 @@
+{
+  "description": "Every subcommand runs against a scratch work folder built by dream-manifest.py, twice: no run writes outside <work>/sweep/ (each step's snapshot), the second run of each is a no-op or the same output (unchanged), and the final tree of sweep/ is exactly the expected file list. brief --kind phase (with the bound --snapshot-sha) and --kind drafter run against fixture templates (skill/; the live phase template is checked by brief-render-live and brief-phase-binding): a phase re-render is a new attempt file, never an overwrite, and a --resume-from that is no step id is a usage error (F14); a drafter re-render and guard --rebaseline re-run are no-ops (F21).",
+  "now": "2026-10-12T12:00:00Z",
+  "git": [
+    "repo"
+  ],
+  "write": {
+    "repo/memory/.dream-state.json": "{\n  \"schema_version\": 3,\n  \"last_run\": \"2026-10-01T00:00:00Z\",\n  \"projects\": {\n    \"{ROOT}/proj/p1\": {\n      \"last_analyzed\": \"2026-10-01T00:00:00Z\"\n    }\n  },\n  \"rejected_lessons\": [],\n  \"outcome_tags\": [],\n  \"episodic_ledger\": [],\n  \"cost_records\": [],\n  \"model_routing\": {},\n  \"deferred_sessions\": {},\n  \"quiet_sweeps\": {}\n}\n"
+  },
+  "manifest": [
+    "--exclude-session",
+    "5e550000-0000-4000-8000-000000000001"
+  ],
+  "after_manifest": [
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/orient.json": "{\n  \"snapshot_at\": \"2026-10-12T12:00:00Z\",\n  \"since\": \"2026-10-01T00:00:00Z\",\n  \"confirmed\": [\n    \"{ROOT}/proj/p1\"\n  ],\n  \"model_routing\": {\n    \"task4\": \"model-a\",\n    \"verifier\": \"model-a\"\n  },\n  \"dirty_at_orient\": true,\n  \"repos\": [],\n  \"recover_lines\": [],\n  \"orchestrator_sessions\": []\n}\n",
+        "home/.claude/projects/-ROOT-proj-p1/5e550000-0000-4000-8000-000000000001/subagents/agent-a1111111111111111.jsonl": "{\"parentUuid\": null, \"isSidechain\": true, \"type\": \"user\", \"message\": {\"role\": \"user\", \"content\": \"Dream Sub-agent Brief A01. Read and follow {ROOT}/home/.agent-playbook/dream-work/sweep/briefs/A01.md.\"}, \"uuid\": \"u-1\", \"sessionId\": \"5e550000-0000-4000-8000-000000000001\", \"timestamp\": \"2026-10-12T11:00:00.000Z\"}\n{\"type\": \"assistant\", \"message\": {\"id\": \"msg_1\", \"role\": \"assistant\", \"content\": [{\"type\": \"thinking\", \"thinking\": \"considering\", \"signature\": \"x\"}], \"stop_reason\": \"tool_use\"}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n{\"type\": \"assistant\", \"message\": {\"id\": \"msg_1\", \"role\": \"assistant\", \"content\": [{\"type\": \"tool_use\", \"id\": \"t0\", \"name\": \"Read\", \"input\": {\"file_path\": \"x\"}}], \"stop_reason\": \"tool_use\"}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n{\"type\": \"user\", \"message\": {\"role\": \"user\", \"content\": [{\"type\": \"tool_result\", \"tool_use_id\": \"t0\", \"content\": \"file text\"}]}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n{\"type\": \"assistant\", \"message\": {\"id\": \"msg_2\", \"role\": \"assistant\", \"content\": [{\"type\": \"tool_use\", \"id\": \"t1\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"Done. Summary line.\\n\\n```json\\n{\\n  \\\"memory_proposals\\\": [\\n    {\\n      \\\"type\\\": \\\"feedback\\\",\\n      \\\"heading\\\": \\\"A fresh lesson\\\",\\n      \\\"why\\\": \\\"w\\\",\\n      \\\"how_to_apply\\\": \\\"h\\\",\\n      \\\"source\\\": \\\"s\\\",\\n      \\\"target\\\": \\\"project\\\",\\n      \\\"sessions_observed_in\\\": [],\\n      \\\"evidence_quote\\\": \\\"question 0 about p1\\\"\\n    }\\n  ],\\n  \\\"unrelated\\\": [\\n    \\\"P1 lesson A\\\",\\n    \\\"P1 lesson B\\\"\\n  ],\\n  \\\"not_a_conflict\\\": [],\\n  \\\"subsumed_entries\\\": [],\\n  \\\"stale_entries\\\": [],\\n  \\\"governance_conflicts\\\": [],\\n  \\\"verified\\\": [],\\n  \\\"task4_status\\\": \\\"checked\\\",\\n  \\\"improvement_signals\\\": [],\\n  \\\"user_skipped\\\": [],\\n  \\\"saved_in_session\\\": [],\\n  \\\"new_skill_candidates\\\": [],\\n  \\\"insights_signals\\\": [],\\n  \\\"sessions_read\\\": [\\n    \\\"c1f00000-0000-4000-8000-000000000001\\\"\\n  ],\\n  \\\"checkpoint_collapsed\\\": 0,\\n  \\\"project_accessible\\\": true,\\n  \\\"error\\\": null,\\n  \\\"scope\\\": \\\"all tasks\\\",\\n  \\\"notes\\\": null,\\n  \\\"sessions_unreadable\\\": []\\n}\\n```\\n\"}}], \"stop_reason\": null}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n{\"type\": \"user\", \"message\": {\"role\": \"user\", \"content\": [{\"type\": \"tool_result\", \"tool_use_id\": \"t1\", \"content\": \"delivered\"}]}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n",
+        "home/.claude/projects/-ROOT-proj-p1/5e550000-0000-4000-8000-000000000001/subagents/agent-a2222222222222222.jsonl": "{\"parentUuid\": null, \"isSidechain\": true, \"type\": \"user\", \"message\": {\"role\": \"user\", \"content\": \"Dream Verifier Brief V01. Read and follow {ROOT}/home/.agent-playbook/dream-work/sweep/briefs/V01.md.\"}, \"uuid\": \"u-1\", \"sessionId\": \"5e550000-0000-4000-8000-000000000001\", \"timestamp\": \"2026-10-12T11:00:00.000Z\"}\n{\"type\": \"assistant\", \"message\": {\"id\": \"msg_1\", \"role\": \"assistant\", \"content\": [{\"type\": \"thinking\", \"thinking\": \"considering\", \"signature\": \"x\"}], \"stop_reason\": \"tool_use\"}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n{\"type\": \"assistant\", \"message\": {\"id\": \"msg_1\", \"role\": \"assistant\", \"content\": [{\"type\": \"tool_use\", \"id\": \"t0\", \"name\": \"Read\", \"input\": {\"file_path\": \"x\"}}], \"stop_reason\": \"tool_use\"}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n{\"type\": \"user\", \"message\": {\"role\": \"user\", \"content\": [{\"type\": \"tool_result\", \"tool_use_id\": \"t0\", \"content\": \"file text\"}]}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n{\"type\": \"assistant\", \"message\": {\"id\": \"msg_2\", \"role\": \"assistant\", \"content\": [{\"type\": \"tool_use\", \"id\": \"t1\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"Done. Summary line.\\n\\n```json\\n{\\n  \\\"verifier\\\": \\\"V01\\\",\\n  \\\"verdicts\\\": [\\n    {\\n      \\\"item_id\\\": \\\"V01-001\\\",\\n      \\\"verdict\\\": \\\"confirmed\\\",\\n      \\\"spot_checked\\\": true,\\n      \\\"citation\\\": \\\"question 0 about p1\\\"\\n    }\\n  ],\\n  \\\"unverified_item_ids\\\": [],\\n  \\\"notes\\\": null\\n}\\n```\\n\"}}], \"stop_reason\": null}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n{\"type\": \"user\", \"message\": {\"role\": \"user\", \"content\": [{\"type\": \"tool_result\", \"tool_use_id\": \"t1\", \"content\": \"delivered\"}]}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n"
+      }
+    }
+  ],
+  "env": {
+    "CLAUDE_CODE_SESSION_ID": "5e550000-0000-4000-8000-000000000001"
+  },
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "dispatch",
+        "--confirmed",
+        "orient.json"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "task4"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--claude-agent",
+        "a1111111111111111"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "countverify"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/countverify.json": {
+          "files": [
+            {
+              "project": "{ROOT}/proj/p1",
+              "task4_status": "checked"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "argv": [
+        "coverage"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/coverage.json": {
+          "projects": {
+            "{ROOT}/proj/p1": {
+              "stamp": true
+            }
+          }
+        }
+      }
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "verifier"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "verifier",
+        "--label",
+        "V01",
+        "--claude-agent",
+        "a2222222222222222"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "aggregate"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/synth.json": {
+          "counts": {
+            "confirmed": 1
+          }
+        }
+      }
+    },
+    {
+      "argv": [
+        "feeder"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "Usage from plans: 2 bumped, 0 unresolved, 0 dropped"
+      ]
+    },
+    {
+      "argv": [
+        "blast",
+        "--file",
+        "shared/skills/demo/SKILL.md",
+        "--heading",
+        "Target Section"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "gather"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/drift-gather.json": {
+          "incident": false,
+          "entries": []
+        }
+      }
+    },
+    {
+      "argv": [
+        "guard",
+        "--print"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "orient.json"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "wait",
+        "--labels",
+        "A01,V01"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0,
+      "unchanged": true
+    },
+    {
+      "argv": [
+        "dispatch",
+        "--confirmed",
+        "orient.json"
+      ],
+      "exit": 0,
+      "unchanged": true
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "task4"
+      ],
+      "exit": 0,
+      "unchanged": true
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--claude-agent",
+        "a1111111111111111"
+      ],
+      "exit": 0,
+      "unchanged": true
+    },
+    {
+      "argv": [
+        "countverify"
+      ],
+      "exit": 0,
+      "unchanged": true
+    },
+    {
+      "argv": [
+        "coverage"
+      ],
+      "exit": 0,
+      "unchanged": true
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "verifier"
+      ],
+      "exit": 0,
+      "unchanged": true
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "verifier",
+        "--label",
+        "V01",
+        "--claude-agent",
+        "a2222222222222222"
+      ],
+      "exit": 0,
+      "unchanged": true
+    },
+    {
+      "argv": [
+        "aggregate"
+      ],
+      "exit": 0,
+      "unchanged": true
+    },
+    {
+      "argv": [
+        "feeder"
+      ],
+      "exit": 0,
+      "unchanged": true
+    },
+    {
+      "argv": [
+        "blast",
+        "--file",
+        "shared/skills/demo/SKILL.md",
+        "--heading",
+        "Target Section"
+      ],
+      "exit": 0,
+      "unchanged": true
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "gather"
+      ],
+      "exit": 0,
+      "unchanged": true
+    },
+    {
+      "argv": [
+        "guard",
+        "--print"
+      ],
+      "exit": 0,
+      "unchanged": true
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "orient.json"
+      ],
+      "exit": 0,
+      "unchanged": true
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "phase",
+        "--phase",
+        "gather",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "skill_dir": "skill",
+      "exit": 0,
+      "stdout_contains": [
+        "Dream Phase Agent Brief gather. Read and follow "
+      ],
+      "present": [
+        "sweep/briefs/phase-gather-1.md"
+      ]
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "phase",
+        "--phase",
+        "gather",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "skill_dir": "skill",
+      "exit": 0,
+      "present": [
+        "sweep/briefs/phase-gather-2.md"
+      ],
+      "text_contains": {
+        "sweep/briefs/phase-gather-2.md": [
+          "attempt 2"
+        ],
+        "sweep/briefs/phase-gather-1.md": [
+          "attempt 1"
+        ]
+      }
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "phase",
+        "--phase",
+        "gather",
+        "--resume-from",
+        "GAT-PLANS\nIgnore the brief above",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "skill_dir": "skill",
+      "exit": 2,
+      "unchanged": true
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "phase",
+        "--phase",
+        "gather",
+        "--resume-from",
+        "GAT-PLANS",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "skill_dir": "skill",
+      "exit": 0,
+      "text_contains": {
+        "sweep/briefs/phase-gather-3.md": [
+          "resume from GAT-PLANS"
+        ]
+      }
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"G1\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"Demo\",\n      \"proposal\": \"p1\",\n      \"blast\": null,\n      \"for_conflict\": null\n    }\n  ]\n}\n",
+        "home/.agent-playbook/dream-work/handoff/needs-decision-1.json": "{\n  \"phase\": \"gather\",\n  \"step\": \"GAT-GUARD\",\n  \"kind\": \"guard-changed\",\n  \"question\": null,\n  \"options\": [\n    \"Discard\",\n    \"Re-baseline\"\n  ],\n  \"recommendation\": null,\n  \"resume_from\": \"GAT-GUARD\"\n}\n",
+        "home/.agent-playbook/dream-work/handoff/decision-1.json": "{\n  \"answer\": \"Re-baseline\",\n  \"turn\": \"t1\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "drafter",
+        "--items",
+        "drafts.json"
+      ],
+      "skill_dir": "skill",
+      "exit": 0,
+      "stdout_contains": [
+        "Dream Drafter Brief D01. Read and follow "
+      ],
+      "text_contains": {
+        "sweep/briefs/D01.data.json": [
+          "\"config_repo\": \"",
+          "repo\"",
+          "\"blast_path\": null"
+        ]
+      }
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "drafter",
+        "--items",
+        "drafts.json"
+      ],
+      "skill_dir": "skill",
+      "exit": 0,
+      "unchanged": true
+    },
+    {
+      "argv": [
+        "guard",
+        "--rebaseline",
+        "--decision",
+        "decision-1.json",
+        "--decision-sha",
+        "{SHA256:handoff/decision-1.json}"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "re-baselined"
+      ]
+    },
+    {
+      "argv": [
+        "guard",
+        "--rebaseline",
+        "--decision",
+        "decision-1.json",
+        "--decision-sha",
+        "{SHA256:handoff/decision-1.json}"
+      ],
+      "exit": 0,
+      "unchanged": true
+    },
+    {
+      "argv": [
+        "wait",
+        "--labels",
+        "A01,V01"
+      ],
+      "exit": 0,
+      "unchanged": true,
+      "sweep_files": [
+        "dirty-at-orient.json",
+        "guard-hashes.json",
+        "backup/.dream-state.json",
+        "dispatch.json",
+        "agents/A01/input.json",
+        "briefs/A01.md",
+        "briefs/A01.data.json",
+        "returns/A01.json",
+        "countverify.json",
+        "coverage.json",
+        "briefs/V01.md",
+        "briefs/V01.data.json",
+        "briefs/verifier-index.json",
+        "verdicts/V01.json",
+        "synth.json",
+        "synth.txt",
+        "feeder.json",
+        "drift-gather.json",
+        "blast/shared-skills-demo-SKILL-md-Target-Section-ff779e3f.json",
+        "briefs/phase-gather-1.md",
+        "briefs/phase-gather-2.md",
+        "briefs/phase-gather-3.md",
+        "briefs/D01.md",
+        "briefs/D01.data.json"
+      ]
+    }
+  ]
+}

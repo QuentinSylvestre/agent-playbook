@@ -1,0 +1,84 @@
+# schema-version: 1
+# Deployment inventory manifest for agent-playbook.
+# Format: kind<TAB>dest<TAB>source<TAB>mode
+# - kind: symlink-file | symlink-dir | copy-file | copy-dir-recursive | merge-file
+#         | template-file | seed-file
+# - template-file: copied with {{USER_HOME}} / {{PLAYBOOK_ROOT}} substituted at deploy
+#   time. Tokens expand to the platform-native root; authors MUST use forward slashes
+#   for everything after the token (Windows tolerates the mixed form, POSIX needs it).
+#   setup.ps1 JSON-escapes the backslashes a Windows root carries; setup.sh does not,
+#   because a POSIX root has none -- see setup.sh render_template. Consumers are JSON
+#   files, or YAML values written in DOUBLE QUOTES (YAML double-quoted scalars use the
+#   same backslash escapes as JSON, so the rendered `C:\\Users\\X` reads back as
+#   `C:\Users\X`). A bare (unquoted) YAML scalar would keep the doubled backslashes:
+#   never template one.
+# - seed-file: a template-file that is written ONLY when the destination is absent,
+#   and verified for PRESENCE rather than content. For config the app itself rewrites
+#   at runtime (mcp.json) the repo copy is a restore seed, not a managed artifact --
+#   so an in-app edit must not report DRIFTED, and a deploy must never clobber the
+#   live file. Refresh the repo copy deliberately when you want to capture changes.
+# - dest: deployment target path. `~` expands to the user home; `<KIRO_IDE_USER>`
+#   expands to the Kiro IDE per-user config dir, which is platform-divergent:
+#   %APPDATA%\Kiro\User on Windows, ${XDG_CONFIG_HOME:-~/.config}/Kiro/User on POSIX.
+#   Each setup/verify twin resolves it for its own platform.
+# - source: repo-relative path to the source file/dir
+# - mode: claude | codex | gemini | kiro-always | kiro
+# Consumers: setup.ps1, setup.sh, verify-deployment.py, test-parity.sh
+# Dynamic entries (per-skill symlinks/copies, overlay merges) are NOT listed here: every
+# provider gets one link per shared skill inside its own skills/ folder (never a link of
+# the whole folder), so its other skills stay.
+# They remain auto-discovered at runtime from the filesystem.
+# Mode `kiro` rows are symlinked by BOTH setup twins (Windows copy mode was retired
+# 2026-09-20). Overlay-bearing Kiro skills are the only generated copies, and they are
+# dynamic entries, not manifest rows.
+
+# --- Claude Code ---
+symlink-file	~/.claude/CLAUDE.md	shared/AGENTS.md	claude
+symlink-file	~/.claude/AUTHORING.md	shared/AUTHORING.md	claude
+symlink-file	~/.claude/statusline-command.sh	providers/claude/statusline-command.sh	claude
+symlink-file	~/.claude/notify-command.ps1	providers/claude/notify-command.ps1	claude
+symlink-file	~/.claude/memory-load-hook.py	providers/claude/memory-load-hook.py	claude
+symlink-file	~/.claude/memory-load-hook.ps1	providers/claude/memory-load-hook.ps1	claude
+symlink-file	~/.claude/agents/qdream-reader.md	providers/claude/agents/qdream-reader.md	claude
+
+# --- Codex ---
+symlink-file	~/.codex/AGENTS.md	shared/AGENTS.md	codex
+symlink-file	~/.codex/AUTHORING.md	shared/AUTHORING.md	codex
+
+# --- Gemini CLI ---
+symlink-file	~/.gemini/GEMINI.md	shared/AGENTS.md	gemini
+symlink-file	~/.gemini/AUTHORING.md	shared/AUTHORING.md	gemini
+
+# --- Kiro (always-copy, both modes) ---
+# AUTHORING.md is deliberately NOT a kiro steering entry: Kiro
+# auto-loads everything under ~/.kiro/steering/, which would make this lazily-read
+# authoring reference always-resident. kiro-always copies it outside steering.
+copy-file	~/.kiro/AUTHORING.md	shared/AUTHORING.md	kiro-always
+# The agent definition is a template: its `resources` list carries a double-quoted
+# "file://{{PLAYBOOK_ROOT}}/memory/*.md" entry so the two global tiers (user
+# MEMORY.md and HIGHER_ORDER.md) load from wherever this repo lives on the machine
+# (see the template-file note above). The workspace-relative file://memory/*.md
+# loads only an in-workspace memory/ on a workspace-root start; project memory is
+# in the store repo since plan 261016 (see kiro-guidelines.md).
+template-file	~/.kiro/agents/kiro_default.md	providers/kiro/agents/kiro_default.md	kiro-always
+# The read-only child for the /qdream sweep. It has no placeholder, so it is a plain
+# copy. Kiro exposes it as the tool subagent_qdream_child (providers/kiro/skills/qdream).
+copy-file	~/.kiro/agents/qdream_child.md	providers/kiro/agents/qdream_child.md	kiro-always
+seed-file	~/.kiro/settings/permissions.yaml	providers/kiro/settings/permissions.yaml	kiro-always
+# MCP configs are seed-file: app-rewritten at runtime, so the repo copy is a restore
+# seed. The CLI and IDE schemas differ (mcpServers vs servers) -- not interchangeable.
+seed-file	~/.kiro/settings/mcp.json	providers/kiro/settings/mcp.json	kiro-always
+seed-file	<KIRO_IDE_USER>/mcp.json	providers/kiro/settings/ide-mcp.json	kiro-always
+
+# --- Kiro steering (symlinked on every platform; mode `kiro`) ---
+# kiro-cli v3 only. v2 steering was retired 2026-09-20; its files live under
+# providers/kiro/reference/ (not deployed) and are cited from memory/topics/kiro-cli.md.
+symlink-file	~/.kiro/steering/agents.md	shared/AGENTS.md	kiro
+symlink-file	~/.kiro/steering/kiro-guidelines.md	providers/kiro/steering/kiro-guidelines.md	kiro
+symlink-file	~/.kiro/steering/kiro-cli-local-data.md	providers/kiro/steering/kiro-cli-local-data.md	kiro
+symlink-file	~/.kiro/steering/memory-sources.md	providers/kiro/steering/memory-sources.md	kiro
+symlink-file	~/.kiro/steering/powershell-syntax.md	providers/kiro/steering/powershell-syntax.md	kiro
+symlink-file	~/.kiro/steering/kiro-governance-discipline.md	providers/kiro/steering/kiro-governance-discipline.md	kiro
+symlink-file	~/.kiro/steering/session-tab-title.md	providers/kiro/steering/session-tab-title.md	kiro
+symlink-file	~/.kiro/steering/subagent-session-recovery.md	providers/kiro/steering/subagent-session-recovery.md	kiro
+symlink-file	~/.kiro/steering/mcp-troubleshooting.md	providers/kiro/steering/mcp-troubleshooting.md	kiro

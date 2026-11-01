@@ -1,0 +1,6 @@
+FAIL: line 1: array elements must be non-empty strings
+FAIL: line 2: array elements must be non-empty strings
+FAIL: line 3: array elements must be non-empty strings
+FAIL: line 4: array elements must be non-empty strings
+FAIL: line 5: array elements must be non-empty strings
+verify-dream-journal: ok=0 fail=5 warn=0

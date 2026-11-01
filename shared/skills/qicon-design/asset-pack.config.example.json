@@ -1,0 +1,64 @@
+{
+  "project_slug": "sampleproject",
+  "display_name": "SampleProject",
+  "input_dir": "input",
+  "output_dir": "output",
+  "package_type": "concept-raster",
+  "app_icon_treatment": "contained",
+  "sources": {
+    "app_icon": "app-icon-source.png",
+    "logo_mark": "logo-mark-source.png",
+    "wordmark_dark": "wordmark-dark-source.png",
+    "wordmark_light": "wordmark-light-source.png",
+    "tray_base": "tray-source.png",
+    "tray_states": {
+      "not_running": "tray-not_running-source.png",
+      "running": "tray-running-source.png",
+      "warning": "tray-warning-source.png",
+      "error": "tray-error-source.png"
+    }
+  },
+  "sizes": {
+    "app_png": [
+      16,
+      20,
+      24,
+      32,
+      48,
+      64,
+      128,
+      256,
+      512,
+      1024
+    ],
+    "tray_png": [
+      16,
+      20,
+      24,
+      32,
+      48,
+      64
+    ],
+    "favicon_png": [
+      16,
+      32
+    ],
+    "ico": [
+      16,
+      20,
+      24,
+      32,
+      48,
+      64,
+      128,
+      256
+    ],
+    "pwa": {
+      "apple-touch-icon.png": 180,
+      "android-chrome-192x192.png": 192,
+      "android-chrome-512x512.png": 512
+    }
+  },
+  "generate_previews": true,
+  "generate_manifest": true
+}

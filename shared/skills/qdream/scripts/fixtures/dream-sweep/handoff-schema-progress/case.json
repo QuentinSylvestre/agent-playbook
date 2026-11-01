@@ -1,0 +1,262 @@
+{
+  "description": "progress-<phase>.json: phase from the closed set and equal to the file's phase; per label a status from the closed set, an attempt in 1..99 (not a bool), agent_id and session_id strings or null (a missing one fails).",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/progress-synthesize.json": "{\n  \"phase\": \"synthesize\",\n  \"completed_steps\": [\n    \"SYN-GATE\"\n  ],\n  \"labels\": {\n    \"V01\": {\n      \"agent_id\": \"a1111111111111111\",\n      \"session_id\": \"5e550000-0000-4000-8000-000000000001\",\n      \"attempt\": 1,\n      \"status\": \"returned\"\n    }\n  },\n  \"updated_at\": \"2026-10-12T12:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "progress-synthesize.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check progress-synthesize.json: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/progress-synthesize.json": "{\n  \"phase\": \"synthesize\",\n  \"completed_steps\": [\n    \"SYN-GATE\"\n  ],\n  \"labels\": {\n    \"V01\": {\n      \"agent_id\": null,\n      \"session_id\": null,\n      \"attempt\": 99,\n      \"status\": \"pending\"\n    }\n  },\n  \"updated_at\": \"2026-10-12T12:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "progress-synthesize.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check progress-synthesize.json: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/progress-synthesize.json": "{\n  \"phase\": \"gather\",\n  \"completed_steps\": [\n    \"SYN-GATE\"\n  ],\n  \"labels\": {\n    \"V01\": {\n      \"agent_id\": \"a1111111111111111\",\n      \"session_id\": \"5e550000-0000-4000-8000-000000000001\",\n      \"attempt\": 1,\n      \"status\": \"returned\"\n    }\n  },\n  \"updated_at\": \"2026-10-12T12:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "progress-synthesize.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "phase 'gather' is not the file's phase"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/progress-synthesize.json": "{\n  \"phase\": \"orient\",\n  \"completed_steps\": [\n    \"SYN-GATE\"\n  ],\n  \"labels\": {\n    \"V01\": {\n      \"agent_id\": \"a1111111111111111\",\n      \"session_id\": \"5e550000-0000-4000-8000-000000000001\",\n      \"attempt\": 1,\n      \"status\": \"returned\"\n    }\n  },\n  \"updated_at\": \"2026-10-12T12:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "progress-synthesize.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "key 'phase': expected one of gather, synthesize, apply"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/progress-synthesize.json": "{\n  \"phase\": \"synthesize\",\n  \"completed_steps\": [\n    \"SYN-GATE\"\n  ],\n  \"labels\": {\n    \"V01\": {\n      \"agent_id\": \"a1111111111111111\",\n      \"session_id\": \"5e550000-0000-4000-8000-000000000001\",\n      \"attempt\": 1,\n      \"status\": \"done\"\n    }\n  },\n  \"updated_at\": \"2026-10-12T12:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "progress-synthesize.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "labels['V01'] needs a status in pending, dispatched, returned, failed"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/progress-synthesize.json": "{\n  \"phase\": \"synthesize\",\n  \"completed_steps\": [\n    \"SYN-GATE\"\n  ],\n  \"labels\": {\n    \"v01\": {\n      \"agent_id\": \"a1111111111111111\",\n      \"session_id\": \"5e550000-0000-4000-8000-000000000001\",\n      \"attempt\": 1,\n      \"status\": \"returned\"\n    }\n  },\n  \"updated_at\": \"2026-10-12T12:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "progress-synthesize.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "labels['v01'] needs a status"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/progress-synthesize.json": "{\n  \"phase\": \"synthesize\",\n  \"completed_steps\": [\n    \"SYN-GATE\"\n  ],\n  \"labels\": {\n    \"V01\": {\n      \"agent_id\": \"a1111111111111111\",\n      \"session_id\": \"5e550000-0000-4000-8000-000000000001\",\n      \"attempt\": 0,\n      \"status\": \"returned\"\n    }\n  },\n  \"updated_at\": \"2026-10-12T12:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "progress-synthesize.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "labels['V01'] needs an attempt in 1..99"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/progress-synthesize.json": "{\n  \"phase\": \"synthesize\",\n  \"completed_steps\": [\n    \"SYN-GATE\"\n  ],\n  \"labels\": {\n    \"V01\": {\n      \"agent_id\": \"a1111111111111111\",\n      \"session_id\": \"5e550000-0000-4000-8000-000000000001\",\n      \"attempt\": 100,\n      \"status\": \"returned\"\n    }\n  },\n  \"updated_at\": \"2026-10-12T12:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "progress-synthesize.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "labels['V01'] needs an attempt in 1..99"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/progress-synthesize.json": "{\n  \"phase\": \"synthesize\",\n  \"completed_steps\": [\n    \"SYN-GATE\"\n  ],\n  \"labels\": {\n    \"V01\": {\n      \"agent_id\": \"a1111111111111111\",\n      \"session_id\": \"5e550000-0000-4000-8000-000000000001\",\n      \"attempt\": true,\n      \"status\": \"returned\"\n    }\n  },\n  \"updated_at\": \"2026-10-12T12:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "progress-synthesize.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "labels['V01'] needs an attempt in 1..99"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/progress-synthesize.json": "{\n  \"phase\": \"synthesize\",\n  \"completed_steps\": [\n    \"SYN-GATE\"\n  ],\n  \"labels\": {\n    \"V01\": {\n      \"agent_id\": \"a1111111111111111\",\n      \"session_id\": \"5e550000-0000-4000-8000-000000000001\",\n      \"status\": \"returned\"\n    }\n  },\n  \"updated_at\": \"2026-10-12T12:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "progress-synthesize.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "labels['V01'] needs an attempt in 1..99"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/progress-synthesize.json": "{\n  \"phase\": \"synthesize\",\n  \"completed_steps\": [\n    \"SYN-GATE\"\n  ],\n  \"labels\": {\n    \"V01\": {\n      \"agent_id\": \"bad id!\",\n      \"session_id\": \"5e550000-0000-4000-8000-000000000001\",\n      \"attempt\": 1,\n      \"status\": \"returned\"\n    }\n  },\n  \"updated_at\": \"2026-10-12T12:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "progress-synthesize.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "labels['V01'] needs agent_id"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/progress-synthesize.json": "{\n  \"phase\": \"synthesize\",\n  \"completed_steps\": [\n    \"SYN-GATE\"\n  ],\n  \"labels\": {\n    \"V01\": {\n      \"agent_id\": \"a1111111111111111\",\n      \"attempt\": 1,\n      \"status\": \"returned\"\n    }\n  },\n  \"updated_at\": \"2026-10-12T12:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "progress-synthesize.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "labels['V01'] needs session_id"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/progress-synthesize.json": "{\n  \"phase\": \"synthesize\",\n  \"completed_steps\": [\n    \"SYN-GATE\"\n  ],\n  \"labels\": {\n    \"V01\": {\n      \"agent_id\": \"a1111111111111111\",\n      \"session_id\": \"\",\n      \"attempt\": 1,\n      \"status\": \"returned\"\n    }\n  },\n  \"updated_at\": \"2026-10-12T12:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "progress-synthesize.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "labels['V01'] needs session_id"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/progress-synthesize.json": "{\n  \"phase\": \"synthesize\",\n  \"completed_steps\": [\n    \"SYN-GATE\"\n  ],\n  \"labels\": {\n    \"V01\": {\n      \"agent_id\": \"a1111111111111111\",\n      \"session_id\": \"5e550000-0000-4000-8000-000000000001\",\n      \"attempt\": 1,\n      \"status\": \"returned\"\n    }\n  }\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "progress-synthesize.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "missing key 'updated_at'"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/progress-synthesize.json": "{\n  \"phase\": \"synthesize\",\n  \"completed_steps\": \"SYN-GATE\",\n  \"labels\": {\n    \"V01\": {\n      \"agent_id\": \"a1111111111111111\",\n      \"session_id\": \"5e550000-0000-4000-8000-000000000001\",\n      \"attempt\": 1,\n      \"status\": \"returned\"\n    }\n  },\n  \"updated_at\": \"2026-10-12T12:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "progress-synthesize.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "key 'completed_steps': expected list:str"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/progress-orient.json": "{\n  \"phase\": \"gather\",\n  \"completed_steps\": [\n    \"SYN-GATE\"\n  ],\n  \"labels\": {\n    \"V01\": {\n      \"agent_id\": \"a1111111111111111\",\n      \"session_id\": \"5e550000-0000-4000-8000-000000000001\",\n      \"attempt\": 1,\n      \"status\": \"returned\"\n    }\n  },\n  \"updated_at\": \"2026-10-12T12:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "progress-orient.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no handoff schema"
+      ]
+    }
+  ]
+}

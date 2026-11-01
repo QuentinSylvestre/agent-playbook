@@ -1,0 +1,87 @@
+{
+  "description": "wait reports per label whether its child transcript holds a final message, finding the child by its Agent prompt line or an explicit agent id: a SubagentHandback and an end_turn text are final; a text that stopped for a tool call is no-final-message (running or dead: the caller decides); no transcript is missing. Exit 3 unless every label is final. An explicit agent id must be the label's own transcript (its Agent prompt names the label's brief), and --attempt N accepts only attempt N's brief (G8).",
+  "now": "2026-10-12T12:00:00Z",
+  "env": {
+    "CLAUDE_CODE_SESSION_ID": "5e550000-0000-4000-8000-000000000001"
+  },
+  "units": [
+    "final-message"
+  ],
+  "steps": [
+    {
+      "argv": [
+        "wait",
+        "--labels",
+        "A01,A04"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "wait: 2 of 2 label(s) final",
+        "A01: final (handback)",
+        "A04: final (text)"
+      ]
+    },
+    {
+      "argv": [
+        "wait",
+        "--labels",
+        "A01,A02,A03"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "A02: no-final-message",
+        "A03: missing",
+        "not final: A02, A03",
+        "last record 2026-10-12T11:00:00.000Z"
+      ]
+    },
+    {
+      "argv": [
+        "wait",
+        "--labels",
+        "A01=a1111111111111111"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "A01: final (handback)"
+      ]
+    },
+    {
+      "argv": [
+        "wait",
+        "--labels",
+        "A02=a1111111111111111"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "refused: transcript agent-a1111111111111111.jsonl is not A02's"
+      ]
+    },
+    {
+      "argv": [
+        "wait",
+        "--labels",
+        "A01",
+        "--attempt",
+        "2"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "A01: missing (no child transcript yet)\n"
+      ]
+    },
+    {
+      "argv": [
+        "wait",
+        "--labels",
+        "A01=a1111111111111111",
+        "--attempt",
+        "2"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not A01's attempt 2"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "description": "Version-shaped Stale-when (`<tool> version > <x.y[.z]>`): the claude-code version is the last string `version` in the newest session file by mtime (2.1.291; the trailing last-prompt record has none, and the older file's 9.9.9 is not read). Compared at the precision written: > 2.0 and > 2.1.290 fire, > 2.1 does not (a patch release). A tool outside the allowlist and kiro-cli (this case has no Kiro logs, so no version) give stale_when_unknown, which is informational: not fired, not a suspect (user decision 2026-10-06). Prose Stale-when sets nothing. A near-miss version line (>=, a bullet prefix) sets nothing and is named in errors[]. stale_when_fired is a trigger (memory_pass flagged; plan 261006 Phase 8 gate, user decision 2026-10-06) and makes a suspect; stale_when_unknown is neither.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "git": [
+    "repo"
+  ],
+  "mtimes": {
+    "home/.claude/projects/-ROOT-proj-alpha/c1a00000-0000-4000-8000-0000000000a1.jsonl": "2026-09-20T09:00:00Z",
+    "home/.claude/projects/-ROOT-proj-alpha/c1a00000-0000-4000-8000-0000000000a2.jsonl": "2026-09-01T09:00:00Z"
+  },
+  "expect": {
+    "exit": 0,
+    "index": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "memory_flags": [
+            "stale_when_fired",
+            "stale_when_unknown"
+          ],
+          "memory_pass": "flagged",
+          "counts": {
+            "suspects": 2
+          }
+        }
+      }
+    },
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "entries": [
+            {
+              "heading": "Minor release fires",
+              "stale_when_fired": true,
+              "stale_when_unknown": false,
+              "suspect": true
+            },
+            {
+              "heading": "Patch release does not fire",
+              "stale_when_fired": false,
+              "stale_when_unknown": false,
+              "suspect": false
+            },
+            {
+              "heading": "Three-part precision fires",
+              "stale_when_fired": true,
+              "stale_when_unknown": false,
+              "suspect": true
+            },
+            {
+              "heading": "Tool not on the allowlist",
+              "stale_when_fired": false,
+              "stale_when_unknown": true,
+              "suspect": false
+            },
+            {
+              "heading": "Kiro version is unknown",
+              "stale_when_fired": false,
+              "stale_when_unknown": true,
+              "suspect": false
+            },
+            {
+              "heading": "Prose condition is left to the model",
+              "stale_when_fired": false,
+              "stale_when_unknown": false,
+              "suspect": false
+            },
+            {
+              "heading": "Near-miss forms set nothing",
+              "stale_when_fired": false,
+              "stale_when_unknown": false,
+              "suspect": false
+            }
+          ]
+        }
+      }
+    },
+    "json_not_contains": [
+      "sets no flag: **Why**"
+    ],
+    "json_contains": [
+      "Near-miss forms set nothing is not the version form",
+      "sets no flag: **Stale-when**: claude-code version >= 2.0",
+      "sets no flag: - **Stale-when**: claude-code version > 2.0"
+    ]
+  }
+}

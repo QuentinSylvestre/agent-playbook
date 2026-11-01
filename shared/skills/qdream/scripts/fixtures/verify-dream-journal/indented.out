@@ -1,0 +1,3 @@
+ok: line 1: valid remove record
+ok: line 2: valid rename record
+verify-dream-journal: ok=2 fail=0 warn=0

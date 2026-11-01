@@ -1,0 +1,36 @@
+Done.
+
+```json
+{
+  "current_text": "Push to origin.",
+  "after_heading": null,
+  "new_text": "List commits, then push.",
+  "behaviour": "Agents list unpushed commits before pushing.",
+  "existing_coverage": [
+    {
+      "path": "shared/AGENTS.md",
+      "heading": "H",
+      "quote": "q"
+    }
+  ],
+  "blast_count": 0,
+  "blast_edits": [
+    {
+      "path": "shared/AGENTS.md",
+      "heading": "H",
+      "current_text": null,
+      "new_text": "b",
+      "after_heading": "## H"
+    }
+  ],
+  "memory_ops": [
+    {
+      "file": "memory/MEMORY.md",
+      "heading": "E",
+      "change": "cite the new heading"
+    }
+  ],
+  "notes": null,
+  "handoff_prompt": null
+}
+```

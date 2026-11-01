@@ -1,0 +1,13 @@
+{
+  "description": "A store-backed project whose path has spaces, opened from a subfolder of its git root.",
+  "git": [
+    "my project dir"
+  ],
+  "cwd": "{{ROOT}}/my project dir/sub folder",
+  "contains": [
+    "Spaced entry delta",
+    "/fixture root/stores/my-project-dir-cccccc/memory/MEMORY.md) — delivered in full"
+  ],
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores"
+}

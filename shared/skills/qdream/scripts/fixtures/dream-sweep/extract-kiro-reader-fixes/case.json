@@ -1,0 +1,219 @@
+{
+  "description": "Phase 8 kiro reader fixes: a phase launch and a child launch whose prompt has a preface paragraph before the brief line are found; a child prompt with two different brief lines (attempts 1 and 2) is not a launch of either; a phase agent's 30,000-char preview (kiro-cli 2.31.1 shape) is accepted only when it opens with the whole fixed sentence and the HEAD marker, N is over 30,000 and equals the child's response length (31,135 chars for A01), the HEAD slice is the response's first 500 chars and the omitted count is N - 1,000 (30,135); it is refused when N is off by 3 (both lengths named), when the HEAD slice differs (A03), when the HEAD marker is missing (A07), when the omitted count is off by one (A08), when N is within the 30,000 limit (A09), and when N is a 5000-digit number (A10, exit 3 and no crash); any other mismatch keeps the strict refusal; a missing launch tells the phase agent the child counts as failed.",
+  "now": "2026-10-12T12:00:00Z",
+  "env": {
+    "KIRO_SESSION_ID": "sess_5e550000-0000-4000-8000-0000000000b1"
+  },
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--kiro"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/returns/A01.json": {
+          "via": "kiro-transcript:subagent_response",
+          "agent_id": "c0000001-0000-4000-8000-000000000000",
+          "return": {
+            "unrelated": [
+              "Preview ok"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A02",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is 1917 chars but the preview",
+        "says 1920 chars"
+      ],
+      "absent": [
+        "sweep/returns/A02.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A03",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "does not begin as the preview"
+      ],
+      "absent": [
+        "sweep/returns/A03.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A04",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not the response its phase agent received"
+      ],
+      "absent": [
+        "sweep/returns/A04.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A05",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no qdream_child launch of A05 attempt 1",
+        "never read its return from the inbox"
+      ],
+      "absent": [
+        "sweep/returns/A05.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A05",
+        "--kiro",
+        "--attempt",
+        "2"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no qdream_child launch of A05 attempt 2"
+      ],
+      "absent": [
+        "sweep/returns/A05.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A06",
+        "--kiro",
+        "--attempt",
+        "2"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/returns/A06.a2.json": {
+          "via": "kiro-transcript:subagent_response",
+          "agent_id": "c0000006-0000-4000-8000-000000000000",
+          "return": {
+            "unrelated": [
+              "Second attempt"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A07",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not the response its phase agent received"
+      ],
+      "absent": [
+        "sweep/returns/A07.json"
+      ],
+      "stdout_not_contains": [
+        "does not begin as the preview"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A08",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "does not begin as the preview"
+      ],
+      "absent": [
+        "sweep/returns/A08.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A09",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not the response its phase agent received",
+        "1978 chars is within the 30000-char limit"
+      ],
+      "absent": [
+        "sweep/returns/A09.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A10",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not the response its phase agent received"
+      ],
+      "absent": [
+        "sweep/returns/A10.json"
+      ],
+      "stdout_not_contains": [
+        "Traceback"
+      ]
+    }
+  ]
+}

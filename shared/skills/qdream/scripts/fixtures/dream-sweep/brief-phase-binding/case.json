@@ -1,0 +1,347 @@
+{
+  "description": "brief --kind phase carries the orchestrator-held shas into the brief and checks each against the file it binds: no --snapshot-sha is a usage error, another sha than dirty-at-orient.json's is exit 3, a malformed sha or guard digest is a usage error; --phase apply needs --decisions-sha, bound to handoff/decisions.json (missing or another sha: exit 3); the rendered brief holds the snapshot sha, the decisions sha or none, the guard digest or none and the skill directory; the three flags are a usage error for another kind; the live template renders with no token left. A --decision file needs --decision-sha and is read only when it is that file's sha256.",
+  "now": "2026-10-12T12:00:00Z",
+  "git": [
+    "repo"
+  ],
+  "write": {
+    "repo/memory/.dream-state.json": "{\n  \"schema_version\": 3,\n  \"last_run\": \"2026-10-01T00:00:00Z\",\n  \"projects\": {\n    \"{ROOT}/proj/p1\": {\n      \"last_analyzed\": \"2026-10-01T00:00:00Z\"\n    }\n  },\n  \"rejected_lessons\": [],\n  \"outcome_tags\": [],\n  \"episodic_ledger\": [],\n  \"cost_records\": [],\n  \"model_routing\": {},\n  \"deferred_sessions\": {},\n  \"quiet_sweeps\": {}\n}\n"
+  },
+  "manifest": [
+    "--exclude-session",
+    "5e550000-0000-4000-8000-000000000001"
+  ],
+  "after_manifest": [
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/orient.json": "{\n  \"snapshot_at\": \"2026-10-12T12:00:00Z\",\n  \"since\": \"2026-10-01T00:00:00Z\",\n  \"confirmed\": [\n    \"{ROOT}/proj/p1\"\n  ],\n  \"model_routing\": {\n    \"task4\": \"model-a\",\n    \"verifier\": \"model-a\"\n  },\n  \"dirty_at_orient\": true,\n  \"repos\": [],\n  \"recover_lines\": [],\n  \"orchestrator_sessions\": []\n}\n",
+        "home/.claude/projects/-ROOT-proj-p1/5e550000-0000-4000-8000-000000000001/subagents/agent-a1111111111111111.jsonl": "{\"parentUuid\": null, \"isSidechain\": true, \"type\": \"user\", \"message\": {\"role\": \"user\", \"content\": \"Dream Sub-agent Brief A01. Read and follow {ROOT}/home/.agent-playbook/dream-work/sweep/briefs/A01.md.\"}, \"uuid\": \"u-1\", \"sessionId\": \"5e550000-0000-4000-8000-000000000001\", \"timestamp\": \"2026-10-12T11:00:00.000Z\"}\n{\"type\": \"assistant\", \"message\": {\"id\": \"msg_1\", \"role\": \"assistant\", \"content\": [{\"type\": \"thinking\", \"thinking\": \"considering\", \"signature\": \"x\"}], \"stop_reason\": \"tool_use\"}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n{\"type\": \"assistant\", \"message\": {\"id\": \"msg_1\", \"role\": \"assistant\", \"content\": [{\"type\": \"tool_use\", \"id\": \"t0\", \"name\": \"Read\", \"input\": {\"file_path\": \"x\"}}], \"stop_reason\": \"tool_use\"}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n{\"type\": \"user\", \"message\": {\"role\": \"user\", \"content\": [{\"type\": \"tool_result\", \"tool_use_id\": \"t0\", \"content\": \"file text\"}]}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n{\"type\": \"assistant\", \"message\": {\"id\": \"msg_2\", \"role\": \"assistant\", \"content\": [{\"type\": \"tool_use\", \"id\": \"t1\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"Done. Summary line.\\n\\n```json\\n{\\n  \\\"memory_proposals\\\": [\\n    {\\n      \\\"type\\\": \\\"feedback\\\",\\n      \\\"heading\\\": \\\"A fresh lesson\\\",\\n      \\\"why\\\": \\\"w\\\",\\n      \\\"how_to_apply\\\": \\\"h\\\",\\n      \\\"source\\\": \\\"s\\\",\\n      \\\"target\\\": \\\"project\\\",\\n      \\\"sessions_observed_in\\\": [],\\n      \\\"evidence_quote\\\": \\\"question 0 about p1\\\"\\n    }\\n  ],\\n  \\\"unrelated\\\": [\\n    \\\"P1 lesson A\\\",\\n    \\\"P1 lesson B\\\"\\n  ],\\n  \\\"not_a_conflict\\\": [],\\n  \\\"subsumed_entries\\\": [],\\n  \\\"stale_entries\\\": [],\\n  \\\"governance_conflicts\\\": [],\\n  \\\"verified\\\": [],\\n  \\\"task4_status\\\": \\\"checked\\\",\\n  \\\"improvement_signals\\\": [],\\n  \\\"user_skipped\\\": [],\\n  \\\"saved_in_session\\\": [],\\n  \\\"new_skill_candidates\\\": [],\\n  \\\"insights_signals\\\": [],\\n  \\\"sessions_read\\\": [\\n    \\\"c1f00000-0000-4000-8000-000000000001\\\"\\n  ],\\n  \\\"checkpoint_collapsed\\\": 0,\\n  \\\"project_accessible\\\": true,\\n  \\\"error\\\": null,\\n  \\\"scope\\\": \\\"all tasks\\\",\\n  \\\"notes\\\": null,\\n  \\\"sessions_unreadable\\\": []\\n}\\n```\\n\"}}], \"stop_reason\": null}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n{\"type\": \"user\", \"message\": {\"role\": \"user\", \"content\": [{\"type\": \"tool_result\", \"tool_use_id\": \"t1\", \"content\": \"delivered\"}]}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n",
+        "home/.claude/projects/-ROOT-proj-p1/5e550000-0000-4000-8000-000000000001/subagents/agent-a2222222222222222.jsonl": "{\"parentUuid\": null, \"isSidechain\": true, \"type\": \"user\", \"message\": {\"role\": \"user\", \"content\": \"Dream Verifier Brief V01. Read and follow {ROOT}/home/.agent-playbook/dream-work/sweep/briefs/V01.md.\"}, \"uuid\": \"u-1\", \"sessionId\": \"5e550000-0000-4000-8000-000000000001\", \"timestamp\": \"2026-10-12T11:00:00.000Z\"}\n{\"type\": \"assistant\", \"message\": {\"id\": \"msg_1\", \"role\": \"assistant\", \"content\": [{\"type\": \"thinking\", \"thinking\": \"considering\", \"signature\": \"x\"}], \"stop_reason\": \"tool_use\"}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n{\"type\": \"assistant\", \"message\": {\"id\": \"msg_1\", \"role\": \"assistant\", \"content\": [{\"type\": \"tool_use\", \"id\": \"t0\", \"name\": \"Read\", \"input\": {\"file_path\": \"x\"}}], \"stop_reason\": \"tool_use\"}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n{\"type\": \"user\", \"message\": {\"role\": \"user\", \"content\": [{\"type\": \"tool_result\", \"tool_use_id\": \"t0\", \"content\": \"file text\"}]}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n{\"type\": \"assistant\", \"message\": {\"id\": \"msg_2\", \"role\": \"assistant\", \"content\": [{\"type\": \"tool_use\", \"id\": \"t1\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"Done. Summary line.\\n\\n```json\\n{\\n  \\\"verifier\\\": \\\"V01\\\",\\n  \\\"verdicts\\\": [\\n    {\\n      \\\"item_id\\\": \\\"V01-001\\\",\\n      \\\"verdict\\\": \\\"confirmed\\\",\\n      \\\"spot_checked\\\": true,\\n      \\\"citation\\\": \\\"question 0 about p1\\\"\\n    }\\n  ],\\n  \\\"unverified_item_ids\\\": [],\\n  \\\"notes\\\": null\\n}\\n```\\n\"}}], \"stop_reason\": null}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n{\"type\": \"user\", \"message\": {\"role\": \"user\", \"content\": [{\"type\": \"tool_result\", \"tool_use_id\": \"t1\", \"content\": \"delivered\"}]}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n"
+      }
+    }
+  ],
+  "env": {
+    "CLAUDE_CODE_SESSION_ID": "5e550000-0000-4000-8000-000000000001"
+  },
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "phase",
+        "--phase",
+        "gather"
+      ],
+      "skill_dir": "skill",
+      "exit": 2,
+      "absent": [
+        "sweep/briefs"
+      ]
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "phase",
+        "--phase",
+        "gather",
+        "--snapshot-sha",
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ],
+      "skill_dir": "skill",
+      "exit": 3,
+      "stdout_contains": [
+        "is not the recorded one"
+      ],
+      "absent": [
+        "sweep/briefs"
+      ]
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "phase",
+        "--phase",
+        "gather",
+        "--snapshot-sha",
+        "xyz"
+      ],
+      "skill_dir": "skill",
+      "exit": 2,
+      "absent": [
+        "sweep/briefs"
+      ]
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "phase",
+        "--phase",
+        "gather",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}",
+        "--guard-digest",
+        "GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG"
+      ],
+      "skill_dir": "skill",
+      "exit": 2,
+      "absent": [
+        "sweep/briefs"
+      ]
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "phase",
+        "--phase",
+        "gather",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "skill_dir": "skill",
+      "exit": 0,
+      "stdout_contains": [
+        "Dream Phase Agent Brief gather. Read and follow "
+      ],
+      "text_contains": {
+        "sweep/briefs/phase-gather-1.md": [
+          "snapshot {SHA256:sweep/dirty-at-orient.json}",
+          "decisions none",
+          "guard none",
+          "skill `{ROOT}/skill`"
+        ]
+      }
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "phase",
+        "--phase",
+        "apply",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "skill_dir": "skill",
+      "exit": 2,
+      "absent": [
+        "sweep/briefs/phase-apply-1.md"
+      ]
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "phase",
+        "--phase",
+        "apply",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}",
+        "--decisions-sha",
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ],
+      "skill_dir": "skill",
+      "exit": 3,
+      "stdout_contains": [
+        "decisions.json missing"
+      ],
+      "absent": [
+        "sweep/briefs/phase-apply-1.md"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": []\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "phase",
+        "--phase",
+        "apply",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}",
+        "--decisions-sha",
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ],
+      "skill_dir": "skill",
+      "exit": 3,
+      "stdout_contains": [
+        "is not the recorded one"
+      ],
+      "absent": [
+        "sweep/briefs/phase-apply-1.md"
+      ]
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "phase",
+        "--phase",
+        "apply",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}",
+        "--decisions-sha",
+        "{SHA256:handoff/decisions.json}",
+        "--guard-digest",
+        "abababababababababababababababababababababababababababababababab"
+      ],
+      "skill_dir": "skill",
+      "exit": 0,
+      "text_contains": {
+        "sweep/briefs/phase-apply-1.md": [
+          "decisions {SHA256:handoff/decisions.json}",
+          "guard abababababababababababababababababababababababababababababababab",
+          "snapshot {SHA256:sweep/dirty-at-orient.json}"
+        ]
+      }
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "task4",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "exit": 2
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "phase",
+        "--phase",
+        "synthesize",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "Dream Phase Agent Brief synthesize. Read and follow "
+      ],
+      "text_contains": {
+        "sweep/briefs/phase-synthesize-1.md": [
+          "**Dream Phase Agent Brief**",
+          "--snapshot-sha {SHA256:sweep/dirty-at-orient.json}",
+          "synthesize phase",
+          "push --repos"
+        ]
+      },
+      "text_not_contains": {
+        "sweep/briefs/phase-synthesize-1.md": [
+          "{snapshot_sha}",
+          "{phase}"
+        ]
+      }
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decision-1.json": "{\n  \"answer\": \"Retry\",\n  \"turn\": \"t\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "phase",
+        "--phase",
+        "gather",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}",
+        "--decision",
+        "handoff/decision-1.json"
+      ],
+      "skill_dir": "skill",
+      "exit": 2
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "phase",
+        "--phase",
+        "gather",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}",
+        "--decision-sha",
+        "{SHA256:handoff/decision-1.json}"
+      ],
+      "skill_dir": "skill",
+      "exit": 2
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "phase",
+        "--phase",
+        "gather",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}",
+        "--decision",
+        "handoff/decision-1.json",
+        "--decision-sha",
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ],
+      "skill_dir": "skill",
+      "exit": 3,
+      "stdout_contains": [
+        "is not the recorded one"
+      ]
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "phase",
+        "--phase",
+        "gather",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}",
+        "--decision",
+        "handoff/gather.json",
+        "--decision-sha",
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ],
+      "skill_dir": "skill",
+      "exit": 2
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "phase",
+        "--phase",
+        "gather",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}",
+        "--decision",
+        "handoff/decision-1.json",
+        "--decision-sha",
+        "{SHA256:handoff/decision-1.json}"
+      ],
+      "skill_dir": "skill",
+      "exit": 0,
+      "text_contains": {
+        "sweep/briefs/phase-gather-2.md": [
+          "decision-1.json"
+        ]
+      }
+    }
+  ]
+}

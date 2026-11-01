@@ -1,0 +1,45 @@
+{
+  "description": "A final message with no JSON object, or a broken fenced block, is exit 3 with no partial write.",
+  "now": "2026-10-12T12:00:00Z",
+  "env": {
+    "CLAUDE_CODE_SESSION_ID": "5e550000-0000-4000-8000-000000000001"
+  },
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--claude-agent",
+        "a1111111111111111"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no JSON object"
+      ],
+      "absent": [
+        "sweep/returns"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A02",
+        "--claude-agent",
+        "a2222222222222222"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no JSON object"
+      ],
+      "absent": [
+        "sweep/returns"
+      ]
+    }
+  ]
+}

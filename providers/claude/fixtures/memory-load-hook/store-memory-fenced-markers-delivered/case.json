@@ -1,0 +1,13 @@
+{
+  "cwd": "{{ROOT}}/proj",
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores",
+  "description": "Conflict markers inside a code fence are an example, not a conflict (verify-memory reads them the same way): the project tier is delivered in full.",
+  "contains": [
+    "delivered in full",
+    "<<<<<<< HEAD"
+  ],
+  "absent": [
+    "holds git conflict markers"
+  ]
+}

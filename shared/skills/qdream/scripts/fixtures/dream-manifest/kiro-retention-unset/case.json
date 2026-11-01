@@ -1,0 +1,28 @@
+{
+  "description": "Without kiro-cli cleanup.periodDays no Kiro deletion age is known, so a 176-day-old unread Kiro session raises no due flag (no deletion observed, providers/kiro/steering/memory-sources.md).",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "sweep_due": false,
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "due": false
+        }
+      }
+    },
+    "stdout_contains": [
+      "sweep due: no (1 new sessions, 0 projects near deletion)"
+    ]
+  },
+  "mtimes": {
+    "home/.kiro/sessions/0123456789abcdef/sess_k1600000-0000-4000-8000-000000000001/messages.jsonl": "2026-04-01T11:00:00Z"
+  }
+}

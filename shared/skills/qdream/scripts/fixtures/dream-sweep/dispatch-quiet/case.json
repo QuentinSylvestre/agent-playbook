@@ -1,0 +1,68 @@
+{
+  "description": "FIX-DISPATCH-quiet over a manifest dream-manifest.py writes: P1 (sessions) gets `all tasks`; P2 (flagged: Stale-after passed) and P3 (periodic: quiet_sweeps 4) get `Tasks 4-5 only`; Q (missing cited path only, counter 2) gets no agent and is harvested by the orchestrator.",
+  "now": "2026-10-12T12:00:00Z",
+  "git": [
+    "repo"
+  ],
+  "write": {
+    "repo/memory/.dream-state.json": "{\n  \"schema_version\": 3,\n  \"last_run\": \"2026-10-01T00:00:00Z\",\n  \"projects\": {\n    \"{ROOT}/proj/p1\": {\n      \"last_analyzed\": \"2026-10-01T00:00:00Z\"\n    },\n    \"{ROOT}/proj/p2\": {\n      \"last_analyzed\": \"2026-10-01T00:00:00Z\"\n    },\n    \"{ROOT}/proj/p3\": {\n      \"last_analyzed\": \"2026-10-01T00:00:00Z\"\n    },\n    \"{ROOT}/proj/q\": {\n      \"last_analyzed\": \"2026-10-01T00:00:00Z\"\n    }\n  },\n  \"rejected_lessons\": [],\n  \"outcome_tags\": [],\n  \"episodic_ledger\": [],\n  \"cost_records\": [],\n  \"model_routing\": {},\n  \"deferred_sessions\": {},\n  \"quiet_sweeps\": {\n    \"projects\": {\n      \"{ROOT}/proj/p1\": 0,\n      \"{ROOT}/proj/p2\": 0,\n      \"{ROOT}/proj/p3\": 4,\n      \"{ROOT}/proj/q\": 2\n    }\n  }\n}\n"
+  },
+  "manifest": [],
+  "after_manifest": [
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/orient.json": "{\n  \"snapshot_at\": \"2026-10-12T12:00:00Z\",\n  \"since\": \"2026-10-01T00:00:00Z\",\n  \"confirmed\": [\n    \"{ROOT}/proj/p1\",\n    \"{ROOT}/proj/p2\",\n    \"{ROOT}/proj/p3\",\n    \"{ROOT}/proj/q\"\n  ],\n  \"model_routing\": {\n    \"task4\": \"model-a\",\n    \"verifier\": \"model-a\"\n  },\n  \"dirty_at_orient\": true,\n  \"repos\": [],\n  \"recover_lines\": [],\n  \"orchestrator_sessions\": []\n}\n"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "dispatch",
+        "--confirmed",
+        "orient.json"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/dispatch.json": {
+          "agents": [
+            {
+              "label": "A01",
+              "project": "{ROOT}/proj/p1",
+              "scope": "all tasks"
+            },
+            {
+              "label": "A02",
+              "project": "{ROOT}/proj/p2",
+              "scope": "Tasks 4-5 only",
+              "sessions": []
+            },
+            {
+              "label": "A03",
+              "project": "{ROOT}/proj/p3",
+              "scope": "Tasks 4-5 only",
+              "sessions": []
+            }
+          ],
+          "quiet": [
+            {
+              "project": "{ROOT}/proj/q",
+              "reason": "quiet"
+            }
+          ],
+          "harvest": [
+            "{ROOT}/proj/q"
+          ]
+        }
+      }
+    }
+  ]
+}

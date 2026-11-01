@@ -1,0 +1,48 @@
+{
+  "description": "Only a session every record of which a higher-ranked transcript elsewhere holds gets the errors[] note: T shares only a prefix with the larger K in beta (no note); S and S2 hold the same records, so S (smaller id) is the keeper and only S2's project names the pair.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "sessions": [
+            {
+              "id": "f0000000-0000-4000-8000-000000000221",
+              "boundary": "L1"
+            },
+            {
+              "id": "f0000000-0000-4000-8000-000000000223",
+              "boundary": "L1"
+            }
+          ],
+          "fork_collapsed": [],
+          "errors": []
+        },
+        "{ROOT}/proj/beta": {
+          "sessions": [
+            {
+              "id": "f0000000-0000-4000-8000-000000000222",
+              "boundary": "L1"
+            },
+            {
+              "id": "f0000000-0000-4000-8000-000000000224",
+              "boundary": "L1"
+            }
+          ],
+          "fork_collapsed": [],
+          "errors": [
+            "$contains:every record of Claude session f0000000-0000-4000-8000-000000000224 is also in session f0000000-0000-4000-8000-000000000223 ("
+          ]
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,148 @@
+{
+  "description": "Phase 10 B negatives: a path whose first component the project owns is judged only there (docs/guide.md exists in the config repo, not in alpha's docs/); a genuinely missing path, a plan whose archived title differs, an unknown folder name, a missing file in a sibling and a missing absolute path inside a sibling are reported; an absolute path outside every known project is not checked; user memory does not resolve into a project unless it names the project's folder; a slug whose title is only a suffix of a plan's title, and a plan or slug whose only same-title archive is dated before it, are missing; a generic first folder name (docs/, scripts/) never resolves through the config repo or a sibling project of that name; a Git Bash absolute path (/c/...) inside a known project is checked there (unit cite-msys, which also maps /cygdrive/<letter>/ and a bare /<letter> to the drive root and leaves /cc/x, //c/x and /c:/x alone); a dated cited plan never matches an undated archive; an undated folder under plans/done/ (assets/) and a dated folder outside plans/done/ are not plans.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "memory_flags": [
+            "cited_paths_missing",
+            "cited_slugs_missing"
+          ],
+          "entries": [
+            {
+              "heading": "Project-owned folder shadows the config repo",
+              "cited_paths_missing": [
+                "docs/guide.md"
+              ]
+            },
+            {
+              "heading": "Genuinely missing",
+              "cited_paths_missing": [
+                "src/gone.py"
+              ]
+            },
+            {
+              "heading": "Archived title differs",
+              "cited_paths_missing": [
+                "plans/260106_GONE.md"
+              ]
+            },
+            {
+              "heading": "Unknown folder name",
+              "cited_paths_missing": [
+                "gamma/x.md"
+              ]
+            },
+            {
+              "heading": "Sibling file missing",
+              "cited_paths_missing": [
+                "beta/src/gone.py"
+              ]
+            },
+            {
+              "heading": "Absolute sibling file missing",
+              "cited_paths_missing": [
+                "{ROOT}/proj/beta/src/gone.py"
+              ]
+            },
+            {
+              "heading": "Absolute outside known projects",
+              "cited_paths_missing": []
+            },
+            {
+              "heading": "Slug nowhere",
+              "cited_paths_missing": [],
+              "cited_slugs_missing": [
+                "260107_NOWHERE_PLAN"
+              ]
+            },
+            {
+              "heading": "Slug title only a suffix",
+              "cited_paths_missing": [],
+              "cited_slugs_missing": [
+                "260101_TOO"
+              ]
+            },
+            {
+              "heading": "Archive dated before the plan",
+              "cited_paths_missing": [
+                "plans/260901_FIX.md"
+              ],
+              "cited_slugs_missing": [
+                "260901_FIX"
+              ]
+            },
+            {
+              "heading": "Generic folder name of a sibling project",
+              "cited_paths_missing": [
+                "scripts/run.py"
+              ]
+            },
+            {
+              "heading": "Dated plan with only an undated archive",
+              "cited_paths_missing": [
+                "plans/260901_Y.md"
+              ],
+              "cited_slugs_missing": []
+            },
+            {
+              "heading": "Undated folder is not a plan",
+              "cited_paths_missing": [],
+              "cited_slugs_missing": [
+                "260107_ASSETS"
+              ]
+            },
+            {
+              "heading": "Dated folder outside done is not a plan",
+              "cited_paths_missing": [],
+              "cited_slugs_missing": [
+                "260108_DRAFTS"
+              ]
+            }
+          ]
+        },
+        "{ROOT}/proj/beta": {
+          "memory_flags": [
+            "cited_paths_missing"
+          ],
+          "entries": [
+            {
+              "heading": "Generic folder name in the config repo",
+              "cited_paths_missing": [
+                "docs/guide.md"
+              ]
+            }
+          ]
+        }
+      },
+      "user_memory": {
+        "memory_flags": [
+          "cited_paths_missing"
+        ],
+        "entries": [
+          {
+            "heading": "User memory cites a project file by a bare path",
+            "cited_paths_missing": [
+              "docs/other.md"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "git": [
+    "repo"
+  ],
+  "units": [
+    "cite-msys"
+  ]
+}

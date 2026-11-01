@@ -1,0 +1,9 @@
+{
+  "description": "The real lock-owner check, not the stub: this process is alive, the pid of an exited child is not, and a missing, zero, negative, boolean, string, float or out-of-range pid (above 2**31-1, including a value that wraps to the exited child's pid in 32 bits) is never answered dead and never raises, and dead_owner reclaims only a lock naming a pid in 1..2**31-1 (F4).",
+  "now": "2026-10-12T12:00:00Z",
+  "setup": [],
+  "steps": [],
+  "units": [
+    "pid-alive"
+  ]
+}

@@ -1,0 +1,88 @@
+{
+  "description": "--kind verifier validates the verdict list and writes sweep/verdicts/<label>.json; a verdict outside confirmed / plausible / refuted is exit 3. The record names its attempt's data file and that file's sha256; without the data file the extract is exit 3 (G1). A label with a trailing newline is refused as no label (G5).",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "verifier",
+        "--label",
+        "V01",
+        "--from-file",
+        "inbox/V01.txt"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "2 verdict(s), 1 unverified"
+      ],
+      "files": {
+        "sweep/verdicts/V01.json": {
+          "return": {
+            "unverified_item_ids": [
+              "V01-003"
+            ]
+          },
+          "data": "sweep/briefs/V01.data.json",
+          "data_sha256": "{SHA256:sweep/briefs/V01.data.json}"
+        }
+      },
+      "absent": [
+        "sweep/returns"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "verifier",
+        "--label",
+        "V02",
+        "--from-file",
+        "inbox/V02.txt"
+      ],
+      "exit": 3,
+      "absent": [
+        "sweep/verdicts/V02.json"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/inbox/V03.txt": "```json\n{\n  \"verifier\": \"V03\",\n  \"verdicts\": [\n    {\n      \"item_id\": \"V03-001\",\n      \"verdict\": \"confirmed\",\n      \"spot_checked\": true,\n      \"citation\": \"span\"\n    }\n  ],\n  \"unverified_item_ids\": [\n    \"V03-003\"\n  ],\n  \"notes\": null\n}\n```\n"
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "verifier",
+        "--label",
+        "V03",
+        "--from-file",
+        "inbox/V03.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "V03 has no data file for attempt 1"
+      ],
+      "absent": [
+        "sweep/verdicts/V03.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "verifier",
+        "--label",
+        "V01\n",
+        "--from-file",
+        "inbox/V01.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "refused: label"
+      ]
+    }
+  ]
+}

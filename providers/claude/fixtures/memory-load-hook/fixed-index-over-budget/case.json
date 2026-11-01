@@ -1,0 +1,18 @@
+{
+  "description": "The fixed index alone exceeds the cap: whole lines drop from the end of the user index, with a +N more line.",
+  "cwd": "{{ROOT}}/empty",
+  "cap": 1500,
+  "contains": [
+    "- Entry number 01 with enough padding words",
+    "- Higher-order entry one",
+    "Project memory: none found"
+  ],
+  "absent": [
+    "Entry number 60"
+  ],
+  "regex": [
+    "^\\(\\+\\d+ more — see .*/cfg/memory/MEMORY\\.md\\)$"
+  ],
+  "whole_lines": true,
+  "config_repo": "{{ROOT}}/cfg"
+}

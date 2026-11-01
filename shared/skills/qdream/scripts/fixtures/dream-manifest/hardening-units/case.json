@@ -1,0 +1,27 @@
+{
+  "description": "Unit checks: a relative, filesystem-root or missing home is refused; swaps between a check and the create or delete it guards never redirect it; a failed delete exits 6 naming the leftover; a crashing selftest case is a FAIL line; AppData, Library and OneDrive* are pruned directly under home only. The Windows selftest comparator normalizes '\\\\' to '/' in expected and actual values (simulated here); drive letters are uppercased in project keys and slugs; new_plans excerpts are capped and an oversized manifest.json warns; the sweep-due count leaves out history_only stubs and scratchpad pseudo-projects. parse_entries (memory-entries.py) reads only the type sections and never a fenced heading.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "count",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "work_absent": true
+  },
+  "units": [
+    "home",
+    "races",
+    "selftest-robust",
+    "prune",
+    "seps",
+    "drive",
+    "caps",
+    "due-count",
+    "entries",
+    "config-plans"
+  ]
+}

@@ -1,0 +1,2 @@
+{"type": "user", "timestamp": "2026-10-14T10:00:00Z", "sessionId": "b5a00000-0000-4000-8000-000000000017", "cwd": "{ROOT}/proj", "message": {"role": "user", "content": "run the sweep"}}
+{"type": "assistant", "timestamp": "2026-10-14T10:00:01Z", "sessionId": "b5a00000-0000-4000-8000-000000000017", "cwd": "{ROOT}/proj", "message": {"id": "msg_O1", "type": "message", "role": "assistant", "model": "claude-opus-5", "content": [{"type": "text", "text": "ok"}], "usage": {"input_tokens": 7, "cache_creation_input_tokens": 0, "cache_read_input_tokens": 0, "output_tokens": 0}}}

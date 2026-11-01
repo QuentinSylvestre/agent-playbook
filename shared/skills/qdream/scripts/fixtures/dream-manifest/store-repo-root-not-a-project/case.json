@@ -1,0 +1,35 @@
+{
+  "description": "plan 261016 Phase 10: the store repo replaces <config-repo>/workspaces/ as the place no project lives. A session whose cwd is the store repo root does not make the root a project (errors[] names it), Method B never walks into the store repo, so neither store directory holding memory/MEMORY.md is a project, and the `local` store whose folder exists is still discovered under that folder (Method C), its memory read from the store.",
+  "now": "2026-09-24T12:00:00Z",
+  "store_repo": "stores",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "$absent": [
+          "{ROOT}/stores",
+          "{ROOT}/stores/alpha-aaaaaa",
+          "{ROOT}/stores/beta-bbbbbb"
+        ],
+        "{ROOT}/proj/alpha": {
+          "status": "new",
+          "discovered_by": [
+            "C"
+          ],
+          "memory_file": "{ROOT}/stores/alpha-aaaaaa/memory/MEMORY.md"
+        }
+      }
+    },
+    "json_contains": [
+      "is not a project: it is at or inside the store repo",
+      "Method B: not walking {ROOT}/stores: it is at or inside the store repo"
+    ]
+  }
+}

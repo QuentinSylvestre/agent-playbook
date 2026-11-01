@@ -1,0 +1,42 @@
+# QV fixture: asymmetric parallel groups
+
+> **Status**: In Progress — phase 1 under way <!-- lifecycle: Exploring -> Draft -> In Progress -> Complete -->
+
+## Intent
+
+### Success criteria
+
+- SC-1: the first criterion
+- SC-2: the second criterion
+
+### Scope
+
+boundary line
+
+## Phases
+
+### Phase 1: Alpha [P:2]
+
+**Covers**: SC-1
+
+- [x] a
+
+### Phase 2: Beta
+
+**Covers**: SC-2
+
+- [x] b
+
+### Phase 3: Gamma [P:9]
+
+- [ ] c
+
+## 8) Documentation Updates
+
+| Document | Change | Phase |
+|---|---|---|
+| `done.md` | updated | 1 |
+
+## Harness Improvement Opportunities
+
+- none observed — cost: none — suggested change: none

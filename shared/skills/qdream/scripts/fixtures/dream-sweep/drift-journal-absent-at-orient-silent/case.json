@@ -1,0 +1,45 @@
+{
+  "description": "A journal absent at Orient and still absent is silent; so is an unchanged state file.",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/.gitignore": "memory/.dream-journal.jsonl\n",
+    "repo/memory/MEMORY.md": "# Memory\n",
+    "repo/memory/.dream-state.json": "{\"state\": \"orient\"}\n"
+  },
+  "git": [
+    "repo"
+  ],
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "gather"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/drift-gather.json": {
+          "incident": false,
+          "entries": []
+        }
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "gather"
+      ],
+      "exit": 0,
+      "unchanged": true
+    }
+  ]
+}

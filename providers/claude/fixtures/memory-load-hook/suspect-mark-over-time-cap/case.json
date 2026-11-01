@@ -1,0 +1,16 @@
+{
+  "description": "Past the time cap the git check is skipped: no marks, and the header says so.",
+  "git": [
+    "cfg"
+  ],
+  "git_date": "2026-09-15T12:00:00",
+  "time_cap": 0,
+  "cwd": "{{ROOT}}/empty",
+  "contains": [
+    "marks omitted: the git check passed"
+  ],
+  "regex": [
+    "^- Changed after verify$"
+  ],
+  "config_repo": "{{ROOT}}/cfg"
+}

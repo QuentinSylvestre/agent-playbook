@@ -1,0 +1,25 @@
+{
+  "description": "baseline --by-role, verifier brief marker (plan 261006 Phase 9): a sub-agent whose first user record carries only the `Dream Verifier Brief` marker line, with no `Cross-validation` and no lowercase `verifier`, is a verifier; a Task-4 brief whose first line carries its own marker and names the verifier marker below it stays task4, because the first-line marker decides the role.",
+  "now": "2026-10-08T12:00:00Z",
+  "argv": [
+    "baseline",
+    "--session",
+    "{ROOT}/home/.claude/projects/-ROOT-proj/b5a00000-0000-4000-8000-000000000009.jsonl",
+    "--by-role"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_contains": [
+      "tokens: 266\n",
+      "agents: 2\n",
+      "role orchestrator: files 1, tokens: 8\n",
+      "role task4: files 1, tokens: 138\n",
+      "role verifier: files 1, tokens: 120\n",
+      "role other: files 0, tokens: 0\n"
+    ],
+    "stdout_not_contains": [
+      "error:",
+      "other: agent-"
+    ]
+  }
+}

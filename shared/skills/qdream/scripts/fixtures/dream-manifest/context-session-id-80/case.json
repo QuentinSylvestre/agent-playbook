@@ -1,0 +1,16 @@
+{
+  "description": "Review R15 (plan 261027): an 80-character CLAUDE_CODE_SESSION_ID is usable.",
+  "now": "2026-10-27T12:00:00Z",
+  "env": {
+    "CLAUDE_CODE_SESSION_ID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "argv": [
+    "context"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_contains": [
+      "context: 502 tokens at the last model call"
+    ]
+  }
+}

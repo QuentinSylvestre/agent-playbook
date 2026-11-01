@@ -1,0 +1,1 @@
+Keeps providers/ present so providers/.. resolves on POSIX.

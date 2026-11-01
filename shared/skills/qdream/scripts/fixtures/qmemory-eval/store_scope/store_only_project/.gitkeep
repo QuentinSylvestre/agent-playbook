@@ -1,0 +1,2 @@
+This workspace deliberately holds no memory/ directory: its memory lives in its
+store under stores/, so the store side is the only populated location.

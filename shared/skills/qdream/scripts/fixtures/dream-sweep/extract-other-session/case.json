@@ -1,0 +1,46 @@
+{
+  "description": "D22: --session collects a child of an earlier session; without it the running session (CLAUDE_CODE_SESSION_ID) has no such transcript (exit 3).",
+  "now": "2026-10-12T12:00:00Z",
+  "env": {
+    "CLAUDE_CODE_SESSION_ID": "5e550000-0000-4000-8000-000000000001"
+  },
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--claude-agent",
+        "a1111111111111111"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no transcript"
+      ],
+      "absent": [
+        "sweep/returns"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--claude-agent",
+        "a1111111111111111",
+        "--session",
+        "5e550000-0000-4000-8000-000000000002"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/returns/A01.json": {
+          "session_id": "5e550000-0000-4000-8000-000000000002"
+        }
+      }
+    }
+  ]
+}

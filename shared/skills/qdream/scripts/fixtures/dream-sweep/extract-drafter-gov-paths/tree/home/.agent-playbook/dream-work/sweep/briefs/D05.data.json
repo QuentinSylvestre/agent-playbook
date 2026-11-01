@@ -1,0 +1,13 @@
+{
+  "label": "D05",
+  "id": "g1",
+  "kind": "governance",
+  "code": false,
+  "target_file": "shared/skills/demo/SKILL.md",
+  "heading": "## Target Section",
+  "proposal": "p",
+  "blast": "sweep/blast/shared-skills-demo-SKILL-md-Target-Section-ff779e3f.json",
+  "for_conflict": null,
+  "blast_path": "{ROOT}/home/.agent-playbook/dream-work/sweep/blast/shared-skills-demo-SKILL-md-Target-Section-ff779e3f.json",
+  "config_repo": "{ROOT}/repo"
+}

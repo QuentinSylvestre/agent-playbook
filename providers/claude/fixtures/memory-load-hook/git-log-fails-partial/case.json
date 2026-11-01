@@ -1,0 +1,23 @@
+{
+  "description": "A repository with commits whose git log fails: the marks are reported missing (partial), never silently empty.",
+  "time_cap": 20,
+  "cwd": "{{ROOT}}/empty",
+  "regex": [
+    "^- Changed after verify$"
+  ],
+  "absent": [
+    "marks omitted"
+  ],
+  "config_repo": "{{ROOT}}/cfg",
+  "git": [
+    "cfg"
+  ],
+  "git_date": "2026-09-15T12:00:00",
+  "fake_git_log": {
+    "stderr": "fatal: does not have any commits yet\n",
+    "code": 128
+  },
+  "contains": [
+    "marks missing where git could not read a repository"
+  ]
+}

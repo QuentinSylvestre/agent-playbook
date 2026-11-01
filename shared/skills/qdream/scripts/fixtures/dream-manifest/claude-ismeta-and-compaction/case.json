@@ -1,0 +1,41 @@
+{
+  "description": "isMeta records, compaction summaries, task notifications, peer messages and local-command output are harness text; a slash-command record keeps the command and its arguments.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "sessions": [
+            {
+              "id": "c4a00000-0000-4000-8000-000000000001",
+              "boundary": "L2"
+            }
+          ]
+        }
+      }
+    },
+    "stripped": {
+      "c4a00000-0000-4000-8000-000000000001": {
+        "contains": [
+          "L2 [user] /qfixture --scope parser",
+          "L8 [user] thanks, that fixed it"
+        ],
+        "not_contains": [
+          "EXPANDED SKILL BODY",
+          "COMPACTION SUMMARY",
+          "TASK NOTIFICATION",
+          "PEER MESSAGE",
+          "LOCAL COMMAND STDOUT"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "description": "brief --kind verifier --label V01: --label is not a flag of brief, and the usage error names it as typed (unrecognized arguments: --label V01), not the --labels flag argparse's prefix matching used to run it as. The real --labels still gets its own message.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": ["brief", "--kind", "verifier", "--label", "V01"],
+      "exit": 2,
+      "stderr_contains": ["unrecognized arguments: --label V01"],
+      "stderr_not_contains": ["--labels is for task4 briefs"]
+    },
+    {
+      "argv": ["brief", "--kind", "verifier", "--labels", "V01"],
+      "exit": 2,
+      "stderr_contains": ["--labels is for task4 briefs"]
+    }
+  ]
+}

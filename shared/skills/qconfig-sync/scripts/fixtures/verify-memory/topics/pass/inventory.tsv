@@ -1,0 +1,9 @@
+# schema-version: 1
+# fixture: acceptance is by destination
+
+symlink-file	~/.claude/CLAUDE.md	shared/AGENTS.md	claude
+symlink-file	~/.claude/AUTHORING.md	shared/AUTHORING.md	claude
+symlink-file	~/.codex/AGENTS.md	codexhome/AGENTS.md	codex
+symlink-file	~/.gemini/GEMINI.md	geminihome/GEMINI.md	gemini
+copy-file	~/.kiro/AUTHORING.md	shared/AUTHORING.md	kiro-always
+symlink-file	~/.kiro/steering/powershell-syntax.md	providers/kiro/steering/powershell-syntax.md	kiro

@@ -1,0 +1,44 @@
+{
+  "description": "A Windows drive letter is uppercased wherever a project key is built: a Kiro workspace 'c:\\\\...' is reported under 'C:\\\\...' (the form state keys use), a new project included, and a lowercase-drive workspace of a state project joins that project instead of forming a second key.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "$absent": [
+          "c:\\dream-fixture-nonexistent\\Proj",
+          "c:\\dream-fixture-nonexistent\\other",
+          "C:\\dream-fixture-nonexistent\\other"
+        ],
+        "C:\\dream-fixture-nonexistent\\Proj": {
+          "status": "new",
+          "sessions": [
+            {
+              "id": "sess_kd000000-0000-4000-8000-000000000001",
+              "boundary": "L1"
+            }
+          ]
+        },
+        "C:\\dream-fixture-nonexistent\\Other": {
+          "discovered_by": [
+            "A",
+            "state"
+          ],
+          "sessions": [
+            {
+              "id": "sess_kd000000-0000-4000-8000-000000000002",
+              "boundary": "L1"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

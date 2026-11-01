@@ -1,0 +1,80 @@
+{
+  "description": "dirty records each repository the manifest names plus the config repo: HEAD, branch and porcelain (an edit made before Orient is listed), and each candidate's sha256 of its Orient content.",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/memory/MEMORY.md": "# Memory\n",
+    "repo/memory/.dream-state.json": "{}\n",
+    "proj/alpha/memory/MEMORY.md": "# alpha memory\n",
+    "proj/beta/memory/MEMORY.md": "# beta memory\n"
+  },
+  "git": [
+    "repo",
+    "proj/alpha",
+    "proj/beta"
+  ],
+  "setup": [
+    {
+      "write": {
+        "proj/alpha/memory/MEMORY.md": "# alpha memory\n\nedited by another session\n"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "dirty: 3 repo(s)"
+      ],
+      "files": {
+        "sweep/dirty-at-orient.json": {
+          "repo": "{ROOT}/repo",
+          "repos": {
+            "{ROOT}/proj/alpha": {
+              "branch": "main",
+              "head": "$nonnull",
+              "porcelain": [
+                " M memory/MEMORY.md"
+              ]
+            },
+            "{ROOT}/proj/beta": {
+              "branch": "main",
+              "porcelain": []
+            },
+            "{ROOT}/repo": {
+              "branch": "main",
+              "porcelain": []
+            }
+          },
+          "candidates": {
+            "{ROOT}/proj/alpha/memory/MEMORY.md": {
+              "sha256": "90ba4d452808b62d0d6a8efcfedefd8712d1d406167dd7b62e61b62dd15e849f",
+              "repo": "{ROOT}/proj/alpha",
+              "git": "tracked"
+            },
+            "{ROOT}/proj/beta/memory/MEMORY.md": {
+              "sha256": "e80f86e16681e90bb4651594ba1effa6b3ec3a58ebb4d7154b8b57988e812611",
+              "git": "tracked"
+            }
+          }
+        }
+      }
+    },
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0,
+      "unchanged": true,
+      "stdout_contains": [
+        "already taken"
+      ]
+    }
+  ]
+}

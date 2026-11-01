@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "1.0.0",
+  "dataModelVersion": 1,
+  "id": "sess_kd000000-0000-4000-8000-000000000001",
+  "title": "fixture",
+  "agentMode": "kiro_default",
+  "workspacePaths": [
+    "c:\\dream-fixture-nonexistent\\Proj"
+  ],
+  "createdAt": "2026-09-23T08:00:00.000Z",
+  "lastModifiedAt": "2026-09-23T08:00:00.000Z",
+  "modelId": "fixture-model",
+  "status": "idle"
+}

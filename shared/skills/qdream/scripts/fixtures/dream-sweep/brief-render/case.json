@@ -1,0 +1,65 @@
+{
+  "description": "brief --kind task4 renders A01 from the live Dream Sub-agent Brief: the marker first, {project_path}, {task_scope} and {memory_file} filled, a footer naming the data file and requiring the final message to be one fenced json block (extract reads only the last message); the Return Schema asks for `notes` and `sessions_unreadable` (plan 261012 D11, Phase 3 review Q5/Q6); it prints the one-line Agent prompt. A re-run is a no-op.",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/memory/.dream-state.json": "{\n  \"schema_version\": 3,\n  \"last_run\": \"2026-10-01T00:00:00Z\",\n  \"projects\": {},\n  \"rejected_lessons\": [],\n  \"outcome_tags\": [],\n  \"episodic_ledger\": [],\n  \"cost_records\": [],\n  \"model_routing\": {},\n  \"deferred_sessions\": {},\n  \"quiet_sweeps\": {}\n}\n"
+  },
+  "git": [
+    "repo"
+  ],
+  "steps": [
+    {
+      "argv": [
+        "dispatch",
+        "--confirmed",
+        "orient.json"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "task4"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "Dream Sub-agent Brief A01. Read and follow {ROOT}/home/.agent-playbook/dream-work/sweep/briefs/A01.md."
+      ],
+      "text_contains": {
+        "sweep/briefs/A01.md": [
+          "**Dream Sub-agent Brief**",
+          "You are analyzing project `{ROOT}/proj/alpha`",
+          "**Scope for this dispatch**: all tasks.",
+          "the memory file `{ROOT}/proj/alpha/memory/MEMORY.md`",
+          "{ROOT}/home/.agent-playbook/dream-work/sweep/briefs/A01.data.json",
+          "\"notes\": null",
+          "\"sessions_unreadable\": []",
+          "Your final message is the Return Schema JSON in one fenced json block, nothing after it."
+        ]
+      },
+      "text_not_contains": {
+        "sweep/briefs/A01.md": [
+          "{project_path}",
+          "{task_scope}",
+          "{memory_file}"
+        ]
+      },
+      "files": {
+        "sweep/briefs/A01.data.json": {
+          "label": "A01",
+          "scope": "all tasks"
+        }
+      }
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "task4"
+      ],
+      "exit": 0,
+      "unchanged": true
+    }
+  ]
+}

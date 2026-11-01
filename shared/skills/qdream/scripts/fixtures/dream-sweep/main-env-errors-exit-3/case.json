@@ -1,0 +1,29 @@
+{
+  "description": "F10, G12: a malformed sweep file (dispatch.json without agents) is exit 3 with one line naming the file and the missing key, no traceback; the unit checks OSError, a git timeout and a LoadError the same way, and that a KeyError, ValueError or TypeError raised outside a load site (a bug) is not swallowed.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/sweep/dispatch.json": "{}\n"
+      }
+    },
+    {
+      "argv": [
+        "countverify"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "precondition failed: sweep/dispatch.json: missing key 'agents'"
+      ],
+      "stdout_not_contains": [
+        "Traceback"
+      ],
+      "absent": [
+        "sweep/countverify.json"
+      ]
+    }
+  ],
+  "units": [
+    "main-env-errors"
+  ]
+}

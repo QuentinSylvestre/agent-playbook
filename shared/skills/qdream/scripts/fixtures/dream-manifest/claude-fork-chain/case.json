@@ -1,0 +1,51 @@
+{
+  "description": "A chain of forks: the original O (6 records) continued after the fork, its fork B (4) and B's fork G (5) share the first two records, and B and G share B's first own record. Keepers resolve largest-first across all three: O keeps the shared prefix, G keeps B's first own record plus its own turns, B keeps only its last record. Pairwise best overlap made G a keeper of the prefix O already holds (double count). The smallest transcript has the smallest id, so taking sessions in id or scan order instead of size order also fails.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "sessions": [
+            {
+              "id": "f0000000-0000-4000-8000-000000000101",
+              "boundary": "L4",
+              "$absent": [
+                "fork_of",
+                "fork_shared"
+              ]
+            },
+            {
+              "id": "f0000000-0000-4000-8000-000000000102",
+              "boundary": "L3",
+              "$absent": [
+                "fork_of",
+                "fork_shared"
+              ]
+            },
+            {
+              "id": "f0000000-0000-4000-8000-000000000103",
+              "boundary": "L1",
+              "$absent": [
+                "fork_of",
+                "fork_shared"
+              ]
+            }
+          ],
+          "fork_collapsed": [],
+          "errors": []
+        }
+      }
+    },
+    "stdout_contains": [
+      "forks_collapsed=0"
+    ]
+  }
+}

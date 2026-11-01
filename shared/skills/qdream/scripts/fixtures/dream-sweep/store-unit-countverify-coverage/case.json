@@ -1,0 +1,58 @@
+{
+  "description": "plan 261016 Phase 5: two project paths of one store (a unit) -- the manifest gives the store's memory file to the leader only, so countverify has one record for it (keyed by the memory file), classified once, and coverage stamps both paths (sessions stay per path).",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "countverify"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "countverify: 1 file(s): checked 1"
+      ],
+      "files": {
+        "sweep/countverify.json": {
+          "files": [
+            {
+              "project": "{ROOT}/proj/alpha",
+              "memory_file": "{ROOT}/stores/unit-1/memory/MEMORY.md",
+              "labels": [
+                "A01"
+              ],
+              "entries": 2,
+              "task4_status": "checked",
+              "missing": [],
+              "extra": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "argv": [
+        "coverage"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/coverage.json": {
+          "projects": {
+            "{ROOT}/proj/alpha": {
+              "stamp": true,
+              "reasons": [],
+              "labels": [
+                "A01"
+              ]
+            },
+            "{ROOT}/proj/beta": {
+              "stamp": true,
+              "reasons": [],
+              "labels": [
+                "A02"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "description": "Each verifier input item joins its verdict; an item without one is `missing` (also every item of a verifier with no verdict file), an item listed unverified is `unverified`; synth.txt has one line per item. The verdict is extracted first, so it is bound to V01.data.json (G1).",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "verifier",
+        "--label",
+        "V01",
+        "--from-file",
+        "inbox/V01.txt"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/verdicts/V01.json": {
+          "attempt": 1,
+          "data": "sweep/briefs/V01.data.json",
+          "data_sha256": "$nonnull"
+        }
+      }
+    },
+    {
+      "argv": [
+        "aggregate"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "4 item(s): confirmed 1, unverified 1, missing 2"
+      ],
+      "files": {
+        "sweep/synth.json": {
+          "counts": {
+            "confirmed": 1,
+            "missing": 2,
+            "unverified": 1
+          },
+          "items": [
+            {
+              "item_id": "V01-001",
+              "verdict": "confirmed",
+              "citation": "span"
+            },
+            {
+              "item_id": "V01-002",
+              "verdict": "missing"
+            },
+            {
+              "item_id": "V01-003",
+              "verdict": "unverified"
+            },
+            {
+              "item_id": "V02-001",
+              "verdict": "missing",
+              "heading": "Beta friction"
+            }
+          ]
+        }
+      },
+      "text_contains": {
+        "sweep/synth.txt": [
+          "V01-002\tmemory_proposals\tmissing\tSecond lesson\n",
+          "V02-001\timprovement_signals\tmissing\tBeta friction\n"
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,38 @@
+# Complete Parity Fixture
+
+> **Status**: Complete — shipped and verified
+
+## Intent
+
+### Success criteria
+
+- SC-1: only criterion
+
+### Scope
+
+boundary line
+
+## Phases
+
+### Phase 1: Alpha
+
+**Covers**: SC-1
+
+```markdown
+## Fenced H2 heading -- must NOT end Phase 1's block (fence evaluated before boundary)
+```
+
+- [x] lowercase tick counts (still counts after a fenced ## heading)
+- [X] uppercase tick must NOT count (case-sensitive grammar)
+
+### Phase 2: Beta
+
+- [ ] a real unticked box drives the completeness FAIL branch
+
+```
+- [ ] this fenced unticked box must be excluded from completeness
+```
+
+## Verification
+
+- [x] this ticked box is in a trailing H2 and must be excluded from phase-count

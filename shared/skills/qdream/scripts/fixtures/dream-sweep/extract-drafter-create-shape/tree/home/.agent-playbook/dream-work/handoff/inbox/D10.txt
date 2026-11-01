@@ -1,0 +1,25 @@
+Done.
+
+```json
+{
+  "current_text": "Push to origin.",
+  "after_heading": null,
+  "new_text": "List commits, then push.",
+  "behaviour": "Agents list unpushed commits before pushing.",
+  "existing_coverage": [],
+  "blast_count": 0,
+  "blast_edits": [
+    {
+      "path": "shared/skills/demo/SKILL.md",
+      "heading": "H",
+      "current_text": null,
+      "new_text": "new",
+      "after_heading": "## H",
+      "create": true
+    }
+  ],
+  "memory_ops": [],
+  "notes": null,
+  "handoff_prompt": null
+}
+```

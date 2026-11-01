@@ -1,0 +1,38 @@
+{
+  "description": "plan 261016 Step 9 (D4): a nested folder with a store of its own (plans only) under an ancestor store that holds memory reads the ancestor's memory but gets no memory file of its own here: the sweep writes where its sessions write (store_for names its own store). The ancestor store, which no project serves, keeps a builder as a store-only project.",
+  "now": "2026-09-24T12:00:00Z",
+  "store_repo": "stores",
+  "git": [
+    "proj/e"
+  ],
+  "git_origin": {
+    "proj/e": "https://example.com/Org/Eee.git"
+  },
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/e/sub": {
+          "memory_file": null,
+          "entries": []
+        },
+        "store:remote example.com/org/eee": {
+          "memory_file": "{ROOT}/stores/eee-dddddd/memory/MEMORY.md",
+          "entries": [
+            {
+              "heading": "Ancestor entry"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "normal_folders": true
+}

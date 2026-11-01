@@ -1,0 +1,32 @@
+{
+  "description": "baseline --by-role, drafter marker (plan 261012 Phase 3, D9; review fix Q2): `Dream Drafter Brief` on the first non-blank line is the drafter role, tested before the verifier marker and before the older-transcript fallback, so a drafter brief that names the verifier marker, the word verifier and Cross-validation is a drafter; the one-line `Dream Drafter Brief D03. Read and follow <path>.` form is a drafter; a verifier brief naming the drafter marker below its marker line stays a verifier. The drafter marker is not tested on the whole text: a brief whose body, not its first line, names the drafter marker is a verifier when it also names the verifier marker, and other when it names nothing else. A drafter brief whose marker line comes after leading blank lines (an empty line, a whitespace-only line and a tab-only line) is still a drafter even though its body names the verifier marker and Cross-validation: blank lines are skipped before the first-line test (agent 7). The five role lines sum to tokens:.",
+  "now": "2026-10-14T12:00:00Z",
+  "argv": [
+    "baseline",
+    "--session",
+    "{ROOT}/home/.claude/projects/-ROOT-proj/b5a00000-0000-4000-8000-000000000012.jsonl",
+    "--by-role"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_contains": [
+      "tokens: 1442\n",
+      "agents: 7\n",
+      "role orchestrator: files 1, tokens: 6\n",
+      "role task4: files 1, tokens: 904\n",
+      "role verifier: files 2, tokens: 106\n",
+      "role drafter: files 3, tokens: 403\n",
+      "role other: files 1, tokens: 23\n",
+      "other: agent-a0000000000000006.jsonl: You prepare one gate proposal. This is the Dream Drafter Brief.\n"
+    ],
+    "stdout_not_contains": [
+      "error:",
+      "other: agent-a0000000000000001",
+      "other: agent-a0000000000000002",
+      "other: agent-a0000000000000003",
+      "other: agent-a0000000000000004",
+      "other: agent-a0000000000000005",
+      "other: agent-a0000000000000007"
+    ]
+  }
+}

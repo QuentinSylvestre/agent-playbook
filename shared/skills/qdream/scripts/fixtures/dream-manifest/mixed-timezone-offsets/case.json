@@ -1,0 +1,27 @@
+{
+  "description": "Timestamps are compared as instants: 06:00Z is after 07:33:27+02:00 (05:33:27Z) although it sorts before it as a string; 09:00+05:00 (04:00Z) is before it although it sorts after.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "sessions": [
+            {
+              "id": "c14a0000-0000-4000-8000-000000000001",
+              "provider": "claude",
+              "boundary": "L1"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

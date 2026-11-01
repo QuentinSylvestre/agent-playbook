@@ -1,0 +1,86 @@
+{
+  "description": "Phase 10 B: a cited path resolves under the memory file's folder, a plans/done/ archive (same title under a new date prefix, or the same name), a known project named by its folder, an absolute path inside a known project, and the config repo when the project lacks the path's first component; a slug resolves in a sibling project's archive, for project and user memory; a cited plan without a date prefix matches an archive of any date; a /qclose research-mode slug resolves to its archive folder plans/done/<YYMMDD-HHMM>_RESEARCH_<TAG>/.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "memory_flags": [],
+          "entries": [
+            {
+              "heading": "Memory-folder relative",
+              "cited_paths_missing": [],
+              "cited_slugs_missing": []
+            },
+            {
+              "heading": "Archived under a new prefix",
+              "cited_paths_missing": [],
+              "cited_slugs_missing": []
+            },
+            {
+              "heading": "Archived under the same name",
+              "cited_paths_missing": [],
+              "cited_slugs_missing": []
+            },
+            {
+              "heading": "Sibling by folder name",
+              "cited_paths_missing": [],
+              "cited_slugs_missing": []
+            },
+            {
+              "heading": "Sibling plan archived",
+              "cited_paths_missing": [],
+              "cited_slugs_missing": []
+            },
+            {
+              "heading": "Absolute inside a sibling",
+              "cited_paths_missing": [],
+              "cited_slugs_missing": []
+            },
+            {
+              "heading": "Config repo fallback",
+              "cited_paths_missing": [],
+              "cited_slugs_missing": []
+            },
+            {
+              "heading": "Slug in a sibling archive",
+              "cited_paths_missing": [],
+              "cited_slugs_missing": []
+            },
+            {
+              "heading": "Undated plan archived under a date",
+              "cited_paths_missing": [],
+              "cited_slugs_missing": []
+            },
+            {
+              "heading": "Research run archived as a folder",
+              "cited_paths_missing": [],
+              "cited_slugs_missing": []
+            }
+          ]
+        }
+      },
+      "user_memory": {
+        "memory_flags": [],
+        "entries": [
+          {
+            "heading": "User memory cites a sibling",
+            "cited_paths_missing": [],
+            "cited_slugs_missing": []
+          }
+        ]
+      }
+    }
+  },
+  "git": [
+    "repo"
+  ]
+}

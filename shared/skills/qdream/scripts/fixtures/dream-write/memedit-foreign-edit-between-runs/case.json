@@ -1,0 +1,172 @@
+{
+  "description": "A file another session edits between two memedit runs is still written, but marked foreign-edit (the run compares its current sha256 with the last one recorded for it), so commit lists it instead of committing the other session's edit; a file nobody touched in between stays unmarked and is committed.",
+  "now": "2026-10-12T12:00:00Z",
+  "store_repo": "stores",
+  "setup": [
+    {
+      "write": {
+        "repo/.gitignore": "memory/.dream-journal.jsonl\n",
+        "repo/AGENTS.md": "# Agents\n\n## Rules\n\nOld rule text.\n\n### Sub\n\nsub text\n\n## Other\n\nKeep this.\n",
+        "repo/shared/skills/demo/SKILL.md": "# Demo skill\n\n## Steps\n\nStep one.\n",
+        "repo/memory/MEMORY.md": "# Memory\n\n## Topics\n\n| Topic | Trigger |\n|---|---|\n| ci | when editing CI |\n\n## Feedback\n\n### Keep commits small\n\n**Why**: small diffs review faster.\n**How to apply**: split by concern.\n**Source**: plan-a § Notes | **Verified**: 2026-09-01\n\n### Old heading text\n\n**Why**: w.\n**How to apply**: h.\n**Source**: plan-b § Notes | **Verified**: 2026-09-02\n\n## Decision\n\n### Use stdlib only\n\n**Why**: no installs.\n**How to apply**: import nothing third-party.\n**Source**: plan-c § D1 | **Verified**: 2026-09-03 (human:alice)\n\n## Pattern\n\n### Fenced example\n\n```text\n### Not an entry\n```\n\n**Why**: shows fences.\n**How to apply**: n/a.\n**Source**: plan-d § P | **Verified**: 2026-09-04\n**Usage**: 2\n\n## Declined\n\n- \"Rejected idea\" — declined 2026-09-10 (not useful)\n",
+        "repo/memory/topics/ci.md": "# CI topic\n\n## Pattern\n\n### Pin the runner image\n\n**Why**: drift.\n**How to apply**: pin.\n**Source**: s6 | **Verified**: 2026-09-07\n",
+        "repo/memory/HIGHER_ORDER.md": "# Higher-order memory\n\n## Pattern\n\n### Node one\n\n**Why**: n.\n**How to apply**: n.\n**Source**: s7 | **Verified**: 2026-09-08\n**Support-set**: episodic_ledger #1\n",
+        "repo/memory/.dream-state.json": "{\n  \"schema_version\": 3,\n  \"last_run\": \"2026-10-01T00:00:00Z\",\n  \"projects\": {\n    \"{ROOT}/proj/alpha\": {\n      \"last_analyzed\": \"2026-10-01T00:00:00Z\"\n    },\n    \"{ROOT}/proj/beta\": {\n      \"last_analyzed\": \"2026-10-01T00:00:00Z\"\n    }\n  },\n  \"rejected_lessons\": [],\n  \"outcome_tags\": [],\n  \"episodic_ledger\": [\n    {\n      \"what\": \"memory written: Keep commits small\",\n      \"where\": \"5e550000-0000-4000-8000-000000000001\",\n      \"when\": \"2026-09-01\",\n      \"outcome\": \"written\",\n      \"support_set\": [\n        \"user memory § Keep commits small\"\n      ]\n    }\n  ],\n  \"cost_records\": [],\n  \"model_routing\": {},\n  \"deferred_sessions\": {},\n  \"quiet_sweeps\": {\n    \"projects\": {\n      \"{ROOT}/proj/alpha\": 1,\n      \"{ROOT}/proj/beta\": 0\n    },\n    \"user_memory\": 2\n  }\n}\n",
+        "repo/memory/.dream-journal.jsonl": "",
+        "stores/beta-000000/STORE": "local {ROOT}/proj/beta\n",
+        "stores/beta-000000/memory/MEMORY.md": "# Beta memory\n\n## Feedback\n\n### Beta entry\n\n**Why**: b.\n**How to apply**: b.\n**Source**: s4 | **Verified**: 2026-09-06\n\n### Beta second\n\n**Why**: c.\n**How to apply**: c.\n**Source**: s5 | **Verified**: 2026-09-06\n**Usage**: 9 | **Outcome**: not-recurred 2026-07-20\n\n## Declined\n",
+        "proj/alpha/memory/MEMORY.md": "# Alpha memory\n\n## Feedback\n\n### Shared heading\n\n**Why**: f.\n**How to apply**: f.\n**Source**: s1 | **Verified**: 2026-09-05\n\n### Alpha only\n\n**Why**: a.\n**How to apply**: a.\n**Source**: s2 | **Verified**: 2026-09-05\n\n## Pattern\n\n### Shared heading\n\n**Why**: p.\n**How to apply**: p.\n**Source**: s3 | **Verified**: 2026-09-05\n\n## Declined\n",
+        "proj/alpha/README.md": "alpha\n",
+        "proj/beta/README.md": "beta\n",
+        "home/.agent-playbook/dream-work/manifest.json": "{\n  \"snapshot_at\": \"2026-10-12T11:00:00Z\",\n  \"sweep_due\": false,\n  \"due_sessions\": 0,\n  \"new_project_baseline\": {\n    \"rule\": \"last_run\",\n    \"since\": \"2026-10-01T00:00:00Z\"\n  },\n  \"errors\": [],\n  \"empty_sessions\": 0,\n  \"unattributed\": \"unattributed.json\",\n  \"watermarks_to_clear\": [],\n  \"user_memory\": {\n    \"detail\": \"user_memory.json\",\n    \"counts\": {\n      \"files\": 2,\n      \"entries\": 5,\n      \"suspects\": 0\n    },\n    \"quiet_sweeps\": 2,\n    \"memory_pass\": null,\n    \"memory_flags\": [],\n    \"file_flags\": {},\n    \"file_suspects\": {}\n  },\n  \"projects\": {\n    \"{ROOT}/proj/alpha\": {\n      \"status\": \"known\",\n      \"discovered_by\": [\n        \"state\"\n      ],\n      \"subdirectory_of\": null,\n      \"baseline_rule\": \"state\",\n      \"older_sessions_not_read\": 0,\n      \"empty_sessions\": 0,\n      \"counts\": {\n        \"sessions\": 0,\n        \"entries\": 0,\n        \"suspects\": 0,\n        \"new_plans\": 0,\n        \"errors\": 0\n      },\n      \"sessions\": [],\n      \"errors\": [],\n      \"due\": false,\n      \"fork_collapsed\": [],\n      \"memory_file\": \"{ROOT}/proj/alpha/memory/MEMORY.md\",\n      \"detail\": \"projects/alpha.json\",\n      \"quiet_sweeps\": 1,\n      \"memory_pass\": null,\n      \"memory_flags\": []\n    },\n    \"{ROOT}/proj/beta\": {\n      \"status\": \"known\",\n      \"discovered_by\": [\n        \"state\"\n      ],\n      \"subdirectory_of\": null,\n      \"baseline_rule\": \"state\",\n      \"older_sessions_not_read\": 0,\n      \"empty_sessions\": 0,\n      \"counts\": {\n        \"sessions\": 0,\n        \"entries\": 0,\n        \"suspects\": 0,\n        \"new_plans\": 0,\n        \"errors\": 0\n      },\n      \"sessions\": [],\n      \"errors\": [],\n      \"due\": false,\n      \"fork_collapsed\": [],\n      \"memory_file\": \"{ROOT}/stores/beta-000000/memory/MEMORY.md\",\n      \"detail\": \"projects/beta.json\",\n      \"quiet_sweeps\": 0,\n      \"memory_pass\": null,\n      \"memory_flags\": []\n    }\n  }\n}\n",
+        "home/.agent-playbook/dream-work/projects/alpha.json": "{\n  \"project\": \"{ROOT}/proj/alpha\",\n  \"entries\": [\n    {\n      \"file\": \"{ROOT}/proj/alpha/memory/MEMORY.md\",\n      \"heading\": \"Shared heading\",\n      \"ordinal\": 1,\n      \"cited_paths_missing\": [],\n      \"cited_slugs_missing\": [],\n      \"stale_after_passed\": false,\n      \"governance_conflict_open\": [],\n      \"cited_path_changed\": [],\n      \"cited_commit_missing\": [],\n      \"stale_when_fired\": false,\n      \"stale_when_unknown\": false,\n      \"suspect\": false\n    },\n    {\n      \"file\": \"{ROOT}/proj/alpha/memory/MEMORY.md\",\n      \"heading\": \"Alpha only\",\n      \"ordinal\": 2,\n      \"cited_paths_missing\": [],\n      \"cited_slugs_missing\": [],\n      \"stale_after_passed\": false,\n      \"governance_conflict_open\": [],\n      \"cited_path_changed\": [],\n      \"cited_commit_missing\": [],\n      \"stale_when_fired\": false,\n      \"stale_when_unknown\": false,\n      \"suspect\": false\n    },\n    {\n      \"file\": \"{ROOT}/proj/alpha/memory/MEMORY.md\",\n      \"heading\": \"Shared heading\",\n      \"ordinal\": 3,\n      \"cited_paths_missing\": [],\n      \"cited_slugs_missing\": [],\n      \"stale_after_passed\": false,\n      \"governance_conflict_open\": [],\n      \"cited_path_changed\": [],\n      \"cited_commit_missing\": [],\n      \"stale_when_fired\": false,\n      \"stale_when_unknown\": false,\n      \"suspect\": false\n    }\n  ],\n  \"plans\": {\n    \"archive\": null,\n    \"archive_source\": null,\n    \"new_plans\": [],\n    \"recent\": [],\n    \"accept_and_note\": []\n  },\n  \"older_sessions\": [],\n  \"empty_session_ids\": []\n}\n",
+        "home/.agent-playbook/dream-work/projects/beta.json": "{\n  \"project\": \"{ROOT}/proj/beta\",\n  \"entries\": [\n    {\n      \"file\": \"{ROOT}/stores/beta-000000/memory/MEMORY.md\",\n      \"heading\": \"Beta entry\",\n      \"ordinal\": 1,\n      \"cited_paths_missing\": [],\n      \"cited_slugs_missing\": [],\n      \"stale_after_passed\": false,\n      \"governance_conflict_open\": [],\n      \"cited_path_changed\": [],\n      \"cited_commit_missing\": [],\n      \"stale_when_fired\": false,\n      \"stale_when_unknown\": false,\n      \"suspect\": false\n    },\n    {\n      \"file\": \"{ROOT}/stores/beta-000000/memory/MEMORY.md\",\n      \"heading\": \"Beta second\",\n      \"ordinal\": 2,\n      \"cited_paths_missing\": [],\n      \"cited_slugs_missing\": [],\n      \"stale_after_passed\": false,\n      \"governance_conflict_open\": [],\n      \"cited_path_changed\": [],\n      \"cited_commit_missing\": [],\n      \"stale_when_fired\": false,\n      \"stale_when_unknown\": false,\n      \"suspect\": false\n    }\n  ],\n  \"plans\": {\n    \"archive\": null,\n    \"archive_source\": null,\n    \"new_plans\": [],\n    \"recent\": [],\n    \"accept_and_note\": []\n  },\n  \"older_sessions\": [],\n  \"empty_session_ids\": []\n}\n",
+        "home/.agent-playbook/dream-work/user_memory.json": "{\n  \"files\": [\n    \"{ROOT}/repo/memory/MEMORY.md\",\n    \"{ROOT}/repo/memory/topics/ci.md\"\n  ],\n  \"entries\": []\n}\n",
+        "home/.agent-playbook/dream-work/unattributed.json": "{\n  \"sessions\": []\n}\n"
+      }
+    },
+    {
+      "init": [
+        "repo",
+        "proj/alpha",
+        "proj/beta"
+      ]
+    },
+    {
+      "sweep": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ]
+    },
+    {
+      "write": {
+        "proj/alpha/memory/MEMORY.md": "# Alpha memory\n\n## Feedback\n\n### Shared heading\n\n**Why**: f.\n**How to apply**: f.\n**Source**: s1 | **Verified**: 2026-09-05\n\n### Alpha only\n\n**Why**: a.\n**How to apply**: a.\n**Source**: s2 | **Verified**: 2026-09-05\n\n## Pattern\n\n### Shared heading\n\n**Why**: p.\n**How to apply**: p.\n**Source**: s3 | **Verified**: 2026-09-05\n\n## Declined\n\nother session\n"
+      }
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/ops/a.json": "{\n  \"ops\": [\n    {\n      \"id\": \"f1\",\n      \"op\": \"usage_bump\",\n      \"file\": \"{ROOT}/proj/alpha/memory/MEMORY.md\",\n      \"heading\": \"Alpha only\"\n    },\n    {\n      \"id\": \"f2\",\n      \"op\": \"usage_bump\",\n      \"file\": \"{ROOT}/repo/memory/topics/ci.md\",\n      \"heading\": \"Pin the runner image\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/ops/b.json": "{\n  \"ops\": [\n    {\n      \"id\": \"f3\",\n      \"op\": \"usage_bump\",\n      \"file\": \"{ROOT}/proj/alpha/memory/MEMORY.md\",\n      \"heading\": \"Shared heading\",\n      \"section\": \"Feedback\"\n    }\n  ]\n}\n"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/ops/g.json": "{\n  \"ops\": [\n    {\n      \"id\": \"g0\",\n      \"op\": \"usage_bump\",\n      \"file\": \"{ROOT}/repo/memory/topics/ci.md\",\n      \"heading\": \"Pin the runner image\"\n    },\n    {\n      \"id\": \"m0\",\n      \"op\": \"usage_bump\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Keep commits small\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "memedit",
+        "--ops",
+        "handoff/ops/g.json",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "writes": [
+        "repo/memory/topics/ci.md",
+        "repo/memory/MEMORY.md"
+      ],
+      "files": {
+        "sweep/hashes.json": {
+          "files": {
+            "{ROOT}/repo/memory/topics/ci.md": {
+              "foreign_edit": false
+            },
+            "{ROOT}/repo/memory/MEMORY.md": {
+              "foreign_edit": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "replace_text": {
+        "repo/memory/topics/ci.md": [
+          "**Why**: drift.",
+          "**Why**: drift. OTHER SESSION LINE"
+        ]
+      }
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/ops/h.json": "{\n  \"ops\": [\n    {\n      \"id\": \"g1\",\n      \"op\": \"usage_bump\",\n      \"file\": \"{ROOT}/repo/memory/topics/ci.md\",\n      \"heading\": \"Pin the runner image\"\n    },\n    {\n      \"id\": \"m1\",\n      \"op\": \"usage_bump\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Keep commits small\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "memedit",
+        "--ops",
+        "handoff/ops/h.json",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "writes": [
+        "repo/memory/topics/ci.md",
+        "repo/memory/MEMORY.md"
+      ],
+      "files": {
+        "sweep/hashes.json": {
+          "files": {
+            "{ROOT}/repo/memory/topics/ci.md": {
+              "foreign_edit": true
+            },
+            "{ROOT}/repo/memory/MEMORY.md": {
+              "foreign_edit": false
+            }
+          }
+        }
+      }
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": []\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "commit",
+        "--repos",
+        "{ROOT}/repo",
+        "--usage-line",
+        "Usage from plans: 1 bumped, 0 unresolved, 0 dropped by the manifest cap",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}",
+        "--decisions",
+        "handoff/decisions.json",
+        "--decisions-sha",
+        "{SHA256:handoff/decisions.json}"
+      ],
+      "stdout_contains": [
+        "memory/topics/ci.md: foreign-edit"
+      ],
+      "gitcheck": [
+        {
+          "dir": "repo",
+          "args": [
+            "rev-list",
+            "--count",
+            "HEAD"
+          ],
+          "equals": "2"
+        },
+        {
+          "dir": "repo",
+          "args": [
+            "show",
+            "--name-only",
+            "--format=",
+            "HEAD"
+          ],
+          "equals": "memory/MEMORY.md"
+        }
+      ]
+    }
+  ]
+}

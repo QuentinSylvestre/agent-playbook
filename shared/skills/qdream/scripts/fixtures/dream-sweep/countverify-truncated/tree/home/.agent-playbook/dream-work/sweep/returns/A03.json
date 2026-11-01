@@ -1,0 +1,28 @@
+{
+  "label": "A03",
+  "kind": "task4",
+  "via": "inbox",
+  "return": {
+    "memory_proposals": [],
+    "unrelated": [
+      "G1",
+      "Ghost"
+    ],
+    "not_a_conflict": [],
+    "subsumed_entries": [],
+    "stale_entries": [],
+    "governance_conflicts": [],
+    "verified": [],
+    "task4_status": "checked",
+    "improvement_signals": [],
+    "user_skipped": [],
+    "saved_in_session": [],
+    "new_skill_candidates": [],
+    "insights_signals": [],
+    "sessions_read": [],
+    "checkpoint_collapsed": 0,
+    "project_accessible": true,
+    "error": null,
+    "scope": "all tasks"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "description": "main() as a subprocess with a cwd that breaks the build: exit 0 and the one-line fail-open notice.",
+  "stdin": "{\"cwd\": 5, \"hook_event_name\": \"SessionStart\", \"source\": \"startup\"}",
+  "regex": [
+    "\\APlaybook memory hook failed open \\(TypeError: [^\\n]*\\Z"
+  ],
+  "config_repo": "{{ROOT}}/cfg"
+}

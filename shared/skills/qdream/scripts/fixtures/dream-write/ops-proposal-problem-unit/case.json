@@ -1,0 +1,15 @@
+{
+  "description": "Review R22 and R15 (plan 261027): proposal_problem refuses a heading over 200 characters, a source holding a `|`, a free-text field holding a `**<Field>**:` marker or starting with `###`, and passes a clean proposal.",
+  "now": "2026-10-12T12:00:00Z",
+  "setup": [
+    {
+      "write": {
+        "repo/.gitkeep": ""
+      }
+    }
+  ],
+  "steps": [],
+  "units": [
+    "proposal-problem"
+  ]
+}

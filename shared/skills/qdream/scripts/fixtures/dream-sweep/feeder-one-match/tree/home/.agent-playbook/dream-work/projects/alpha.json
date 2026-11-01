@@ -1,0 +1,55 @@
+{
+  "project": "{ROOT}/proj/alpha",
+  "entries": [
+    {
+      "file": "{ROOT}/proj/alpha/memory/MEMORY.md",
+      "heading": "Use the cache wisely",
+      "ordinal": 1,
+      "cited_paths_missing": [],
+      "cited_slugs_missing": [],
+      "stale_after_passed": false,
+      "governance_conflict_open": [],
+      "cited_path_changed": [],
+      "cited_commit_missing": [],
+      "stale_when_fired": false,
+      "stale_when_unknown": false,
+      "suspect": false
+    }
+  ],
+  "plans": {
+    "archive": null,
+    "archive_source": null,
+    "new_plans": [
+      {
+        "file": "261005-1200_ONE.md",
+        "title": "T",
+        "date": "2026-10-05",
+        "decisions": [],
+        "review_log": [],
+        "truncated": false,
+        "memory_relied_on": [
+          "use the  cache WISELY",
+          "Use the cache wisely."
+        ],
+        "memory_relied_on_truncated": false
+      },
+      {
+        "file": "261006-1200_TWO.md",
+        "title": "T",
+        "date": "2026-10-05",
+        "decisions": [],
+        "review_log": [],
+        "truncated": false,
+        "memory_relied_on": [
+          "Use the cache wisely",
+          " topic   LESSON "
+        ],
+        "memory_relied_on_truncated": false
+      }
+    ],
+    "recent": [],
+    "accept_and_note": []
+  },
+  "older_sessions": [],
+  "empty_session_ids": []
+}

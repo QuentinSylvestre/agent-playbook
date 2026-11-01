@@ -1,0 +1,163 @@
+{
+  "description": "Phase 8 kiro reader guards: the last of two subagent_response calls is the return; a phase-agent id or a child id that is a path is never followed out of sub-executions/; the last of two sub_agent_complete records decides; a prose subagent_response that differs from the response the phase agent got is refused even with a JSON Say; a JSON Say followed by another tool call is no return (a later prose Say is fine); a child record with no subExecutionId or no executionId is refused.",
+  "now": "2026-10-12T12:30:00Z",
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "B01",
+        "--kiro"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "source subagent_response"
+      ],
+      "files": {
+        "sweep/returns/B01.json": {
+          "return": {
+            "unrelated": [
+              "B01 real last"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "B02",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no qdream_child launch of B02"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "B03",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no qdream_child launch of B03"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "B04",
+        "--kiro"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/returns/B04.json": {
+          "return": {
+            "unrelated": [
+              "B04 ok"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "B05",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not the response its phase agent received"
+      ],
+      "absent": [
+        "sweep/returns/B05.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "B06",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "followed by a 'read_file' call"
+      ],
+      "absent": [
+        "sweep/returns/B06.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "B07",
+        "--kiro"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "source say"
+      ],
+      "files": {
+        "sweep/returns/B07.json": {
+          "via": "kiro-transcript:say",
+          "return": {
+            "unrelated": [
+              "B07 say"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "B08",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "with no subExecutionId"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "B09",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "with no executionId"
+      ]
+    }
+  ]
+}

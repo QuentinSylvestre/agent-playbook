@@ -1,0 +1,2 @@
+symlink-file	~/.claude/CLAUDE.md	shared/AGENTS.md	claude
+symlink-file	~/.kiro/steering/powershell-syntax.md	providers/kiro/steering/powershell-syntax.md	kiro

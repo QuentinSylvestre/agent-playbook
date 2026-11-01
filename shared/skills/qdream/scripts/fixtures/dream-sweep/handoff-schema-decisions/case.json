@@ -1,0 +1,230 @@
+{
+  "description": "decisions.json: items a list of objects (dream-write.py checks each item further). The items pass dream-write.py item_problems, the table check memedit runs: an unknown kind, an option outside the kind's options, an unknown variant, and an item that authorizes a memory op without file, heading or shown_text fail here.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": [\n    {\n      \"id\": \"G1\",\n      \"kind\": \"governance\",\n      \"answer\": \"Skip\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "decisions.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check decisions.json: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": [\n    [\n      \"G1\",\n      \"Skip\"\n    ]\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "decisions.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "key 'items': expected list:obj"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"answers\": []\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "decisions.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "missing key 'items'"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decisions.json": "[]\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "decisions.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "decisions.json is not a JSON object"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": [\n    {\n      \"id\": \"S1\",\n      \"kind\": \"stale\",\n      \"answer\": \"Delete, it is gone\",\n      \"option\": \"Delete\",\n      \"file\": \"/r/memory/MEMORY.md\",\n      \"heading\": \"H\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "decisions.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check decisions.json: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": [\n    {\n      \"id\": \"S1\",\n      \"kind\": \"stale\",\n      \"answer\": \"Delete, it is gone\",\n      \"option\": \"Yes apply\",\n      \"file\": \"/r/memory/MEMORY.md\",\n      \"heading\": \"H\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "decisions.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "'Yes apply' is not a stale option"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": [\n    {\n      \"id\": \"S1\",\n      \"kind\": \"stale\",\n      \"answer\": \"Delete, it is gone\",\n      \"file\": \"/r/memory/MEMORY.md\",\n      \"heading\": \"H\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "decisions.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not a stale option (write the normalized option in `option`"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": [\n    {\n      \"id\": \"S1\",\n      \"kind\": \"cleanup\",\n      \"answer\": \"Delete, it is gone\",\n      \"option\": \"Delete\",\n      \"file\": \"/r/memory/MEMORY.md\",\n      \"heading\": \"H\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "decisions.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "unknown kind 'cleanup'"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": [\n    {\n      \"id\": \"S1\",\n      \"kind\": \"stale\",\n      \"answer\": \"Delete, it is gone\",\n      \"option\": \"Delete\",\n      \"file\": \"/r/memory/MEMORY.md\",\n      \"heading\": \"H\",\n      \"variant\": \"merge-downgrade\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "decisions.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "'merge-downgrade' is not a variant of stale"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": [\n    {\n      \"id\": \"S1\",\n      \"kind\": \"stale\",\n      \"answer\": \"Delete, it is gone\",\n      \"option\": \"Delete\",\n      \"heading\": \"H\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "decisions.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "option 'delete' needs 'file'"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": [\n    {\n      \"id\": \"S1\",\n      \"kind\": \"memory-proposal\",\n      \"answer\": \"Save\",\n      \"option\": \"Save\",\n      \"file\": \"/r/memory/MEMORY.md\",\n      \"heading\": \"H\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "decisions.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "option 'save' needs 'shown_text'"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": [\n    {\n      \"id\": \"D1\",\n      \"kind\": \"duplicate\",\n      \"answer\": \"Delete a.md copy\",\n      \"option\": \"Delete copy\",\n      \"file\": \"/r/memory/a.md\",\n      \"heading\": \"H\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "decisions.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check decisions.json: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": [\n    {\n      \"id\": \"B1\",\n      \"kind\": \"budget-move\",\n      \"answer\": \"Move\",\n      \"file\": \"/r/m.md\",\n      \"heading\": \"H\",\n      \"shown_text\": \"### H\\n\\nb\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "decisions.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "option 'move' needs 'to_file'"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": [\n    {\n      \"id\": \"S1\",\n      \"kind\": \"stale\",\n      \"answer\": \"Delete, it is gone\",\n      \"option\": \"Delete\",\n      \"file\": \"/r/memory/MEMORY.md\",\n      \"heading\": \"H\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"stale\",\n      \"answer\": \"Delete, it is gone\",\n      \"option\": \"Delete\",\n      \"file\": \"/r/memory/MEMORY.md\",\n      \"heading\": \"H\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "decisions.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "item 2 has no unique id"
+      ]
+    }
+  ]
+}

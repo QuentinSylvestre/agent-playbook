@@ -1,0 +1,8 @@
+{
+  "description": "The guard digest covers tracked *.py, *.ps1 and *.sh at any depth and leaves out fixtures/, __pycache__/ (bytecode included), untracked files and other extensions; a deployed copy without git counts every file with a guarded extension. Expected digests are computed in the unit by hand.",
+  "now": "2026-10-12T12:00:00Z",
+  "units": [
+    "guard-digest-synthetic"
+  ],
+  "steps": []
+}

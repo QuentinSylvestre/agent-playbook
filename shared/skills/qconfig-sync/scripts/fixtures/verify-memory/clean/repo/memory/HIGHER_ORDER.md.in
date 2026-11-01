@@ -1,0 +1,16 @@
+# Higher-Order Memory
+
+Fixture preamble. It holds no entry heading.
+
+## Feedback
+
+## Decision
+
+## Pattern
+
+### Fixture node
+
+**Why**: the node reason.
+**How to apply**: the node action.
+**Source**: fixture-plan § Node | **Verified**: 2026-10-02 (sweep, anchor-reopen)
+**Support-set**: user memory § Fixture feedback entry one, user memory § Fixture pattern entry

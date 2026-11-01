@@ -1,0 +1,26 @@
+{
+  "description": "X6: coverage counts and prints the labels whose return came from the inbox (extract --from-file, via inbox), and lists them in coverage.json inbox_returns, so the Report line is script-sourced. A01 came from the inbox, A02 from a transcript: only A01 is named. A label with no return is not an inbox label.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "coverage"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "returns from the inbox (--from-file, no transcript check): 1 (A01)"
+      ],
+      "stdout_not_contains": [
+        "(A01, A02)",
+        ": 2 ("
+      ],
+      "files": {
+        "sweep/coverage.json": {
+          "inbox_returns": [
+            "A01"
+          ]
+        }
+      }
+    }
+  ]
+}

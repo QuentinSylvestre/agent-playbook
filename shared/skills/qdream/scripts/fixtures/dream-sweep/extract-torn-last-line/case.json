@@ -1,0 +1,59 @@
+{
+  "description": "F18: a transcript whose last line does not parse is still being written: extract is exit 3 (the torn record may be the final message) and wait reports no-final-message with the torn line; an unparseable middle line is counted in the summary and the final message is still taken.",
+  "now": "2026-10-12T12:00:00Z",
+  "env": {
+    "CLAUDE_CODE_SESSION_ID": "5e550000-0000-4000-8000-000000000001"
+  },
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--claude-agent",
+        "a1111111111111111"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "still being written"
+      ],
+      "absent": [
+        "sweep/returns"
+      ]
+    },
+    {
+      "argv": [
+        "wait",
+        "--labels",
+        "A01=a1111111111111111"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "A01: no-final-message",
+        "the last one torn"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A02",
+        "--claude-agent",
+        "a2222222222222222"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "transcript: 1 unparseable line(s) skipped"
+      ],
+      "files": {
+        "sweep/returns/A02.json": {
+          "via": "claude-transcript:text"
+        }
+      }
+    }
+  ]
+}

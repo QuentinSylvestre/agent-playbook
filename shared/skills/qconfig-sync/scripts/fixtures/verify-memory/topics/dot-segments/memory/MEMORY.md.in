@@ -1,0 +1,11 @@
+## Topics
+
+| Topic file | Read when | Also cited from |
+|---|---|---|
+| `memory/topics/git.md` | a git operation | `providers/../skills/qqa/SKILL.md` |
+| `memory/topics/powershell.md` | a PowerShell script | `shared/skills/./SKILL.md` |
+| `memory/topics/kiro-cli.md` | driving kiro-cli | `shared/skills/..\..\providers\kiro\skills\qrecover-file/SKILL.md` |
+| `memory/topics/http-testing.md` | a Host header test | `shared/skills/qqa./SKILL.md` |
+| `memory/topics/claude-code.md` | configuring Claude Code | `shared/skills/qqa /SKILL.md` |
+| `memory/topics/house-style-docs.md` | a deliverable | `shared/skills/qqa/SKILL.md/` |
+| `memory/topics/electron-vite.md` | an Electron build | `shared/skills/qqa/SKILL.md::$DATA` |

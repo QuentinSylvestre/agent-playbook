@@ -1,0 +1,16 @@
+Done.
+
+```json
+{
+  "current_text": "",
+  "after_heading": null,
+  "new_text": "",
+  "behaviour": "Agents no longer push without listing commits.",
+  "existing_coverage": [],
+  "blast_count": 0,
+  "blast_edits": [],
+  "memory_ops": [],
+  "notes": null,
+  "handoff_prompt": null
+}
+```

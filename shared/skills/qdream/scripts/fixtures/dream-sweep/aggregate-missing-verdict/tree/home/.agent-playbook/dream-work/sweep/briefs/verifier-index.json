@@ -1,0 +1,15 @@
+{
+  "verifiers": [
+    {
+      "label": "V01",
+      "project": "{ROOT}/proj/alpha",
+      "items": 3
+    },
+    {
+      "label": "V02",
+      "project": "{ROOT}/proj/beta",
+      "items": 1
+    }
+  ],
+  "returns_missing": 0
+}

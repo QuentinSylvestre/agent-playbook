@@ -1,0 +1,2 @@
+{"id": "m1", "timestamp": "2026-09-23T08:00:00.000Z", "payload": {"type": "user", "content": "start the export", "_meta": {}, "documents": [], "images": []}}
+{"id": "m2", "timestamp": "2026-09-23T08:00:10.000Z", "payload": {"type": "assistant", "content": "The process then died mid-turn."}}

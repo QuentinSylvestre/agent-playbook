@@ -1,0 +1,12 @@
+{
+  "phase": "gather",
+  "step": "GAT-PLANS",
+  "kind": "failure",
+  "question": null,
+  "options": [
+    "Retry",
+    "Skip"
+  ],
+  "recommendation": null,
+  "resume_from": "GAT-PLANS"
+}

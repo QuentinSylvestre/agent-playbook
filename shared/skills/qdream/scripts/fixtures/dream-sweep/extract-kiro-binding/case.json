@@ -1,0 +1,199 @@
+{
+  "description": "Phase 8 kiro reader binding: two launches of A01 attempt 1 are exit 3 naming both, and --kiro-child picks one (the second); a child with no sub_agent_complete has not ended (exit 3); a subagent_response that differs from the response its phase agent received is exit 3; a kiro_default sub-agent is no qdream_child (not found; named: exit 3); a torn last line is exit 3; a child file holding another sub-execution's record is exit 3; a child that ended with a status other than success is exit 3; a child launched by a sub-agent that is not a kiro_default phase agent is not found (named: exit 3).",
+  "now": "2026-10-12T12:00:00Z",
+  "env": {
+    "KIRO_SESSION_ID": "sess_5e550000-0000-4000-8000-0000000000a1"
+  },
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "2 launches of A01 attempt 1",
+        "c0000001-0000-4000-8000-000000000000",
+        "c0000002-0000-4000-8000-000000000000"
+      ],
+      "absent": [
+        "sweep/returns/A01.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--kiro",
+        "--kiro-child",
+        "c0000002-0000-4000-8000-000000000000"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/returns/A01.json": {
+          "agent_id": "c0000002-0000-4000-8000-000000000000",
+          "return": {
+            "unrelated": [
+              "Launch two"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A02",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "has not ended"
+      ],
+      "absent": [
+        "sweep/returns/A02.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A03",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not the response its phase agent received"
+      ],
+      "absent": [
+        "sweep/returns/A03.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A04",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no qdream_child launch of A04"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A04",
+        "--kiro",
+        "--kiro-child",
+        "c0000005-0000-4000-8000-000000000000"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "'kiro_default' sub-agent"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A05",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "ends in an unparseable line"
+      ],
+      "absent": [
+        "sweep/returns/A05.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A06",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "holds a record of sub-execution"
+      ],
+      "absent": [
+        "sweep/returns/A06.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A07",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "ended with status 'error'"
+      ],
+      "absent": [
+        "sweep/returns/A07.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A08",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no qdream_child launch of A08"
+      ],
+      "absent": [
+        "sweep/returns/A08.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A08",
+        "--kiro",
+        "--kiro-child",
+        "c0000011-0000-4000-8000-000000000000"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "was not launched by a phase agent of session"
+      ]
+    }
+  ]
+}

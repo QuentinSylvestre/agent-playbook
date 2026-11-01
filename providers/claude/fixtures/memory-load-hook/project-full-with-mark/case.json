@@ -1,0 +1,21 @@
+{
+  "description": "A git project whose cited file changed after Verified, opened from a subfolder: the mark resolves against the project root, never cwd. A cited path escaping the root (../) gets no mark.",
+  "git": [
+    "proj",
+    "outside"
+  ],
+  "git_date": "2026-09-15T12:00:00",
+  "time_cap": 20,
+  "cwd": "{{ROOT}}/proj/src",
+  "cap": 9500,
+  "contains": [
+    "delivered in full",
+    "⚠ in project tier: Project marked heading"
+  ],
+  "absent": [
+    "Project quiet heading;",
+    "; Project escaping heading"
+  ],
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores"
+}

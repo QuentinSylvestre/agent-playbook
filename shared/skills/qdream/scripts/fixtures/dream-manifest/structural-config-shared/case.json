@@ -1,0 +1,28 @@
+{
+  "description": "A session run from a skill folder under the config repo's shared/ is a subdirectory of the config repo: shared/AGENTS.md is the deployed global file, never a project marker, so the ancestor walk skips it.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "$absent": [
+          "{ROOT}/repo/shared"
+        ],
+        "{ROOT}/repo/shared/skills/x": {
+          "status": "new",
+          "discovered_by": [
+            "A"
+          ],
+          "subdirectory_of": "{ROOT}/repo"
+        }
+      }
+    }
+  }
+}

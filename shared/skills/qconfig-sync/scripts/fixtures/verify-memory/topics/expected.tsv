@@ -1,0 +1,23 @@
+# Topic-citation fixture verdicts (the former verify-topics guard), read by
+# verify-memory.py --selftest. case = fixture directory; the selftest copies it to scratch, drops a trailing
+# .in from every file name (MEMORY.md.in keeps fictional citations away from
+# verify-links), and passes the copy as the repo root. exit = expected exit
+# code. transform = bom-crlf to add a UTF-8 BOM and CRLF endings to
+# memory/MEMORY.md and inventory.tsv in the copy, else -. Each case's expected
+# stdout is <case>/expected.out (empty for an exit-2 case). stderr = a
+# substring stderr must contain (the reason an exit-2 case stopped), else -.
+case	exit	transform	stderr
+pass	0	-	-
+missing-citer	1	-	-
+non-deployed-citer	1	-	-
+bom-crlf	0	bom-crlf	-
+no-topics	2	-	no '## Topics' heading
+non-ascii	1	-	-
+not-utf8	1	-	-
+utf16-memory	2	-	memory/MEMORY.md is not UTF-8 text
+memory-nul	2	-	memory/MEMORY.md is not UTF-8 text
+memory-latin1	2	-	memory/MEMORY.md is not UTF-8 text
+inventory-utf16	2	-	inventory.tsv is not UTF-8 text
+malformed-row	2	-	malformed Topics row (expected 3 cells, found 2)
+dot-segments	1	-	-
+empty-table	0	-	-

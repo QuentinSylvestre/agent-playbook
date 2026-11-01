@@ -1,0 +1,54 @@
+# Expected verdicts for verify-dream-journal.py on the journals in this directory.
+# Consumer: verify-dream-journal.py --selftest, which runs every row in process and four rows (valid,
+# signal, missing-file, deep-nesting) also as a subprocess (the CLI dream-write.py's run_validator
+# uses); renaming or removing one of those four rows fails the selftest. Each <case>.out holds the exact expected
+# stdout (LF line endings, one line per output line); the selftest compares it byte for byte.
+# Expected outputs follow the Python verdict (the .sh twin's embedded Python); where the .ps1 twin
+# differs (duplicate keys, case-only keys, one-element arrays, ISO timestamps, lenient JSON, invalid
+# UTF-8) the row is still the Python verdict.
+#
+# Columns (tab-separated):
+#   case    name; the expected stdout is <case>.out
+#   input   journal file in this directory, or - for a path that does not exist
+#   exit    expected exit code (0 = no FAIL, 1 = at least one FAIL or an unreadable file)
+#   note    what the case pins
+case	input	exit	note
+valid	valid.jsonl	0	both forms, both prefixes, expired_signal class
+all-classes	all-classes.jsonl	0	every one of the 8 canonical classes
+bom	bom.jsonl	0	valid journal behind a UTF-8 BOM
+bom-only	bom-only.jsonl	0	a BOM and nothing else
+empty	empty.jsonl	0	0 bytes
+whitespace-only	whitespace-only.jsonl	0	blank lines only
+missing-file	-	0	the path does not exist
+crlf	crlf.jsonl	0	CRLF line endings
+cr-only	cr-only.jsonl	0	lone CR line endings
+indented	indented.jsonl	0	leading/trailing whitespace is stripped
+blank-line-numbering	blank-line-numbering.jsonl	0	blank lines skipped but counted
+no-final-newline	no-final-newline.jsonl	0	last line without a newline
+torn	torn.jsonl	0	parse error on the last non-empty line -> WARN
+torn-then-blank	torn-then-blank.jsonl	0	torn line followed by blank lines is still last
+torn-only	torn-only.jsonl	0	a single torn line
+malformed-interior	malformed-interior.jsonl	1	interior parse error -> FAIL
+interior-fail-and-torn	interior-fail-and-torn.jsonl	1	interior FAIL plus torn last
+bad-class	bad-class.jsonl	0	off-list class -> WARN, record ok
+class-case	class-case.jsonl	0	class match is case-sensitive
+bad-target	bad-target.jsonl	1	remove target without an fq prefix -> FAIL
+rename-elem0-not-fq	rename-elem0-not-fq.jsonl	1	rename element 0 unprefixed
+rename-elem1-not-fq	rename-elem1-not-fq.jsonl	1	rename element 1 unprefixed
+prefix-near-miss	prefix-near-miss.jsonl	1	prefix needs the exact spelling and spacing
+not-object	not-object.jsonl	1	top-level scalars and arrays
+key-count	key-count.jsonl	1	zero keys and two keys
+wrong-key	wrong-key.jsonl	1	unknown key; key match is case-sensitive
+value-not-array	value-not-array.jsonl	1	value is a string, object, number, null
+array-length	array-length.jsonl	1	arrays of 0, 1 and 3 elements
+element-type	element-type.jsonl	1	number, null, empty, nested, bool element
+signal	signal.jsonl	1	topic-file signal removal keeps the user memory prefix
+divergent	divergent.jsonl	1	from test-parity: escapes, duplicate key (last wins), bare scalar, blanks
+dup-key-exact	dup-key-exact.jsonl	0	exact duplicate key: last one wins
+dup-key-case	dup-key-case.jsonl	1	keys differing only by case are two keys
+single-element-array	single-element-array.jsonl	1	a one-element top-level array is not an object
+iso-date-class	iso-date-class.jsonl	0	an ISO timestamp string stays a string
+lenient-json	lenient-json.jsonl	1	trailing comma, single quotes, // comment are not JSON
+nan-element	nan-element.jsonl	1	NaN parses as a number, not a string
+invalid-utf8	invalid-utf8.jsonl	1	not UTF-8: stdout empty, a decode error on stderr, exit 1
+deep-nesting	deep-nesting.jsonl	1	100000 '[' (RecursionError) is a parse error: interior FAIL, last-line torn WARN

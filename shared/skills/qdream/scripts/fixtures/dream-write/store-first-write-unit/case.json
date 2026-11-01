@@ -1,0 +1,15 @@
+{
+  "description": "plan 261016 Phase 5: the first memedit write into a store-less project's store creates the store through the resolver (STORE file only), is idempotent, and refuses a store no manifest project resolves to.",
+  "now": "2026-10-12T12:00:00Z",
+  "setup": [
+    {
+      "write": {
+        "repo/.gitkeep": ""
+      }
+    }
+  ],
+  "steps": [],
+  "units": [
+    "store-first-write"
+  ]
+}

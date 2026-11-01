@@ -1,0 +1,15 @@
+```json
+{
+  "verifier": "V01",
+  "verdicts": [
+    {
+      "item_id": "V01-002",
+      "verdict": "refuted",
+      "spot_checked": true,
+      "citation": "span"
+    }
+  ],
+  "unverified_item_ids": [],
+  "notes": null
+}
+```

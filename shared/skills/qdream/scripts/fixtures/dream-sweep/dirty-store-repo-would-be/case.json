@@ -1,0 +1,79 @@
+{
+  "description": "plan 261016 Phase 5: with a readable store repo, a project without a memory file gets its would-be file recorded `absent` in the store the resolver finds for it (found by STORE identity); the store repo is its own repository, so the snapshot records no repo for it here.",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/.gitignore": "memory/.dream-journal.jsonl\n",
+    "repo/memory/MEMORY.md": "# Memory\n",
+    "repo/memory/.dream-state.json": "{\"s\": 1}\n",
+    "repo/memory/.dream-journal.jsonl": "{\"rename\":[\"user memory \u00a7 A\",\"user memory \u00a7 B\"]}\n",
+    "proj/gamma/AGENTS.md": "# gamma\n",
+    "proj/delta/AGENTS.md": "# delta\n",
+    "stores/gamma-111111/STORE": "local {ROOT}/proj/gamma\n",
+    "stores/gamma-111111/artifacts/note.md": "# note\n",
+    "stores/delta-222222/STORE": "local {ROOT}/proj/delta\n"
+  },
+  "git": [
+    "repo"
+  ],
+  "setup": [
+    {
+      "write": {
+        "repo/memory/topics/new.md": "# new topic\n"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/dirty-at-orient.json": {
+          "candidates": {
+            "{ROOT}/repo/memory/MEMORY.md": {
+              "sha256": "d7870cdadd1ac3b46461cce0776275aeb54f15f19338e597fafd0f277b1f0070",
+              "git": "tracked"
+            },
+            "{ROOT}/repo/memory/.dream-journal.jsonl": {
+              "git": "ignored",
+              "sha256": "e2beb8508b2688936c264a13d2345c55e275602085398af35af4334dda2eed96"
+            },
+            "{ROOT}/repo/memory/topics/new.md": {
+              "git": "untracked"
+            },
+            "{ROOT}/repo/memory/HIGHER_ORDER.md": {
+              "sha256": "absent",
+              "git": "absent"
+            },
+            "{ROOT}/stores/gamma-111111/memory/MEMORY.md": {
+              "sha256": "absent",
+              "repo": "not-a-repo",
+              "note": "would-be"
+            },
+            "{ROOT}/stores/delta-222222/memory/MEMORY.md": {
+              "sha256": "absent",
+              "repo": "not-a-repo",
+              "note": "would-be"
+            }
+          },
+          "backup": {
+            ".dream-state.json": {
+              "sha256": "15c454887738d8c5087434e5837912c8c8198822907a13e92edc015ae34d5235"
+            }
+          }
+        },
+        "sweep/backup/.dream-state.json": {
+          "s": 1
+        }
+      },
+      "present": [
+        "sweep/backup/.dream-journal.jsonl",
+        "sweep/guard-hashes.json"
+      ]
+    }
+  ],
+  "store_repo": "stores"
+}

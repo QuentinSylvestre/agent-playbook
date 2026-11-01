@@ -1,0 +1,49 @@
+{
+  "description": "A journal present at Orient and changed outside the scripts is the incident (exit 3).",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/.gitignore": "memory/.dream-journal.jsonl\n",
+    "repo/memory/MEMORY.md": "# Memory\n",
+    "repo/memory/.dream-state.json": "{\"state\": \"orient\"}\n",
+    "repo/memory/.dream-journal.jsonl": "{\"rename\":[\"user memory § A\",\"user memory § B\"]}\n"
+  },
+  "git": [
+    "repo"
+  ],
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0
+    },
+    {
+      "write": {
+        "repo/memory/.dream-journal.jsonl": "{\"remove\":[\"user memory § A\",\"pruned\"]}\n"
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "synthesize"
+      ],
+      "exit": 3,
+      "files": {
+        "sweep/drift-synthesize.json": {
+          "incident": true,
+          "entries": [
+            {
+              "kind": "incident",
+              "what": "journal",
+              "change": "changed",
+              "path": "{ROOT}/repo/memory/.dream-journal.jsonl"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

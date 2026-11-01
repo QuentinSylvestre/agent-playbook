@@ -1,0 +1,18 @@
+{
+  "description": "plan 261016 Phase 5 review F1: the project's memory lives in the store repo and another STORE is unreadable; nothing can be shown, and the hook says why instead of only 'none found'.",
+  "cwd": "{{ROOT}}/proj",
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores",
+  "unreadable_store": [
+    "zzz-bad-000000"
+  ],
+  "contains": [
+    "Project memory: none found",
+    "Note: store repo unreadable:",
+    "project memory kept there cannot be shown (resolve it with /qconfig-sync)."
+  ],
+  "absent": [
+    "Store repo entry gamma",
+    "two project memory files exist"
+  ]
+}

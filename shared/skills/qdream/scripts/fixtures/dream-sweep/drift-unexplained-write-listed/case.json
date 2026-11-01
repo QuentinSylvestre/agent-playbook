@@ -1,0 +1,51 @@
+{
+  "description": "A candidate memory file changed with no hashes.json record is listed (a write that bypassed the scripts); notify-only, exit 0.",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/.gitignore": "memory/.dream-journal.jsonl\n",
+    "repo/memory/MEMORY.md": "# Memory\n",
+    "repo/memory/.dream-state.json": "{\"state\": \"orient\"}\n",
+    "proj/alpha/memory/MEMORY.md": "# a\n"
+  },
+  "git": [
+    "repo",
+    "proj/alpha"
+  ],
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0
+    },
+    {
+      "write": {
+        "proj/alpha/memory/MEMORY.md": "# a\n\nsweep edit\n"
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "synthesize"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/drift-synthesize.json": {
+          "incident": false,
+          "entries": [
+            {
+              "kind": "candidate-changed",
+              "path": "{ROOT}/proj/alpha/memory/MEMORY.md",
+              "recorded": false,
+              "expected": "fd99dedae7c3f7532f8a65d60f811a05dc9dc3e1c5936b0c554c98aafdad8c10",
+              "current": "29bf640d024fb083ec72ee5c2d8528d40fa2624b395d5d208de64994b40d862b"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

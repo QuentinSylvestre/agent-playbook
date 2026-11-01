@@ -1,0 +1,6 @@
+ok: line 1: valid rename record
+ok: line 2: valid remove record
+ok: line 3: valid rename record
+FAIL: line 4: not a JSON object
+ok: line 6: valid remove record
+verify-dream-journal: ok=4 fail=1 warn=0

@@ -1,0 +1,2 @@
+{"id": "m1", "timestamp": "2026-09-15T08:00:00.000Z", "payload": {"type": "user", "content": "old kiro beta prompt", "_meta": {}, "documents": [], "images": []}}
+{"id": "m2", "timestamp": "2026-09-15T08:00:10.000Z", "payload": {"type": "assistant", "content": "Old kiro beta answer."}}

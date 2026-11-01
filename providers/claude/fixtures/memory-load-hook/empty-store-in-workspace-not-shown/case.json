@@ -1,0 +1,14 @@
+{
+  "description": "The no-store read rule: a store serves the folder but holds no memory yet, so the in-workspace memory/MEMORY.md is not shown (any store at a level, even an empty one, ends the fallback).",
+  "cwd": "{{ROOT}}/proj",
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores",
+  "contains": [
+    "Project memory: none found",
+    "- User entry one"
+  ],
+  "absent": [
+    "Workspace entry beta",
+    "delivered in full"
+  ]
+}

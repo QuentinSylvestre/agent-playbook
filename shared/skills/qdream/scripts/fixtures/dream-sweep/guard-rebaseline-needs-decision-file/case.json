@@ -1,0 +1,223 @@
+{
+  "description": "guard --rebaseline rewrites guard-hashes.json only from a decision-<n>.json whose sha matches, answering Re-baseline to a guard-changed needs-decision-<n>.json: a missing file, another question kind and a Discard answer are each refused and leave the file as it was. The decision's option (else its answer) must be one of the question's options (a Re-baseline answer to a budget question fails the handoff check), and guard --rebaseline matches the normalized option, not the verbatim answer. A needs-decision the orchestrator writes itself (step and resume_from `start`, for a guard change its own digest recompute finds) passes the handoff check and is accepted by guard --rebaseline.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "guard",
+        "--rebaseline",
+        "--decision",
+        "decision-1.json",
+        "--decision-sha",
+        "65901d774bd9930a748ca23ec32e330a68ab236f46dbe6bf6b56f9d1522d2c5c"
+      ],
+      "exit": 3,
+      "text_contains": {
+        "sweep/guard-hashes.json": [
+          "0000000000000000000000000000000000000000000000000000000000000000"
+        ]
+      }
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-2.json": "{\n  \"phase\": \"apply\",\n  \"step\": \"APP-STATE\",\n  \"kind\": \"budget\",\n  \"question\": null,\n  \"options\": [\n    \"Resume\",\n    \"Abort\"\n  ],\n  \"recommendation\": null,\n  \"resume_from\": \"APP-STATE\"\n}\n",
+        "home/.agent-playbook/dream-work/handoff/decision-2.json": "{\"answer\": \"Resume\", \"turn\": \"user turn 2\"}\n"
+      }
+    },
+    {
+      "argv": [
+        "guard",
+        "--rebaseline",
+        "--decision",
+        "decision-2.json",
+        "--decision-sha",
+        "{SHA256:handoff/decision-2.json}"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "not a guard-changed question"
+      ],
+      "text_contains": {
+        "sweep/guard-hashes.json": [
+          "0000000000000000000000000000000000000000000000000000000000000000"
+        ]
+      }
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-3.json": "{\n  \"phase\": \"apply\",\n  \"step\": \"APP-STATE\",\n  \"kind\": \"guard-changed\",\n  \"question\": null,\n  \"options\": [\n    \"Discard\",\n    \"Re-baseline\"\n  ],\n  \"recommendation\": null,\n  \"resume_from\": \"APP-STATE\"\n}\n",
+        "home/.agent-playbook/dream-work/handoff/decision-3.json": "{\"answer\": \"Discard\", \"turn\": \"user turn 3\"}\n"
+      }
+    },
+    {
+      "argv": [
+        "guard",
+        "--rebaseline",
+        "--decision",
+        "decision-3.json",
+        "--decision-sha",
+        "082341a6d1ac7d9d58872bcbf344079fb230839d9ab604393f4786dde6e5d1d1"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "not Re-baseline"
+      ],
+      "text_contains": {
+        "sweep/guard-hashes.json": [
+          "0000000000000000000000000000000000000000000000000000000000000000"
+        ]
+      }
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-4.json": "{\n  \"phase\": \"apply\",\n  \"step\": \"APP-STATE\",\n  \"kind\": \"guard-changed\",\n  \"question\": null,\n  \"options\": [\n    \"Discard\",\n    \"Re-baseline\"\n  ],\n  \"recommendation\": null,\n  \"resume_from\": \"APP-STATE\"\n}\n",
+        "home/.agent-playbook/dream-work/handoff/decision-4.json": "{\"answer\": \"Re-baseline\", \"turn\": \"user turn 4\"}\n"
+      }
+    },
+    {
+      "argv": [
+        "guard",
+        "--rebaseline",
+        "--decision",
+        "decision-4.json",
+        "--decision-sha",
+        "57ec7cc990b6968c0b7be79aed0425425e52df0af4a09331de745dca0c15c09c"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "re-baselined; new digest"
+      ],
+      "text_not_contains": {
+        "sweep/guard-hashes.json": [
+          "0000000000000000000000000000000000000000000000000000000000000000"
+        ]
+      }
+    },
+    {
+      "argv": [
+        "guard",
+        "--rebaseline",
+        "--decision",
+        "decision-4.json",
+        "--decision-sha",
+        "57ec7cc990b6968c0b7be79aed0425425e52df0af4a09331de745dca0c15c09c"
+      ],
+      "exit": 0,
+      "unchanged": true
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-5.json": "{\n  \"phase\": \"apply\",\n  \"step\": \"APP-STATE\",\n  \"kind\": \"guard-changed\",\n  \"question\": null,\n  \"options\": [\n    \"Discard\",\n    \"Re-baseline\"\n  ],\n  \"recommendation\": \"Discard\",\n  \"resume_from\": \"APP-STATE\"\n}\n"
+      }
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decision-5.json": "{\n  \"answer\": \"yes, go ahead and re-baseline it\",\n  \"option\": \"re-baseline\",\n  \"turn\": \"user turn 5\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "guard",
+        "--rebaseline",
+        "--decision",
+        "decision-5.json",
+        "--decision-sha",
+        "{SHA256:handoff/decision-5.json}"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "re-baselined; new digest"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-6.json": "{\n  \"phase\": \"apply\",\n  \"step\": \"APP-STATE\",\n  \"kind\": \"guard-changed\",\n  \"question\": null,\n  \"options\": [\n    \"Discard\",\n    \"Re-baseline\"\n  ],\n  \"recommendation\": \"Discard\",\n  \"resume_from\": \"APP-STATE\"\n}\n"
+      }
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decision-6.json": "{\n  \"answer\": \"Re-baseline\",\n  \"option\": \"Discard\",\n  \"turn\": \"user turn 6\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "guard",
+        "--rebaseline",
+        "--decision",
+        "decision-6.json",
+        "--decision-sha",
+        "{SHA256:handoff/decision-6.json}"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "the recorded option is not Re-baseline"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decision-7.json": "{\n  \"answer\": \"Re-baseline\",\n  \"option\": \"Abandon\",\n  \"turn\": \"user turn 7\"\n}\n"
+      }
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-7.json": "{\n  \"phase\": \"apply\",\n  \"step\": \"APP-STATE\",\n  \"kind\": \"guard-changed\",\n  \"question\": null,\n  \"options\": [\n    \"Discard\",\n    \"Re-baseline\"\n  ],\n  \"recommendation\": \"Discard\",\n  \"resume_from\": \"APP-STATE\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "decision-7.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "option 'abandon' is not one of Discard, Re-baseline"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-8.json": "{\n  \"phase\": \"apply\",\n  \"step\": \"start\",\n  \"kind\": \"guard-changed\",\n  \"question\": null,\n  \"options\": [\n    \"Discard\",\n    \"Re-baseline\"\n  ],\n  \"recommendation\": \"Discard\",\n  \"resume_from\": \"start\"\n}\n",
+        "home/.agent-playbook/dream-work/handoff/decision-8.json": "{\n  \"answer\": \"Re-baseline\",\n  \"option\": \"Re-baseline\",\n  \"turn\": \"user turn\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "needs-decision-8.json"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "guard",
+        "--rebaseline",
+        "--decision",
+        "decision-8.json",
+        "--decision-sha",
+        "{SHA256:handoff/decision-8.json}"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "re-baselined; new digest"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-9.json": "{\n  \"phase\": \"gather\",\n  \"step\": \"start\",\n  \"kind\": \"budget\",\n  \"question\": null,\n  \"options\": [\n    \"Resume\",\n    \"Abort\"\n  ],\n  \"recommendation\": null,\n  \"resume_from\": \"start\"\n}\n",
+        "home/.agent-playbook/dream-work/handoff/decision-9.json": "{\n  \"answer\": \"Re-baseline\",\n  \"option\": \"Re-baseline\",\n  \"turn\": \"user turn\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "decision-9.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "option 're baseline' is not one of Resume, Abort"
+      ]
+    }
+  ]
+}

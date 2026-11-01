@@ -1,0 +1,89 @@
+{
+  "description": "R7: a drift run that refuses before it writes leaves no drift-<phase>.json of an earlier run, because the loop branches on that file's fields: a clean drift-gather.json from a first run is gone after a second run of the same phase refuses (a tampered snapshot), while another phase's file is untouched. A run that writes (exit 0) leaves its file, and a re-run with the same result leaves it unchanged.",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/.gitignore": "memory/.dream-journal.jsonl\n",
+    "repo/memory/MEMORY.md": "# Memory\n",
+    "repo/memory/.dream-state.json": "{\"state\": \"orient\"}\n"
+  },
+  "git": [
+    "repo"
+  ],
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "gather"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/drift-gather.json": {
+          "phase": "gather",
+          "incident": false,
+          "check_failed": false,
+          "entries": []
+        }
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "gather"
+      ],
+      "exit": 0,
+      "unchanged": true
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/sweep/dirty-at-orient.json": "{\n  \"repo\": \"{ROOT}/repo\",\n  \"repos\": {\n    \"{ROOT}/repo\": {\n      \"head\": \"--output={ROOT}/PWNED.txt\",\n      \"porcelain\": []\n    }\n  },\n  \"candidates\": {},\n  \"governance_dirty\": {}\n}\n",
+        "home/.agent-playbook/dream-work/sweep/drift-synthesize.json": "{\n  \"phase\": \"synthesize\",\n  \"incident\": false,\n  \"check_failed\": false,\n  \"snapshot_bound\": false,\n  \"decisions_bound\": false,\n  \"entries\": []\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "gather"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not a commit id"
+      ],
+      "absent": [
+        "sweep/drift-gather.json"
+      ],
+      "present": [
+        "sweep/drift-synthesize.json"
+      ]
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "gather",
+        "--snapshot-sha",
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ],
+      "exit": 3,
+      "absent": [
+        "sweep/drift-gather.json"
+      ],
+      "present": [
+        "sweep/drift-synthesize.json"
+      ]
+    }
+  ],
+  "units": [
+    "drift-git-refusal-clears"
+  ]
+}

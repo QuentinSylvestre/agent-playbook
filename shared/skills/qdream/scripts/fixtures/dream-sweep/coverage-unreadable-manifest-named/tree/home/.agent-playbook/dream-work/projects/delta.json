@@ -1,0 +1,28 @@
+{
+  "project": "{ROOT}/proj/delta",
+  "entries": [
+    {
+      "file": "{ROOT}/proj/delta/memory/MEMORY.md",
+      "heading": "D",
+      "ordinal": 1,
+      "cited_paths_missing": [],
+      "cited_slugs_missing": [],
+      "stale_after_passed": false,
+      "governance_conflict_open": [],
+      "cited_path_changed": [],
+      "cited_commit_missing": [],
+      "stale_when_fired": false,
+      "stale_when_unknown": false,
+      "suspect": false
+    }
+  ],
+  "plans": {
+    "archive": null,
+    "archive_source": null,
+    "new_plans": [],
+    "recent": [],
+    "accept_and_note": []
+  },
+  "older_sessions": [],
+  "empty_session_ids": []
+}

@@ -1,0 +1,30 @@
+{
+  "description": "plan 261016 Phase 10 review: in an ordinary folder (not a no-create one) with a readable store repo and no store for the project, its in-workspace memory/MEMORY.md and plans/ are leftovers: not read (memory_file null, no entries, no plans archive). The no-create case: memory-no-create-folder-read.",
+  "now": "2026-09-24T12:00:00Z",
+  "normal_folders": true,
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "memory_file": null,
+          "entries": [],
+          "plans": {
+            "archive": null,
+            "archive_source": null
+          }
+        }
+      }
+    }
+  },
+  "git": [
+    "repo"
+  ]
+}

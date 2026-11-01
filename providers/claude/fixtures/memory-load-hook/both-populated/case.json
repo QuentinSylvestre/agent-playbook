@@ -1,0 +1,15 @@
+{
+  "description": "A store-repo store and an in-workspace memory/ both exist: only the store is read (in-workspace memory is never read), and no note about two files is emitted.",
+  "cwd": "{{ROOT}}/proj",
+  "contains": [
+    "Store-side entry",
+    "/stores/proj-dddddd/memory/MEMORY.md) — delivered in full"
+  ],
+  "absent": [
+    "In-workspace entry",
+    "two project memory files exist",
+    "/proj/memory/MEMORY.md"
+  ],
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores"
+}

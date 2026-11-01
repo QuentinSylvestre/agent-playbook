@@ -1,0 +1,9 @@
+{
+  "description": "G5, G6, G9: another writer's file landing between create_once's check and its link (or its rename, on a volume without hard links) is never overwritten; a stray <L>.a1 file is no attempt and attempts compare numerically; every id pattern refuses a trailing newline.",
+  "now": "2026-10-12T12:00:00Z",
+  "units": [
+    "create-once-races",
+    "attempt-names",
+    "id-patterns"
+  ]
+}

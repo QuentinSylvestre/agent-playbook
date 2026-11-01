@@ -1,0 +1,28 @@
+{
+  "description": "D24: a trigger flag wins over a due periodic pass: stored 4 and an entry whose Stale-after has passed -> flagged, not periodic.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "quiet_sweeps": 4,
+          "memory_pass": "flagged",
+          "memory_flags": [
+            "stale_after_passed"
+          ]
+        }
+      }
+    }
+  },
+  "git": [
+    "repo"
+  ]
+}

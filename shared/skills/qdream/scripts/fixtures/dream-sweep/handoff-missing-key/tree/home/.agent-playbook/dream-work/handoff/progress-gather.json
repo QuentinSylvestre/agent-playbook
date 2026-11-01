@@ -1,0 +1,15 @@
+{
+  "phase": "gather",
+  "completed_steps": [
+    "GAT-PLANS"
+  ],
+  "labels": {
+    "A01": {
+      "agent_id": "a1111111111111111",
+      "session_id": "5e550000-0000-4000-8000-000000000001",
+      "status": "returned",
+      "attempt": 1
+    }
+  },
+  "updated_at": "2026-10-12T12:00:00Z"
+}

@@ -1,0 +1,129 @@
+# Expected verdicts for verify-dream-state.py on the fixtures in this
+# directory. Consumer: verify-dream-state.py --selftest, which runs every row.
+# Each exit-1 fixture carries exactly one defect, so a row fails if the check
+# that defect targets is removed (mutation-sensitive). Each exit-0 fixture
+# other than v3-valid carries one edge case a regressed check would reject:
+# ISO-timestamp-looking strings (PowerShell 7 coerces them to [datetime]),
+# cost_records out of date order (append order is authoritative), a populated
+# quiet_sweeps, a kind-baseline cost record with null fields, a
+# quiet_sweeps.projects key that is not (yet) a projects key, a
+# tokens_by_role record whose stages sum exactly to surfaced - kept, a
+# five-role tokens_by_role (with drafter) and a file mixing it with a
+# legacy four-role record, a model_routing provider with the optional
+# drafter and one without it, and
+# kind-sweep records without tokens_by_role that break the findings
+# invariants (exempt: written before the field existed). The
+# one-element-array fixtures (v3-cost-array-element, v3-routing-array,
+# top-level-array) guard the .ps1 twin's pipeline unrolling.
+#
+# Columns (tab-separated):
+#   fixture        file name in this directory
+#   exit           expected exit code (0 = valid, 1 = FAIL)
+#   baseline       --ledger-baseline / -LedgerBaseline file in this directory,
+#                  or - for none (the ledger check then prints a skip note)
+#   must_contain   substring the output must contain
+fixture	exit	baseline	must_contain
+v3-valid.json	0	ledger-baseline.json	ok: episodic_ledger append-only (2 records, baseline 2 is a prefix)
+v2-with-v3-sections.json	1	-	FAIL: v2 file carries v3 section "cost_records" (half-migrated write?)
+v2-plain.json	0	-	note: schema v2 -- the next /qdream full run migrates this file to v3
+v3-ledger-shrunk.json	1	ledger-baseline.json	FAIL: episodic_ledger shrank to 1 records from baseline 2 (append-only: restore
+v3-ledger-rewritten.json	1	ledger-baseline.json	FAIL: episodic_ledger[1] differs from the baseline record at that position (append-only: restore
+v3-cost-array-element.json	1	-	FAIL: cost_records[0] -- sessions_read must be a non-negative integer
+v3-routing-array.json	1	-	FAIL: model_routing missing or not an object (required in v3)
+top-level-array.json	1	-	FAIL: top-level is not a JSON object
+v3-cost-over-cap.json	1	-	FAIL: cost_records -- 21 records, at most 20 are kept
+v3-cost-bad-kind.json	1	-	FAIL: cost_records[0] -- kind must be "sweep" or "baseline"
+v3-routing-bad-role.json	1	-	FAIL: model_routing["claude"] -- unknown key "planner"
+v3-routing-bad-confirmed.json	1	-	FAIL: model_routing["claude"] -- confirmed must be YYYY-MM-DD
+v3-deferred-bad-key.json	1	-	FAIL: deferred_sessions["3f2a9c10-1111-4222-8333-944445555666"] -- key must be "<provider>:<session id>"
+v3-missing-section.json	1	-	FAIL: deferred_sessions missing or not an object (required in v3)
+v3-iso-strings.json	0	-	verify-dream-state: ok=12 fail=0 (schema v3)
+v3-cost-append-order.json	0	-	ok: cost_records (2 records)
+v3-retired-cache-section.json	1	-	FAIL: unknown top-level key "classification_cache"
+v3-routing-collector-role.json	1	-	FAIL: model_routing["claude"] -- unknown key "collector"
+v3-quiet-bad-value.json	1	-	FAIL: quiet_sweeps.projects["/home/user/proj-a"] -- must be a non-negative integer
+v3-quiet-unknown-key.json	1	-	FAIL: quiet_sweeps -- unknown key "global"
+v3-quiet-orphan-key.json	0	-	ok: quiet_sweeps (1 projects)
+v2-with-quiet-sweeps.json	1	-	FAIL: v2 file carries v3 section "quiet_sweeps" (half-migrated write?)
+v3-sweep-null-bytes.json	1	-	FAIL: cost_records[1] -- bytes_read must be a non-negative integer
+v3-quiet-valid.json	0	-	ok: quiet_sweeps (1 projects)
+v3-baseline-nulls.json	0	-	verify-dream-state: ok=12 fail=0 (schema v3)
+v3-baseline-missing-key.json	1	-	FAIL: cost_records[0] -- bytes_read must be a non-negative integer
+v3-count-over-int64.json	1	-	FAIL: cost_records[1] -- sessions_read must be a non-negative integer
+v3-count-at-int64-max.json	0	-	verify-dream-state: ok=12 fail=0 (schema v3)
+v3-tokens-by-role-valid.json	0	-	ok: cost_records (2 records)
+v3-tokens-by-role-negative.json	1	-	FAIL: cost_records[0] -- tokens_by_role must be {orchestrator, task4, verifier, other} or {orchestrator, task4, verifier, drafter, other} with non-negative integer counts
+v3-tokens-by-role-non-integer.json	1	-	FAIL: cost_records[0] -- tokens_by_role must be {orchestrator, task4, verifier, other} or {orchestrator, task4, verifier, drafter, other} with non-negative integer counts
+v3-tokens-by-role-unknown-key.json	1	-	FAIL: cost_records[0] -- tokens_by_role must be {orchestrator, task4, verifier, other} or {orchestrator, task4, verifier, drafter, other} with non-negative integer counts
+v3-tokens-by-role-kept-over-surfaced.json	1	-	FAIL: cost_records[0] -- findings.kept exceeds findings.surfaced
+v3-tokens-by-role-stages-over-gap.json	1	-	FAIL: cost_records[0] -- findings.dropped_by_stage sums above surfaced minus kept
+v3-no-tokens-by-role-inconsistent.json	0	-	ok: cost_records (2 records)
+v3-tokens-by-role-missing-key.json	1	-	FAIL: cost_records[0] -- tokens_by_role must be {orchestrator, task4, verifier, other} or {orchestrator, task4, verifier, drafter, other} with non-negative integer counts
+v3-tokens-by-role-bool.json	1	-	FAIL: cost_records[0] -- tokens_by_role must be {orchestrator, task4, verifier, other} or {orchestrator, task4, verifier, drafter, other} with non-negative integer counts
+v3-tokens-by-role-tokens-null.json	1	-	FAIL: cost_records[0] -- tokens_by_role needs a non-null tokens
+v3-tokens-by-role-sum-mismatch.json	1	-	FAIL: cost_records[0] -- tokens_by_role must sum to tokens
+v3-tokens-by-role-missing-stage.json	1	-	FAIL: cost_records[0] -- findings.dropped_by_stage must list every stage: already_known, not_durable, unsupported, suppressed, contradicts_governance
+v3-tokens-by-role-five-keys.json	0	-	ok: cost_records (2 records)
+v3-tokens-by-role-legacy-four.json	0	-	ok: cost_records (2 records)
+v3-tokens-by-role-bad-set.json	1	-	FAIL: cost_records[0] -- tokens_by_role must be {orchestrator, task4, verifier, other} or {orchestrator, task4, verifier, drafter, other} with non-negative integer counts
+v3-routing-drafter.json	0	-	ok: model_routing (1 providers)
+v3-routing-legacy-two.json	0	-	ok: model_routing (2 providers)
+v3-routing-drafter-empty.json	1	-	FAIL: model_routing["claude"] -- drafter must be a non-empty string when present
+v3-routing-drafter-null.json	1	-	FAIL: model_routing["claude"] -- drafter must be a non-empty string when present
+v1-plain.json	0	-	note: schema v1 (legacy) -- the next /qdream full run migrates this file to v3
+v1-with-v2-section.json	1	-	FAIL: v1 file carries v2 section "rejected_lessons" (half-migrated write?)
+v1-with-v3-section.json	1	-	FAIL: v1 file carries v3 section "cost_records" (half-migrated write?)
+schema-version-string.json	1	-	FAIL: schema_version must be the integer 1, 2 or 3
+schema-version-bool.json	1	-	FAIL: schema_version must be the integer 1, 2 or 3
+schema-version-four.json	1	-	FAIL: schema_version must be the integer 1, 2 or 3
+not-json-truncated.json	1	-	FAIL: not valid JSON
+v3-bom.json	0	-	verify-dream-state: ok=12 fail=0 (schema v3)
+v3-last-run-date-only.json	1	-	FAIL: last_run missing or not an ISO-8601 timestamp
+v3-projects-array.json	1	-	FAIL: projects missing or not an object
+v3-project-not-object.json	1	-	FAIL: projects["/home/user/proj-a"] -- not an object
+v3-project-bad-last-analyzed.json	1	-	FAIL: projects["/home/user/proj-a"] -- last_analyzed missing or not an ISO-8601 timestamp
+v3-project-unknown-key.json	1	-	FAIL: projects["/home/user/proj-a"] -- unknown key "extra"
+v3-rejected-empty-signal.json	1	-	FAIL: rejected_lessons[0] -- signal missing or empty
+v3-rejected-bad-reason.json	1	-	FAIL: rejected_lessons[0] -- reason must be "refuted" or "skipped"
+v3-rejected-bad-date.json	1	-	FAIL: rejected_lessons[0] -- date must be YYYY-MM-DD
+v3-rejected-not-array.json	1	-	FAIL: rejected_lessons missing or not an array (required since v2)
+v3-rejected-element-not-object.json	1	-	FAIL: rejected_lessons[0] -- not an object
+v3-rejected-unknown-key.json	1	-	FAIL: rejected_lessons[0] -- unknown key "note"
+v3-outcome-empty-target.json	1	-	FAIL: outcome_tags[0] -- target missing or empty
+v3-outcome-bad-applied.json	1	-	FAIL: outcome_tags[0] -- applied must be YYYY-MM-DD
+v3-outcome-without-checked.json	1	-	FAIL: outcome_tags[1] -- outcome and checked must be set together
+v3-outcome-bad-vocab.json	1	-	FAIL: outcome_tags[1] -- outcome must be "recurred" or "not-recurred"
+v3-outcome-bad-checked.json	1	-	FAIL: outcome_tags[1] -- checked must be YYYY-MM-DD
+v3-ledger-empty-where.json	1	-	FAIL: episodic_ledger[0] -- where missing or empty
+v3-ledger-bad-when.json	1	-	FAIL: episodic_ledger[0] -- when must be YYYY-MM-DD
+v3-ledger-support-set-string.json	1	-	FAIL: episodic_ledger[0] -- support_set must be an array of non-empty strings
+v3-ledger-support-set-blank.json	1	-	FAIL: episodic_ledger[0] -- support_set must be an array of non-empty strings
+v3-ledger-not-array.json	1	ledger-baseline.json	note: episodic_ledger shrink check skipped (episodic_ledger is not an array)
+v3-ledger-key-order.json	0	ledger-baseline.json	ok: episodic_ledger append-only (2 records, baseline 2 is a prefix)
+v3-ledger-grown.json	0	ledger-baseline.json	ok: episodic_ledger append-only (3 records, baseline 2 is a prefix)
+v3-valid.json	1	ledger-baseline-not-json.json	FAIL: episodic_ledger baseline is not a readable JSON object
+v3-valid.json	1	ledger-baseline-array.json	FAIL: episodic_ledger baseline is not a readable JSON object
+v3-valid.json	0	ledger-baseline-no-ledger.json	ok: episodic_ledger append-only (2 records, baseline 0 is a prefix)
+v2-plain.json	0	ledger-baseline.json	ok: episodic_ledger append-only (2 records, baseline 2 is a prefix)
+v3-cost-bad-date.json	1	-	FAIL: cost_records[0] -- date must be YYYY-MM-DD
+v3-cost-negative-projects.json	1	-	FAIL: cost_records[1] -- projects_analyzed must be a non-negative integer
+v3-cost-float-sessions.json	1	-	FAIL: cost_records[1] -- sessions_read must be a non-negative integer
+v3-baseline-null-sessions.json	1	-	FAIL: cost_records[0] -- sessions_read must be a non-negative integer
+v3-cost-agents-string-count.json	1	-	FAIL: cost_records[0] -- agents must be an object of role -> non-negative integer
+v3-cost-models-empty-name.json	1	-	FAIL: cost_records[0] -- models must be an object of role -> model name
+v3-cost-findings-extra-key.json	1	-	FAIL: cost_records[1] -- findings must be {surfaced, kept, dropped_by_stage} with non-negative integer counts
+v3-cost-proposals-missing-applied.json	1	-	FAIL: cost_records[1] -- proposals must be {surfaced, applied} with non-negative integer counts
+v3-cost-tokens-missing.json	1	-	FAIL: cost_records[1] -- tokens must be a non-negative integer or null
+v3-cost-unknown-key.json	1	-	FAIL: cost_records[1] -- unknown key "duration"
+v3-cost-element-not-object.json	1	-	FAIL: cost_records[0] -- not an object
+v3-cost-not-array.json	1	-	FAIL: cost_records missing or not an array (required in v3)
+v3-cost-at-cap.json	0	-	ok: cost_records (20 records)
+v3-routing-missing-verifier.json	1	-	FAIL: model_routing["claude"] -- verifier missing or empty
+v3-routing-provider-string.json	1	-	FAIL: model_routing["claude"] -- not an object
+v3-deferred-empty-project.json	1	-	FAIL: deferred_sessions["kiro:3f2a9c10-1111-4222-8333-944445555666"] -- project missing or empty
+v3-deferred-bad-since.json	1	-	FAIL: deferred_sessions["kiro:3f2a9c10-1111-4222-8333-944445555666"] -- since must be YYYY-MM-DD
+v3-deferred-unknown-key.json	1	-	FAIL: deferred_sessions["kiro:3f2a9c10-1111-4222-8333-944445555666"] -- unknown key "note"
+v3-deferred-entry-string.json	1	-	FAIL: deferred_sessions["kiro:3f2a9c10-1111-4222-8333-944445555666"] -- not an object
+v3-quiet-user-memory-negative.json	1	-	FAIL: quiet_sweeps -- user_memory must be a non-negative integer
+v3-quiet-projects-array.json	1	-	FAIL: quiet_sweeps -- projects must be an object
+v3-quiet-missing.json	1	-	FAIL: quiet_sweeps missing or not an object (required in v3)

@@ -1,0 +1,26 @@
+{
+  "description": "D24: a quiet project whose stored quiet_sweeps is 4 and whose entries raise no flag gets memory_pass periodic.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "quiet_sweeps": 4,
+          "memory_pass": "periodic",
+          "memory_flags": []
+        }
+      }
+    }
+  },
+  "git": [
+    "repo"
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "description": "No session record carries a version (only a last-prompt record): a claude-code version condition is stale_when_unknown, never fired, and not a suspect. An open Governance-conflict alone is not a suspect either (it still triggers the pass).",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "git": [
+    "repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "memory_flags": [
+            "governance_conflict_open",
+            "stale_when_unknown"
+          ],
+          "memory_pass": "flagged",
+          "counts": {
+            "suspects": 0
+          },
+          "entries": [
+            {
+              "heading": "Claude version unreadable",
+              "stale_when_fired": false,
+              "stale_when_unknown": true,
+              "suspect": false
+            },
+            {
+              "heading": "Open adjudication alone",
+              "governance_conflict_open": [
+                "deferred"
+              ],
+              "suspect": false
+            }
+          ]
+        }
+      }
+    }
+  }
+}

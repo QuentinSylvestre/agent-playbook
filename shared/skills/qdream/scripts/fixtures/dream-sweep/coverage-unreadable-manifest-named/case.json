@@ -1,0 +1,36 @@
+{
+  "description": "D11: a listed session the agent could not read counts as covered when the manifest's errors[] names it. A transcript the manifest itself could not read blocks the stamp in each form (Claude `unreadable <path>`, Kiro `(not read)`), also for a `Tasks 4-5 only` project (FIX-STATE-tasks45-unread-session); an unreadable plan or memory file is not a session and does not block.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "coverage"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/coverage.json": {
+          "projects": {
+            "{ROOT}/proj/alpha": {
+              "stamp": true
+            },
+            "{ROOT}/proj/beta": {
+              "stamp": false,
+              "reasons": [
+                "the manifest could not read 1 transcript(s) or session(s)"
+              ]
+            },
+            "{ROOT}/proj/gamma": {
+              "stamp": false
+            },
+            "{ROOT}/proj/delta": {
+              "stamp": true
+            },
+            "{ROOT}/proj/q": {
+              "stamp": false
+            }
+          }
+        }
+      }
+    }
+  ]
+}

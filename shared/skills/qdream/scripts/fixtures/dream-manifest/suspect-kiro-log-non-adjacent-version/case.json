@@ -1,0 +1,51 @@
+{
+  "description": "Plan 261009 Phase 2: a KIRO_CLI line whose \"version\" key is not adjacent to \"origin\" (the real logs carry dozens of KIRO_CLI lines with other fields) is not the version: the log's only version-shaped values are 9.9.9 after another key, a KIRO_CLI line with no version, and a KiroCLI/2.29.0 user agent, so kiro-cli stays stale_when_unknown (informational: not fired, not a suspect). A claude-code control entry fires, which shows the manifest ran.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "git": [
+    "repo"
+  ],
+  "mtimes": {
+    "home/.claude/projects/-ROOT-proj-alpha/c1a00000-0000-4000-8000-0000000000a1.jsonl": "2026-09-20T09:00:00Z"
+  },
+  "expect": {
+    "exit": 0,
+    "index": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "memory_flags": [
+            "stale_when_fired",
+            "stale_when_unknown"
+          ],
+          "memory_pass": "flagged"
+        }
+      }
+    },
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "entries": [
+            {
+              "heading": "Claude control fires",
+              "stale_when_fired": true,
+              "stale_when_unknown": false,
+              "suspect": true
+            },
+            {
+              "heading": "Kiro version stays unknown",
+              "stale_when_fired": false,
+              "stale_when_unknown": true,
+              "suspect": false
+            }
+          ]
+        }
+      }
+    }
+  }
+}

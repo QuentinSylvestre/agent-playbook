@@ -1,0 +1,124 @@
+{
+  "description": "handoff check validates a handoff file against HANDOFF_SCHEMAS: a missing key, an out-of-set kind, wrong fixed options, a rate-limit without reset_at and an empty gate.md are exit 3; a valid file is exit 0; an unknown name or a path outside handoff/ is refused; dispatch refuses an invalid orient.json.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "orient.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "missing key 'confirmed'"
+      ]
+    },
+    {
+      "argv": [
+        "dispatch",
+        "--confirmed",
+        "orient.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not a valid orient.json"
+      ],
+      "absent": [
+        "sweep"
+      ]
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "needs-decision-1.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "key 'kind': expected one of"
+      ]
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "needs-decision-2.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "options of kind failure must be"
+      ]
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "needs-decision-3.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "a rate-limit needs reset_at"
+      ]
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "gate.md"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is empty"
+      ]
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "progress-gather.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check progress-gather.json: ok"
+      ]
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "foo.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no handoff schema"
+      ]
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "../manifest.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "refused"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/orient.json": "{\n  \"snapshot_at\": \"2026-10-12T12:00:00Z\",\n  \"since\": \"2026-10-01T00:00:00Z\",\n  \"confirmed\": [],\n  \"model_routing\": {\n    \"task4\": \"model-a\",\n    \"verifier\": \"model-a\"\n  },\n  \"dirty_at_orient\": true,\n  \"repos\": [],\n  \"recover_lines\": [],\n  \"orchestrator_sessions\": []\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "orient.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check orient.json: ok"
+      ]
+    }
+  ]
+}

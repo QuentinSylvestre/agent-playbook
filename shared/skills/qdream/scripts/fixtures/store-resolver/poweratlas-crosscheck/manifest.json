@@ -1,0 +1,12 @@
+{
+  "_comment": "Cross-check fixture for plan 261016 Phase 7 (SC-5). PowerAtlas tests/test_web.py materializes it in a temp folder (a committed fixture cannot hold .git directories) and asserts that the store resolver and PowerAtlas overview._get_store_dir both return each folder's expected store. {ws} in a path stands for the temp workspace root; a folder with git set is a repository whose origin is remote. expect is store:<dir> (a directory of the scratch store repo, serving plans) or none. Each store holds plans/<plan>.md, because the resolver counts only a store that holds content.",
+  "stores": [
+    {"dir": "acme-app-a1b2c3", "store": "remote github.com/acme/app\n", "plan": "260101_ACME.md"}
+  ],
+  "folders": [
+    {"id": "toplevel", "path": "{ws}/app", "git": true, "remote": "https://github.com/Acme/App.git", "expect": "store:acme-app-a1b2c3"},
+    {"id": "subfolder", "path": "{ws}/app/src/deep", "git": false, "expect": "store:acme-app-a1b2c3"},
+    {"id": "second-checkout", "path": "{ws}/elsewhere/app-clone", "git": true, "remote": "git@github.com:acme/app.git", "expect": "store:acme-app-a1b2c3"},
+    {"id": "plain", "path": "{ws}/plain", "git": false, "expect": "none"}
+  ]
+}

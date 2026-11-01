@@ -1,0 +1,11 @@
+{
+  "snapshot_at": "2026-10-12T12:00:00Z",
+  "chunk_bytes": 450000,
+  "confirmed": [
+    "{ROOT}/proj/alpha"
+  ],
+  "agents": [],
+  "quiet": [],
+  "not_dispatched": [],
+  "harvest": []
+}

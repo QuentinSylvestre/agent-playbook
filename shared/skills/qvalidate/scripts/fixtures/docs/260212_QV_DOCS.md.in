@@ -1,0 +1,52 @@
+# QV fixture: Documentation Updates target forms (decisions 3 and 6)
+
+> **Status**: In Progress — phase 1 under way <!-- lifecycle: Exploring -> Draft -> In Progress -> Complete -->
+
+## Intent
+
+### Success criteria
+
+- SC-1: the first criterion
+- SC-2: the second criterion
+
+### Scope
+
+boundary line
+
+## Phases
+
+### Phase 1: Alpha
+
+**Covers**: SC-1, SC-2
+
+- [x] a
+
+## 8) Documentation Updates
+
+| Document | Change | Phase |
+|---|---|---|
+| `done.md` | backtick path | 1 |
+| docs/plain.txt updated | bare path | 1 |
+| `api.md:102,148` | line list | 1 |
+| `kiro_default.{json,md}` | brace set | 1 |
+| `shared/AGENTS.md § Memory locations` | section anchor | 1 |
+| `README.md` | the diff holds Readme.md: case-sensitive | 1 |
+| `guide-été.md` | non-ASCII name | 1 |
+| `extra/first.md`, `extra/second.md` | two files in one row: each is a target | 1 |
+| `sub/SKILL.md` | only other/SKILL.md changed: a basename alone is no match | 1 |
+| `wiki/External.md` | external wiki | doc-table-only |
+| Team wiki | no file target | 1 |
+
+### Out of scope
+
+| Document | Change | Phase |
+|---|---|---|
+| `notdone.md` | after the section end | 1 |
+
+### Zero-hit
+
+| `zerohit.md` | after the section end | 1 |
+
+## Harness Improvement Opportunities
+
+- none observed — cost: none — suggested change: none

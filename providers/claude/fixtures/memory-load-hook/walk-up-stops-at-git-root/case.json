@@ -1,0 +1,15 @@
+{
+  "description": "The walk stops at the git root: a store keyed to a folder above it is not this project's.",
+  "git": [
+    "outer/proj"
+  ],
+  "cwd": "{{ROOT}}/outer/proj/src",
+  "contains": [
+    "Project memory: none found"
+  ],
+  "absent": [
+    "Outside the git root"
+  ],
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores"
+}

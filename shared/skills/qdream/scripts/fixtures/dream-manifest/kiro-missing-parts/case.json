@@ -1,0 +1,57 @@
+{
+  "description": "A Kiro session.json without workspacePaths is reported in errors[] (top level when no project is known), not skipped in silence. A session folder without messages.jsonl whose session.json shows no activity (lastModifiedAt within 60 s of createdAt) is an empty session: counted in its project's empty_sessions and listed by id in its side file (top-level empty_sessions and unattributed.json when it names no workspace), never an error. The same folder with activity (lastModifiedAt an hour after createdAt) is an error of its project, not an empty session. A messages.jsonl that cannot be read (here a directory) stays an error of its project.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "empty_sessions": 1,
+      "unattributed": {
+        "empty_session_ids": [
+          "sess_k3000000-0000-4000-8000-000000000003"
+        ]
+      },
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "sessions": [],
+          "empty_sessions": 1,
+          "empty_session_ids": [
+            "sess_k3000000-0000-4000-8000-000000000002"
+          ],
+          "counts": {
+            "errors": 2
+          },
+          "errors": [
+            "$contains:unreadable {ROOT}/home/.kiro/sessions/0123456789abcdef/sess_k3000000-0000-4000-8000-000000000004/messages.jsonl",
+            "$contains:Kiro session sess_k3000000-0000-4000-8000-000000000005 shows activity"
+          ]
+        }
+      }
+    },
+    "json_contains": [
+      "Kiro session sess_k3000000-0000-4000-8000-000000000001 has no workspacePaths",
+      "Kiro session sess_k3000000-0000-4000-8000-000000000006 has no workspacePaths"
+    ],
+    "json_not_contains": [
+      "sess_k3000000-0000-4000-8000-000000000002 shows activity",
+      "Kiro session sess_k3000000-0000-4000-8000-000000000003 has no workspacePaths"
+    ],
+    "index": {
+      "unattributed": "unattributed.json",
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "$absent": [
+            "empty_session_ids"
+          ],
+          "empty_sessions": 1
+        }
+      }
+    }
+  }
+}

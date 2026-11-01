@@ -1,0 +1,12 @@
+{
+  "cwd": "{{ROOT}}/proj",
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores",
+  "description": "A store-repo project tier names the store whose STORE file it came from, so a session can see which workspace's memory it was given.",
+  "contains": [
+    "delivered in full"
+  ],
+  "regex": [
+    "^Project memory comes from the store whose STORE file reads: local .*/fixture root/proj$"
+  ]
+}

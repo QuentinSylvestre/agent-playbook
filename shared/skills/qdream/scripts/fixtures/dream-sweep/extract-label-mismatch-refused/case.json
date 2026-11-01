@@ -1,0 +1,83 @@
+{
+  "description": "F4: extract checks that the child is the label's: A01's transcript filed as A02, or under another kind's marker, is exit 3; D01's inbox file filed as D02 is exit 3; nothing is written. The matching extract still works.",
+  "now": "2026-10-12T12:00:00Z",
+  "env": {
+    "CLAUDE_CODE_SESSION_ID": "5e550000-0000-4000-8000-000000000001"
+  },
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A02",
+        "--claude-agent",
+        "a1111111111111111"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not A02's"
+      ],
+      "absent": [
+        "sweep/returns"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "verifier",
+        "--label",
+        "A01",
+        "--claude-agent",
+        "a1111111111111111"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "'Dream Verifier Brief A01. Read and follow ...'"
+      ],
+      "absent": [
+        "sweep/verdicts"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/inbox/D01.txt": "{\"current_text\": null, \"new_text\": \"n\", \"behaviour\": \"b\"}\n"
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D02",
+        "--from-file",
+        "inbox/D01.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not D02's inbox file"
+      ],
+      "absent": [
+        "sweep/drafts"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--claude-agent",
+        "a1111111111111111"
+      ],
+      "exit": 0,
+      "present": [
+        "sweep/returns/A01.json"
+      ]
+    }
+  ]
+}

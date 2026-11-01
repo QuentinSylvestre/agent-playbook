@@ -1,0 +1,32 @@
+{
+  "description": "kiro-cli cleanup.periodDays 20 puts the Kiro due threshold at 13 days: an unread Kiro session last written 14 days ago marks its project due; one written a day ago does not.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "sweep_due": true,
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "due": true
+        },
+        "{ROOT}/proj/beta": {
+          "due": false
+        }
+      }
+    },
+    "stdout_contains": [
+      "sweep due: yes (2 new sessions, 1 projects near deletion)"
+    ]
+  },
+  "mtimes": {
+    "home/.kiro/sessions/0123456789abcdef/sess_k1500000-0000-4000-8000-000000000001/messages.jsonl": "2026-09-10T11:00:00Z",
+    "home/.kiro/sessions/fedcba9876543210/sess_k1500000-0000-4000-8000-000000000002/messages.jsonl": "2026-09-23T08:00:00Z"
+  }
+}

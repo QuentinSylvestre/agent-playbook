@@ -1,0 +1,54 @@
+{
+  "description": "FIX-DISPATCH-user-memory-flagged: a flagged user memory with quiet_sweeps 4 (at QUIET_PERIODIC_AT) dispatches every file, as for periodic.",
+  "now": "2026-10-12T12:00:00Z",
+  "git": [
+    "repo"
+  ],
+  "write": {
+    "repo/memory/.dream-state.json": "{\n  \"schema_version\": 3,\n  \"last_run\": \"2026-10-01T00:00:00Z\",\n  \"projects\": {\n    \"{ROOT}/proj/alpha\": {\n      \"last_analyzed\": \"2026-10-01T00:00:00Z\"\n    }\n  },\n  \"rejected_lessons\": [],\n  \"outcome_tags\": [],\n  \"episodic_ledger\": [],\n  \"cost_records\": [],\n  \"model_routing\": {},\n  \"deferred_sessions\": {},\n  \"quiet_sweeps\": {\n    \"user_memory\": 4\n  }\n}\n"
+  },
+  "manifest": [],
+  "after_manifest": [
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/orient.json": "{\n  \"snapshot_at\": \"2026-10-12T12:00:00Z\",\n  \"since\": \"2026-10-01T00:00:00Z\",\n  \"confirmed\": [],\n  \"model_routing\": {\n    \"task4\": \"model-a\",\n    \"verifier\": \"model-a\"\n  },\n  \"dirty_at_orient\": true,\n  \"repos\": [],\n  \"recover_lines\": [],\n  \"orchestrator_sessions\": []\n}\n"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "dispatch",
+        "--confirmed",
+        "orient.json"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/dispatch.json": {
+          "agents": [
+            {
+              "label": "A01",
+              "project": "user memory",
+              "scope": "Tasks 4-5 only",
+              "memory_file": "{ROOT}/repo/memory/topics/git.md"
+            },
+            {
+              "label": "A02",
+              "project": "user memory",
+              "scope": "Tasks 4-5 only",
+              "memory_file": "{ROOT}/repo/memory/topics/powershell.md"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

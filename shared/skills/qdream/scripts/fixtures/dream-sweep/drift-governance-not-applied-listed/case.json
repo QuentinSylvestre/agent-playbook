@@ -1,0 +1,58 @@
+{
+  "description": "A tracked governance file changed since Orient that is no Applied target is listed (may be another session); an Applied target whose hashes.json record matches is silent; a file already modified at Orient and unchanged since is silent.",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/.gitignore": "memory/.dream-journal.jsonl\n",
+    "repo/memory/MEMORY.md": "# Memory\n",
+    "repo/memory/.dream-state.json": "{\"state\": \"orient\"}\n",
+    "repo/shared/skills/x/SKILL.md": "# x\n",
+    "repo/shared/applied.md": "# applied\n",
+    "repo/shared/dirty-before.md": "# before\n"
+  },
+  "git": [
+    "repo"
+  ],
+  "setup": [
+    {
+      "write": {
+        "repo/shared/dirty-before.md": "# before, edited pre-Orient\n"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0
+    },
+    {
+      "write": {
+        "repo/shared/skills/x/SKILL.md": "# x\n\nedited later\n",
+        "repo/shared/applied.md": "# applied\n\nApplied text.\n",
+        "home/.agent-playbook/dream-work/sweep/hashes.json": "{\n  \"version\": 1,\n  \"files\": {\n    \"{ROOT}/repo/shared/applied.md\": {\n      \"sha256\": \"c8c02be3a9eda7a3f611d40d9237a84eb8baea0ad0c907abd2977619bcd5cc89\",\n      \"kind\": \"governance\",\n      \"by\": \"hash --record\",\n      \"at\": \"2026-10-12T12:30:00Z\",\n      \"foreign_edit\": false\n    }\n  }\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "apply"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/drift-apply.json": {
+          "entries": [
+            {
+              "kind": "governance-changed",
+              "path": "{ROOT}/repo/shared/skills/x/SKILL.md",
+              "label": "may be another session"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

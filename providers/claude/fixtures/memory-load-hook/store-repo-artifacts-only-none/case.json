@@ -1,0 +1,14 @@
+{
+  "description": "The store repo holds the project's store but only artifacts/: no memory is found, and nothing else is read.",
+  "cwd": "{{ROOT}}/proj",
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores",
+  "contains": [
+    "Project memory: none found"
+  ],
+  "absent": [
+    "Legacy entry delta",
+    "delivered in full",
+    "two project memory files exist"
+  ]
+}

@@ -1,0 +1,9 @@
+MISSING	memory/topics/claude-code.md	providers/claude/README.md:not-always-loaded
+MISSING	memory/topics/playbook-authoring.md	shared/AUTHORING.md:not-always-loaded
+MISSING	memory/topics/house-style-docs.md	shared/skills/qplan/TEMPLATES.md:not-always-loaded
+MISSING	memory/topics/kiro-cli.md	providers/kiro/steering/kiro-cli-local-data.md:not-always-loaded
+MISSING	memory/topics/http-testing.md	providers/claude/README.md:not-always-loaded;shared/skills/qqa/SKILL.md:no-reference
+MISSING	memory/topics/powershell.md	providers/kiro/steering/memory-sources.md:not-always-loaded
+MISSING	memory/topics/git.md	providers/claude/steering/memory-sources.md:not-always-loaded
+MISSING	memory/topics/electron-vite.md	providers/kiro/skills/qrecover-file/SKILL.md:not-always-loaded
+SUMMARY	ok=0	waived=0	missing=8

@@ -1,0 +1,17 @@
+{
+  "cwd": "{{ROOT}}/proj",
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores",
+  "description": "The store resolver cannot load: the user, higher-order and topic index still go out, with a note that the project tier could not be located.",
+  "broken_helper": 0,
+  "contains": [
+    "- User entry one",
+    "- Higher-order entry one",
+    "- memory/topics/git.md",
+    "the project tier could not be located"
+  ],
+  "absent": [
+    "Store entry alpha",
+    "failed open"
+  ]
+}

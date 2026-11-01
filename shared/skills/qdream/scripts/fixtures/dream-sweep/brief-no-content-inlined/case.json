@@ -1,0 +1,77 @@
+{
+  "description": "Session and memory content (entry headings, user-memory headings, proposal headings and evidence quotes) goes to <label>.data.json, never into the rendered brief.",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/memory/.dream-state.json": "{\n  \"schema_version\": 3,\n  \"last_run\": \"2026-10-01T00:00:00Z\",\n  \"projects\": {},\n  \"rejected_lessons\": [],\n  \"outcome_tags\": [],\n  \"episodic_ledger\": [],\n  \"cost_records\": [],\n  \"model_routing\": {},\n  \"deferred_sessions\": {},\n  \"quiet_sweeps\": {}\n}\n"
+  },
+  "git": [
+    "repo"
+  ],
+  "steps": [
+    {
+      "argv": [
+        "dispatch",
+        "--confirmed",
+        "orient.json"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "task4"
+      ],
+      "exit": 0,
+      "text_not_contains": {
+        "sweep/briefs/A01.md": [
+          "SENTINEL-HEADING-7Q",
+          "SENTINEL-USER-3Z"
+        ]
+      },
+      "text_contains": {
+        "sweep/briefs/A01.data.json": [
+          "SENTINEL-HEADING-7Q",
+          "SENTINEL-USER-3Z"
+        ]
+      }
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "verifier"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "Dream Verifier Brief V01. Read and follow "
+      ],
+      "text_not_contains": {
+        "sweep/briefs/V01.md": [
+          "SENTINEL-QUOTE-9X",
+          "SENTINEL-PROPOSAL-4M"
+        ]
+      },
+      "text_contains": {
+        "sweep/briefs/V01.data.json": [
+          "SENTINEL-QUOTE-9X"
+        ],
+        "sweep/briefs/V01.md": [
+          "**Dream Verifier Brief**",
+          "\"unverified_item_ids\""
+        ]
+      },
+      "files": {
+        "sweep/briefs/verifier-index.json": {
+          "verifiers": [
+            {
+              "label": "V01",
+              "project": "{ROOT}/proj/alpha",
+              "items": 1
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

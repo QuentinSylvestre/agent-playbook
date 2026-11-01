@@ -1,0 +1,76 @@
+{
+  "description": "Two channels of user speech that are not type:user text blocks: AskUserQuestion answers (read from toolUseResult.answers, one line per question) and human queued_command attachments typed mid-turn. Each is labelled and counts as a new turn. A non-human origin, isMeta, isSidechain, tool_result framing text and answers no question asked stay out.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "sessions": [
+            {
+              "id": "f1a00000-0000-4000-8000-000000000001",
+              "boundary": "L3"
+            },
+            {
+              "id": "f1a00000-0000-4000-8000-000000000002",
+              "boundary": "L3"
+            }
+          ]
+        }
+      }
+    },
+    "stripped": {
+      "f1a00000-0000-4000-8000-000000000001": {
+        "contains": [
+          "L3 [user:answer] Q: Which parser? → A: Claude only",
+          "L3 [user:answer] Q: How wide is the scope? → A: Keep it small",
+          "L4 [user:mid-turn] also cover the kiro path please",
+          "L11 [user:mid-turn] [Image #1] this layout looks off",
+          "L12 [assistant] All done.",
+          "L13 [user:mid-turn] one more thing"
+        ],
+        "order": [
+          "L1 [user] start the answers scenario",
+          "=== NEW TURNS BEGIN ===\nL3 [user:answer] Q: Which parser?",
+          "L3 [user:answer] Q: How wide is the scope?",
+          "L4 [user:mid-turn]"
+        ],
+        "not_contains": [
+          "The user answered",
+          "HARNESS FRAMING",
+          "TOOL OUTPUT FRAMING",
+          "FORGED ANSWER",
+          "PEER QUEUED TEXT",
+          "TASK QUEUED TEXT",
+          "META ANSWER TEXT",
+          "UNMATCHED ANSWER",
+          "SIDECHAIN ANSWER TEXT",
+          "AAAA",
+          "L2 [",
+          "L5 [",
+          "L6 [",
+          "L7 [",
+          "L8 [",
+          "L9 [",
+          "L10 ["
+        ]
+      },
+      "f1a00000-0000-4000-8000-000000000002": {
+        "contains": [
+          "L1 [user] an older prompt"
+        ],
+        "order": [
+          "L2 [assistant] ok",
+          "=== NEW TURNS BEGIN ===\nL3 [user:mid-turn] a new mid-turn note"
+        ]
+      }
+    }
+  }
+}

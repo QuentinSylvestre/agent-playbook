@@ -1,0 +1,21 @@
+{
+  "description": "--by-role on a subcommand other than baseline is a usage error (exit 2), never silently ignored.",
+  "now": "2026-10-06T12:00:00Z",
+  "argv": [
+    "count",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo",
+    "--by-role"
+  ],
+  "expect": {
+    "exit": 2,
+    "stderr_contains": [
+      "--session, --until and --by-role are accepted only by baseline"
+    ],
+    "stdout_not_contains": [
+      "sweep due"
+    ]
+  }
+}

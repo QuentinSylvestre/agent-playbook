@@ -1,0 +1,84 @@
+{
+  "project": "{ROOT}/proj/alpha",
+  "entries": [
+    {
+      "file": "{ROOT}/proj/alpha/memory/MEMORY.md",
+      "heading": "Human rule",
+      "ordinal": 1,
+      "cited_paths_missing": [],
+      "cited_slugs_missing": [],
+      "stale_after_passed": false,
+      "governance_conflict_open": [],
+      "cited_path_changed": [],
+      "cited_commit_missing": [],
+      "stale_when_fired": false,
+      "stale_when_unknown": false,
+      "suspect": false
+    },
+    {
+      "file": "{ROOT}/proj/alpha/memory/MEMORY.md",
+      "heading": "Plain rule",
+      "ordinal": 1,
+      "cited_paths_missing": [],
+      "cited_slugs_missing": [],
+      "stale_after_passed": false,
+      "governance_conflict_open": [],
+      "cited_path_changed": [],
+      "cited_commit_missing": [],
+      "stale_when_fired": false,
+      "stale_when_unknown": false,
+      "suspect": false
+    },
+    {
+      "file": "{ROOT}/proj/alpha/memory/MEMORY.md",
+      "heading": "Human flagged",
+      "ordinal": 1,
+      "cited_paths_missing": [],
+      "cited_slugs_missing": [],
+      "stale_after_passed": false,
+      "governance_conflict_open": [],
+      "cited_path_changed": [],
+      "cited_commit_missing": [],
+      "stale_when_fired": true,
+      "stale_when_unknown": false,
+      "suspect": false
+    },
+    {
+      "file": "{ROOT}/proj/alpha/memory/MEMORY.md",
+      "heading": "Human stale",
+      "ordinal": 1,
+      "cited_paths_missing": [],
+      "cited_slugs_missing": [],
+      "stale_after_passed": false,
+      "governance_conflict_open": [],
+      "cited_path_changed": [],
+      "cited_commit_missing": [],
+      "stale_when_fired": false,
+      "stale_when_unknown": false,
+      "suspect": false
+    },
+    {
+      "file": "{ROOT}/proj/alpha/memory/MEMORY.md",
+      "heading": "Human unforced",
+      "ordinal": 1,
+      "cited_paths_missing": [],
+      "cited_slugs_missing": [],
+      "stale_after_passed": false,
+      "governance_conflict_open": [],
+      "cited_path_changed": [],
+      "cited_commit_missing": [],
+      "stale_when_fired": false,
+      "stale_when_unknown": false,
+      "suspect": false
+    }
+  ],
+  "plans": {
+    "archive": null,
+    "archive_source": null,
+    "new_plans": [],
+    "recent": [],
+    "accept_and_note": []
+  },
+  "older_sessions": [],
+  "empty_session_ids": []
+}

@@ -1,0 +1,72 @@
+{
+  "description": "F9: when `git status` fails in the config repo (a corrupt index), dirty is exit 3 and takes no snapshot; when it fails in a project repo, that repo's porcelain is null with an error (never [] = clean) and dirty says so.",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/memory/MEMORY.md": "# Memory\n",
+    "repo/memory/.dream-state.json": "{}\n",
+    "proj/alpha/memory/MEMORY.md": "# alpha memory\n",
+    "proj/beta/memory/MEMORY.md": "# beta memory\n"
+  },
+  "git": [
+    "repo",
+    "proj/alpha",
+    "proj/beta"
+  ],
+  "setup": [
+    {
+      "write": {
+        "repo/.git/index": "not an index\n"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "failed in the config repo"
+      ],
+      "absent": [
+        "sweep/dirty-at-orient.json",
+        "sweep/guard-hashes.json"
+      ]
+    },
+    {
+      "delete": [
+        "repo/.git/index"
+      ],
+      "write": {
+        "proj/alpha/.git/index": "not an index\n"
+      }
+    },
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "git status failed"
+      ],
+      "files": {
+        "sweep/dirty-at-orient.json": {
+          "repos": {
+            "{ROOT}/proj/alpha": {
+              "porcelain": null,
+              "error": "git status failed"
+            },
+            "{ROOT}/proj/beta": {
+              "porcelain": [],
+              "error": null
+            }
+          }
+        }
+      }
+    }
+  ]
+}

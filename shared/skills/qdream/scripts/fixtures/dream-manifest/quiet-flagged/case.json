@@ -1,0 +1,39 @@
+{
+  "description": "D24: stored 0, one entry whose Stale-after date has passed -> memory_pass flagged, driven by stale_after_passed.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "quiet_sweeps": 0,
+          "memory_pass": "flagged",
+          "memory_flags": [
+            "stale_after_passed"
+          ],
+          "entries": [
+            {
+              "heading": "Keep answers short",
+              "stale_after_passed": false
+            },
+            {
+              "heading": "Expires soon",
+              "stale_after_passed": true,
+              "governance_conflict_open": []
+            }
+          ]
+        }
+      }
+    }
+  },
+  "git": [
+    "repo"
+  ]
+}

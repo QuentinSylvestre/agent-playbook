@@ -1,0 +1,37 @@
+{
+  "description": "isSidechain records (sub-agent turns inline in the parent file) are neither user speech nor recency evidence.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "sessions": [
+            {
+              "id": "c5a00000-0000-4000-8000-000000000002",
+              "boundary": "L1"
+            }
+          ]
+        }
+      }
+    },
+    "stripped": {
+      "c5a00000-0000-4000-8000-000000000002": {
+        "contains": [
+          "what did the helper find?",
+          "It found two call sites."
+        ],
+        "not_contains": [
+          "SIDECHAIN"
+        ]
+      }
+    }
+  }
+}

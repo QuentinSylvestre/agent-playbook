@@ -1,0 +1,95 @@
+{
+  "description": "A store-backed workspace is discovered by its `local` STORE file (Method C) and its memory and archive resolve to the store; the store directory and shared/ are never projects; the config repo's own memory resolves only to a store; entry fields are computed per entry.",
+  "now": "2026-09-24T12:00:00Z",
+  "store_repo": "stores",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "$absent": [
+          "{ROOT}/stores/gamma-abc123",
+          "{ROOT}/repo/shared",
+          "{ROOT}/proj/vanished"
+        ],
+        "{ROOT}/repo": {
+          "status": "known",
+          "memory_file": null,
+          "sessions": []
+        },
+        "{ROOT}/proj/gamma": {
+          "status": "known",
+          "discovered_by": [
+            "C",
+            "state"
+          ],
+          "sessions": [],
+          "memory_file": "{ROOT}/stores/gamma-abc123/memory/MEMORY.md",
+          "entries": [
+            {
+              "heading": "Keep the guide current",
+              "ordinal": 1,
+              "cited_paths_missing": [
+                "shared/skills/nope/SKILL.md"
+              ],
+              "cited_slugs_missing": [
+                "260101_GONE_PLAN"
+              ],
+              "stale_after_passed": true
+            },
+            {
+              "heading": "Duplicate heading",
+              "ordinal": 1,
+              "cited_paths_missing": [],
+              "cited_slugs_missing": [],
+              "stale_after_passed": false
+            },
+            {
+              "heading": "Duplicate heading",
+              "ordinal": 2
+            }
+          ],
+          "plans": {
+            "archive": "{ROOT}/stores/gamma-abc123/plans/done",
+            "archive_source": "default",
+            "new_plans": [
+              {
+                "file": "260920-1000_STORE_PLAN.md",
+                "title": "Store Plan",
+                "date": "2026-09-19",
+                "decisions": [
+                  "| D1 | Location | Store |"
+                ]
+              }
+            ],
+            "recent": [
+              {
+                "file": "260920-1000_STORE_PLAN.md",
+                "intent": "Move gamma's memory into the store."
+              },
+              {
+                "file": "260801-1000_OLD_PLAN.md"
+              }
+            ],
+            "accept_and_note": [
+              {
+                "plan": "260801-1000_OLD_PLAN.md",
+                "item": "An old unlabelled opportunity from a legacy plan."
+              },
+              {
+                "plan": "260920-1000_STORE_PLAN.md",
+                "item": "**Accepted (harness opportunity)** -- the store path is not guarded by verify-links."
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

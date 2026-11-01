@@ -1,0 +1,57 @@
+{
+  "label": "A01",
+  "kind": "task4",
+  "via": "inbox",
+  "return": {
+    "memory_proposals": [],
+    "unrelated": [],
+    "not_a_conflict": [],
+    "subsumed_entries": [],
+    "stale_entries": [
+      {
+        "heading": "Human stale",
+        "reason": "grep `x` in a: none",
+        "entry_verified": "2026-09-01 (human:alice)",
+        "expiry_fired": true
+      }
+    ],
+    "governance_conflicts": [],
+    "verified": [
+      {
+        "heading": "Human rule",
+        "expiry": "Stale-after"
+      },
+      {
+        "heading": "Plain rule",
+        "expiry": "Stale-after"
+      },
+      {
+        "heading": "Human flagged",
+        "method": "grep"
+      },
+      {
+        "heading": "Human stale",
+        "expiry": "Stale-after"
+      },
+      "Human unforced"
+    ],
+    "task4_status": "checked",
+    "improvement_signals": [],
+    "user_skipped": [],
+    "saved_in_session": [],
+    "new_skill_candidates": [],
+    "insights_signals": [],
+    "sessions_read": [
+      "s1",
+      "s2",
+      "s3",
+      "s4",
+      "s5"
+    ],
+    "checkpoint_collapsed": 0,
+    "project_accessible": true,
+    "error": null,
+    "scope": "all tasks",
+    "notes": "Not an error, notes only. No plan archive resolved."
+  }
+}

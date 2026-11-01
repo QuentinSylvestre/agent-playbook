@@ -1,0 +1,56 @@
+{
+  "snapshot_at": "2026-10-12T12:00:00Z",
+  "chunk_bytes": 450000,
+  "confirmed": [
+    "{ROOT}/proj/alpha"
+  ],
+  "agents": [
+    {
+      "label": "A01",
+      "project": "{ROOT}/proj/alpha",
+      "scope": "tasks 4-5 only",
+      "part": "t45",
+      "memory_file": "{ROOT}/proj/alpha/memory/MEMORY.md",
+      "sessions": [],
+      "bytes": 0,
+      "plans_task": true
+    },
+    {
+      "label": "A02",
+      "project": "{ROOT}/proj/alpha",
+      "scope": "sessions only",
+      "part": "1/2",
+      "memory_file": "{ROOT}/proj/alpha/memory/MEMORY.md",
+      "sessions": [
+        "s1"
+      ],
+      "bytes": 0,
+      "plans_task": true
+    },
+    {
+      "label": "A03",
+      "project": "{ROOT}/proj/alpha",
+      "scope": "sessions only",
+      "part": "2/2",
+      "memory_file": "{ROOT}/proj/alpha/memory/MEMORY.md",
+      "sessions": [
+        "s2"
+      ],
+      "bytes": 0,
+      "plans_task": true
+    },
+    {
+      "label": "A04",
+      "project": "user memory",
+      "scope": "Tasks 4-5 only",
+      "part": "1/1",
+      "memory_file": "{ROOT}/repo/memory/topics/t.md",
+      "sessions": [],
+      "bytes": 0,
+      "plans_task": true
+    }
+  ],
+  "quiet": [],
+  "not_dispatched": [],
+  "harvest": []
+}

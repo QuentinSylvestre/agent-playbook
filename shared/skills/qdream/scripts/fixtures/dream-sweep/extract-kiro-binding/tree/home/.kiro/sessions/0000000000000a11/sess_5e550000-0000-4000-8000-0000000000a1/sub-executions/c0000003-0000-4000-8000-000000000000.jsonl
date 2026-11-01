@@ -1,0 +1,2 @@
+{"id": "r-0014", "timestamp": "2026-10-12T12:00:14.000Z", "payload": {"type": "steering_inclusion", "documents": ["file:///steering/a.md"], "executionId": "e0000000-0000-4000-8000-000000000001", "subExecutionId": "c0000003-0000-4000-8000-000000000000"}}
+{"id": "r-0015", "timestamp": "2026-10-12T12:00:15.000Z", "payload": {"executionId": "e0000000-0000-4000-8000-000000000001", "subExecutionId": "c0000003-0000-4000-8000-000000000000", "type": "tool_call", "toolCallId": "t14", "toolName": "read_file", "args": {"path": "x"}, "status": "approved"}}

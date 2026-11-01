@@ -1,0 +1,21 @@
+{
+  "label": "V01",
+  "project": "{ROOT}/proj/alpha",
+  "items": [
+    {
+      "item_id": "V01-001",
+      "class": "memory_proposals",
+      "heading": "First lesson"
+    },
+    {
+      "item_id": "V01-002",
+      "class": "memory_proposals",
+      "heading": "Second lesson"
+    },
+    {
+      "item_id": "V01-003",
+      "class": "stale_entries",
+      "heading": "Old entry"
+    }
+  ]
+}

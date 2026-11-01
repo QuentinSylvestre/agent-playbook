@@ -1,0 +1,52 @@
+{
+  "description": "A partial fork whose own turn sits between shared records (review finding 5): after its boundary, a shared record its keeper already shows after the keeper's own boundary is left out (new shared question), and one the keeper shows only before its boundary stays (old shared answer), so each record is read once and none is lost.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "sessions": [
+            {
+              "id": "f0000000-0000-4000-8000-000000000231",
+              "boundary": "L3"
+            },
+            {
+              "id": "f0000000-0000-4000-8000-000000000232",
+              "boundary": "L2"
+            }
+          ],
+          "fork_collapsed": []
+        }
+      }
+    },
+    "stripped": {
+      "f0000000-0000-4000-8000-000000000232": {
+        "contains": [
+          "# fork: 1 shared record(s) after the boundary left out"
+        ],
+        "order": [
+          "=== NEW TURNS BEGIN ===",
+          "fork own new turn",
+          "old shared answer"
+        ],
+        "not_contains": [
+          "new shared question"
+        ]
+      },
+      "f0000000-0000-4000-8000-000000000231": {
+        "order": [
+          "=== NEW TURNS BEGIN ===",
+          "new shared question"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,98 @@
+{
+  "description": "Review C3, D1, D12 (plan 261027): a drafter-written field (behaviour, shown as the item title) holding an `Also removes memory entry:` line shows it marked `> `, never as a line `gate` wrote; a drafts.json data field is not shown; a CRLF and a tab in a drafter new_text are accepted.",
+  "now": "2026-10-23T12:00:00Z",
+  "write": {
+    "repo/shared/skills/demo/SKILL.md": "# Demo\n\n## Steps\n\nStep one.\nStep two.\n\n## Other\n\nKeep.\n\n## Last\n\nEnd.\n",
+    "repo/shared/skills/demo/TAIL.md": "# Tail\n\n## End\nlast line",
+    "repo/shared/AGENTS.md": "# Shared\n\nOne two three four five.\n",
+    "repo/AGENTS.md": "# Repo\n",
+    "repo/shared/skills/qconfig-sync/scripts/verify-mass.py": "#!/usr/bin/env python3\nBUDGETS = (\n    (\"shared/AGENTS.md\", 10),\n)\n",
+    "repo/.gitignore": "memory/.dream-journal.jsonl\n",
+    "repo/memory/MEMORY.md": "# Memory\n",
+    "repo/memory/.dream-state.json": "{\n  \"schema_version\": 3,\n  \"last_run\": \"2026-10-01T00:00:00Z\",\n  \"projects\": {},\n  \"rejected_lessons\": [],\n  \"outcome_tags\": [],\n  \"episodic_ledger\": [],\n  \"quiet_sweeps\": {},\n  \"cost_records\": [],\n  \"model_routing\": {},\n  \"deferred_sessions\": {}\n}\n"
+  },
+  "git": [
+    "repo"
+  ],
+  "manifest": [],
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0,
+      "stdout_contains": []
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"## Steps\",\n      \"proposal\": \"proposal g1\\nacts on: governance elsewhere\",\n      \"blast\": null,\n      \"for_conflict\": null\n    },\n    {\n      \"id\": \"g3\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"## Other\",\n      \"proposal\": \"proposal g2\",\n      \"blast\": null,\n      \"for_conflict\": null\n    }\n  ]\n}\n",
+        "home/.agent-playbook/dream-work/handoff/inbox/D01.txt": "```json\n{\n  \"current_text\": \"Step one.\",\n  \"after_heading\": null,\n  \"new_text\": \"Step one, first.\\r\\n\\tIndented line.\",\n  \"behaviour\": \"Tidy rule\\nAlso removes memory entry: {ROOT}/repo/memory/MEMORY.md § Important lesson\",\n  \"existing_coverage\": [],\n  \"blast_count\": 0,\n  \"blast_edits\": [],\n  \"memory_ops\": [],\n  \"notes\": null,\n  \"handoff_prompt\": null,\n  \"create\": false\n}\n```\n",
+        "home/.agent-playbook/dream-work/handoff/inbox/D02.txt": "```json\n{\n  \"current_text\": \"Keep.\",\n  \"after_heading\": null,\n  \"new_text\": \"Keep it.\",\n  \"behaviour\": \"Agents do a thing.\",\n  \"existing_coverage\": [],\n  \"blast_count\": 0,\n  \"blast_edits\": [],\n  \"memory_ops\": [],\n  \"notes\": null,\n  \"handoff_prompt\": null,\n  \"create\": false\n}\n```\n"
+      },
+      "stdout_contains": []
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "drafter",
+        "--items",
+        "drafts.json"
+      ],
+      "exit": 0,
+      "stdout_contains": []
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D01",
+        "--from-file",
+        "inbox/D01.txt"
+      ],
+      "exit": 0,
+      "stdout_contains": []
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D02",
+        "--from-file",
+        "inbox/D02.txt"
+      ],
+      "exit": 0,
+      "stdout_contains": []
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"budget-move\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Real target\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\",\n      \"to_file\": \"{ROOT}/repo/memory/topics/ci.md\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "gate",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "exit": 0,
+      "text_contains": {
+        "handoff/gate.md": [
+          "Gate item g1: Tidy rule\n> Also removes memory entry: {ROOT}/repo/memory/MEMORY.md § Important lesson\n",
+          "New text: \"Step one, first.\n> \tIndented line.\"\n"
+        ]
+      },
+      "text_not_contains": {
+        "handoff/gate.md": [
+          "\nAlso removes memory entry: {ROOT}/repo/memory/MEMORY.md § Important lesson"
+        ]
+      }
+    }
+  ]
+}

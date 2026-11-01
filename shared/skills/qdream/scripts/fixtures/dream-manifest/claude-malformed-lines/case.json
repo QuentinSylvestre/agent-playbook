@@ -1,0 +1,38 @@
+{
+  "description": "A too-deeply nested JSON line is an unparseable-line error, not a crash; lines with invalid UTF-8 or a non-object JSON value are counted in one error line per file.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "sessions": [
+            {
+              "id": "cca00000-0000-4000-8000-000000000001",
+              "boundary": "L2"
+            }
+          ]
+        }
+      }
+    },
+    "json_contains": [
+      "unparseable line L1 in {ROOT}/home/.claude/projects/-ROOT-proj-alpha/cca00000-0000-4000-8000-000000000001.jsonl (nested too deeply)",
+      "2 line(s) with invalid UTF-8 or non-object JSON in {ROOT}/home/.claude/projects/-ROOT-proj-alpha/cca00000-0000-4000-8000-000000000001.jsonl"
+    ],
+    "stripped": {
+      "cca00000-0000-4000-8000-000000000001": {
+        "contains": [
+          "L2 [user] first genuine prompt",
+          "L5 [assistant] Answer after"
+        ]
+      }
+    }
+  }
+}

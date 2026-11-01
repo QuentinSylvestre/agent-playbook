@@ -1,0 +1,61 @@
+{
+  "description": "The Orient backup of the state file is taken once: after the state file changes, a second `dirty` keeps the snapshot and the backup holds the Orient bytes; with no journal at Orient there is no journal copy.",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/memory/MEMORY.md": "# Memory\n",
+    "repo/memory/.dream-state.json": "{\"marker\": \"ORIENT-STATE-A\"}\n"
+  },
+  "git": [
+    "repo"
+  ],
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/dirty-at-orient.json": {
+          "backup": {
+            ".dream-journal.jsonl": {
+              "sha256": "absent",
+              "copy": null
+            }
+          }
+        }
+      },
+      "absent": [
+        "sweep/backup/.dream-journal.jsonl"
+      ]
+    },
+    {
+      "write": {
+        "repo/memory/.dream-state.json": "{\"marker\": \"LATER-STATE-B\"}\n"
+      }
+    },
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0,
+      "unchanged": true,
+      "stdout_contains": [
+        "already taken"
+      ],
+      "text_contains": {
+        "sweep/backup/.dream-state.json": [
+          "ORIENT-STATE-A"
+        ]
+      },
+      "text_not_contains": {
+        "sweep/backup/.dream-state.json": [
+          "LATER-STATE-B"
+        ]
+      }
+    }
+  ]
+}

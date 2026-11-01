@@ -1,0 +1,60 @@
+{
+  "description": "Method B finds a sub-project below a session cwd; vendored trees are not scanned; a cwd with no markers of its own under a marked parent is flagged; --add and removed projects appear. A Method-A root nested in another root's walk is walked once, and the walk's size and time go to stderr.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo",
+    "--add",
+    "{ROOT}/proj/extra"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "$absent": [
+          "{ROOT}/proj/mono/node_modules/pkg"
+        ],
+        "{ROOT}/proj/mono": {
+          "status": "known",
+          "subdirectory_of": null
+        },
+        "{ROOT}/proj/mono/services/api": {
+          "status": "new",
+          "discovered_by": [
+            "B"
+          ]
+        },
+        "{ROOT}/proj/mono/src/leaf": {
+          "status": "new",
+          "discovered_by": [
+            "A"
+          ],
+          "subdirectory_of": "{ROOT}/proj/mono",
+          "sessions": [
+            {
+              "id": "c17b0000-0000-4000-8000-000000000001"
+            }
+          ]
+        },
+        "{ROOT}/proj/extra": {
+          "status": "new",
+          "discovered_by": [
+            "add"
+          ]
+        },
+        "{ROOT}/proj/gone": {
+          "status": "removed",
+          "discovered_by": [
+            "state"
+          ]
+        }
+      }
+    },
+    "stderr_contains": [
+      "under 1 root(s) (1 nested root(s) skipped)"
+    ]
+  }
+}

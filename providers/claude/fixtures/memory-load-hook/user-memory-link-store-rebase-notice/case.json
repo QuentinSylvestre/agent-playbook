@@ -1,0 +1,12 @@
+{
+  "description": "User memory behind the `memory` link while the store repo is mid-rebase: the index still goes out, with a note that user memory sits in a store repo with a rebase in progress.",
+  "cwd": "{{ROOT}}/empty",
+  "link": [{"src": "stores/user/memory", "dst": "cfg/memory"}],
+  "contains": [
+    "- User entry one",
+    "Note: user memory sits in the store repo, which has a rebase in progress"
+  ],
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores",
+  "store_op": "rebase-merge"
+}

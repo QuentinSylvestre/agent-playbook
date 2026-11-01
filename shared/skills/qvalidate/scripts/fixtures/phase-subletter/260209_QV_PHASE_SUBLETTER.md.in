@@ -1,0 +1,38 @@
+# QV fixture: a split sub-phase heading (decision 2)
+
+> **Status**: In Progress — phase 1 under way <!-- lifecycle: Exploring -> Draft -> In Progress -> Complete -->
+
+## Intent
+
+### Success criteria
+
+- SC-1: the first criterion
+- SC-2: the second criterion
+
+### Scope
+
+boundary line
+
+## Phases
+
+### Phase 8: Alpha
+
+**Covers**: SC-1, SC-2
+
+- [x] a
+
+### Phase 8b: Alpha split
+
+- [x] b
+- [x] c
+- [ ] d
+
+## 8) Documentation Updates
+
+| Document | Change | Phase |
+|---|---|---|
+| `done.md` | updated | 1 |
+
+## Harness Improvement Opportunities
+
+- none observed — cost: none — suggested change: none

@@ -1,0 +1,52 @@
+{
+  "description": "A template token no value fills is exit 3 naming it; a token value with a newline or brace is refused; a sweep file without the marker line is exit 3. On the CLI, a skill directory whose sweep-decide-apply.md has no Dream Drafter Brief marker is a clean exit 3 naming it; with the live template, --items naming anything but drafts.json is a usage error; and a phase brief without --snapshot-sha is a usage error that writes no brief.",
+  "now": "2026-10-12T12:00:00Z",
+  "units": [
+    "unfilled-token"
+  ],
+  "steps": [
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "drafter",
+        "--items",
+        "items.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "Dream Drafter Brief"
+      ],
+      "absent": [
+        "sweep/briefs"
+      ],
+      "skill_dir": "skill"
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "drafter",
+        "--items",
+        "items.json"
+      ],
+      "exit": 2,
+      "absent": [
+        "sweep/briefs"
+      ]
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "phase",
+        "--phase",
+        "gather"
+      ],
+      "exit": 2,
+      "absent": [
+        "sweep/briefs"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "description": "baseline --by-role, whole-text order (plan 261012 Phase 3, review fix Q3): when no marker is on the first non-blank line, the whole text is tested for the verifier marker, then the task4 marker, then the older-transcript fallback (plan Phase 3, Classifier order: verifier before task4). A body that names the Task-4 marker first and the verifier marker later is a verifier; a body that names the Task-4 marker and only the lowercase word verifier is task4, because a marker beats the fallback.",
+  "now": "2026-10-14T12:00:00Z",
+  "argv": [
+    "baseline",
+    "--session",
+    "{ROOT}/home/.claude/projects/-ROOT-proj/b5a00000-0000-4000-8000-000000000015.jsonl",
+    "--by-role"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_contains": [
+      "tokens: 177\n",
+      "agents: 2\n",
+      "role orchestrator: files 1, tokens: 4\n",
+      "role task4: files 1, tokens: 91\n",
+      "role verifier: files 1, tokens: 82\n",
+      "role drafter: files 0, tokens: 0\n",
+      "role other: files 0, tokens: 0\n"
+    ],
+    "stdout_not_contains": [
+      "error:",
+      "other: agent-"
+    ]
+  }
+}

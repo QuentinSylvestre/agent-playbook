@@ -1,0 +1,62 @@
+{
+  "label": "A01",
+  "kind": "task4",
+  "via": "inbox",
+  "return": {
+    "memory_proposals": [],
+    "unrelated": [
+      "H1",
+      "H2",
+      "H3"
+    ],
+    "not_a_conflict": [
+      {
+        "heading": "H4",
+        "governance_ref": "shared/AGENTS.md § X",
+        "narrowing_reason": "r",
+        "governance_span": "s"
+      }
+    ],
+    "subsumed_entries": [
+      {
+        "heading": "H5",
+        "governance_ref": "shared/AGENTS.md § X",
+        "subsuming_quote": "q"
+      },
+      {
+        "heading": "H6",
+        "governance_ref": "shared/AGENTS.md § X",
+        "subsuming_quote": "q"
+      }
+    ],
+    "stale_entries": [],
+    "governance_conflicts": [
+      {
+        "heading": "H7",
+        "governance_ref": "shared/AGENTS.md § X",
+        "governance_span": "s",
+        "disagreement": "d",
+        "entry_verified": "2026-09-01 (sweep)"
+      },
+      {
+        "heading": "H8",
+        "governance_ref": "shared/AGENTS.md § X",
+        "governance_span": "s",
+        "disagreement": "d",
+        "entry_verified": "2026-09-01 (sweep)"
+      }
+    ],
+    "verified": [],
+    "task4_status": "checked",
+    "improvement_signals": [],
+    "user_skipped": [],
+    "saved_in_session": [],
+    "new_skill_candidates": [],
+    "insights_signals": [],
+    "sessions_read": [],
+    "checkpoint_collapsed": 0,
+    "project_accessible": true,
+    "error": null,
+    "scope": "all tasks"
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "description": "F15: a repository whose core.fsmonitor names a command (here one that writes a file beside the repositories) does not run it under dirty or drift: every git call passes -c core.fsmonitor=false. The step snapshot fails the case if the file appears.",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/memory/MEMORY.md": "# Memory\n",
+    "repo/memory/.dream-state.json": "{}\n",
+    "proj/alpha/memory/MEMORY.md": "# alpha memory\n",
+    "proj/beta/memory/MEMORY.md": "# beta memory\n"
+  },
+  "git": [
+    "repo",
+    "proj/alpha",
+    "proj/beta"
+  ],
+  "setup": [
+    {
+      "write": {
+        "proj/alpha/.git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n\tfsmonitor = \"echo pwned > {ROOT}/PWNED-alpha.txt; false\"\n",
+        "repo/.git/config": "[core]\n\trepositoryformatversion = 0\n\tbare = false\n\tfsmonitor = \"echo pwned > {ROOT}/PWNED-repo.txt; false\"\n"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "gather"
+      ],
+      "exit": 0
+    }
+  ]
+}

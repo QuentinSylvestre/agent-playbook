@@ -1,0 +1,17 @@
+{
+  "description": "plan 261027 SC-2: a --marker that the first user record of more than one sub-agent file contains (`Brief` is in both) with equal first-record times is still a usage error (exit 2), never a guess (review R9: with different times the latest is taken); without CLAUDE_CODE_SESSION_ID or --session nothing is read.",
+  "now": "2026-10-27T12:00:00Z",
+  "argv": [
+    "context",
+    "--session",
+    "{ROOT}/home/.claude/projects/-ROOT-proj/b5a00000-0000-4000-8000-000000000031.jsonl",
+    "--marker",
+    "Brief"
+  ],
+  "expect": {
+    "exit": 2,
+    "stderr_contains": [
+      "it must match exactly one"
+    ]
+  }
+}

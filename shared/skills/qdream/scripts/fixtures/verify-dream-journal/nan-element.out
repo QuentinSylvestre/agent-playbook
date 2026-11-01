@@ -1,0 +1,3 @@
+FAIL: line 1: array elements must be non-empty strings
+ok: line 2: valid remove record
+verify-dream-journal: ok=1 fail=1 warn=0

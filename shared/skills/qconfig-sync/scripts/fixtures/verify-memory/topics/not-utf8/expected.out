@@ -1,0 +1,6 @@
+MISSING	memory/topics/git.md	notes/le.txt:not-utf8
+MISSING	memory/topics/powershell.md	notes/zero.txt:not-utf8
+MISSING	memory/topics/kiro-cli.md	notes/be.txt:not-utf8
+OK	memory/topics/claude-code.md	shared/AGENTS.md
+MISSING	memory/topics/http-testing.md	notes/latin1.txt:not-utf8
+SUMMARY	ok=1	waived=0	missing=4

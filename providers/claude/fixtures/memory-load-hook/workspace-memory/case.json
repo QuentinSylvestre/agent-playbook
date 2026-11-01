@@ -1,0 +1,13 @@
+{
+  "description": "memory-rules.md § Resolution contract steps 1 and 3: a folder no store serves (here under the system temp directory, where the resolver creates none), with a readable store repo and no store at any level, has its in-workspace memory/MEMORY.md read. It is shown as a labelled heading index, never in full (plan 261016 Step 9).",
+  "cwd": "{{ROOT}}/proj",
+  "contains": [
+    "- Workspace entry beta",
+    "In-workspace memory ({{ROOT}}/proj/memory/MEMORY.md) — no store serves this folder"
+  ],
+  "absent": [
+    "Project memory: none found",
+    "delivered in full"
+  ],
+  "config_repo": "{{ROOT}}/cfg"
+}

@@ -1,0 +1,11 @@
+{
+  "description": "An in-workspace memory/ in a parent folder is never read (in-workspace memory is not a source). The resolver's non-git walk-up to ancestor stores is covered by config-repo-itself, not here.",
+  "cwd": "{{ROOT}}/proj/sub",
+  "contains": [
+    "Project memory: none found for {{ROOT}}/proj/sub"
+  ],
+  "absent": [
+    "Parent folder entry"
+  ],
+  "config_repo": "{{ROOT}}/cfg"
+}

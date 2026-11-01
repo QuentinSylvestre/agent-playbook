@@ -1,0 +1,31 @@
+{
+  "description": "D24: the user memory gets one quiet_sweeps / memory_pass pair under the key 'user memory' (no stored value: seed 2) and per-file flags in file_flags; a missing cited path in a topic file is listed in memory_flags and file_flags but, since the user decision of 2026-09-25, does not set memory_pass (seed 2 -> null).",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "user_memory": {
+        "quiet_sweeps": 2,
+        "memory_pass": null,
+        "memory_flags": [
+          "cited_paths_missing"
+        ],
+        "file_flags": {
+          "{ROOT}/repo/memory/topics/authoring.md": [
+            "cited_paths_missing"
+          ]
+        }
+      }
+    }
+  },
+  "git": [
+    "repo"
+  ]
+}

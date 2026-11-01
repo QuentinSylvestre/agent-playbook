@@ -1,0 +1,70 @@
+{
+  "description": "ops/<name>.json: a name of letters, digits, dot, dash and underscore; ops a list of objects.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/ops/syn-write_1.json": "{\n  \"ops\": [\n    {\n      \"id\": \"o1\",\n      \"op\": \"usage_bump\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "ops/syn-write_1.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check ops/syn-write_1.json: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/ops/syn-write_1.json": "{\n  \"ops\": [\n    \"o1\"\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "ops/syn-write_1.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "key 'ops': expected list:obj"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/ops/syn-write_1.json": "{\n  \"op\": []\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "ops/syn-write_1.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "missing key 'ops'"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/ops/syn write.json": "{\n  \"ops\": []\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "ops/syn write.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no handoff schema"
+      ]
+    }
+  ]
+}

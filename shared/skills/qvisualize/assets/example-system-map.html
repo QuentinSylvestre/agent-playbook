@@ -1,0 +1,176 @@
+<div id="example-system-map">
+<style>
+/* Shape of an operational system map. Copy the structure, not the content:
+   header + chips, legend, one figure per flow with lane labels and numbered
+   probes, side figures in a two-column grid, a data-location table, then one
+   probe card per number. */
+#example-system-map{display:grid;gap:24px;color:var(--foreground);min-width:0}
+#example-system-map header{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 16px}
+#example-system-map h2{margin:0;font-weight:500}
+#example-system-map h3{margin:0 0 8px;font-weight:500;text-transform:uppercase;letter-spacing:.04em;color:var(--muted-foreground)}
+#example-system-map .chips{display:flex;flex-wrap:wrap;gap:6px}
+#example-system-map .legend{display:flex;flex-wrap:wrap;gap:16px;align-items:center;color:var(--muted-foreground)}
+#example-system-map .sw{display:inline-block;width:18px;height:12px;margin-right:6px;vertical-align:middle;border-radius:2px}
+#example-system-map .sw.device{border:1.5px solid var(--orange)}
+#example-system-map .sw.service{border:1.5px solid var(--foreground)}
+#example-system-map .sw.store{border:1.5px dashed var(--blue)}
+#example-system-map figure{margin:0;min-width:0}
+#example-system-map .scroll{overflow-x:auto}
+#example-system-map .wide svg{min-width:820px}
+#example-system-map svg{display:block;max-width:100%;height:auto}
+#example-system-map svg text{fill:var(--foreground);font-size:12px}
+#example-system-map svg .title{font-weight:500;font-size:13px}
+#example-system-map svg .mono,#example-system-map svg .lane{font-family:var(--font-mono);font-size:10px;fill:var(--muted-foreground)}
+#example-system-map svg .device{fill:none;stroke:var(--orange);stroke-width:1.5}
+#example-system-map svg .service{fill:none;stroke:var(--foreground);stroke-width:1.2}
+#example-system-map svg .store{fill:none;stroke:var(--blue);stroke-width:1.5;stroke-dasharray:5 3}
+#example-system-map svg .edge{fill:none;stroke:var(--muted-foreground);stroke-width:1.2}
+#example-system-map svg .probe circle{fill:var(--red)}
+#example-system-map svg .probe text{fill:var(--background);font-family:var(--font-mono);font-size:11px;font-weight:500}
+#example-system-map figcaption{margin-top:8px;color:var(--muted-foreground)}
+#example-system-map .grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:16px}
+#example-system-map .pn{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--red);color:var(--background);font-family:var(--font-mono);font-size:11px;flex:none}
+#example-system-map .probes{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,340px),1fr));gap:12px}
+#example-system-map .probe-card{display:grid;gap:6px;min-width:0;padding:10px 12px;border:1px solid var(--border);border-radius:6px}
+#example-system-map .probe-card .head{display:flex;gap:8px;align-items:center;font-weight:500}
+#example-system-map .where,#example-system-map .expect{color:var(--muted-foreground)}
+#example-system-map pre{margin:0;padding:8px 10px;overflow-x:auto;border-radius:4px;background:var(--muted)}
+#example-system-map code{font-family:var(--font-mono)}
+</style>
+
+<header>
+  <h2>Order Event Pipeline</h2>
+  <div class="chips">
+    <span class="viz-badge">ORD-042</span>
+    <span class="viz-badge">staging stack</span>
+    <span class="viz-badge">store 12</span>
+    <span class="viz-badge">Europe/Paris</span>
+  </div>
+</header>
+
+<div class="legend text-small">
+  <span><span class="sw device"></span>device</span>
+  <span><span class="sw service"></span>service</span>
+  <span><span class="sw store"></span>data store</span>
+  <span><span class="pn">3</span> probe: commands below</span>
+</div>
+
+<section>
+  <h3>1 · Recording path (real time)</h3>
+  <figure id="recording-path" class="wide">
+    <div class="scroll">
+    <svg viewBox="0 0 900 190" width="900" role="img" aria-label="Tills send events to the edge gateway, which streams them to the ingest service; ingest writes daily JSON lines to the object store.">
+      <defs><marker id="example-system-map-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+      <text class="lane" x="20" y="20">FIELD</text>
+      <text class="lane" x="250" y="20">EDGE</text>
+      <text class="lane" x="480" y="20">INGEST</text>
+      <text class="lane" x="710" y="20">STORE</text>
+
+      <rect class="device" x="20" y="60" width="170" height="70" rx="4"/>
+      <text class="title" x="32" y="84">Till terminals</text>
+      <text class="mono" x="32" y="102">sale + refund events</text>
+      <text class="mono" x="32" y="118">TILL-01 … TILL-08</text>
+
+      <rect class="service" x="250" y="60" width="170" height="70" rx="4"/>
+      <text class="title" x="262" y="84">Edge gateway</text>
+      <text class="mono" x="262" y="102">edge-gw-1</text>
+      <text class="mono" x="262" y="118">batches ≈1 s</text>
+
+      <rect class="service" x="480" y="60" width="170" height="70" rx="4"/>
+      <text class="title" x="492" y="84">Ingest service</text>
+      <text class="mono" x="492" y="102">ingest-1</text>
+      <text class="mono" x="492" y="118">validates, buffers</text>
+
+      <rect class="store" x="710" y="60" width="170" height="86" rx="4"/>
+      <text class="title" x="722" y="84">Object store</text>
+      <text class="mono" x="722" y="102">bucket orders-raw</text>
+      <text class="mono" x="722" y="118">{store}/{YYYY}/{MM}/{DD}/</text>
+      <text class="mono" x="722" y="134">{epoch}.jsonl</text>
+
+      <g style="color:var(--muted-foreground)">
+        <path class="edge" d="M190,95 L248,95" marker-end="url(#example-system-map-arrow)"/>
+        <path class="edge" d="M420,95 L478,95" marker-end="url(#example-system-map-arrow)"/>
+        <path class="edge" d="M650,95 L708,95" marker-end="url(#example-system-map-arrow)"/>
+      </g>
+      <text class="mono" x="194" y="160">HTTPS POST</text>
+      <text class="mono" x="194" y="174">/events</text>
+      <text class="mono" x="424" y="160">gRPC stream</text>
+      <text class="mono" x="654" y="160">flush ≈5 min</text>
+      <text class="mono" x="654" y="174">only when events</text>
+
+      <g class="probe"><circle cx="420" cy="60" r="10"/><text x="420" y="64" text-anchor="middle">1</text></g>
+      <g class="probe"><circle cx="650" cy="60" r="10"/><text x="650" y="64" text-anchor="middle">2</text></g>
+      <g class="probe"><circle cx="880" cy="60" r="10"/><text x="880" y="64" text-anchor="middle">3</text></g>
+    </svg>
+    </div>
+    <figcaption class="text-small">An event reaches storage up to 5 minutes after it happens.</figcaption>
+  </figure>
+</section>
+
+<section class="grid2">
+  <figure id="record-format">
+    <h3>2 · Archive line</h3>
+    <svg viewBox="0 0 440 90" width="440" role="img" aria-label="One JSON object per line with type, timestamp, till and amount.">
+      <text class="mono" x="10" y="24">{"type":"sale", "ts":"2026-10-27T19:19:22Z",</text>
+      <text class="mono" x="22" y="40">"till":"TILL-03", "amount":12.40}</text>
+      <text class="mono" x="10" y="68">{"type":"refund", … same fields }</text>
+    </svg>
+  </figure>
+  <figure id="run-states">
+    <h3>3 · Batch states</h3>
+    <svg viewBox="0 0 440 90" width="440" role="img" aria-label="queued, running, then succeeded or failed.">
+      <defs><marker id="example-system-map-arrow-2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="currentColor"/></marker></defs>
+      <rect class="service" x="10" y="20" width="90" height="32" rx="16"/><text class="mono" x="55" y="40" text-anchor="middle">queued</text>
+      <rect class="service" x="140" y="20" width="90" height="32" rx="16"/><text class="mono" x="185" y="40" text-anchor="middle">running</text>
+      <rect class="service" x="270" y="20" width="100" height="32" rx="16"/><text class="mono" x="320" y="40" text-anchor="middle">succeeded</text>
+      <g style="color:var(--muted-foreground)">
+        <path class="edge" d="M100,36 L138,36" marker-end="url(#example-system-map-arrow-2)"/>
+        <path class="edge" d="M230,36 L268,36" marker-end="url(#example-system-map-arrow-2)"/>
+      </g>
+      <text class="mono" x="140" y="76">error → failed, retried after 1 h</text>
+      <g class="probe"><circle cx="230" cy="20" r="10"/><text x="230" y="24" text-anchor="middle">4</text></g>
+    </svg>
+  </figure>
+</section>
+
+<section>
+  <h3>4 · Where the data lives</h3>
+  <div class="table-responsive">
+    <table class="table table-sm">
+      <thead><tr><th>Data</th><th>Store</th><th>Key / table</th><th>Written by</th><th>Read by</th><th>Probe</th></tr></thead>
+      <tbody>
+        <tr><td>Raw events</td><td>Object store</td><td><code>orders-raw/{store}/{YYYY}/{MM}/{DD}/{epoch}.jsonl</code></td><td>ingest</td><td>batch job</td><td><span class="pn">3</span></td></tr>
+        <tr><td>Batch runs</td><td>PostgreSQL</td><td><code>order_batches</code></td><td>scheduler</td><td>operator page</td><td><span class="pn">4</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section>
+  <h3>5 · Probes</h3>
+  <div class="probes">
+    <div class="probe-card">
+      <div class="head"><span class="pn">1</span>Gateway sends batches</div>
+      <pre><code>docker logs --since 10m edge-gw-1 2&gt;&amp;1 | grep "batch sent"</code></pre>
+      <div class="expect text-small">Expect: <code>batch sent n=…</code> about every second</div>
+    </div>
+    <div class="probe-card">
+      <div class="head"><span class="pn">2</span>Ingest flushes</div>
+      <pre><code>docker logs ingest-1 2&gt;&amp;1 | grep "flushed"</code></pre>
+      <div class="expect text-small">Expect: <code>flushed N events to orders-raw/12/…</code> every 5 min</div>
+    </div>
+    <div class="probe-card">
+      <div class="head"><span class="pn">3</span>Read archive lines</div>
+      <div class="where text-small">script: <code>tools/read_lines.py</code></div>
+      <pre><code>python tools/read_lines.py 12 2026/10/27</code></pre>
+      <div class="expect text-small">Expect: one line per event, with its upload time</div>
+    </div>
+    <div class="probe-card">
+      <div class="head"><span class="pn">4</span>Batch status</div>
+      <div class="where text-small">UI: operator page <code>/stores/12/batches</code></div>
+      <pre><code>psql -c "SELECT id, status FROM order_batches ORDER BY id DESC LIMIT 5"</code></pre>
+      <div class="expect text-small">Expect: <code>queued → running → succeeded</code></div>
+    </div>
+  </div>
+</section>
+</div>

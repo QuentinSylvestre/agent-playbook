@@ -1,0 +1,20 @@
+{
+  "description": "Review R19 (plan 261027): `context --orchestrator` reads the session's last call (502 tokens) and prints the orchestrator's limit, ORCHESTRATOR_CONTEXT_LIMIT (500000), not the phase limit (200000).",
+  "now": "2026-10-27T12:00:00Z",
+  "argv": [
+    "context",
+    "--session",
+    "{ROOT}/home/.claude/projects/-ROOT-proj/b5a00000-0000-4000-8000-000000000031.jsonl",
+    "--orchestrator"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_contains": [
+      "context: 502 tokens at the last model call (2026-10-27T10:00:02Z)\n",
+      "over limit: no (limit 500000)\n"
+    ],
+    "stdout_not_contains": [
+      "200000"
+    ]
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "description": "plan 261016 Phase 5 review F1, F2, F6: one unreadable STORE among several makes the store repo scan fail. Reads fail open (no project memory is read from it, no store-only project is listed) but the manifest says the store repo is unreadable; a `store:` state key is kept (known, with the reason), never removed and never probed as a path; a path-keyed state project whose folder exists but holds no marker and has no live discovery (proj/a, whose store cannot be checked) is kept known with the reason, not removed (plan 261016 Phase 10). With a readable store repo the same project is removed: store-repo-readable-unmarked-removed.",
+  "now": "2026-09-24T12:00:00Z",
+  "store_repo": "stores",
+  "mkdirs": [
+    "stores/zzz-bad-000000/STORE"
+  ],
+  "git": [
+    "proj/a"
+  ],
+  "git_origin": {
+    "proj/a": "https://example.com/Org/Proj.git"
+  },
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "$absent": [
+          "store:remote example.com/org/proj",
+          "store:remote example.com/org/other"
+        ],
+        "{ROOT}/proj/a": {
+          "status": "known",
+          "memory_file": null,
+          "entries": [],
+          "errors": [
+            "$contains:store repo unreadable:"
+          ]
+        },
+        "store:remote example.com/org/ghost": {
+          "status": "known",
+          "memory_file": null,
+          "sessions": [],
+          "errors": [
+            "$contains:the store repo could not be read this run"
+          ]
+        }
+      }
+    },
+    "json_contains": [
+      "store repo unreadable:",
+      "resolve it with /qconfig-sync"
+    ],
+    "json_not_contains": [
+      "cannot probe",
+      "store lookup failed"
+    ]
+  }
+}

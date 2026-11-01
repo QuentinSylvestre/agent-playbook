@@ -1,0 +1,74 @@
+# Remote URL normalization cases for store-resolver.py --selftest.
+# Columns: case name, remote URL as git stores it, expected identity (host/path) or LOCAL.
+# Expected values are written by hand from the rules in the Phase 2 contract of
+# plans/261016_WORKSPACE_STORE_REPO_REMOTE_IDENTITY_AND_PYTHON_GUARDS.md, never produced by the code.
+# {CRED}, {CRED2} and {CRED3} (a password holding "/") stand for a user:password@ prefix, {QTOKEN} for a token query, filled in by the selftest so no credential-shaped text sits in the repo.
+# Lines starting with # are comments. An empty URL column is written as the word EMPTY.
+https-dotgit	https://github.com/Owner/Repo.git	github.com/owner/repo
+https-bare	https://github.com/Owner/Repo	github.com/owner/repo
+https-trailing-slash	https://github.com/Owner/Repo/	github.com/owner/repo
+https-dotgit-then-slash	https://github.com/Owner/Repo.git/	github.com/owner/repo
+https-upper-dotgit	https://github.com/Owner/Repo.GIT	github.com/owner/repo
+dotgit-is-suffix-only	https://github.com/o/r.gitx	github.com/o/r.gitx
+dotgit-inside-name	https://github.com/o/my.git.tools	github.com/o/my.git.tools
+https-user-password	https://{CRED}github.com/Owner/Repo.git	github.com/owner/repo
+https-token-only	https://token@github.com/Owner/Repo/	github.com/owner/repo
+https-password-with-at	https://{CRED2}github.com/o/r.git	github.com/o/r
+https-default-port	https://HOST.example:443/a/b.git	host.example/a/b
+http-default-port	http://host.example:80/a/b	host.example/a/b
+https-other-port	https://host.example:8443/a/b	host.example:8443/a/b
+http-plain	http://host.example/a/b	host.example/a/b
+git-scheme	git://github.com/o/r.git	github.com/o/r
+scp-user	git@github.com:Owner/Repo.git	github.com/owner/repo
+scp-no-user	github.com:Owner/Repo	github.com/owner/repo
+scp-other-user	deploy@git.example.internal:core/mono.git	git.example.internal/core/mono
+ssh-scheme	ssh://git@github.com/Owner/Repo.git	github.com/owner/repo
+ssh-port	ssh://git@host.example:2222/grp/sub/Repo.git	host.example/grp/sub/repo
+ssh-user-password	ssh://{CRED}host.example/a/b	host.example/a/b
+ssh-github-443	ssh://git@ssh.github.com:443/Owner/Repo.git	github.com/owner/repo
+scp-ssh-github	git@ssh.github.com:Owner/Repo.git	github.com/owner/repo
+azure-ssh-scp	git@ssh.dev.azure.com:v3/Org/Proj/Repo	dev.azure.com/org/proj/repo
+azure-ssh-scheme	ssh://git@ssh.dev.azure.com/v3/Org/Proj/Repo	dev.azure.com/org/proj/repo
+azure-https-user	https://Org@dev.azure.com/Org/Proj/_git/Repo	dev.azure.com/org/proj/repo
+azure-https-bare	https://dev.azure.com/Org/Proj/_git/Repo	dev.azure.com/org/proj/repo
+census-app-bare	https://git.example.internal/cloud/app	git.example.internal/cloud/app
+census-app-dotgit	https://git.example.internal/cloud/app.git	git.example.internal/cloud/app
+census-mono	https://git.example.internal/core/mono.git	git.example.internal/core/mono
+census-poweratlas	https://github.com/example-user/PowerAtlas	github.com/example-user/poweratlas
+census-samplerecorder	https://github.com/example-user/SampleRecorder.git	github.com/example-user/samplerecorder
+local-drive-forward	C:/Users/alice/Documents/src/demo-app	LOCAL
+local-drive-back	C:\Users\x\repo	LOCAL
+local-drive-lower	d:/work/repo	LOCAL
+local-posix-abs	/srv/git/repo.git	LOCAL
+local-relative-dotdot	../sibling	LOCAL
+local-relative-dot	./here	LOCAL
+local-file-scheme	file:///srv/git/repo.git	LOCAL
+local-unc	\\server\share\repo.git	LOCAL
+local-one-letter-host	a:foo	LOCAL
+local-empty	EMPTY	LOCAL
+local-no-path	https://github.com	LOCAL
+local-no-colon-no-slash	justaname	LOCAL
+azure-https-percent-space	https://dev.azure.com/Org/My%20Project/_git/Repo	dev.azure.com/org/my project/repo
+azure-ssh-space	git@ssh.dev.azure.com:v3/Org/My Project/Repo	dev.azure.com/org/my project/repo
+azure-https-user-percent-space	https://Org@dev.azure.com/Org/My%20Project/_git/Repo.git	dev.azure.com/org/my project/repo
+percent-tilde	https://host.example/%7EUser/Repo.git	host.example/~user/repo
+percent-invalid-sequence-kept	https://host.example/a/100%zz	host.example/a/100%zz
+percent-newline-is-no-remote	https://h.example/a%0Ab/c.git	LOCAL
+percent-carriage-return-is-no-remote	https://h.example/a%0Db/c.git	LOCAL
+percent-nul-is-no-remote	https://h.example/a%00b/c.git	LOCAL
+percent-unit-separator-is-no-remote	https://h.example/a%1Fb/c.git	LOCAL
+percent-del-is-no-remote	https://h.example/a%7Fb/c.git	LOCAL
+percent-newline-in-scp-form-is-no-remote	git@h.example:a%0Ab/c.git	LOCAL
+percent-space-just-above-control-range-kept	https://h.example/a%20b/c.git	h.example/a b/c
+query-string-dropped	https://github.com/o/r.git?{QTOKEN}	github.com/o/r
+fragment-dropped	https://github.com/o/r#abc123	github.com/o/r
+encoded-query-dropped	https://github.com/o/r%3Fabc123	github.com/o/r
+scp-query-dropped	git@github.com:o/r.git?x=1	github.com/o/r
+password-with-slash	https://{CRED3}github.com/o/r	github.com/o/r
+query-dropped-before-decoding	https://github.com/o/r?x=%0A	github.com/o/r
+password-digits-and-slash	https://{CRED4}github.com/o/r	github.com/o/r
+password-at-and-slash	https://{CRED5}github.com/o/r	github.com/o/r
+password-slash-dotless-host	https://{CRED3}localhost/o/r	localhost/o/r
+password-slash-port-host	https://{CRED3}gitserver:3000/team/repo.git	gitserver:3000/team/repo
+password-slash-ssh	ssh://{CRED3}gitserver/team/repo.git	gitserver/team/repo
+query-before-any-path	https://{CRED}host.example?x/o/r	LOCAL

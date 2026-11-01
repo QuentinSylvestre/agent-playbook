@@ -1,0 +1,20 @@
+{
+  "description": "Without --by-role the baseline output gains no role lines (the --by-role tree, read plainly).",
+  "now": "2026-10-06T12:00:00Z",
+  "argv": [
+    "baseline",
+    "--session",
+    "{ROOT}/home/.claude/projects/-ROOT-proj/b5a00000-0000-4000-8000-000000000006.jsonl"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_contains": [
+      "tokens: 7064\n",
+      "agents: 5\n"
+    ],
+    "stdout_not_contains": [
+      "role ",
+      "other:"
+    ]
+  }
+}

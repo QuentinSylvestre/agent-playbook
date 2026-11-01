@@ -1,0 +1,17 @@
+Done. Summary line.
+
+```json
+{
+  "verifier": "V01",
+  "verdicts": [
+    {
+      "item_id": "V01-001",
+      "verdict": "maybe"
+    }
+  ],
+  "unverified_item_ids": [
+    "V01-003"
+  ],
+  "notes": null
+}
+```

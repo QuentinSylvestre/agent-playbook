@@ -1,0 +1,24 @@
+{
+  "description": "D11: a session the agent lists in sessions_unreadable that the manifest's errors[] does not name is not covered: the project is not stamped.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "coverage"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/coverage.json": {
+          "projects": {
+            "{ROOT}/proj/alpha": {
+              "stamp": false,
+              "reasons": [
+                "session s2 unreadable but not named in the manifest's errors[]"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

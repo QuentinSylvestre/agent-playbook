@@ -1,0 +1,63 @@
+{
+  "description": "cited_commit_missing: a backticked 7-40 character lowercase hex token with at least one letter that no known repository holds as a commit is listed; an all-digit token (a token count), uppercase hex and a token under 7 characters are not commit-shaped. A present commit, also one held only by a second known repository, is checked by unit anchors-commit. The flag is an input, not a trigger: memory_pass stays null at quiet_sweeps 2; the project's index counts its suspects.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "git": [
+    "repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_contains": [
+      "suspects=1"
+    ],
+    "index": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "memory_flags": [
+            "cited_commit_missing"
+          ],
+          "memory_pass": null,
+          "quiet_sweeps": 2,
+          "counts": {
+            "entries": 3,
+            "suspects": 1
+          }
+        }
+      }
+    },
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "entries": [
+            {
+              "heading": "Missing commit",
+              "cited_commit_missing": [
+                "abcdef1"
+              ],
+              "suspect": true
+            },
+            {
+              "heading": "All-digit token is not a commit",
+              "cited_commit_missing": [],
+              "suspect": false
+            },
+            {
+              "heading": "Uppercase or short hex is not a commit",
+              "cited_commit_missing": [],
+              "suspect": false
+            }
+          ]
+        }
+      }
+    }
+  },
+  "units": [
+    "anchors-commit"
+  ]
+}

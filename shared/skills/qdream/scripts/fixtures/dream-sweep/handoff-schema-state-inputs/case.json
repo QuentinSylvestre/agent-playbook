@@ -1,0 +1,70 @@
+{
+  "description": "state-inputs.json: decisions_sha a string, two lists and cost_record an object.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/state-inputs.json": "{\n  \"decisions_sha\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"rejected_lessons\": [],\n  \"outcome_tags\": [],\n  \"cost_record\": {}\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "state-inputs.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check state-inputs.json: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/state-inputs.json": "{\n  \"decisions_sha\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"rejected_lessons\": [],\n  \"outcome_tags\": [],\n  \"cost_record\": []\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "state-inputs.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "key 'cost_record': expected obj"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/state-inputs.json": "{\n  \"decisions_sha\": \"0000000000000000000000000000000000000000000000000000000000000000\",\n  \"rejected_lessons\": [],\n  \"cost_record\": {}\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "state-inputs.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "missing key 'outcome_tags'"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/state-inputs.json": "{\n  \"decisions_sha\": null,\n  \"rejected_lessons\": [],\n  \"outcome_tags\": [],\n  \"cost_record\": {}\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "state-inputs.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "key 'decisions_sha': expected str"
+      ]
+    }
+  ]
+}

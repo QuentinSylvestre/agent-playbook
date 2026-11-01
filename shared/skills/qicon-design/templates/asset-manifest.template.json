@@ -1,0 +1,26 @@
+{
+  "project_slug": "project-name",
+  "display_name": "Project Name",
+  "generated_at": "ISO-8601 timestamp",
+  "package_type": "concept-raster",
+  "assets": [
+    {
+      "path": "concept-raster/app/png/project-app-icon-concept-1024x1024.png",
+      "role": "app_icon_png",
+      "size": [
+        1024,
+        1024
+      ],
+      "source_input": "input/app-icon-source.png",
+      "alpha_expectation": "allowed",
+      "background_expectation": "contained or platform-safe",
+      "status": "generated",
+      "skip_reason": null,
+      "manual_review": [
+        "small-size readability",
+        "background safety"
+      ]
+    }
+  ],
+  "skipped": []
+}

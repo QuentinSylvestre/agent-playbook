@@ -1,0 +1,255 @@
+{
+  "description": "--kind drafter validates the Dream Drafter Brief return (current_text null allowed, new_text and behaviour required, blast_edits exact) into sweep/drafts/. The record is bound to the attempt's data file (data, data_sha256): drafter labels are positional like verifier labels (G1). New guards (Phase 6): a null current_text needs an after_heading heading line (D04) or non-blank notes (D01), else exit 3 (D03, D11 whitespace notes); a non-heading after_heading is refused (D05); each blast_edits entry needs a heading (D06) and an after_heading when its current_text is null (D07, D08 accepted); existing_coverage and memory_ops entries need their keys (D10, D09; D08 accepted). An empty current_text is refused, for the proposal (D12) and a blast edit (D13): replay_edits could never place it; an empty new_text (a retirement deleting a span) is accepted (D14).",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D01",
+        "--from-file",
+        "inbox/D01.txt"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/drafts/D01.json": {
+          "return": {
+            "current_text": null,
+            "memory_ops": [],
+            "handoff_prompt": null
+          },
+          "attempt": 1,
+          "data": "sweep/briefs/D01.data.json",
+          "data_sha256": "{SHA256:sweep/briefs/D01.data.json}"
+        }
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D02",
+        "--from-file",
+        "inbox/D02.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "missing key 'new_text'"
+      ],
+      "absent": [
+        "sweep/drafts/D02.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D03",
+        "--from-file",
+        "inbox/D03.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "current_text null needs after_heading"
+      ],
+      "absent": [
+        "sweep/drafts/D03.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D04",
+        "--from-file",
+        "inbox/D04.txt"
+      ],
+      "exit": 0,
+      "present": [
+        "sweep/drafts/D04.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D05",
+        "--from-file",
+        "inbox/D05.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "after_heading must be one Markdown heading line"
+      ],
+      "absent": [
+        "sweep/drafts/D05.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D06",
+        "--from-file",
+        "inbox/D06.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "blast_edits[0] needs path, heading, current_text, new_text"
+      ],
+      "absent": [
+        "sweep/drafts/D06.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D07",
+        "--from-file",
+        "inbox/D07.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "blast_edits[0]: current_text null needs after_heading"
+      ],
+      "absent": [
+        "sweep/drafts/D07.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D08",
+        "--from-file",
+        "inbox/D08.txt"
+      ],
+      "exit": 0,
+      "present": [
+        "sweep/drafts/D08.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D09",
+        "--from-file",
+        "inbox/D09.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "memory_ops[0] needs file, heading, change"
+      ],
+      "absent": [
+        "sweep/drafts/D09.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D10",
+        "--from-file",
+        "inbox/D10.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "existing_coverage[0] needs path, heading, quote"
+      ],
+      "absent": [
+        "sweep/drafts/D10.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D11",
+        "--from-file",
+        "inbox/D11.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "current_text null needs after_heading"
+      ],
+      "absent": [
+        "sweep/drafts/D11.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D12",
+        "--from-file",
+        "inbox/D12.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "current_text must not be empty"
+      ],
+      "absent": [
+        "sweep/drafts/D12.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D13",
+        "--from-file",
+        "inbox/D13.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "blast_edits[0]: current_text must not be empty"
+      ],
+      "absent": [
+        "sweep/drafts/D13.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D14",
+        "--from-file",
+        "inbox/D14.txt"
+      ],
+      "exit": 0,
+      "present": [
+        "sweep/drafts/D14.json"
+      ]
+    }
+  ]
+}

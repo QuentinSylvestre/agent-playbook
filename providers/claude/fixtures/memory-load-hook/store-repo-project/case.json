@@ -1,0 +1,16 @@
+{
+  "description": "plan 261016 Phase 5: a project whose memory lives in the store repo (a STORE directory found by identity, no WORKSPACE file).",
+  "cwd": "{{ROOT}}/proj",
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores",
+  "contains": [
+    "Store repo entry gamma",
+    "/stores/proj-bbbbbb/memory/MEMORY.md) — delivered in full",
+    "- User entry one"
+  ],
+  "absent": [
+    "Project memory: none found",
+    "two project memory files exist"
+  ],
+  "whole_lines": true
+}

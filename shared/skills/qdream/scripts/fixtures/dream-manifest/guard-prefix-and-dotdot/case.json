@@ -1,0 +1,25 @@
+{
+  "description": "The work folder is accepted only when its real path equals <home>/.agent-playbook/dream-work component-wise: a linked .agent-playbook, a prefix-sharing sibling, a dot-dot path and a linked dream-work are refused; --work is test-only.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 3,
+    "stdout_contains": [
+      "refused",
+      "is a link (resolves to {ROOT}/elsewhere)"
+    ]
+  },
+  "symlinks": {
+    "home/.agent-playbook": "elsewhere"
+  },
+  "units": [
+    "guard",
+    "usage"
+  ]
+}

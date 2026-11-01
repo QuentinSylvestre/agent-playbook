@@ -1,0 +1,5 @@
+{"id": "m1", "timestamp": "2026-09-23T08:00:00.000Z", "payload": {"type": "user", "content": "first part of the task", "_meta": {}, "documents": [], "images": []}}
+{"id": "m2", "timestamp": "2026-09-23T08:00:10.000Z", "payload": {"type": "assistant", "content": "First part done."}}
+{"id": "m3", "timestamp": "2026-09-23T08:00:20.000Z", "payload": {"type": "tool_result", "content": "tool output", "success": true}}
+{"id": "m4", "timestamp": "2026-09-23T08:30:00.000Z", "payload": {"type": "user", "content": "second part, written after the watermark", "_meta": {}, "documents": [], "images": []}}
+{"id": "m5", "timestamp": "2026-09-23T08:30:10.000Z", "payload": {"type": "assistant", "content": "Second part done."}}

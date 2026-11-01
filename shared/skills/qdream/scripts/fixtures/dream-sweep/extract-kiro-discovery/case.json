@@ -1,0 +1,281 @@
+{
+  "description": "Phase 8 kiro reader, session discovery (no KIRO_SESSION_ID, no --session): extract --kiro finds the one session whose messages.jsonl started a gather phase agent of this work folder that launched the label's attempt, both launches at or after manifest.json's snapshot_at. A previous sweep's launch (before snapshot_at) never matches, at the phase or the child launch; a label launched in two sessions, or in two folders of one session id, is exit 3 until --session narrows it; a synthesize phase agent or another work folder's phase agent is no gather phase agent. KIRO_SESSION_ID narrows only when it is a sess_ id (a bare uuid is ignored). --kiro-sessions only moves the reading location.",
+  "now": "2026-10-12T12:30:00Z",
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--kiro"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "c1000000-0000-4000-8000-000000000001",
+        "sess_5e550000-0000-4000-8000-0000000000d1"
+      ],
+      "files": {
+        "sweep/returns/A01.json": {
+          "agent_id": "c1000000-0000-4000-8000-000000000001",
+          "session_id": "sess_5e550000-0000-4000-8000-0000000000d1",
+          "return": {
+            "unrelated": [
+              "Alpha one"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A02",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no qdream_child launch of A02 attempt 1",
+        "1 matching launch(es) before this sweep's snapshot_at"
+      ],
+      "absent": [
+        "sweep/returns/A02.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A02",
+        "--kiro",
+        "--session",
+        "sess_5e550000-0000-4000-8000-0000000000d0"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no qdream_child launch of A02 attempt 1"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A03",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no qdream_child launch of A03 attempt 1",
+        "1 matching launch(es) before"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A04",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no qdream_child launch of A04 attempt 1",
+        "1 matching launch(es) before"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A05",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "launched in 2 session folders",
+        "sess_5e550000-0000-4000-8000-0000000000d1",
+        "sess_5e550000-0000-4000-8000-0000000000d2"
+      ],
+      "absent": [
+        "sweep/returns/A05.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A05",
+        "--kiro",
+        "--session",
+        "sess_5e550000-0000-4000-8000-0000000000d2"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/returns/A05.json": {
+          "agent_id": "c2000000-0000-4000-8000-000000000005",
+          "session_id": "sess_5e550000-0000-4000-8000-0000000000d2",
+          "return": {
+            "unrelated": [
+              "A05 in d2"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A06",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no qdream_child launch of A06"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A07",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "launched in 2 session folders"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--kiro"
+      ],
+      "env": {
+        "KIRO_SESSION_ID": "sess_5e550000-0000-4000-8000-0000000000d2"
+      },
+      "exit": 3,
+      "stdout_contains": [
+        "no qdream_child launch of A01 attempt 1",
+        "in session sess_5e550000-0000-4000-8000-0000000000d2"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--kiro"
+      ],
+      "env": {
+        "KIRO_SESSION_ID": "5e550000-0000-4000-8000-0000000000d2"
+      },
+      "exit": 0,
+      "unchanged": true
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--kiro",
+        "--session",
+        "sess_5e550000-0000-4000-8000-0000000000d1"
+      ],
+      "env": {
+        "KIRO_SESSION_ID": "sess_5e550000-0000-4000-8000-0000000000d2"
+      },
+      "exit": 0,
+      "unchanged": true
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A08",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no qdream_child launch of A08"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A08",
+        "--kiro",
+        "--kiro-sessions",
+        "{ROOT}/alt/home/.kiro/sessions"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/returns/A08.json": {
+          "session_id": "sess_5e550000-0000-4000-8000-0000000000f1",
+          "return": {
+            "unrelated": [
+              "Alt store"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A09",
+        "--kiro",
+        "--kiro-sessions",
+        "{ROOT}/alt/none"
+      ],
+      "exit": 2
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A09",
+        "--kiro-sessions",
+        "{ROOT}/alt/home/.kiro/sessions",
+        "--from-file",
+        "inbox/A09.txt"
+      ],
+      "exit": 2
+    }
+  ]
+}

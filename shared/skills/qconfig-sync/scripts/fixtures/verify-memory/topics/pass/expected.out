@@ -1,0 +1,9 @@
+OK	memory/topics/git.md	shared/AGENTS.md
+OK	memory/topics/powershell.md	providers/kiro/steering/powershell-syntax.md
+OK	memory/topics/playbook-authoring.md	AGENTS.md
+OK	memory/topics/http-testing.md	shared/skills/qqa/SKILL.md
+OK	memory/topics/house-style-docs.md	providers/kiro/skills/qwire-governance/SKILL.md
+OK	memory/topics/electron-vite.md	waiver
+OK	memory/topics/kiro-cli.md	codexhome/AGENTS.md
+OK	memory/topics/claude-code.md	geminihome/GEMINI.md
+SUMMARY	ok=7	waived=1	missing=0

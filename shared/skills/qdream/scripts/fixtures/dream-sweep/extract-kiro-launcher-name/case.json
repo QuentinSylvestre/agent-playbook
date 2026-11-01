@@ -1,0 +1,39 @@
+{
+  "description": "X7a: only a kiro_default sub-execution of messages.jsonl is a phase agent. A02's child was launched by a sub-execution started with the very same phase brief prompt but named kiro_other: extract --kiro finds no launch of it (exit 3, no record), while A01, launched by a kiro_default phase agent of the same session, is read.",
+  "now": "2026-10-12T12:30:00Z",
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--kiro"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/returns/A01.json": {
+          "phase_agent_id": "a0000001-0000-4000-8000-000000000001"
+        }
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A02",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no qdream_child launch of A02 attempt 1"
+      ],
+      "absent": [
+        "sweep/returns/A02.json"
+      ]
+    }
+  ]
+}

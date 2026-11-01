@@ -1,0 +1,7 @@
+symlink-file	~/.claude/AUTHORING.md	shared/AUTHORING.md	claude
+copy-file	~/.kiro/AUTHORING.md	shared/AUTHORING.md	kiro-always
+symlink-file	~/.kiro/steering-archive/kiro-cli-local-data.md	providers/kiro/steering/kiro-cli-local-data.md	kiro
+symlink-dir	~/.kiro/steering/	providers/kiro/steering/memory-sources.md	kiro
+symlink-file	~/.claude/CLAUDE.md.bak	providers/claude/steering/memory-sources.md	claude
+symlink-file	~/.claude/CLAUDE.md		providers/claude/README.md	claude
+  # symlink-file	~/.claude/CLAUDE.md	shared/AUTHORING.md	claude

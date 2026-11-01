@@ -1,0 +1,23 @@
+{
+  "description": "--until <ISO timestamp> cuts at the last session record dated at or before it (line 5) and includes every sub-agent transcript starting at or before it, the one starting exactly at the cutoff included.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "baseline",
+    "--session",
+    "{ROOT}/home/.claude/projects/-ROOT-proj/b5a00000-0000-4000-8000-000000000002.jsonl",
+    "--until",
+    "2026-09-24T10:07:00Z"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_contains": [
+      "files: 1 session + 2 sub-agent transcript(s)",
+      "0 started after the cutoff, 0 undated (of 2)",
+      "input_tokens=54 output_tokens=1264 cache_creation_input_tokens=0 cache_read_input_tokens=1301",
+      "tokens: 2619",
+      "model claude-opus-5-5: 1661",
+      "model claude-sonnet-5: 958",
+      "agents: 2"
+    ]
+  }
+}

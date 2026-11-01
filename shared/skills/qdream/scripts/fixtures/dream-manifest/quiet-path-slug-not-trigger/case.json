@@ -1,0 +1,40 @@
+{
+  "description": "User decision 2026-09-25 (A): a missing cited path and a missing plan slug stay in memory_flags and on the entry but do not set memory_pass: stored 3 -> null.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "quiet_sweeps": 3,
+          "memory_pass": null,
+          "memory_flags": [
+            "cited_paths_missing",
+            "cited_slugs_missing"
+          ],
+          "entries": [
+            {
+              "heading": "Cites gone things",
+              "cited_paths_missing": [
+                "src/gone.py"
+              ],
+              "cited_slugs_missing": [
+                "260101-1200_NO_SUCH_PLAN"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "git": [
+    "repo"
+  ]
+}

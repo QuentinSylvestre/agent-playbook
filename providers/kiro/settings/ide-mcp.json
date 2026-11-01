@@ -1,0 +1,13 @@
+{
+	"servers": {
+		"atlassian": {
+			"command": "node",
+			"args": [
+				"{{USER_HOME}}/AppData/Roaming/npm/node_modules/mcp-remote/dist/proxy.js",
+				"https://mcp.atlassian.com/v1/mcp/authv2"
+			],
+			"disabled": false
+		}
+	},
+	"inputs": []
+}

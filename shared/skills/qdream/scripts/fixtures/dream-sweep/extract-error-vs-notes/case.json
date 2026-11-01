@@ -1,0 +1,63 @@
+{
+  "description": "D11: `notes` is kept apart from `error`; a non-null string `error` is schema-valid (coverage, not extract, judges it); an `error` that is not null or a string breaks the schema (exit 3).",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--from-file",
+        "inbox/A01.txt"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/returns/A01.json": {
+          "return": {
+            "error": null,
+            "notes": "Not an error, notes only."
+          }
+        }
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A02",
+        "--from-file",
+        "inbox/A02.txt"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/returns/A02.json": {
+          "return": {
+            "error": "dispatch timeout after 3 tries"
+          }
+        }
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A03",
+        "--from-file",
+        "inbox/A03.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "error must be null or a string"
+      ],
+      "absent": [
+        "sweep/returns/A03.json"
+      ]
+    }
+  ]
+}

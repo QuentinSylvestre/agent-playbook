@@ -1,0 +1,26 @@
+{
+  "description": "F2: drift compares the scripts' digest with the bound snapshot's guard_digest (or the digest the orchestrator holds after a re-baseline), never with sweep/guard-hashes.json, which an agent could rewrite to match edited scripts; that file only names the differing scripts.",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/.gitignore": "memory/.dream-journal.jsonl\n",
+    "repo/memory/MEMORY.md": "# Memory\n",
+    "repo/memory/.dream-state.json": "{\"state\": \"orient\"}\n",
+    "repo/shared/skills/x/SKILL.md": "# x\n"
+  },
+  "git": [
+    "repo"
+  ],
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0
+    }
+  ],
+  "units": [
+    "drift-guard-reference"
+  ]
+}

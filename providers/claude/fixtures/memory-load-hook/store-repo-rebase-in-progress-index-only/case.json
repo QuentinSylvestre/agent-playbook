@@ -1,0 +1,16 @@
+{
+  "cwd": "{{ROOT}}/proj",
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores",
+  "description": "The store repo is stopped mid-rebase (.git/rebase-merge exists): the project tier is shown as a heading index, never in full, with a note to finish the rebase before writing memory.",
+  "store_op": "rebase-merge",
+  "contains": [
+    "- Store entry alpha",
+    "heading index only; read it in full",
+    "has a rebase in progress"
+  ],
+  "absent": [
+    "delivered in full",
+    "**Why**: fixture."
+  ]
+}

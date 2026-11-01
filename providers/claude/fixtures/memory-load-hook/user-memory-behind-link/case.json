@@ -1,0 +1,15 @@
+{
+  "description": "User memory lives in the store repo's reserved user/memory/, reached through the config repo's `memory` link: the user and higher-order index is read through the link exactly as from a real folder, with no missing-memory note.",
+  "cwd": "{{ROOT}}/empty",
+  "link": [{"src": "stores/user/memory", "dst": "cfg/memory"}],
+  "contains": [
+    "- User entry one",
+    "- Higher-order entry one"
+  ],
+  "absent": [
+    "no user memory at",
+    "in progress"
+  ],
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores"
+}

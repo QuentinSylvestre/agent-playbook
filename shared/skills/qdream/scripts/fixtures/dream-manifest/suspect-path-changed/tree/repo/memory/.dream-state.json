@@ -1,0 +1,14 @@
+{
+  "schema_version": 3,
+  "last_run": "2026-09-22T07:33:27+02:00",
+  "projects": {},
+  "rejected_lessons": [],
+  "outcome_tags": [],
+  "episodic_ledger": [],
+  "cost_records": [],
+  "model_routing": {},
+  "deferred_sessions": {},
+  "quiet_sweeps": {
+    "user_memory": 1
+  }
+}

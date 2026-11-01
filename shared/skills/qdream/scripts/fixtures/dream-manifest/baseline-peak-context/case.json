@@ -1,0 +1,36 @@
+{
+  "description": "baseline --by-role peak context (plan 261012 Phase 3, D13; review fix Q1): one `peak context <role>: P` line per role, P the largest input_tokens + cache_creation_input_tokens + cache_read_input_tokens of one deduplicated message among that role's files (the max, never the sum; output_tokens left out; a message repeated on two records counts once, with each field's largest value). A phase agent's call counts toward the orchestrator's peak; a role with no message is 0. Then `peak context orchestrator (session): P` for the session file alone (sub-agents excluded), and one `peak context <role> <agent file name>: P` line per sub-agent file of the orchestrator role (phase agents) and the drafter role, largest first; the task4 and verifier files get none. A phase agent with two calls reports its largest, not their sum. A message.id seen in both the session and phase agent 6 (msg_SH, 250 of context) is attributed to the first file read, the session: the session line shows 250 and agent 6 keeps its own 90.",
+  "now": "2026-10-14T12:00:00Z",
+  "argv": [
+    "baseline",
+    "--session",
+    "{ROOT}/home/.claude/projects/-ROOT-proj/b5a00000-0000-4000-8000-000000000013.jsonl",
+    "--by-role"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_contains": [
+      "peak context orchestrator: 420\n",
+      "peak context task4: 201\n",
+      "peak context verifier: 70\n",
+      "peak context drafter: 300\n",
+      "peak context other: 0\n",
+      "role drafter: files 2, tokens: 556\n",
+      "peak context orchestrator (session): 250\npeak context orchestrator agent-a0000000000000005: 420\npeak context orchestrator agent-a0000000000000006: 90\npeak context drafter agent-a0000000000000003: 300\npeak context drafter agent-a0000000000000004: 250\n"
+    ],
+    "stdout_not_contains": [
+      "error:",
+      "peak context orchestrator: 105\n",
+      "peak context task4: 1050\n",
+      "peak context drafter: 550\n",
+      "agent-a0000000000000005: 435\n",
+      "agent-a0000000000000006: 120\n",
+      "agent-a0000000000000006: 250\n",
+      "(session): 105\n",
+      "(session): 420\n",
+      "peak context task4 agent-",
+      "peak context verifier agent-",
+      "(more)"
+    ]
+  }
+}

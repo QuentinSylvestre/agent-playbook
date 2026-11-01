@@ -1,0 +1,5 @@
+FAIL: line 1: remove target not fq-prefixed
+FAIL: line 2: remove target not fq-prefixed
+FAIL: line 3: remove target not fq-prefixed
+FAIL: line 4: remove target not fq-prefixed
+verify-dream-journal: ok=0 fail=4 warn=0

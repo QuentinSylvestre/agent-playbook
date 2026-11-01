@@ -1,0 +1,67 @@
+{
+  "description": "Phase 8 kiro reader, live A01 attempt-2 shape: a child that returned prose only, with no JSON in any Say message, is exit 3 and writes nothing. The attempt binds the child: attempt 2 is read only from the A01.a2 launch (by the relaunched phase agent), attempt 1 only from the A01 launch, and --kiro-child naming the attempt-2 child for attempt 1 is exit 3.",
+  "now": "2026-10-12T12:00:00Z",
+  "env": {
+    "KIRO_SESSION_ID": "sess_5e550000-0000-4000-8000-0000000000a1"
+  },
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--kiro",
+        "--attempt",
+        "2"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no JSON object",
+        "c0000003-0000-4000-8000-000000000000"
+      ],
+      "absent": [
+        "sweep/returns/A01.a2.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--kiro",
+        "--kiro-child",
+        "c0000003-0000-4000-8000-000000000000"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not A01's attempt 1"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--kiro"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/returns/A01.json": {
+          "agent_id": "c0000001-0000-4000-8000-000000000000",
+          "phase_agent_id": "a1000000-0000-4000-8000-000000000001",
+          "return": {
+            "unrelated": [
+              "Alpha attempt one"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

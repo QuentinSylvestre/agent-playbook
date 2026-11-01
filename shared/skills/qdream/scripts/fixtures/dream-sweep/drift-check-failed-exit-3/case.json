@@ -1,0 +1,73 @@
+{
+  "description": "F8/F10: with git missing (PATH empty) drift is exit 3 on one line, no traceback; with the config repo's HEAD pointing at a missing commit, the commits-since-Orient check fails and drift records a check-failed entry and exits 3 instead of reporting 0 findings.",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/.gitignore": "memory/.dream-journal.jsonl\n",
+    "repo/memory/MEMORY.md": "# Memory\n",
+    "repo/memory/.dream-state.json": "{\"state\": \"orient\"}\n",
+    "repo/shared/skills/x/SKILL.md": "# x\n"
+  },
+  "git": [
+    "repo"
+  ],
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "gather"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "synthesize"
+      ],
+      "env": {
+        "PATH": ""
+      },
+      "exit": 3,
+      "stdout_contains": [
+        "precondition failed"
+      ],
+      "stdout_not_contains": [
+        "Traceback"
+      ],
+      "absent": [
+        "sweep/drift-synthesize.json"
+      ]
+    },
+    {
+      "write": {
+        "repo/.git/refs/heads/main": "1111111111111111111111111111111111111111\n"
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "apply"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "CHECK FAILED: commits since the Orient HEAD"
+      ],
+      "files": {
+        "sweep/drift-apply.json": {
+          "check_failed": true,
+          "incident": false
+        }
+      }
+    }
+  ]
+}

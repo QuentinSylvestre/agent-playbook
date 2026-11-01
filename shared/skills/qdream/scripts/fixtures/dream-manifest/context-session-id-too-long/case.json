@@ -1,0 +1,16 @@
+{
+  "description": "Review R15 (plan 261027): an 81-character CLAUDE_CODE_SESSION_ID is not usable: exit 2.",
+  "now": "2026-10-27T12:00:00Z",
+  "env": {
+    "CLAUDE_CODE_SESSION_ID": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+  },
+  "argv": [
+    "context"
+  ],
+  "expect": {
+    "exit": 2,
+    "stderr_contains": [
+      "no usable CLAUDE_CODE_SESSION_ID"
+    ]
+  }
+}

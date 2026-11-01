@@ -1,0 +1,54 @@
+{
+  "description": "harvest.json: items a list of objects.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/harvest.json": "{\n  \"items\": [\n    {\n      \"project\": \"/p/alpha\",\n      \"observation\": \"HARNESS_HARVEST: x\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "harvest.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check harvest.json: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/harvest.json": "{\n  \"items\": [\n    \"HARNESS_HARVEST: x\"\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "harvest.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "key 'items': expected list:obj"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/harvest.json": "{\n  \"signals\": []\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "harvest.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "missing key 'items'"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,119 @@
+{
+  "schema_version": 3,
+  "last_run": "2026-10-15T10:00:00Z",
+  "projects": {},
+  "rejected_lessons": [],
+  "outcome_tags": [],
+  "episodic_ledger": [],
+  "quiet_sweeps": {},
+  "cost_records": [
+    {
+      "date": "2026-09-24",
+      "kind": "baseline",
+      "projects_analyzed": 52,
+      "sessions_read": 40,
+      "bytes_read": 5000000,
+      "agents": {
+        "per_project": 52,
+        "verifier": 1
+      },
+      "models": {
+        "per_project": "model-x",
+        "verifier": "model-x"
+      },
+      "findings": {
+        "surfaced": 10,
+        "kept": 6,
+        "dropped_by_stage": {}
+      },
+      "proposals": {
+        "surfaced": 4,
+        "applied": 2
+      },
+      "tokens": 1000000
+    },
+    {
+      "date": "2026-10-01",
+      "kind": "sweep",
+      "projects_analyzed": 8,
+      "sessions_read": 20,
+      "bytes_read": 2000000,
+      "agents": {
+        "collector": 4,
+        "task4": 3,
+        "verifier": 2
+      },
+      "models": {
+        "collector": "model-x",
+        "task4": "model-x",
+        "verifier": "model-x"
+      },
+      "findings": {
+        "surfaced": 10,
+        "kept": 6,
+        "dropped_by_stage": {}
+      },
+      "proposals": {
+        "surfaced": 4,
+        "applied": 2
+      },
+      "tokens": 800000
+    },
+    {
+      "date": "2026-10-08",
+      "kind": "sweep",
+      "projects_analyzed": 5,
+      "sessions_read": 10,
+      "bytes_read": 1000000,
+      "agents": {
+        "collector": 2,
+        "task4": 1,
+        "verifier": 1
+      },
+      "models": {
+        "collector": "model-x",
+        "task4": "model-x",
+        "verifier": "model-x"
+      },
+      "findings": {
+        "surfaced": 10,
+        "kept": 6,
+        "dropped_by_stage": {}
+      },
+      "proposals": {
+        "surfaced": 4,
+        "applied": 2
+      },
+      "tokens": null
+    },
+    {
+      "date": "2026-10-15",
+      "kind": "sweep",
+      "projects_analyzed": 6,
+      "sessions_read": 12,
+      "bytes_read": 1500000,
+      "agents": {
+        "collector": 3,
+        "task4": 4,
+        "verifier": 2
+      },
+      "models": {
+        "collector": "model-x",
+        "task4": "model-x",
+        "verifier": "model-x"
+      },
+      "findings": {
+        "surfaced": 10,
+        "kept": 6,
+        "dropped_by_stage": {}
+      },
+      "proposals": {
+        "surfaced": 4,
+        "applied": 2
+      },
+      "tokens": 600000
+    }
+  ],
+  "model_routing": {},
+  "deferred_sessions": {}
+}

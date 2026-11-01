@@ -1,0 +1,66 @@
+{
+  "description": "R5, R6: wait prints the script's own clock and each unfinished label's age in minutes, with a script-computed status: `stalled` only when the child has no final message and its last record is more than 10 minutes before now (strictly: exactly 10.0 is still running; 9.5 running; 10.2 and 45.0 stalled; 4.0 running), so the 10-minute rule never depends on the caller's clock. A label with a final message carries no age or status, however old its records. A label still missing is a failed child, said plainly in its line and on a `missing:` line.",
+  "now": "2026-10-12T12:00:00Z",
+  "env": {
+    "CLAUDE_CODE_SESSION_ID": "5e550000-0000-4000-8000-000000000001"
+  },
+  "steps": [
+    {
+      "argv": [
+        "wait",
+        "--labels",
+        "A01,A02,A03,A04,A05,A06,A07"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "wait: 1 of 7 label(s) final; now 2026-10-12T12:00:00Z",
+        "A01: final (handback)",
+        "A02: no-final-message agent-a2222222222222222.jsonl, last record 2026-10-12T11:50:30.000Z, age 9.5 min, running",
+        "A03: no-final-message agent-a3333333333333333.jsonl, last record 2026-10-12T11:49:50.000Z, age 10.2 min, stalled",
+        "A04: no-final-message agent-a4444444444444444.jsonl, last record 2026-10-12T11:15:00.000Z, age 45.0 min, stalled",
+        "A05: no-final-message agent-a5555555555555555.jsonl, last record 2026-10-12T11:56:00.000Z, age 4.0 min, running",
+        "A06: no-final-message agent-a6666666666666666.jsonl, last record 2026-10-12T11:50:00.000Z, age 10.0 min, running",
+        "A07: missing (no child transcript yet)\n",
+        "not final: A02, A03, A04, A05, A06, A07",
+        "stalled: A03, A04\n",
+        "missing: A07"
+      ],
+      "stdout_not_contains": [
+        "failed",
+        "stalled: A01",
+        "stalled: A02",
+        "stalled: A03, A04, "
+      ]
+    },
+    {
+      "argv": [
+        "wait",
+        "--labels",
+        "A02,A05"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "stalled: none"
+      ],
+      "stdout_not_contains": [
+        "stalled: A",
+        "missing:"
+      ]
+    },
+    {
+      "argv": [
+        "wait",
+        "--labels",
+        "A01"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "wait: 1 of 1 label(s) final; now 2026-10-12T12:00:00Z"
+      ],
+      "stdout_not_contains": [
+        "stalled:",
+        " min, "
+      ]
+    }
+  ]
+}

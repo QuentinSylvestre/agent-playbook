@@ -1,0 +1,28 @@
+{
+  "description": "D24: a quiet_sweeps.projects key is looked up with the manifest's key normalization: a case and trailing-separator variant of the project key matches (the quiet-seed unit checks a drive-letter-case variant directly).",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "quiet_sweeps": 4,
+          "memory_pass": "periodic"
+        }
+      }
+    }
+  },
+  "git": [
+    "repo"
+  ],
+  "units": [
+    "quiet-seed"
+  ]
+}

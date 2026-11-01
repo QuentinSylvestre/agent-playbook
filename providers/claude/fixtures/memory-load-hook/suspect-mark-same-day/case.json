@@ -1,0 +1,13 @@
+{
+  "description": "A file changed on the Verified day itself is not marked (strictly after).",
+  "git": [
+    "cfg"
+  ],
+  "git_date": "2026-09-15T12:00:00",
+  "time_cap": 20,
+  "cwd": "{{ROOT}}/empty",
+  "regex": [
+    "^- Verified the day of the change$"
+  ],
+  "config_repo": "{{ROOT}}/cfg"
+}

@@ -1,0 +1,47 @@
+{
+  "description": "--from-file reads a raw return from handoff/inbox/ (D7 fallback); a file outside handoff/inbox/ is refused.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A03",
+        "--from-file",
+        "inbox/A03.txt"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/returns/A03.json": {
+          "via": "inbox",
+          "return": {
+            "notes": "n",
+            "sessions_read": [
+              "x"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A04",
+        "--from-file",
+        "orient.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "refused"
+      ],
+      "absent": [
+        "sweep/returns/A04.json"
+      ]
+    }
+  ]
+}

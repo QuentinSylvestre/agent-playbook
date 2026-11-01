@@ -1,0 +1,8 @@
+{
+  "description": "replace_in_work refuses a linked directory under sweep/, a linked target and a path outside sweep/; nothing reaches the link target. SKIP without symlink privilege.",
+  "now": "2026-10-12T12:00:00Z",
+  "units": [
+    "link-refused"
+  ],
+  "steps": []
+}

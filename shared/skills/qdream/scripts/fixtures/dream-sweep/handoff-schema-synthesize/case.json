@@ -1,0 +1,86 @@
+{
+  "description": "synthesize.json: every key required; gate_items a list of strings; insights_report a string (empty allowed, null not).",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/synthesize.json": "{\n  \"tallies\": {\n    \"already_known\": 0\n  },\n  \"rejected_lessons\": [],\n  \"outcome_tags\": [],\n  \"ledger_indices\": [\n    4\n  ],\n  \"working_map\": \"sweep/working-map.json\",\n  \"gate_items\": [\n    \"G1\"\n  ],\n  \"insights_report\": \"\",\n  \"autonomous_writes\": []\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "synthesize.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check synthesize.json: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/synthesize.json": "{\n  \"tallies\": {\n    \"already_known\": 0\n  },\n  \"rejected_lessons\": [],\n  \"outcome_tags\": [],\n  \"ledger_indices\": [\n    4\n  ],\n  \"working_map\": \"sweep/working-map.json\",\n  \"gate_items\": [\n    \"G1\",\n    2\n  ],\n  \"insights_report\": \"\",\n  \"autonomous_writes\": []\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "synthesize.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "key 'gate_items': expected list:str"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/synthesize.json": "{\n  \"tallies\": {\n    \"already_known\": 0\n  },\n  \"rejected_lessons\": [],\n  \"outcome_tags\": [],\n  \"ledger_indices\": [\n    4\n  ],\n  \"working_map\": \"sweep/working-map.json\",\n  \"gate_items\": [\n    \"G1\"\n  ],\n  \"insights_report\": null,\n  \"autonomous_writes\": []\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "synthesize.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "key 'insights_report': expected str"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/synthesize.json": "{\n  \"tallies\": {\n    \"already_known\": 0\n  },\n  \"rejected_lessons\": [],\n  \"outcome_tags\": [],\n  \"ledger_indices\": [\n    4\n  ],\n  \"working_map\": \"sweep/working-map.json\",\n  \"gate_items\": [\n    \"G1\"\n  ],\n  \"insights_report\": \"\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "synthesize.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "missing key 'autonomous_writes'"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/synthesize.json": "{\n  \"tallies\": [\n    0\n  ],\n  \"rejected_lessons\": [],\n  \"outcome_tags\": [],\n  \"ledger_indices\": [\n    4\n  ],\n  \"working_map\": \"sweep/working-map.json\",\n  \"gate_items\": [\n    \"G1\"\n  ],\n  \"insights_report\": \"\",\n  \"autonomous_writes\": []\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "synthesize.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "key 'tallies': expected obj"
+      ]
+    }
+  ]
+}

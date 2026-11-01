@@ -1,0 +1,102 @@
+{
+  "description": "steps/<STEP-ID>.json: a three-letter prefix step id as the file name, a step key equal to it, outputs an object.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/steps/SYN-RECONCILE.json": "{\n  \"step\": \"SYN-RECONCILE\",\n  \"outputs\": {\n    \"human_expiries\": []\n  }\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "steps/SYN-RECONCILE.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check steps/SYN-RECONCILE.json: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/steps/SYN-RECONCILE.json": "{\n  \"step\": \"SYN-STALE\",\n  \"outputs\": {\n    \"human_expiries\": []\n  }\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "steps/SYN-RECONCILE.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "step 'SYN-STALE' is not the file's step id"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/steps/SYN-RECONCILE.json": "{\n  \"step\": \"SYN-RECONCILE\",\n  \"outputs\": []\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "steps/SYN-RECONCILE.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "key 'outputs': expected obj"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/steps/SYN-RECONCILE.json": "{\n  \"outputs\": {\n    \"human_expiries\": []\n  }\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "steps/SYN-RECONCILE.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "missing key 'step'"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/steps/SY-RECONCILE.json": "{\n  \"step\": \"SY-RECONCILE\",\n  \"outputs\": {\n    \"human_expiries\": []\n  }\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "steps/SY-RECONCILE.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no handoff schema"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/steps/syn-reconcile.json": "{\n  \"step\": \"syn-reconcile\",\n  \"outputs\": {\n    \"human_expiries\": []\n  }\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "steps/syn-reconcile.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no handoff schema"
+      ]
+    }
+  ]
+}

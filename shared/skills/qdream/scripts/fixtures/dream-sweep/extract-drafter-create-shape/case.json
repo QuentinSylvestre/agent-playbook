@@ -1,0 +1,469 @@
+{
+  "description": "The drafter return's new-file shape and non-.md follow-ups (Phase 6 diff-check N1, N2, N3). `create: true` (current_text and after_heading null, a non-blank new_text) is accepted on a target_file absent at Orient (D01) and refused on one that existed (D05); a target absent at Orient takes no other shape: an after_heading (the dummy anchor), a not-located note, a current_text (D02-D04); create with an anchor, a current_text, a blank text or a non-boolean (D06-D09) and on a blast edit (D10) is refused. `manual_sites` (path, where, change) is kept; an entry without `where` is refused (D12, D13). A create on a target in no repository of the snapshot (D14) and on one untracked at Orient (D15) is refused. handoff check drafts.json refuses a retirement of a file absent at Orient and a target_file with an alternate-data-stream colon or a trailing dot or space; brief --kind drafter writes `target_absent` into the data file (true for the new file, false for the existing one).",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/shared/skills/demo/SKILL.md": "# Demo\n\n## Target Section\n\nSee `shared/skills/demo/SKILL.md § Target Section` for the rule.\n",
+    "repo/shared/AGENTS.md": "# Shared\n\nCite § Target Section here.\nNothing on this line.\n",
+    "repo/providers/kiro/skills/demo/OVERLAY.md": "# Overlay\n\nPer `shared/skills/demo/SKILL.md § Target Section`.\n",
+    "repo/shared/skills/qconfig-sync/scripts/citation-checks.tsv": "# a comment naming shared/skills/demo/SKILL.md\nTarget Section\tTarget Section\tshared/skills/demo/SKILL.md\tshared/AGENTS.md\nOther\tOther\tshared/x.md\n",
+    "repo/memory/MEMORY.md": "# Memory\n\nmentions § Target Section\n",
+    "repo/notes/outside.md": "§ Target Section outside the scanned roots\n",
+    "repo/.gitignore": "memory/.dream-journal.jsonl\n",
+    "repo/memory/.dream-state.json": "{\"state\": \"orient\"}\n"
+  },
+  "git": [
+    "repo"
+  ],
+  "setup": [
+    {
+      "write": {
+        "repo/shared/untracked.md": "§ Target Section, untracked\n"
+      }
+    },
+    {
+      "write": {
+        "repo/shared/skills/demo/UNTRACKED.md": "x\n"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D01",
+        "--from-file",
+        "inbox/D01.txt"
+      ],
+      "exit": 0,
+      "present": [
+        "sweep/drafts/D01.json"
+      ],
+      "files": {
+        "sweep/drafts/D01.json": {
+          "return": {
+            "create": true
+          }
+        }
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D02",
+        "--from-file",
+        "inbox/D02.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "the target file is absent at Orient: a new file is written only as create: true"
+      ],
+      "absent": [
+        "sweep/drafts/D02.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D03",
+        "--from-file",
+        "inbox/D03.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "the target file is absent at Orient: a new file is written only as create: true"
+      ],
+      "absent": [
+        "sweep/drafts/D03.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D04",
+        "--from-file",
+        "inbox/D04.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "the target file is absent at Orient: a new file is written only as create: true"
+      ],
+      "absent": [
+        "sweep/drafts/D04.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D05",
+        "--from-file",
+        "inbox/D05.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "create: true, but the target file existed at Orient"
+      ],
+      "absent": [
+        "sweep/drafts/D05.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D06",
+        "--from-file",
+        "inbox/D06.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "create: true needs current_text and after_heading null"
+      ],
+      "absent": [
+        "sweep/drafts/D06.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D07",
+        "--from-file",
+        "inbox/D07.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "create: true needs current_text and after_heading null"
+      ],
+      "absent": [
+        "sweep/drafts/D07.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D08",
+        "--from-file",
+        "inbox/D08.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "create: true needs a non-blank new_text"
+      ],
+      "absent": [
+        "sweep/drafts/D08.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D09",
+        "--from-file",
+        "inbox/D09.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "create must be true or false"
+      ],
+      "absent": [
+        "sweep/drafts/D09.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D10",
+        "--from-file",
+        "inbox/D10.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "blast_edits[0]: create is for a proposal's own new target_file"
+      ],
+      "absent": [
+        "sweep/drafts/D10.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D11",
+        "--from-file",
+        "inbox/D11.txt"
+      ],
+      "exit": 0,
+      "present": [
+        "sweep/drafts/D11.json"
+      ],
+      "files": {
+        "sweep/drafts/D11.json": {
+          "return": {
+            "create": false
+          }
+        }
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D12",
+        "--from-file",
+        "inbox/D12.txt"
+      ],
+      "exit": 0,
+      "present": [
+        "sweep/drafts/D12.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D13",
+        "--from-file",
+        "inbox/D13.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "manual_sites[0] needs path, where, change"
+      ],
+      "absent": [
+        "sweep/drafts/D13.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D14",
+        "--from-file",
+        "inbox/D14.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "the Orient snapshot cannot say whether the target file existed"
+      ],
+      "absent": [
+        "sweep/drafts/D14.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D15",
+        "--from-file",
+        "inbox/D15.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "create: true, but the target file existed at Orient"
+      ],
+      "absent": [
+        "sweep/drafts/D15.json"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/NEW.md\",\n      \"heading\": \"## Target Section\",\n      \"proposal\": \"p\",\n      \"blast\": null,\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 0
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"kind\": \"retirement\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/NEW.md\",\n      \"heading\": \"## Target Section\",\n      \"proposal\": \"p\",\n      \"blast\": null,\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "a retirement removes text, but target_file is absent at Orient"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"kind\": \"retirement\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"## Target Section\",\n      \"proposal\": \"p\",\n      \"blast\": null,\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 0
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"AGENTS.md:x.md\",\n      \"heading\": \"## Target Section\",\n      \"proposal\": \"p\",\n      \"blast\": null,\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "target_file has a ':' in a component"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"memory./x.md\",\n      \"heading\": \"## Target Section\",\n      \"proposal\": \"p\",\n      \"blast\": null,\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "target_file has a memory component"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"memory /x.md\",\n      \"heading\": \"## Target Section\",\n      \"proposal\": \"p\",\n      \"blast\": null,\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "target_file has a memory component"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"AGENTS.md.\",\n      \"heading\": \"## Target Section\",\n      \"proposal\": \"p\",\n      \"blast\": null,\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "target_file has a component ending in a dot or a space"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo /SKILL.md\",\n      \"heading\": \"## Target Section\",\n      \"proposal\": \"p\",\n      \"blast\": null,\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "target_file has a component ending in a dot or a space"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/NEW.md\",\n      \"heading\": \"## Target Section\",\n      \"proposal\": \"p\",\n      \"blast\": null,\n      \"for_conflict\": null\n    },\n    {\n      \"id\": \"g2\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"## Target Section\",\n      \"proposal\": \"p\",\n      \"blast\": null,\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "drafter",
+        "--items",
+        "drafts.json",
+        "--attempt",
+        "2"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/briefs/D01.a2.data.json": {
+          "target_absent": true
+        },
+        "sweep/briefs/D02.a2.data.json": {
+          "target_absent": false
+        }
+      }
+    }
+  ]
+}

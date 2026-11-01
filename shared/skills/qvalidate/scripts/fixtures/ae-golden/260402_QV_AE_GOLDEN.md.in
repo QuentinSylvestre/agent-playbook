@@ -1,0 +1,19 @@
+# QV fixture: acceptance-evidence golden rows, copied verbatim from real plans
+
+> **Status**: In Progress
+
+## Review Log
+
+| # | Severity | Finding (one line) | Resolution (one line) |
+|---|---|---|---|
+| L1 | Low | Ledger key uses `outcome` for D29(g)'s "kind". | Fixed -- recorded as a departure. User: accepted — a naming departure only, recorded in §9 (2026-10-16 "ok with recos"). |
+| X3 | Medium | Claude Code children run as default agents with Write and Bash while reading untrusted session content; the asymmetry with kiro is unrecorded. | X3a fixed in 3ed93a03: `extract` refuses write-tool children. X3b: User: accepted — deferred to Follow-up Work item 5. |
+| 17 | Low | Cycle-2 rows #10 and #17 and the cycle-1 #24 correction describe the removed 2 h token. | Superseded by C2-5 (User: accepted — site-owner token, default lifetime). |
+
+| Item | User decision (turn quote) | Effect on findings |
+|---|---|---|
+| U-8 badge reassignment | "badge id … can't be changed. We can document as a limitation for the pilot though" | #44: User: accepted — documented pilot limitation |
+
+## Harness Improvement Opportunities
+
+- none observed — cost: none — suggested change: none

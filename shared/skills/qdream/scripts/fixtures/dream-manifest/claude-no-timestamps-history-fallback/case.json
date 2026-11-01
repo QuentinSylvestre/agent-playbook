@@ -1,0 +1,47 @@
+{
+  "description": "Records without a timestamp take their date from the matching history.jsonl prompt; a session with no dated record at all is read whole with boundary unknown.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "sessions": [
+            {
+              "id": "c2a00000-0000-4000-8000-000000000001",
+              "boundary": "L3",
+              "kind": "normal"
+            },
+            {
+              "id": "c2a00000-0000-4000-8000-000000000002",
+              "boundary": "unknown",
+              "kind": "normal"
+            }
+          ]
+        }
+      }
+    },
+    "stripped": {
+      "c2a00000-0000-4000-8000-000000000001": {
+        "order": [
+          "L1 [user] please refactor",
+          "=== NEW TURNS BEGIN ===",
+          "L3 [user] now add tests"
+        ]
+      },
+      "c2a00000-0000-4000-8000-000000000002": {
+        "order": [
+          "=== NEW TURNS BEGIN ===",
+          "L1 [user] an undated prompt"
+        ]
+      }
+    }
+  }
+}

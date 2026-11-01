@@ -1,0 +1,32 @@
+{
+  "description": "cleanupPeriodDays 20 puts the due threshold at 13 days: an unread transcript last written 14 days ago marks its project due, and one due project makes the sweep due.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "sweep_due": true,
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "due": true
+        },
+        "{ROOT}/proj/beta": {
+          "due": false
+        }
+      }
+    },
+    "stdout_contains": [
+      "sweep due: yes (2 new sessions, 1 projects near deletion)"
+    ]
+  },
+  "mtimes": {
+    "home/.claude/projects/-ROOT-proj-alpha/c15a0000-0000-4000-8000-000000000001.jsonl": "2026-09-10T11:00:00Z",
+    "home/.claude/projects/-ROOT-proj-beta/c15b0000-0000-4000-8000-000000000001.jsonl": "2026-09-23T11:00:00Z"
+  }
+}

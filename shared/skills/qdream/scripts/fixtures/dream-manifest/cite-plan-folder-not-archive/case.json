@@ -1,0 +1,41 @@
+{
+  "description": "Phase 10 review finding #23: a cited plans/<name>.md is present only when plans/done/ holds a matching plan file; a folder plans/done/<name>/ (same name, or the same title under a later date) is not that plan. A matching archived file still resolves.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "entries": [
+            {
+              "heading": "Folder under the cited name",
+              "cited_paths_missing": [
+                "plans/260110_FOLDER_PLAN.md"
+              ]
+            },
+            {
+              "heading": "Folder under a later archive date",
+              "cited_paths_missing": [
+                "plans/260111_LATER_PLAN.md"
+              ]
+            },
+            {
+              "heading": "File archive still resolves",
+              "cited_paths_missing": []
+            }
+          ]
+        }
+      }
+    }
+  },
+  "git": [
+    "repo"
+  ]
+}

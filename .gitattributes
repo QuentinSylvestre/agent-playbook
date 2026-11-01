@@ -1,0 +1,3 @@
+* text=auto eol=lf
+# Byte-exact journal fixtures (CRLF, lone CR, BOM cases): never normalize line endings.
+shared/skills/qdream/scripts/fixtures/verify-dream-journal/*.jsonl -text

@@ -1,0 +1,33 @@
+{
+  "description": "G17: kiro-cli v3 writes harness records as payload.type user. A record with _meta.kiro.notification (workflow progress, system notification), a [WORKFLOW NOTIFICATION] block, a <original_user_request> restatement or a _kiro/ JSON-RPC body renders as [system]. A typed prompt, live steering ([LIVE STEERING ...]) and source: steer text stay [user].",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "stripped": {
+      "sess_k1300000-0000-4000-8000-000000000001": {
+        "contains": [
+          "L1 [user] Run the phase 2 review now.\n",
+          "L2 [system] {\"method\":\"_kiro/workflow/node_complete\"",
+          "L3 [system] {\"phase\": 2, \"status\": \"completed\"}\n",
+          "L4 [system] [WORKFLOW NOTIFICATION]",
+          "L5 [system] <original_user_request>",
+          "L6 [user] [LIVE STEERING - New message from user]",
+          "L7 [user] keep going with phase 3\n",
+          "L8 [assistant] Phase 2 review done.\n"
+        ],
+        "not_contains": [
+          "[user] {\"method\"",
+          "[user] [WORKFLOW NOTIFICATION]",
+          "[user] <original_user_request>"
+        ]
+      }
+    }
+  }
+}

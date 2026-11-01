@@ -1,0 +1,249 @@
+{
+  "description": "F1, G2, G5, G6, G7, G11: every value drift takes from dirty-at-orient.json is validated before git sees it: a head `--output=<path>` (which `git diff` would take as an option and write that file), an upstream sha that is no commit id, a head with a trailing newline, a config repo that is no git top (a plain directory, or a subdirectory of a repository: drift and blast), a relative repos key and a porcelain that is no list are each exit 3 with no drift file; a candidate or hashes.json path outside the config repo, the manifest's project roots and memory files is refused before it is hashed. A project repos key that exists but is no git top (a plain directory or a subdirectory) is a check-failed entry, exit 3, git never run in it (G11: load_dirty probes only the config repo). Nothing is written outside the work folder (the step snapshot).",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/.gitignore": "memory/.dream-journal.jsonl\n",
+    "repo/memory/MEMORY.md": "# Memory\n",
+    "repo/memory/.dream-state.json": "{\"state\": \"orient\"}\n",
+    "repo/shared/skills/x/SKILL.md": "# x\n",
+    "proj/plain/x.md": "not a repository\n",
+    "secret.txt": "not for drift\n"
+  },
+  "git": [
+    "repo"
+  ],
+  "steps": [
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/sweep/dirty-at-orient.json": "{\n  \"repo\": \"{ROOT}/repo\",\n  \"repos\": {\n    \"{ROOT}/repo\": {\n      \"head\": \"--output={ROOT}/PWNED.txt\",\n      \"porcelain\": []\n    }\n  },\n  \"candidates\": {},\n  \"governance_dirty\": {}\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "gather"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not a commit id"
+      ],
+      "absent": [
+        "sweep/drift-gather.json"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/sweep/dirty-at-orient.json": "{\n  \"repo\": \"{ROOT}/repo\",\n  \"repos\": {\n    \"{ROOT}/repo\": {\n      \"head\": null,\n      \"porcelain\": [],\n      \"upstream\": {\n        \"sha\": \"-c core.pager=evil\"\n      }\n    }\n  },\n  \"candidates\": {},\n  \"governance_dirty\": {}\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "gather"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "upstream sha",
+        "is not a commit id"
+      ],
+      "absent": [
+        "sweep/drift-gather.json"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/sweep/dirty-at-orient.json": "{\n  \"repo\": \"{ROOT}/proj/plain\",\n  \"repos\": {\n    \"{ROOT}/repo\": {\n      \"head\": null,\n      \"porcelain\": []\n    }\n  },\n  \"candidates\": {},\n  \"governance_dirty\": {}\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "gather"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "which is not an existing git top"
+      ],
+      "absent": [
+        "sweep/drift-gather.json"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/sweep/dirty-at-orient.json": "{\n  \"repo\": \"{ROOT}/repo\",\n  \"repos\": {\n    \"{ROOT}/proj/plain\": {\n      \"head\": null,\n      \"porcelain\": []\n    }\n  },\n  \"candidates\": {},\n  \"governance_dirty\": {}\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "gather"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "CHECK FAILED: project repository no longer a git top"
+      ],
+      "files": {
+        "sweep/drift-gather.json": {
+          "check_failed": true
+        }
+      }
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/sweep/dirty-at-orient.json": "{\n  \"repo\": \"{ROOT}/repo/memory\",\n  \"repos\": {\n    \"{ROOT}/repo\": {\n      \"head\": null,\n      \"porcelain\": []\n    }\n  },\n  \"candidates\": {},\n  \"governance_dirty\": {}\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "synthesize"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "which is not an existing git top"
+      ],
+      "absent": [
+        "sweep/drift-synthesize.json"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/sweep/dirty-at-orient.json": "{\n  \"repo\": \"{ROOT}/repo/memory\",\n  \"repos\": {\n    \"{ROOT}/repo\": {\n      \"head\": null,\n      \"porcelain\": []\n    }\n  },\n  \"candidates\": {},\n  \"governance_dirty\": {}\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "blast",
+        "--file",
+        "AGENTS.md"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "which is not an existing git top"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/sweep/dirty-at-orient.json": "{\n  \"repo\": \"{ROOT}/repo\",\n  \"repos\": {\n    \"{ROOT}/repo\": {\n      \"head\": null,\n      \"porcelain\": []\n    },\n    \"{ROOT}/repo/shared\": {\n      \"head\": null,\n      \"porcelain\": []\n    }\n  },\n  \"candidates\": {},\n  \"governance_dirty\": {}\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "apply"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "CHECK FAILED: project repository no longer a git top"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/sweep/dirty-at-orient.json": "{\n  \"repo\": \"{ROOT}/repo\",\n  \"repos\": {\n    \"relative/dir\": {\n      \"head\": null,\n      \"porcelain\": []\n    }\n  },\n  \"candidates\": {},\n  \"governance_dirty\": {}\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "synthesize"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not an absolute path"
+      ],
+      "absent": [
+        "sweep/drift-synthesize.json"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/sweep/dirty-at-orient.json": "{\n  \"repo\": \"{ROOT}/repo\",\n  \"repos\": {\n    \"{ROOT}/repo\": {\n      \"head\": null,\n      \"porcelain\": \" M x\"\n    }\n  },\n  \"candidates\": {},\n  \"governance_dirty\": {}\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "synthesize"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "porcelain of",
+        "is not a list of entries"
+      ],
+      "absent": [
+        "sweep/drift-synthesize.json"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/sweep/dirty-at-orient.json": "{\n  \"repo\": \"{ROOT}/repo\",\n  \"repos\": {\n    \"{ROOT}/repo\": {\n      \"head\": \"0123456789abcdef0123456789abcdef01234567\\n\",\n      \"porcelain\": []\n    }\n  },\n  \"candidates\": {},\n  \"governance_dirty\": {}\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "synthesize"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not a commit id"
+      ],
+      "absent": [
+        "sweep/drift-synthesize.json"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/sweep/dirty-at-orient.json": "{\n  \"repo\": \"{ROOT}/repo\",\n  \"repos\": {\n    \"{ROOT}/repo\": {\n      \"head\": null,\n      \"porcelain\": []\n    }\n  },\n  \"candidates\": {\n    \"{ROOT}/secret.txt\": {\n      \"sha256\": \"absent\"\n    }\n  },\n  \"governance_dirty\": {}\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "synthesize"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "refused: sweep/dirty-at-orient.json candidate",
+        "is outside the config repo"
+      ],
+      "absent": [
+        "sweep/drift-synthesize.json"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/sweep/dirty-at-orient.json": "{\n  \"repo\": \"{ROOT}/repo\",\n  \"repos\": {\n    \"{ROOT}/repo\": {\n      \"head\": null,\n      \"porcelain\": []\n    }\n  },\n  \"candidates\": {},\n  \"governance_dirty\": {}\n}\n",
+        "home/.agent-playbook/dream-work/sweep/hashes.json": "{\"version\": 1, \"files\": {\"{ROOT}/secret.txt\": {\"sha256\": \"absent\", \"kind\": \"memory\"}}}\n"
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "synthesize"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "refused: sweep/hashes.json record",
+        "is outside the config repo"
+      ],
+      "stdout_not_contains": [
+        "e3b0c442"
+      ],
+      "absent": [
+        "sweep/drift-synthesize.json"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,110 @@
+{
+  "description": "X3a (kiro): a child's sub-execution file holding a tool_call of any tool outside read_file, list_directory, file_search, grep_search and subagent_response is refused (exit 3, no record), naming the tool: fs_write, execute_bash (after four read-only calls), execute_pwsh, code and an unknown name (frobnicate; the check is an allowlist). A child that called only the four read-only tools and subagent_response is accepted.",
+  "now": "2026-10-12T12:30:00Z",
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--kiro"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "source subagent_response"
+      ],
+      "files": {
+        "sweep/returns/A01.json": {
+          "via": "kiro-transcript:subagent_response"
+        }
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A02",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "called the tool fs_write: a task4 child is read-only (read_file, list_directory, file_search, grep_search); record A02 as failed"
+      ],
+      "absent": [
+        "sweep/returns/A02.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A03",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "called the tool execute_bash: a task4 child is read-only (read_file, list_directory, file_search, grep_search); record A03 as failed"
+      ],
+      "absent": [
+        "sweep/returns/A03.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A04",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "called the tool frobnicate: a task4 child is read-only (read_file, list_directory, file_search, grep_search); record A04 as failed"
+      ],
+      "absent": [
+        "sweep/returns/A04.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A05",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "called the tool execute_pwsh: a task4 child is read-only (read_file, list_directory, file_search, grep_search); record A05 as failed"
+      ],
+      "absent": [
+        "sweep/returns/A05.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A06",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "called the tool code: a task4 child is read-only (read_file, list_directory, file_search, grep_search); record A06 as failed"
+      ],
+      "absent": [
+        "sweep/returns/A06.json"
+      ]
+    }
+  ]
+}

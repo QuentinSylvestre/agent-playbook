@@ -1,0 +1,163 @@
+{
+  "description": "X8 (F10): a governance proposal whose target_file is an agent definition (a .md file at any depth under a directory named agents, any case; with no policy the file cannot be read, so the path alone decides) must be `code: true`: with code false `handoff check drafts.json` is exit 3 naming the rule (also for agents/sub/deep.md), with code true it passes (it is handed off, never Applied). Neighbours that are not agent definitions pass: a directory named agentsmd and a file named agents.md. A prose doc without frontmatter under agents/ passes only with a policy that can read it (unit gov-tools-grant).",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"G1\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": null,\n      \"proposal\": \"p\",\n      \"blast\": null,\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "drafts.json: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"G1\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"providers/claude/agents/writer.md\",\n      \"heading\": null,\n      \"proposal\": \"p\",\n      \"blast\": null,\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is an agent definition (.../agents/<name>.md: its frontmatter grants tools)"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"G1\",\n      \"kind\": \"governance\",\n      \"code\": true,\n      \"target_file\": \"providers/claude/agents/writer.md\",\n      \"heading\": null,\n      \"proposal\": \"p\",\n      \"blast\": null,\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "drafts.json: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"G1\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \".claude/agents/reviewer.md\",\n      \"heading\": null,\n      \"proposal\": \"p\",\n      \"blast\": null,\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is an agent definition (.../agents/<name>.md: its frontmatter grants tools)"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"G1\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"agents/top.md\",\n      \"heading\": null,\n      \"proposal\": \"p\",\n      \"blast\": null,\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is an agent definition (.../agents/<name>.md: its frontmatter grants tools)"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"G1\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/Agents/Mixed.md\",\n      \"heading\": null,\n      \"proposal\": \"p\",\n      \"blast\": null,\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is an agent definition (.../agents/<name>.md: its frontmatter grants tools)"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"G1\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/agents/sub/deep.md\",\n      \"heading\": null,\n      \"proposal\": \"p\",\n      \"blast\": null,\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is an agent definition (.../agents/<name>.md: its frontmatter grants tools)"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"G1\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/agentsmd/x.md\",\n      \"heading\": null,\n      \"proposal\": \"p\",\n      \"blast\": null,\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 0
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"G1\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/agents.md\",\n      \"heading\": null,\n      \"proposal\": \"p\",\n      \"blast\": null,\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 0
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"G1\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/agents/SKILL.md\",\n      \"heading\": null,\n      \"proposal\": \"p\",\n      \"blast\": null,\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is an agent definition (.../agents/<name>.md: its frontmatter grants tools)"
+      ]
+    }
+  ],
+  "units": [
+    "gov-tools-grant"
+  ]
+}

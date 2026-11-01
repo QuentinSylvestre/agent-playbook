@@ -1,0 +1,36 @@
+{
+  "description": "D24: an entry whose only non-terminal Governance-conflict record is rule-update-pending is flagged (stored 0).",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "quiet_sweeps": 0,
+          "memory_pass": "flagged",
+          "memory_flags": [
+            "governance_conflict_open"
+          ],
+          "entries": [
+            {
+              "heading": "Pending rule update",
+              "governance_conflict_open": [
+                "rule-update-pending"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  },
+  "git": [
+    "repo"
+  ]
+}

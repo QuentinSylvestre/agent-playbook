@@ -1,0 +1,13 @@
+{
+  "label": "D10",
+  "id": "g1",
+  "kind": "governance",
+  "code": false,
+  "target_file": "shared/skills/demo/SKILL.md",
+  "heading": "## Target Section",
+  "proposal": "p",
+  "blast": null,
+  "for_conflict": null,
+  "blast_path": null,
+  "config_repo": "{ROOT}/repo"
+}

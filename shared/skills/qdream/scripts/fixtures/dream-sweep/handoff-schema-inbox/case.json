@@ -1,0 +1,134 @@
+{
+  "description": "inbox/<label>.txt: a label name, retry suffix .a2 to .a99 only (attempt 1 is the plain name), non-blank text.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/inbox/A01.txt": "```json\n{}\n```\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "inbox/A01.txt"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check inbox/A01.txt: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/inbox/A01.a2.txt": "x\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "inbox/A01.a2.txt"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check inbox/A01.a2.txt: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/inbox/A01.a99.txt": "x\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "inbox/A01.a99.txt"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check inbox/A01.a99.txt: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/inbox/A01.a1.txt": "x\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "inbox/A01.a1.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no handoff schema"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/inbox/A01.a0.txt": "x\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "inbox/A01.a0.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no handoff schema"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/inbox/A01.a100.txt": "x\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "inbox/A01.a100.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no handoff schema"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/inbox/a01.txt": "x\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "inbox/a01.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no handoff schema"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/inbox/A01.txt": "\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "inbox/A01.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "inbox/A01.txt is empty"
+      ]
+    }
+  ]
+}

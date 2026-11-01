@@ -1,0 +1,2 @@
+symlink-file	~/.claude/CLAUDE.md	shared/AGENTS.md	claude
+symlink-file	~/.gemini/GEMINI.md	notes/le.txt	gemini

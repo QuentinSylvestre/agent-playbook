@@ -1,0 +1,38 @@
+{
+  "description": "The config repo's own memory (memory/MEMORY.md and memory/topics/*.md) is listed as top-level user_memory with entries in the per-project entry shape, one file per entry.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "user_memory": {
+        "files": [
+          "{ROOT}/repo/memory/MEMORY.md",
+          "{ROOT}/repo/memory/topics/authoring.md"
+        ],
+        "entries": [
+          {
+            "file": "{ROOT}/repo/memory/MEMORY.md",
+            "heading": "Keep answers short",
+            "ordinal": 1,
+            "cited_paths_missing": [],
+            "stale_after_passed": false
+          },
+          {
+            "file": "{ROOT}/repo/memory/topics/authoring.md",
+            "heading": "Cite paths carefully",
+            "cited_paths_missing": [
+              "docs/missing.md"
+            ]
+          }
+        ]
+      }
+    }
+  }
+}

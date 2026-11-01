@@ -1,0 +1,58 @@
+{
+  "description": "A decision file whose sha256 is not the one the orchestrator recorded is refused, even with the right answer; an upper-case copy of the right sha is accepted.",
+  "now": "2026-10-12T12:00:00Z",
+  "setup": [
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-1.json": "{\n  \"phase\": \"apply\",\n  \"step\": \"APP-STATE\",\n  \"kind\": \"guard-changed\",\n  \"question\": null,\n  \"options\": [\n    \"Discard\",\n    \"Re-baseline\"\n  ],\n  \"recommendation\": null,\n  \"resume_from\": \"APP-STATE\"\n}\n",
+        "home/.agent-playbook/dream-work/handoff/decision-1.json": "{\"answer\": \"Re-baseline\", \"turn\": \"user turn 1\"}\n"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "argv": [
+        "guard",
+        "--rebaseline",
+        "--decision",
+        "decision-1.json",
+        "--decision-sha",
+        "65901d774bd9930a748ca23ec32e330a68ab236f46dbe6bf6b56f9d1522d2c50"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not the one recorded"
+      ],
+      "text_contains": {
+        "sweep/guard-hashes.json": [
+          "0000000000000000000000000000000000000000000000000000000000000000"
+        ]
+      }
+    },
+    {
+      "argv": [
+        "guard",
+        "--rebaseline",
+        "--decision",
+        "decision-1.json"
+      ],
+      "exit": 2
+    },
+    {
+      "argv": [
+        "guard",
+        "--rebaseline",
+        "--decision",
+        "decision-1.json",
+        "--decision-sha",
+        "65901D774BD9930A748CA23EC32E330A68AB236F46DBE6BF6B56F9D1522D2C5C"
+      ],
+      "exit": 0,
+      "text_not_contains": {
+        "sweep/guard-hashes.json": [
+          "0000000000000000000000000000000000000000000000000000000000000000"
+        ]
+      }
+    }
+  ]
+}

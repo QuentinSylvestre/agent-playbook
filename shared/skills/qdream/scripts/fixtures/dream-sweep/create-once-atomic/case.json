@@ -1,0 +1,8 @@
+{
+  "description": "F11: a create-once write that fails part-way leaves no target and no temp file, so a re-run writes it; identical bytes are then a no-op and different bytes are refused.",
+  "now": "2026-10-12T12:00:00Z",
+  "units": [
+    "create-once-atomic"
+  ],
+  "steps": []
+}

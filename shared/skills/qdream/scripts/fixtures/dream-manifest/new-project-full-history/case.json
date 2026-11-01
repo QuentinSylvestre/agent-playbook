@@ -1,0 +1,53 @@
+{
+  "description": "--full <path> (repeatable) reads a project's whole history: every session of beta is listed with its boundary at its first record (and first_activity, its earliest record time) and nothing is counted as older; a --full path that names no discovered project is reported in errors[].",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo",
+    "--full",
+    "{ROOT}/proj/beta",
+    "--full",
+    "{ROOT}/proj/nowhere"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/beta": {
+          "status": "new",
+          "baseline_rule": "full",
+          "older_sessions_not_read": 0,
+          "sessions": [
+            {
+              "id": "d1a00000-0000-4000-8000-000000000001",
+              "boundary": "L1",
+              "first_activity": "2026-09-10T09:00:00Z"
+            },
+            {
+              "id": "d1a00000-0000-4000-8000-000000000002",
+              "boundary": "L1"
+            },
+            {
+              "id": "sess_kb000000-0000-4000-8000-000000000001",
+              "boundary": "L1"
+            }
+          ]
+        }
+      }
+    },
+    "json_contains": [
+      "--full names no discovered project (nothing read in full): {ROOT}/proj/nowhere"
+    ],
+    "stripped": {
+      "d1a00000-0000-4000-8000-000000000001": {
+        "order": [
+          "=== NEW TURNS BEGIN ===",
+          "L1 [user] old beta question from early september"
+        ]
+      }
+    }
+  }
+}

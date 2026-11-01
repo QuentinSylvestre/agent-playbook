@@ -1,0 +1,35 @@
+{
+  "description": "G18: a ### heading below ## Declined is not read as an entry (the Declined table row and a fenced heading are not entries either), and the manifest names it in the project's errors[] so the sweep can surface it.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "counts": {
+            "entries": 1,
+            "errors": 1
+          },
+          "errors": [
+            "$contains:entry below ## Declined is not read by the sweep (move it above ## Declined): Hidden entry"
+          ],
+          "entries": [
+            {
+              "heading": "Visible entry"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "git": [
+    "repo"
+  ]
+}

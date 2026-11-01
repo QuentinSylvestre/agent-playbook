@@ -1,0 +1,7 @@
+{"rename":["user memory \u00a7 Has unicode \u00a7 char","user memory \u00a7 New \u00a7 heading"]}
+{"remove":["user memory \u00a7 Entry with \"quotes\"","pruned"]}
+{"rename":["user memory \u00a7 A","user memory \u00a7 B"],"rename":["user memory \u00a7 C","user memory \u00a7 D"]}
+42
+
+{"remove":["user memory \u00a7 After blank","demoted"]}
+

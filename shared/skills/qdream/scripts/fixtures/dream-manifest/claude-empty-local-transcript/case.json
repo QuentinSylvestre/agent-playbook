@@ -1,0 +1,35 @@
+{
+  "description": "A local transcript with no conversation records, while history.jsonl holds post-baseline prompts for its session id, is listed as history_only (coverage gap) instead of dropped.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "sessions": [
+            {
+              "id": "cba00000-0000-4000-8000-000000000001",
+              "kind": "history_only",
+              "boundary": "L1"
+            }
+          ]
+        }
+      }
+    },
+    "stripped": {
+      "cba00000-0000-4000-8000-000000000001#history": {
+        "contains": [
+          "[coverage gap:",
+          "L1 [user] prompt whose transcript lost its records"
+        ]
+      }
+    }
+  }
+}

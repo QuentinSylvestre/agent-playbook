@@ -1,0 +1,46 @@
+{
+  "description": "A new plan's header `> **Memory relied on**:` line is extracted into new_plans[].memory_relied_on as the ` | `-separated headings, each stripped (whitespace around a heading dropped, its inner spacing and case kept); a `;`, a `,` or a `|` touching a non-space character never splits a heading; memory_relied_on_truncated is false when nothing was cut.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "counts": {
+            "new_plans": 2
+          },
+          "plans": {
+            "new_plans": [
+              {
+                "file": "260923-0900_FIELD_PLAN.md",
+                "memory_relied_on": [
+                  "Run `test-parity.sh` through Git Bash",
+                  "/qdev review cadence: one review cycle per phase; only the Step 9 holistic review may run more",
+                  "Prefer mechanical resource loading over behavioral instructions",
+                  "Run `a|b` filter",
+                  "Pipe at the end|",
+                  "Commit, then push"
+                ],
+                "memory_relied_on_truncated": false
+              },
+              {
+                "file": "260923-1000_SINGLE_PLAN.md",
+                "memory_relied_on": [
+                  "One heading"
+                ],
+                "memory_relied_on_truncated": false
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

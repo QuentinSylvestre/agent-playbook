@@ -1,0 +1,37 @@
+# QV fixture: Complete, every box ticked
+
+> **Status**: Complete — shipped
+
+## Intent
+
+### Success criteria
+
+- SC-1: the first criterion
+- SC-2: the second criterion
+
+### Scope
+
+boundary line
+
+## Phases
+
+### Phase 1: Alpha
+
+**Covers**: SC-1, SC-2
+
+- [x] first box
+
+```
+- [ ] fenced box is not counted
+```
+
+## 8) Documentation Updates
+
+| Document | Change | Phase |
+|---|---|---|
+| `done.md` | updated | 1 |
+| `missing.md` | never committed | 1 |
+
+## Harness Improvement Opportunities
+
+- none observed — cost: none — suggested change: none

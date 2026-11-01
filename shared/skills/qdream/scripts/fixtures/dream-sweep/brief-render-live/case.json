@@ -1,0 +1,8 @@
+{
+  "description": "The four live templates in this skill directory are each found and render with dummy tokens and leave no {token}: task4 (sweep-gather.md), verifier (sweep-synthesize.md), drafter (sweep-decide-apply.md: {label} only, its return keys and read-only surface named) and phase (sweep-handoff.md). A later prose edit that breaks a template fails here.",
+  "now": "2026-10-12T12:00:00Z",
+  "units": [
+    "templates-live"
+  ],
+  "steps": []
+}

@@ -1,0 +1,146 @@
+{
+  "description": "plan 261027 SC-5: `gather` builds handoff/gather.json from the script outputs: every dispatched label's extracted return (a label without one is refused unless progress-gather.json records it failed, then a failure), coverage and count-verify recomputed (and written to sweep/), the GAT-* result files present and valid, a shallow-analysis note (5 sessions, no improvement_signals) and the human_expiries candidates: a heading in `verified` forced by an `expiry` object or a manifest flag, not in the same return's stale_entries, whose entry has a human: Verified actor (a non-human entry, a stale one and an unforced one are left out).",
+  "now": "2026-10-12T12:00:00Z",
+  "git": [
+    "repo"
+  ],
+  "write": {
+    "repo/memory/.dream-state.json": "{}\n"
+  },
+  "steps": [
+    {
+      "write": {
+        "proj/alpha/memory/MEMORY.md": "## Feedback\n\n### Human rule\n\n**Why**: w\n**How to apply**: h\n**Stale-after**: 2026-10-01\n**Source**: s | **Verified**: 2026-09-01 (human:alice)\n\n### Plain rule\n\n**Why**: w\n**How to apply**: h\n**Stale-after**: 2026-10-01\n**Source**: s | **Verified**: 2026-09-01 (sweep)\n\n### Human flagged\n\n**Why**: w\n**How to apply**: h\n**Stale-when**: tool version > 1.0\n**Source**: s | **Verified**: 2026-09-01 (human:alice, grep)\n\n### Human stale\n\n**Why**: w\n**How to apply**: h\n**Stale-after**: 2026-10-01\n**Source**: s | **Verified**: 2026-09-01 (human:alice)\n\n### Human unforced\n\n**Why**: w\n**How to apply**: h\n**Source**: s | **Verified**: 2026-09-01 (human:alice)\n\n"
+      }
+    },
+    {
+      "delete": [
+        "home/.agent-playbook/dream-work/sweep/returns/A02.json"
+      ]
+    },
+    {
+      "argv": [
+        "gather"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "A02 has no extracted return and progress-gather.json does not record it failed"
+      ],
+      "absent": [
+        "handoff/gather.json"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/progress-gather.json": "{\n  \"phase\": \"gather\",\n  \"completed_steps\": [],\n  \"updated_at\": \"2026-10-12T12:00:00Z\",\n  \"labels\": {\n    \"A01\": {\n      \"status\": \"returned\",\n      \"attempt\": 1,\n      \"agent_id\": null,\n      \"session_id\": null\n    },\n    \"A02\": {\n      \"status\": \"failed\",\n      \"attempt\": 1,\n      \"agent_id\": null,\n      \"session_id\": null\n    }\n  }\n}\n",
+        "home/.agent-playbook/dream-work/handoff/steps/GAT-PLANS.json": "{\n  \"step\": \"GAT-PLANS\",\n  \"outputs\": {\n    \"items\": 0\n  }\n}\n",
+        "home/.agent-playbook/dream-work/handoff/steps/GAT-NATIVE.json": "{\n  \"step\": \"GAT-PLANS\",\n  \"outputs\": {}\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "gather"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "handoff/steps/GAT-NATIVE.json: step 'GAT-PLANS' is not the file's"
+      ],
+      "absent": [
+        "handoff/gather.json"
+      ]
+    },
+    {
+      "delete": [
+        "home/.agent-playbook/dream-work/handoff/steps/GAT-NATIVE.json"
+      ]
+    },
+    {
+      "argv": [
+        "gather"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "gather: handoff/gather.json written; 2 project(s), 1 failure(s), 2 human-expiry candidate(s), 1 note(s); results: plans_result yes, signals_result none, native_result none",
+        "failure: A02 ({ROOT}/proj/beta): no return; progress-gather.json records it failed",
+        "returns from the inbox (--from-file, no transcript check): 1 (A01)",
+        "gather.json sha256: {SHA256:handoff/gather.json}"
+      ],
+      "files": {
+        "handoff/gather.json": {
+          "failures": [
+            {
+              "label": "A02",
+              "project": "{ROOT}/proj/beta",
+              "reason": "no return; progress-gather.json records it failed"
+            }
+          ],
+          "human_expiries": [
+            {
+              "label": "A01",
+              "heading": "Human rule",
+              "file": "{ROOT}/proj/alpha/memory/MEMORY.md",
+              "field": "Stale-after",
+              "fired_text": "**Stale-after**: 2026-10-01",
+              "method": null
+            },
+            {
+              "label": "A01",
+              "heading": "Human flagged",
+              "file": "{ROOT}/proj/alpha/memory/MEMORY.md",
+              "field": "Stale-when",
+              "fired_text": "**Stale-when**: tool version > 1.0",
+              "method": "grep"
+            }
+          ],
+          "notes": [
+            "A01 ({ROOT}/proj/alpha): possible shallow analysis: improvement_signals empty over 5 sessions"
+          ],
+          "plans_result": "handoff/steps/GAT-PLANS.json",
+          "signals_result": null,
+          "native_result": null,
+          "inbox_returns": [
+            "A01"
+          ],
+          "projects": {
+            "{ROOT}/proj/alpha": {
+              "labels": [
+                "A01"
+              ],
+              "returns": {
+                "A01": "sweep/returns/A01.json"
+              }
+            },
+            "{ROOT}/proj/beta": {
+              "labels": [
+                "A02"
+              ],
+              "returns": {}
+            }
+          }
+        },
+        "sweep/coverage.json": {
+          "inbox_returns": [
+            "A01"
+          ]
+        }
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "gather.json"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "gather"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff/gather.json unchanged"
+      ]
+    }
+  ]
+}

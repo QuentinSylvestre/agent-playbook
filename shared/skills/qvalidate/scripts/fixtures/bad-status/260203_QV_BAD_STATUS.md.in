@@ -1,0 +1,39 @@
+# QV fixture: legacy hybrid status
+
+> **Status**: Complete (implementation + review) — shipped
+
+## Intent
+
+### Success criteria
+
+- SC-1: the first criterion
+- SC-2: the second criterion
+
+### Scope
+
+boundary line
+
+## Phases
+
+### Phase 1: Alpha [P:2]
+
+**Covers**: SC-1
+
+- [x] first box
+- [ ] second box
+
+### Phase 2: Beta [P:1]
+
+**Covers**: SC-2
+
+- [x] third box
+
+## 8) Documentation Updates
+
+| Document | Change | Phase |
+|---|---|---|
+| `done.md` | updated | 1 |
+
+## Harness Improvement Opportunities
+
+- none observed — cost: none — suggested change: none

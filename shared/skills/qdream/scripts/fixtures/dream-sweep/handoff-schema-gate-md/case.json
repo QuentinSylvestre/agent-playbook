@@ -1,0 +1,151 @@
+{
+  "description": "gate.md: a text file that must exist and hold a non-blank character, end with `End of gate: <N> items` (`End of gate: 1 item` for one; a truncated file does not) and, when synthesize.json is beside it, state N equal to its gate_items and hold each id.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "gate.md"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "gate.md does not exist"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/gate.md": "Item G1\n\nEnd of gate: 1 item\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "gate.md"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check gate.md: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/gate.md": "Item G1\n\nItem G2 starts and is cut o"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "gate.md"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "gate.md must end with the line `End of gate: <N> items` (`End of gate: 1 item` for one)"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/gate.md": "Item G1\nItem G2\nEnd of gate: 2 items\n"
+      }
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/synthesize.json": "{\n  \"tallies\": {},\n  \"rejected_lessons\": [],\n  \"outcome_tags\": [],\n  \"ledger_indices\": [],\n  \"working_map\": \"ok\",\n  \"gate_items\": [\n    \"G1\",\n    \"G2\"\n  ],\n  \"insights_report\": \"\",\n  \"autonomous_writes\": []\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "gate.md"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check gate.md: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/gate.md": "Item G1\nEnd of gate: 1 item\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "gate.md"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "gate.md says 1 item(s); synthesize.json lists 2 gate_items",
+        "gate item G2 is not in gate.md"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/gate.md": "Item G1\nItem G9\nEnd of gate: 2 items\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "gate.md"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "gate item G2 is not in gate.md"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/gate.md": " \n\t\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "gate.md"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "gate.md is empty"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/gate.md": "Item G1\nItem G2\nEnd of gate: 1 items\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "gate.md"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "gate.md must end with the line `End of gate: <N> items` (`End of gate: 1 item` for one)"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/gate.md": "Item G1\nItem G2\nEnd of gate: 2 item\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "gate.md"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "gate.md must end with the line `End of gate: <N> items` (`End of gate: 1 item` for one)"
+      ]
+    }
+  ]
+}

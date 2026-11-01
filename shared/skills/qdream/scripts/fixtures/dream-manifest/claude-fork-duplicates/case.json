@@ -1,0 +1,50 @@
+{
+  "description": "Claude Code forks copy the whole history under the same record uuids. A transcript whose every record is shared with a larger one is not listed (fork_collapsed); one that shares only a prefix keeps its own turns, its boundary moved past the last shared record (no fork_of / fork_shared field: no reader). Equal record counts go to the smaller session id.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "sessions": [
+            {
+              "id": "f0000000-0000-4000-8000-000000000001",
+              "boundary": "L1",
+              "$absent": ["fork_of", "fork_shared"]
+            },
+            {
+              "id": "f0000000-0000-4000-8000-000000000003",
+              "boundary": "L3",
+              "$absent": ["fork_of", "fork_shared"]
+            }
+          ],
+          "fork_collapsed": [
+            {
+              "dropped": "f0000000-0000-4000-8000-000000000002",
+              "kept": "f0000000-0000-4000-8000-000000000001",
+              "shared_records": 2
+            }
+          ]
+        }
+      }
+    },
+    "stdout_contains": [
+      "forks_collapsed=1"
+    ],
+    "stripped": {
+      "f0000000-0000-4000-8000-000000000003": {
+        "contains": [
+          "fork-only follow-up question",
+          "fork-only answer"
+        ]
+      }
+    }
+  }
+}

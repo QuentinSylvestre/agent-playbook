@@ -1,0 +1,40 @@
+{
+  "description": "A torn final line (a writer mid-append) is ignored silently; an interior unparseable line is reported in errors[]; CRLF endings are tolerated.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "sessions": [
+            {
+              "id": "c19a0000-0000-4000-8000-000000000001",
+              "boundary": "L1"
+            }
+          ],
+          "errors": [
+            "$contains:unparseable line L3 in"
+          ]
+        }
+      }
+    },
+    "stripped": {
+      "c19a0000-0000-4000-8000-000000000001": {
+        "contains": [
+          "L1 [user] first new prompt",
+          "L4 [user] second new prompt"
+        ]
+      }
+    }
+  },
+  "crlf": [
+    "home/.claude/projects/-ROOT-proj-alpha/c19a0000-0000-4000-8000-000000000001.jsonl"
+  ]
+}

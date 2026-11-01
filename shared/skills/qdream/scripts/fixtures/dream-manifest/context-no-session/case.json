@@ -1,0 +1,13 @@
+{
+  "description": "plan 261027 SC-2: no --session and no CLAUDE_CODE_SESSION_ID in the environment (as on kiro): a usage error, exit 2.",
+  "now": "2026-10-27T12:00:00Z",
+  "argv": [
+    "context"
+  ],
+  "expect": {
+    "exit": 2,
+    "stderr_contains": [
+      "no usable CLAUDE_CODE_SESSION_ID"
+    ]
+  }
+}

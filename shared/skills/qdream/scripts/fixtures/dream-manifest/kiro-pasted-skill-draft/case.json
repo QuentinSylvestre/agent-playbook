@@ -1,0 +1,27 @@
+{
+  "description": "A pasted draft that shares a couple of lines with an installed skill is the user's own text and is kept whole.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "stripped": {
+      "sess_k1300000-0000-4000-8000-000000000001": {
+        "contains": [
+          "here is my draft for a new skill",
+          "## Your role",
+          "Read every file the caller names",
+          "Flag any rule that has no named consumer"
+        ],
+        "not_contains": [
+          "[skill body:"
+        ]
+      }
+    }
+  }
+}

@@ -1,0 +1,26 @@
+{
+  "description": "D24: stored quiet_sweeps 3 with no flag -> memory_pass null (the whole pass is not due yet).",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "quiet_sweeps": 3,
+          "memory_pass": null,
+          "memory_flags": []
+        }
+      }
+    }
+  },
+  "git": [
+    "repo"
+  ]
+}

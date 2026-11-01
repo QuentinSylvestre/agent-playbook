@@ -1,0 +1,10 @@
+{
+  "description": "plan 261016 Phase 5: store_for resolves a store-less project to the store the resolver finds or would create, writing nothing, and to None without a readable store repo.",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/.gitkeep": ""
+  },
+  "units": [
+    "store-for"
+  ]
+}

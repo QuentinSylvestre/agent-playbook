@@ -1,0 +1,16 @@
+{
+  "description": "Review R15 (plan 261027): a 7-character CLAUDE_CODE_SESSION_ID is not usable (the regex needs 8 to 80): exit 2.",
+  "now": "2026-10-27T12:00:00Z",
+  "env": {
+    "CLAUDE_CODE_SESSION_ID": "abcdefg"
+  },
+  "argv": [
+    "context"
+  ],
+  "expect": {
+    "exit": 2,
+    "stderr_contains": [
+      "no usable CLAUDE_CODE_SESSION_ID"
+    ]
+  }
+}

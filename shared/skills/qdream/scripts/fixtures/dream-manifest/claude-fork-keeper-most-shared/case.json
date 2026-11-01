@@ -1,0 +1,40 @@
+{
+  "description": "A dropped fork is named against the keeper holding most of its records: T (3 records) shares 1 with C (5) and 2 with B (4), so kept is B, not C, the first match (C holds T's first record and has the smallest id). B keeps its own turns past the record it shares with C.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "sessions": [
+            {
+              "id": "f0000000-0000-4000-8000-000000000121",
+              "boundary": "L1"
+            },
+            {
+              "id": "f0000000-0000-4000-8000-000000000122",
+              "boundary": "L2"
+            }
+          ],
+          "fork_collapsed": [
+            {
+              "dropped": "f0000000-0000-4000-8000-000000000123",
+              "kept": "f0000000-0000-4000-8000-000000000122",
+              "shared_records": 3
+            }
+          ]
+        }
+      }
+    },
+    "stdout_contains": [
+      "forks_collapsed=1"
+    ]
+  }
+}

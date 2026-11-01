@@ -1,0 +1,34 @@
+{
+  "description": "D11 / SC-7: notes never block a stamp and are echoed; a deferred session never blocks; any non-null `error` blocks, even one that reads like a note (no regex over error text).",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "coverage"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "1 project(s) stampable, 1 not"
+      ],
+      "files": {
+        "sweep/coverage.json": {
+          "projects": {
+            "{ROOT}/proj/alpha": {
+              "stamp": true,
+              "reasons": [],
+              "notes": {
+                "A01": "Not an error, notes only. No plan archive resolved."
+              }
+            },
+            "{ROOT}/proj/beta": {
+              "stamp": false,
+              "reasons": [
+                "error in A02"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

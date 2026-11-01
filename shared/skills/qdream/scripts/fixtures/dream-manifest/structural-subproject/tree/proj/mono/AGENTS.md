@@ -1,0 +1,3 @@
+# mono
+
+Synthetic fixture project.

@@ -1,0 +1,54 @@
+{
+  "description": "An untracked file under shared/ that was not in Orient's porcelain is listed (may be another session); one already untracked at Orient is not.",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/.gitignore": "memory/.dream-journal.jsonl\n",
+    "repo/memory/MEMORY.md": "# Memory\n",
+    "repo/memory/.dream-state.json": "{\"state\": \"orient\"}\n",
+    "repo/shared/AGENTS.md": "# shared\n"
+  },
+  "git": [
+    "repo"
+  ],
+  "setup": [
+    {
+      "write": {
+        "repo/shared/old-untracked.md": "already here\n"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0
+    },
+    {
+      "write": {
+        "repo/shared/new-file.md": "new\n"
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "gather"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/drift-gather.json": {
+          "entries": [
+            {
+              "kind": "governance-untracked-new",
+              "path": "{ROOT}/repo/shared/new-file.md",
+              "label": "may be another session"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

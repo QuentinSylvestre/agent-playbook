@@ -1,0 +1,25 @@
+{
+  "description": "count applies the same selection, prints the sweep-due line and the memory-budget line (the 26 words of the fixture MEMORY.md + HIGHER_ORDER.md; the pin is not pinned here, so a ratchet never breaks the case) and writes nothing anywhere. The memory-budget unit covers the line's OVER form, an unreadable MEMORY.md and a counter failure (unknown, never a crash).",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "count",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "work_absent": true,
+    "stdout_contains": [
+      "sweep due: yes (11 new sessions, 0 projects near deletion)",
+      "memory budget: 26/"
+    ],
+    "stdout_not_contains": [
+      "OVER"
+    ]
+  },
+  "units": [
+    "memory-budget"
+  ]
+}

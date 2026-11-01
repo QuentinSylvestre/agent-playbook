@@ -1,0 +1,8 @@
+{
+  "description": "Phase 8 fix: prompt_text_matches tests the first non-blank line in Claude Code's mode and any non-blank line in kiro's; two different brief lines for the label never match, an identical repeat does, another label's line beside it is ignored; a brief outside <work>/sweep/briefs and a line without its final dot never match.",
+  "now": "2026-10-12T12:00:00Z",
+  "units": [
+    "prompt-lines"
+  ],
+  "steps": []
+}

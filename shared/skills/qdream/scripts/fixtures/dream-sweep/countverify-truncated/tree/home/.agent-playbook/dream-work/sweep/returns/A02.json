@@ -1,0 +1,35 @@
+{
+  "label": "A02",
+  "kind": "task4",
+  "via": "inbox",
+  "return": {
+    "memory_proposals": [],
+    "unrelated": [
+      "B2"
+    ],
+    "not_a_conflict": [],
+    "subsumed_entries": [],
+    "stale_entries": [],
+    "governance_conflicts": [
+      {
+        "heading": "B1",
+        "governance_ref": "shared/AGENTS.md § X",
+        "governance_span": "s",
+        "disagreement": "d",
+        "entry_verified": "2026-09-01 (sweep)"
+      }
+    ],
+    "verified": [],
+    "task4_status": "checked",
+    "improvement_signals": [],
+    "user_skipped": [],
+    "saved_in_session": [],
+    "new_skill_candidates": [],
+    "insights_signals": [],
+    "sessions_read": [],
+    "checkpoint_collapsed": 0,
+    "project_accessible": true,
+    "error": null,
+    "scope": "all tasks"
+  }
+}

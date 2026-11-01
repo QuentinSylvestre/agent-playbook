@@ -1,0 +1,27 @@
+{
+  "description": "D24: no quiet_sweeps section in the state (counts as {}) -> the project's quiet_sweeps is the seed int(sha256(key)[:8], 16) % 5 of its key; the quiet-seed unit recomputes it independently and checks the seed function on fixed keys whose seed is 1-3.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "memory_flags": []
+        }
+      }
+    }
+  },
+  "git": [
+    "repo"
+  ],
+  "units": [
+    "quiet-seed"
+  ]
+}

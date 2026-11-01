@@ -1,0 +1,36 @@
+## Topics
+
+> Fixture for verify-memory.py --selftest. Every file here ends in .in, which the selftest drops, so no
+> scanner reads this tree as a live memory file.
+
+| Topic file | Read when | Also cited from |
+|---|---|---|
+| `memory/topics/alpha.md` | doing alpha work | `AGENTS.md` |
+| `memory/topics/improvement-signals.md` | running a sweep | (no always-loaded home — index only) |
+
+## Feedback
+
+### Fixture feedback entry one
+
+**Why**: the feedback reason.
+**How to apply**: the feedback action.
+**Source**: fixture-plan § Section | **Verified**: 2026-10-01 (human:test, grep)
+
+## Decision
+
+## Pattern
+
+### Fixture pattern entry
+
+**Why**: the pattern reason.
+**How to apply**: the pattern action.
+**Source**: fixture-plan § Other | **Verified**: 2026-02-28
+
+```text
+### fenced heading is not an entry
+today
+```
+
+## Declined
+
+- "Fixture declined heading" — declined 2026-09-01 (fixture)

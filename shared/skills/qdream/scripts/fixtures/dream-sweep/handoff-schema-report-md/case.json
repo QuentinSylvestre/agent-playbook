@@ -1,0 +1,65 @@
+{
+  "description": "report.md: a text file that must exist, hold a non-blank character and hold the `Usage from plans` line.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "report.md"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "report.md does not exist"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/report.md": "# Report\n- Created: 1\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "report.md"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "report.md has no `Usage from plans` line"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/report.md": "# Report\n- Usage from plans: 0 bumped, 0 unresolved, 0 dropped\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "report.md"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check report.md: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/report.md": " \n\t\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "report.md"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "report.md is empty"
+      ]
+    }
+  ]
+}

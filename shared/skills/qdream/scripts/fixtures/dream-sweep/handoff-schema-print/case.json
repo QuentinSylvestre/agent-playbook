@@ -1,0 +1,140 @@
+{
+  "description": "handoff schema <name> prints the keys and types of a handoff file from HANDOFF_SCHEMAS (the table handoff check validates against), with no work folder needed: gather.json shows required keys including a string-or-null one; progress-gather.json shows an enum, a list of strings and the per-label rule; synthesize.json the keys a phase agent got wrong by trial; a text file its last-line rule; a steps file by pattern. An unknown name is exit 2 and lists the known names on stderr. The progress file shows the label and agent_id patterns and the non-empty session_id rule from the same constants; needs-decision, decision, drafts and decisions show their 'also:' lines (decisions from dream-write.py's tables); the unknown-name message shows readable names, not regex syntax. Units: every non-plain schema pattern has a readable name, and the decisions item keys the text names are the ones item_problems checks.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": ["handoff", "schema", "gather.json"],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff schema gather.json",
+        "every key below is required",
+        "projects: object",
+        "failures: list",
+        "plans_result: string or null"
+      ]
+    },
+    {
+      "argv": ["handoff", "schema", "progress-gather.json"],
+      "exit": 0,
+      "stdout_contains": [
+        "phase: one of gather, synthesize, apply",
+        "completed_steps: list of strings",
+        "updated_at: string",
+        "attempt (integer 1..99)",
+        "matching ^[A-Z]{1,2}[0-9]{2,4}\\Z",
+        "agent_id a string matching ^[A-Za-z0-9][A-Za-z0-9_-]{0,79}\\Z",
+        "session_id a non-empty string"
+      ]
+    },
+    {
+      "argv": ["handoff", "schema", "synthesize.json"],
+      "exit": 0,
+      "stdout_contains": [
+        "tallies: object",
+        "working_map: string",
+        "gate_items: list of strings",
+        "insights_report: string"
+      ]
+    },
+    {
+      "argv": ["handoff", "schema", "orient.json"],
+      "exit": 0,
+      "stdout_contains": [
+        "since: string or null",
+        "orchestrator_sessions: list of strings"
+      ]
+    },
+    {
+      "argv": ["handoff", "schema", "gate.md"],
+      "exit": 0,
+      "stdout_contains": [
+        "not JSON",
+        "End of gate: <N> items"
+      ]
+    },
+    {
+      "argv": ["handoff", "schema", "steps/GAT-PLANS.json"],
+      "exit": 0,
+      "stdout_contains": [
+        "step: string",
+        "outputs: object",
+        "step id"
+      ]
+    },
+    {
+      "argv": ["handoff", "schema", "needs-decision-1.json"],
+      "exit": 0,
+      "stdout_contains": [
+        "kind: one of user-decision, failure, rate-limit, budget, guard-changed",
+        "options per kind: failure = Retry, Skip, Abort; rate-limit = Wait and resume, Abort",
+        "a rate-limit needs reset_at",
+        "step and resume_from are a step id or start"
+      ]
+    },
+    {
+      "argv": ["handoff", "schema", "decision-1.json"],
+      "exit": 0,
+      "stdout_contains": [
+        "answer: string",
+        "turn: string",
+        "an optional string option"
+      ]
+    },
+    {
+      "argv": ["handoff", "schema", "drafts.json"],
+      "exit": 0,
+      "stdout_contains": [
+        "items: list of objects",
+        "each item is checked beyond being an object",
+        "kind: one of governance, retirement",
+        "code: true or false",
+        "target_file: string",
+        "heading: string or null",
+        "blast: string or null",
+        "for_conflict: string or null"
+      ]
+    },
+    {
+      "argv": ["handoff", "schema", "decisions.json"],
+      "exit": 0,
+      "stdout_contains": [
+        "item_problems",
+        "id: unique non-empty string",
+        "memory-proposal",
+        "stale-salvage",
+        "options per kind:",
+        "memory-proposal = Save, Edit, Skip",
+        "variant: optional; allowed (kind, variant) pairs: memory-proposal/merge-downgrade",
+        "for_conflict: optional",
+        "skip_item: optional",
+        "track: optional",
+        "an Apply on a governance or retirement item also needs target_file and new_text",
+        "a budget-move also to_file"
+      ]
+    },
+    {
+      "argv": ["handoff", "schema", "nope.json"],
+      "exit": 2,
+      "stdout_not_contains": [
+        "every key below"
+      ],
+      "stderr_contains": [
+        "no schema for 'nope.json'",
+        "gather.json",
+        "synthesize.json",
+        "progress-gather.json, progress-synthesize.json, progress-apply.json",
+        "steps/<STEP-ID>.json",
+        "needs-decision-<N>.json",
+        "decision-<N>.json",
+        "ops/<name>.json",
+        "inbox/<LABEL>.txt"
+      ],
+      "stderr_not_contains": [
+        "(gather|synthesize|apply)",
+        "[A-Z]{3}",
+        "[1-9][0-9]"
+      ]
+    }
+  ],
+  "units": ["handoff-schema-names", "handoff-schema-keys"]
+}

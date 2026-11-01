@@ -1,0 +1,37 @@
+{
+  "description": "Undated transcripts select with boundary unknown. A partial fork (K, 5 records) of a larger one (G, 6) still has its boundary moved past the shared prefix (L3, not unknown); F (4), wholly inside G, collapses. F has a smaller id than G, so a keeper chosen by pairwise best overlap would make K a keeper of the prefix G holds.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "sessions": [
+            {
+              "id": "f0000000-0000-4000-8000-000000000132",
+              "boundary": "unknown"
+            },
+            {
+              "id": "f0000000-0000-4000-8000-000000000133",
+              "boundary": "L3"
+            }
+          ],
+          "fork_collapsed": [
+            {
+              "dropped": "f0000000-0000-4000-8000-000000000131",
+              "kept": "f0000000-0000-4000-8000-000000000132",
+              "shared_records": 4
+            }
+          ]
+        }
+      }
+    }
+  }
+}

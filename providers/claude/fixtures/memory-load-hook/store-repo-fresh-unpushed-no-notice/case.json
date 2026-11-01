@@ -1,0 +1,14 @@
+{
+  "description": "plan 261016 Phase 10: a store-repo commit not pushed for under a day (committed now) gets no notice.",
+  "cwd": "{{ROOT}}/empty",
+  "config_repo": "{{ROOT}}/cfg",
+  "time_cap": 20,
+  "store_repo": "stores",
+  "store_git": "fresh-unpushed",
+  "absent": [
+    "Note: the store repo"
+  ],
+  "contains": [
+    "- User entry one"
+  ]
+}

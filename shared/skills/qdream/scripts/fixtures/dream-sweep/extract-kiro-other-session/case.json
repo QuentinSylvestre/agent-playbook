@@ -1,0 +1,133 @@
+{
+  "description": "Phase 8 kiro reader: KIRO_SESSION_ID narrows the search to its session unless --session names another. A child launched only in another session is exit 3 (not found; named with --kiro-child: not launched by a phase agent of this session); --session sess_<other> reads it. A child file whose records carry another execution id (copied from another session) is exit 3. A phase agent's own id is no child. A session id that is not sess_<uuid> is exit 3, and so is a session folder whose session.json names another session.",
+  "now": "2026-10-12T12:00:00Z",
+  "env": {
+    "KIRO_SESSION_ID": "sess_5e550000-0000-4000-8000-0000000000a1"
+  },
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no qdream_child launch of A01 attempt 1"
+      ],
+      "absent": [
+        "sweep/returns/A01.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--kiro",
+        "--kiro-child",
+        "c0000009-0000-4000-8000-000000000000"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "was not launched by a phase agent of session sess_5e550000-0000-4000-8000-0000000000a1"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--kiro",
+        "--session",
+        "sess_5e550000-0000-4000-8000-0000000000b2"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/returns/A01.json": {
+          "agent_id": "c0000009-0000-4000-8000-000000000000",
+          "session_id": "sess_5e550000-0000-4000-8000-0000000000b2",
+          "phase_agent_id": "a2000000-0000-4000-8000-000000000002",
+          "return": {
+            "unrelated": [
+              "From session two"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A02",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "holds a record of execution"
+      ],
+      "absent": [
+        "sweep/returns/A02.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A02",
+        "--kiro",
+        "--kiro-child",
+        "a1000000-0000-4000-8000-000000000001"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "not a child of a phase agent"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A02",
+        "--kiro",
+        "--session",
+        "5e550000-0000-4000-8000-0000000000a1"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not a kiro session id"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--kiro",
+        "--session",
+        "sess_5e550000-0000-4000-8000-0000000000c3"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "does not name session sess_5e550000-0000-4000-8000-0000000000c3"
+      ],
+      "unchanged": true
+    }
+  ]
+}

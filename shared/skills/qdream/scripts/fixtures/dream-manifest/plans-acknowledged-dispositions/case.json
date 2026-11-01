@@ -1,0 +1,36 @@
+{
+  "description": "Accept-and-note harvest (/qclose Step 2 Pass 2): a plan with an `Acknowledged at archival` section contributes only its Accepted harness bullets -- none when it holds only Skipped and Promoted ones (no fallback to the whole Harness Improvement Opportunities section), only the Accepted one when mixed; a plan without that section falls back to the whole Harness Improvement Opportunities section.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "plans": {
+            "accept_and_note": [
+              {
+                "plan": "260902-1000_MIXED.md",
+                "item": "Accepted (harness opportunity): mixed hio item b -- kept for the sweep."
+              },
+              {
+                "plan": "260902-1000_MIXED.md",
+                "item": "Accepted (harness opportunity): mixed hio item d -- not promoted, kept as noted."
+              },
+              {
+                "plan": "260903-1000_NO_ACK.md",
+                "item": "no-ack fallback item -- cost: one manual step -- suggested change: script it."
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

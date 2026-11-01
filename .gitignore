@@ -1,0 +1,41 @@
+*.bak
+.claude/
+
+# Dedicated Python venv for every playbook script, created by setup.ps1
+# (stdlib only; rebuilt from the system Python, never committed).
+/.venv-agent-playbook/
+
+# Local harness wiring, same class as .claude/. .kiro/steering/agents.md is
+# what makes Kiro load the root AGENTS.md project tier; regenerate it after a
+# fresh clone with /qwire-governance.
+.kiro/
+# ...except the fixture session stores the qdream script self-tests read.
+!shared/skills/qdream/scripts/fixtures/**/.claude/
+!shared/skills/qdream/scripts/fixtures/**/.kiro/
+
+# User memory: a link setup makes to the store repo's user/memory/ (shared/AGENTS.md § Config Repo
+# Locations). No trailing slash: `memory/` would not match a symlink.
+/memory
+
+# Python bytecode (generated when skill scripts run, e.g. qdocument-interaction)
+__pycache__/
+*.py[cod]
+
+# Claude Code app's own live skill-sync cache. Setup used to link ~/.claude/skills/
+# to shared/skills/ as a whole, so the app wrote its sync state into the repo tree;
+# setup now links each skill separately, but an older deploy can still leave these.
+# Never a real playbook skill (setup's list_shared_skills skips the same names).
+shared/skills/.trash/
+shared/skills/synced/
+shared/skills/.bucket-*/
+
+# qdocument-interaction installs its Node creation libraries in the skill dir
+# (`npm install`, per docx.md/pptx.md); the tree is machine-specific (sharp
+# native binaries, ~120 MB) and rebuilt from package-lock.json.
+shared/skills/qdocument-interaction/node_modules/
+
+# Kiro tab-title hook debug probe (written beside the script on every run)
+providers/kiro/tab-title-probe.log
+
+# Per-workspace review scratch directories (temporary workflow artifacts)
+**/.review_scratch/

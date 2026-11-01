@@ -1,0 +1,26 @@
+{
+  "description": "The skill-body index covers every .md file of a skill directory, not only SKILL.md, so an expanded sweep-*.md body is replaced by its marker while the user's own text stays.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "stripped": {
+      "cea00000-0000-4000-8000-000000000001": {
+        "contains": [
+          "[skill body: qfixture/sweep-gather.md]",
+          "please follow this:",
+          "and focus on the parser sessions"
+        ],
+        "not_contains": [
+          "Read every stripped transcript listed"
+        ]
+      }
+    }
+  }
+}

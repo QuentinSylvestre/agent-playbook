@@ -1,0 +1,16 @@
+{
+  "description": "The config repo as a git repository, session at its root: the store directory is the project tier.",
+  "git": [
+    "cfg"
+  ],
+  "cwd": "{{ROOT}}/cfg",
+  "contains": [
+    "Config repo root entry",
+    "/fixture root/stores/cfg-eeeeee/memory/MEMORY.md) — delivered in full"
+  ],
+  "absent": [
+    "Project memory ({{ROOT}}/cfg/memory/MEMORY.md)"
+  ],
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores"
+}

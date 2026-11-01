@@ -1,0 +1,3 @@
+ok: line 1: valid remove record
+FAIL: line 2: remove target not fq-prefixed
+verify-dream-journal: ok=1 fail=1 warn=0

@@ -1,0 +1,122 @@
+# citation-checks.tsv -- the data table verify-citations.py reads, kept apart
+# from the script so a check is added without touching code.
+#
+# One row per check: label<TAB>pattern<TAB>site1<TAB>site2<TAB>...
+#   label   -- the canonical-section name reported in the STATUS lines.
+#   pattern -- the literal string each site must contain (grep -F / -SimpleMatch).
+#   site*   -- one or more repo-relative file paths; each must contain at
+#              least one literal occurrence of pattern. Any number of sites
+#              per row, no fixed cap.
+#
+# Comment lines start with '#'; blank lines are ignored. Both loaders skip
+# them and append every other line to CHECKS unchanged.
+#
+# Each entry typically lists its own owner file as a site (it contains the
+# heading itself). Site lists are grep-verified against the repo -- add a
+# site only when the file holds a live reference to the section's literal
+# heading string.
+#
+# Row ORDER matters only for output ordering, not correctness: the sh
+# script's stdout must stay byte-identical to what it printed before this
+# table existed, so do not reorder existing rows -- append new ones at the
+# end. LF line endings, no BOM (the repo's .gitattributes forces eol=lf).
+Documentation Organization	Documentation Organization	shared/AGENTS.md	shared/skills/qplan/SKILL.md	shared/skills/qextract/references/playbook-map.md
+Harness Improvement Capture	Harness Improvement Capture	shared/AGENTS.md	shared/skills/qexplore/SKILL.md	shared/skills/qplan/SKILL.md	shared/skills/qdev/SKILL.md	shared/skills/qauto-research/SKILL.md	shared/skills/qextract/references/playbook-map.md	shared/skills/qplan/TEMPLATES.md	shared/skills/qclose/SKILL.md	shared/skills/qdream/sweep-gather.md	shared/skills/qhandoff/SKILL.md
+Council-Enriched Escalation	Council-Enriched Escalation	shared/AGENTS.md	shared/skills/qplan/SKILL.md	shared/skills/qdev/SKILL.md	shared/skills/qexplore/shared.md	shared/skills/qcouncil/SKILL.md	shared/skills/qexplore/SKILL.md	shared/skills/qexplore-other/SKILL.md	shared/skills/qextract/references/playbook-map.md	shared/skills/qprototype/SKILL.md
+Exploration depth	Exploration depth	shared/skills/qexplore/shared.md	shared/skills/qexplore/SKILL.md	providers/kiro/skills/qexplore/OVERLAY.md
+Parallel Phase Annotation	Parallel Phase Annotation	shared/skills/qplan/TEMPLATES.md	shared/skills/qplan/SKILL.md
+QA Phase Annotation	QA Phase Annotation	shared/skills/qplan/TEMPLATES.md	shared/skills/qplan/SKILL.md
+Commit Conventions	Commit Conventions	shared/AGENTS.md	shared/skills/qdev/SKILL.md	shared/skills/qplan/SKILL.md	shared/skills/qclose/SKILL.md	shared/skills/qextract/references/playbook-map.md	shared/skills/qexplore/SKILL.md
+Doc & Test Guidelines	Doc & Test Guidelines	shared/skills/qplan/TEMPLATES.md	shared/skills/qplan/SKILL.md	shared/skills/qdev/SKILL.md	shared/skills/qreview/SKILL.md	shared/AGENTS.md	providers/kiro/skills/qwire-governance/SKILL.md	shared/skills/qextract/references/playbook-map.md	providers/kiro/steering/kiro-guidelines.md	shared/skills/qclose/SKILL.md
+Structure Requires a Consumer	Structure Requires a Consumer	shared/AGENTS.md	shared/skills/qextract/references/playbook-map.md	shared/skills/qdream/sweep-orient.md	shared/skills/qdream/sweep-recovery.md	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/memory-rules.md	shared/skills/qextract/SKILL.md
+Type Taxonomy	Type Taxonomy	shared/skills/qdream/memory-rules.md	shared/AGENTS.md	shared/skills/qdream/sweep-gather.md	shared/skills/qdream/sweep-synthesize.md	providers/kiro/skills/qdream/OVERLAY.md	shared/skills/qdream/SKILL.md
+Type taxonomy	Type taxonomy	shared/AGENTS.md
+Memory File Format	Memory File Format	shared/skills/qdream/memory-rules.md	shared/skills/qdream/SKILL.md	providers/kiro/skills/qdream/memory-rules.OVERLAY.md	shared/skills/qdream/sweep-decide-apply.md	shared/skills/qdream/sweep-gather.md	shared/skills/qdream/sweep-synthesize.md
+State File Format	State File Format	shared/skills/qdream/memory-rules.md	shared/skills/qdream/sweep-orient.md	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/sweep-decide-apply.md
+Derived Utility & Pruning	Derived Utility & Pruning	shared/skills/qdream/memory-rules.md	shared/AGENTS.md	shared/skills/qdream/sweep-synthesize.md	providers/kiro/skills/qdream/sweep-synthesize.OVERLAY.md
+Higher-Order Tier	Higher-Order Tier	shared/skills/qdream/memory-rules.md	shared/AGENTS.md	shared/skills/qdream/sweep-orient.md	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/sweep-decide-apply.md	providers/kiro/skills/qdream/sweep-synthesize.OVERLAY.md	memory/HIGHER_ORDER.md
+Cross-type optional metadata	Cross-type optional metadata	shared/skills/qdream/memory-rules.md	shared/skills/qdream/SKILL.md	providers/kiro/skills/qdream/OVERLAY.md	providers/kiro/skills/qdream/memory-rules.OVERLAY.md	shared/skills/qdream/sweep-gather.md	shared/skills/qdream/sweep-synthesize.md
+Dream Sub-agent Return Schema	Dream Sub-agent Return Schema	shared/skills/qdream/memory-rules.md	shared/skills/qdream/sweep-gather.md	shared/skills/qdream/failure-archetypes.md	providers/kiro/skills/qdream/OVERLAY.md
+Merge Strategy	Merge Strategy	shared/skills/qdream/memory-rules.md	shared/skills/qdream/SKILL.md	providers/kiro/skills/qdream/memory-rules.OVERLAY.md	providers/kiro/skills/qdream/sweep-synthesize.OVERLAY.md	shared/skills/qdream/sweep-decide-apply.md	shared/skills/qdream/sweep-synthesize.md
+Exclusion List	Exclusion List	shared/skills/qdream/memory-rules.md	shared/skills/qdream/SKILL.md	shared/AGENTS.md	shared/skills/qdream/sweep-decide-apply.md	shared/skills/qdream/sweep-gather.md
+Session-start memory context budget	Session-start memory context budget	shared/skills/qdream/memory-rules.md	shared/AGENTS.md	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/sweep-decide-apply.md	shared/skills/qdream/transition-fixtures.md	providers/kiro/skills/qdream/OVERLAY.md	providers/kiro/skills/qdream/sweep-synthesize.OVERLAY.md	shared/skills/qconfig-sync/SKILL.md	shared/skills/qmemory-eval/SKILL.md	shared/skills/qextract/references/playbook-map.md
+Suspect memory entries	Suspect memory entries	shared/skills/qdream/memory-rules.md	shared/skills/qdream/sweep-orient.md	shared/skills/qdream/sweep-gather.md	providers/kiro/skills/qdream/sweep-orient.OVERLAY.md	providers/kiro/skills/qdream/sweep-gather.OVERLAY.md
+Dream autonomy exception	Dream autonomy exception	shared/AGENTS.md	shared/skills/qdream/SKILL.md	providers/kiro/skills/qdream/OVERLAY.md	shared/skills/qdream/memory-rules.md	memory/HIGHER_ORDER.md	shared/skills/qdream/sweep-decide-apply.md	shared/skills/qdream/sweep-synthesize.md
+Date References	Date References	shared/skills/qdream/memory-rules.md	shared/skills/qdream/sweep-synthesize.md	providers/kiro/skills/qdream/sweep-synthesize.OVERLAY.md	shared/skills/qdream/SKILL.md
+Governance-conflict	Governance-conflict	shared/skills/qdream/memory-rules.md	shared/skills/qdream/SKILL.md	providers/kiro/skills/qdream/OVERLAY.md	providers/kiro/skills/qdream/memory-rules.OVERLAY.md	shared/skills/qextract/references/playbook-map.md	shared/skills/qdream/sweep-decide-apply.md	shared/skills/qdream/sweep-gather.md	shared/skills/qdream/sweep-synthesize.md
+Declined	## Declined	memory/MEMORY.md	shared/skills/qdream/memory-rules.md	shared/AGENTS.md	shared/skills/qdream/SKILL.md	providers/kiro/skills/qdream/OVERLAY.md	providers/kiro/skills/qdream/sweep-synthesize.OVERLAY.md	shared/skills/qdream/sweep-decide-apply.md	shared/skills/qdream/sweep-synthesize.md
+Authority hierarchy	Authority hierarchy	shared/AGENTS.md	shared/skills/qdream/memory-rules.md	shared/skills/qdream/sweep-synthesize.md	providers/kiro/skills/qdream/OVERLAY.md	memory/HIGHER_ORDER.md
+Memory Management	Memory Management	shared/AGENTS.md	shared/skills/qdream/memory-rules.md	shared/skills/qdream/SKILL.md	providers/kiro/skills/qdream/OVERLAY.md	shared/skills/qextract/references/playbook-map.md	shared/skills/qplan/TEMPLATES.md
+Multi-Agent Coordination	Multi-Agent Coordination	shared/AGENTS.md	shared/skills/qhandoff/SKILL.md	shared/skills/qextract/references/playbook-map.md
+Write-time quality gates	Write-time quality gates	shared/AGENTS.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/sweep-gather.md
+Restated-context trigger	Restated-context trigger	shared/AGENTS.md	shared/skills/qdream/memory-rules.md	providers/kiro/skills/qdream/OVERLAY.md	providers/kiro/skills/qdream/failure-archetypes.OVERLAY.md
+Read-time behavior	Read-time behavior	shared/AGENTS.md	shared/skills/qdream/memory-rules.md	memory/HIGHER_ORDER.md
+Memory locations	Memory locations	shared/AGENTS.md	shared/skills/qdream/memory-rules.md	memory/HIGHER_ORDER.md
+Continuous Improvement	Continuous Improvement	shared/AGENTS.md	shared/skills/qextract/references/playbook-map.md
+Style & Output	Style & Output	shared/AGENTS.md	shared/skills/qextract/references/playbook-map.md	providers/kiro/steering/kiro-governance-discipline.md
+Stakes tier	Stakes tier	shared/skills/qcouncil/SKILL.md	shared/AGENTS.md
+ORI-STATE	ORI-STATE	shared/skills/qdream/sweep-orient.md	shared/skills/qdream/memory-rules.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/sweep-decide-apply.md
+ORI-DISCOVER	ORI-DISCOVER	shared/skills/qdream/sweep-orient.md	shared/skills/qdream/memory-rules.md	providers/kiro/skills/qdream/OVERLAY.md	shared/skills/qdream/SKILL.md
+GAT-SESSIONS	GAT-SESSIONS	shared/skills/qdream/sweep-gather.md	providers/kiro/skills/qdream/OVERLAY.md	providers/kiro/skills/qdream/sweep-gather.OVERLAY.md	shared/skills/qdream/SKILL.md
+GAT-PLANS	GAT-PLANS	shared/skills/qdream/sweep-gather.md	shared/AGENTS.md	providers/kiro/skills/qdream/sweep-gather.OVERLAY.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/sweep-synthesize.md
+GAT-CLASSIFY	GAT-CLASSIFY	shared/skills/qdream/sweep-gather.md	shared/skills/qdream/memory-rules.md	shared/skills/qdream/SKILL.md
+GAT-SIGNALS	GAT-SIGNALS	shared/skills/qdream/sweep-gather.md	providers/kiro/skills/qdream/OVERLAY.md	shared/skills/qdream/SKILL.md
+SYN-WRITE	SYN-WRITE	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/memory-rules.md	providers/kiro/skills/qdream/OVERLAY.md	providers/kiro/skills/qdream/sweep-synthesize.OVERLAY.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/sweep-decide-apply.md
+SYN-STALE	SYN-STALE	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/memory-rules.md	providers/kiro/skills/qdream/OVERLAY.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/sweep-decide-apply.md	shared/skills/qdream/sweep-gather.md
+SYN-RECONCILE	SYN-RECONCILE	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/memory-rules.md	providers/kiro/skills/qdream/OVERLAY.md	shared/skills/qextract/references/playbook-map.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/sweep-decide-apply.md	shared/skills/qdream/sweep-gather.md
+SYN-PROMOTE	SYN-PROMOTE	shared/skills/qdream/sweep-synthesize.md	providers/kiro/skills/qdream/sweep-synthesize.OVERLAY.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/sweep-decide-apply.md	shared/skills/qdream/sweep-gather.md
+SYN-INSIGHTS	SYN-INSIGHTS	shared/skills/qdream/sweep-synthesize.md	providers/kiro/skills/qdream/sweep-synthesize.OVERLAY.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/sweep-decide-apply.md	shared/skills/qdream/sweep-gather.md
+DEC-GATE	DEC-GATE	shared/skills/qdream/sweep-decide-apply.md	shared/skills/qdream/memory-rules.md	providers/kiro/skills/qdream/OVERLAY.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/sweep-gather.md	shared/skills/qdream/sweep-synthesize.md
+APP-ADJUDICATE	APP-ADJUDICATE	shared/skills/qdream/sweep-decide-apply.md	shared/AGENTS.md	shared/skills/qdream/memory-rules.md	providers/kiro/skills/qdream/OVERLAY.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/sweep-synthesize.md
+APP-STATE	APP-STATE	shared/skills/qdream/sweep-decide-apply.md	providers/kiro/skills/qdream/OVERLAY.md	providers/kiro/skills/qdream/sweep-synthesize.OVERLAY.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/sweep-recovery.md	shared/skills/qdream/sweep-synthesize.md
+ORI-RECOVER	ORI-RECOVER	shared/skills/qdream/sweep-recovery.md	shared/skills/qdream/memory-rules.md	providers/kiro/skills/qdream/OVERLAY.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/sweep-decide-apply.md	shared/skills/qdream/sweep-orient.md	shared/skills/qdream/sweep-synthesize.md
+Transition Fixtures	Transition Fixtures	shared/skills/qdream/transition-fixtures.md
+transition-fixtures.md	transition-fixtures.md	shared/skills/qdream/sweep-orient.md	shared/skills/qdream/sweep-recovery.md	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/sweep-gather.md	shared/skills/qdream/sweep-decide-apply.md
+Crash-recovery journal	Crash-recovery journal	shared/skills/qdream/memory-rules.md	shared/skills/qdream/sweep-orient.md	shared/skills/qdream/sweep-recovery.md	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/sweep-decide-apply.md
+Reconciliation pass	The reconciliation pass	shared/skills/qdream/memory-rules.md	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/sweep-recovery.md
+Verdict rubrics	Verdict rubrics	shared/skills/qreview/SKILL.md	shared/skills/qdev/SKILL.md	shared/skills/qtest/SKILL.md	shared/skills/qvalidate/SKILL.md	shared/skills/qclose/SKILL.md	providers/kiro/skills/qreview/OVERLAY.md	shared/skills/qextract/references/playbook-map.md
+Staleness nudge	Staleness nudge	shared/skills/qdream/memory-rules.md	shared/skills/qdream/sweep-orient.md
+SKILL.md Authoring	SKILL.md Authoring	providers/kiro/skills/qbrowser-test/OVERLAY.md	providers/kiro/skills/qexplore-other/OVERLAY.md	providers/kiro/skills/qexplore/OVERLAY.md	providers/kiro/skills/qqa/OVERLAY.md	providers/kiro/skills/qreview/OVERLAY.md	providers/kiro/skills/qtest/OVERLAY.md	shared/AGENTS.md	shared/AUTHORING.md	shared/skills/qcouncil/SKILL.md	shared/skills/qexplore/SKILL.md	shared/skills/qextract/SKILL.md	shared/skills/qextract/references/playbook-map.md	shared/skills/qreview/SKILL.md	shared/skills/qvalidate/SKILL.md	memory/topics/kiro-cli.md
+Failure semantics	Failure semantics	providers/kiro/skills/qdev/OVERLAY.md	shared/AGENTS.md	shared/skills/qclose/SKILL.md	shared/skills/qdev/SKILL.md	shared/skills/qextract/references/playbook-map.md	shared/skills/qplan/SKILL.md	shared/skills/qreview/SKILL.md	shared/skills/qvalidate/SKILL.md
+Governance-conflict adjudication	Governance-conflict adjudication	providers/kiro/skills/qdream/OVERLAY.md	providers/kiro/skills/qdream/memory-rules.OVERLAY.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/memory-rules.md	shared/skills/qextract/references/playbook-map.md	shared/skills/qdream/sweep-decide-apply.md	shared/skills/qdream/sweep-synthesize.md
+Dedup Check Procedure	Dedup Check Procedure	providers/kiro/skills/qdream/OVERLAY.md	shared/AGENTS.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/memory-rules.md	shared/skills/qdream/sweep-synthesize.md
+Commit Safety	Commit Safety	shared/AGENTS.md	shared/skills/qauto-research/SKILL.md	shared/skills/qdev/SKILL.md	shared/skills/qdream/sweep-decide-apply.md	shared/skills/qextract/references/playbook-map.md	memory/topics/powershell.md
+Config Repo Locations	Config Repo Locations	shared/AGENTS.md	shared/skills/qconfig-sync/SKILL.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/memory-rules.md	shared/skills/qvalidate/SKILL.md	shared/skills/qdream/sweep-orient.md
+Support-set referential integrity	Support-set referential integrity	memory/HIGHER_ORDER.md	providers/kiro/skills/qdream/sweep-synthesize.OVERLAY.md	shared/AGENTS.md	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/memory-rules.md
+Repository Layout	Repository Layout	shared/AGENTS.md	shared/skills/qextract/references/playbook-map.md	shared/skills/qreview/SKILL.md
+Status Grammar	Status Grammar	shared/skills/qclose/SKILL.md	shared/skills/qdev/SKILL.md	shared/skills/qexplore/SKILL.md	shared/skills/qhandoff/SKILL.md	shared/skills/qplan/TEMPLATES.md
+Output Routing	Output Routing	providers/kiro/skills/qdream/failure-archetypes.OVERLAY.md	shared/skills/qdream/sweep-gather.md	shared/skills/qdream/failure-archetypes.md
+Core Principles	Core Principles	providers/kiro/steering/kiro-governance-discipline.md	shared/AGENTS.md	shared/skills/qextract/references/playbook-map.md
+Browser verification	Browser verification	providers/kiro/steering/kiro-governance-discipline.md	shared/AGENTS.md	shared/skills/qqa/SKILL.md
+Git Staging	Git Staging	providers/kiro/steering/kiro-governance-discipline.md	shared/AGENTS.md	shared/skills/qextract/references/playbook-map.md
+Git Exception	Git Exception	shared/AGENTS.md	shared/skills/qauto-research/SKILL.md	shared/skills/qextract/references/playbook-map.md
+Proposal Template	Proposal Template	shared/AGENTS.md	shared/skills/qdream/memory-rules.md	shared/skills/qdream/SKILL.md
+Symlink Safety	Symlink Safety	shared/AGENTS.md	shared/skills/qextract/references/playbook-map.md
+Sub-agent unavailability gate	Sub-agent unavailability gate	shared/skills/qcouncil/SKILL.md	shared/skills/qdev/SKILL.md	shared/skills/qexplore/SKILL.md	shared/skills/qplan/SKILL.md	shared/skills/qreview/SKILL.md	shared/skills/qtest/SKILL.md
+Destructive-path invariants	Destructive-path invariants	shared/skills/qdream/SKILL.md	shared/skills/qdream/sweep-orient.md	shared/skills/qdream/sweep-recovery.md
+ORI-ROUTE	ORI-ROUTE	shared/skills/qdream/sweep-orient.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/sweep-decide-apply.md	providers/claude/steering/memory-sources.md	providers/kiro/skills/qdream/sweep-orient.OVERLAY.md
+APP-CLEAN	APP-CLEAN	shared/skills/qdream/sweep-decide-apply.md	shared/AGENTS.md	shared/skills/qdream/SKILL.md
+APP-COMMIT	APP-COMMIT	shared/skills/qdream/sweep-decide-apply.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/sweep-handoff.md
+APP-METRICS	APP-METRICS	shared/skills/qdream/sweep-decide-apply.md	shared/skills/qdream/SKILL.md
+DEC-PROPOSALS	DEC-PROPOSALS	shared/skills/qdream/sweep-decide-apply.md	shared/skills/qdream/SKILL.md
+DEC-RETIRE	DEC-RETIRE	shared/skills/qdream/sweep-decide-apply.md	shared/skills/qdream/SKILL.md
+GAT-ARCHETYPES	GAT-ARCHETYPES	shared/skills/qdream/sweep-gather.md	shared/skills/qdream/SKILL.md
+GAT-DRIFT	GAT-DRIFT	shared/skills/qdream/sweep-gather.md	shared/skills/qdream/SKILL.md
+GAT-NATIVE	GAT-NATIVE	shared/skills/qdream/sweep-gather.md	shared/skills/qdream/SKILL.md	providers/claude/reference/claude-code-local-data.md	providers/claude/steering/memory-sources.md	shared/skills/qdream/memory-rules.md	shared/skills/qdream/scripts/fixtures/harvest-dedup/README.md	shared/skills/qdream/sweep-decide-apply.md
+ORI-READMEM	ORI-READMEM	shared/skills/qdream/sweep-orient.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/memory-rules.md	shared/skills/qdream/sweep-recovery.md	shared/skills/qdream/sweep-synthesize.md
+SYN-ARCHPROMO	SYN-ARCHPROMO	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/SKILL.md
+SYN-GATE	SYN-GATE	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/sweep-decide-apply.md	shared/skills/qdream/sweep-gather.md	shared/skills/qdream/transition-fixtures.md
+SYN-HIGHERORDER	SYN-HIGHERORDER	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/memory-rules.md	shared/skills/qdream/sweep-decide-apply.md	shared/skills/qdream/transition-fixtures.md
+SYN-OUTCOME	SYN-OUTCOME	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/sweep-decide-apply.md
+SYN-PATTERN	SYN-PATTERN	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/SKILL.md
+SYN-SKILLS	SYN-SKILLS	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/SKILL.md
+ORI-DISPATCH	ORI-DISPATCH	shared/skills/qdream/sweep-orient.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/sweep-gather.md	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/sweep-decide-apply.md	shared/skills/qdream/transition-fixtures.md	providers/kiro/skills/qdream/sweep-gather.OVERLAY.md	providers/kiro/skills/qdream/sweep-orient.OVERLAY.md	shared/skills/qdream/scripts/dream-manifest.py
+improvement-signals topic file	memory/topics/improvement-signals.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/memory-rules.md	shared/skills/qdream/sweep-orient.md	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/sweep-decide-apply.md	shared/skills/qdream/sweep-recovery.md	providers/kiro/skills/qdream/sweep-synthesize.OVERLAY.md	shared/skills/qextract/references/playbook-map.md	shared/AGENTS.md
+Prune-set exclusions	Prune-set exclusions	shared/skills/qdream/memory-rules.md	shared/skills/qdream/sweep-synthesize.md	providers/kiro/skills/qdream/OVERLAY.md
+FIX-SIZE fixtures	FIX-SIZE-	shared/skills/qdream/transition-fixtures.md	shared/skills/qdream/sweep-synthesize.md
+FIX-BUDGET fixtures	FIX-BUDGET-	shared/skills/qdream/transition-fixtures.md	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/sweep-decide-apply.md
+Plan-less governance capture	Plan-less governance capture	shared/skills/qdream/memory-rules.md	shared/AGENTS.md	shared/skills/qdream/sweep-gather.md	shared/skills/qdream/sweep-synthesize.md	providers/kiro/skills/qdream/OVERLAY.md	AGENTS.md
+FIX-SIGNAL fixtures	FIX-SIGNAL-	shared/skills/qdream/transition-fixtures.md	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/sweep-decide-apply.md
+Failure gate	Failure gate	shared/skills/qdream/sweep-handoff.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/sweep-gather.md	shared/skills/qdream/sweep-synthesize.md
+Orient order	Orient order	shared/skills/qdream/sweep-handoff.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/sweep-orient.md	shared/skills/qdream/sweep-recovery.md
+Handoff files	Handoff files	shared/skills/qdream/sweep-handoff.md	shared/skills/qdream/sweep-gather.md	shared/skills/qdream/sweep-orient.md	shared/skills/qdream/sweep-decide-apply.md

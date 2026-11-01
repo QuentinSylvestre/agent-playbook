@@ -1,0 +1,32 @@
+{
+  "description": "Two matching entries bump nothing -- across files (project and user memory) or twice in one file -- and are listed with their match count; never guess between them.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "feeder"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/feeder.json": {
+          "ops": [
+            {
+              "heading": "Solo",
+              "file": "{ROOT}/proj/alpha/memory/MEMORY.md"
+            }
+          ],
+          "unresolved": [
+            {
+              "heading": "Shared lesson",
+              "reason": "2 matches"
+            },
+            {
+              "heading": "twice here",
+              "reason": "2 matches"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

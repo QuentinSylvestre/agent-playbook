@@ -1,0 +1,33 @@
+# QV fixture: unhyphenated SC tokens (decision 1)
+
+> **Status**: In Progress — phase 1 under way <!-- lifecycle: Exploring -> Draft -> In Progress -> Complete -->
+
+## Intent
+
+### Success criteria
+
+- SC-1: the first criterion
+- SC2 second criterion, written without the hyphen
+- SC3 third one
+
+### Scope
+
+boundary line
+
+## Phases
+
+### Phase 1: Alpha
+
+**Covers**: SC-1
+
+- [x] a
+
+## 8) Documentation Updates
+
+| Document | Change | Phase |
+|---|---|---|
+| `done.md` | updated | 1 |
+
+## Harness Improvement Opportunities
+
+- none observed — cost: none — suggested change: none

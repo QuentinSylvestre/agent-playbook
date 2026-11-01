@@ -1,0 +1,5 @@
+﻿{"rename":["user memory \u00a7 Old heading","user memory \u00a7 New heading"]}
+{"remove":["project memory (~/work/api) \u00a7 Entry A","pruned"]}
+{"remove":["user memory \u00a7 Entry B","demoted"]}
+{"rename":["project memory (~/dev/proj) \u00a7 X","project memory (~/dev/proj) \u00a7 Y"]}
+{"remove":["user memory \u00a7 [improvement_signal] Stale singleton","expired_signal"]}

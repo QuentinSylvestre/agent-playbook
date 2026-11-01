@@ -1,0 +1,99 @@
+{
+  "description": "plan 261016 Phase 5: two checkouts of one remote resolve to one store (one store unit: memory and plans read once, for the leader; both keep their sessions); a store no known checkout serves is read as a project keyed by its STORE identity; a project with a store keeps no in-workspace plans: its leftover plans/ is not read (plan 261016 Phase 10).",
+  "now": "2026-09-24T12:00:00Z",
+  "store_repo": "stores",
+  "git": [
+    "proj/a",
+    "proj/b"
+  ],
+  "git_origin": {
+    "proj/a": "https://example.com/Org/Proj.git",
+    "proj/b": "git@example.com:org/proj.git"
+  },
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "$absent": [
+          "{ROOT}/stores/proj-aaaaaa",
+          "{ROOT}/stores/ghost-bbbbbb",
+          "{ROOT}/stores/dee-cccccc",
+          "store:remote example.com/org/proj"
+        ],
+        "{ROOT}/proj/a": {
+          "status": "known",
+          "memory_file": "{ROOT}/stores/proj-aaaaaa/memory/MEMORY.md",
+          "sessions": [
+            {
+              "id": "c16a0000-0000-4000-8000-0000000000a1"
+            }
+          ],
+          "entries": [
+            {
+              "heading": "Unit entry one"
+            },
+            {
+              "heading": "Unit entry two"
+            }
+          ],
+          "plans": {
+            "archive": "{ROOT}/stores/proj-aaaaaa/plans/done",
+            "new_plans": [
+              {
+                "file": "260918-1000_UNIT_PLAN.md"
+              }
+            ]
+          }
+        },
+        "{ROOT}/proj/b": {
+          "status": "known",
+          "memory_file": null,
+          "sessions": [
+            {
+              "id": "c16a0000-0000-4000-8000-0000000000b1"
+            }
+          ],
+          "entries": [],
+          "plans": {
+            "archive": null,
+            "new_plans": []
+          }
+        },
+        "{ROOT}/proj/d": {
+          "memory_file": "{ROOT}/stores/dee-cccccc/memory/MEMORY.md",
+          "entries": [
+            {
+              "heading": "Mixed store entry"
+            }
+          ],
+          "plans": {
+            "archive": null,
+            "archive_source": null
+          },
+          "errors": []
+        },
+        "store:remote example.com/org/ghost": {
+          "status": "new",
+          "discovered_by": [
+            "C"
+          ],
+          "sessions": [],
+          "memory_file": "{ROOT}/stores/ghost-bbbbbb/memory/MEMORY.md",
+          "entries": [
+            {
+              "heading": "Ghost entry"
+            }
+          ]
+        }
+      }
+    }
+  },
+  "normal_folders": true
+}

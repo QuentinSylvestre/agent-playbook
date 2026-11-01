@@ -1,0 +1,12 @@
+{
+  "phase": "gather",
+  "step": "GAT-PLANS",
+  "kind": "rate-limit",
+  "question": null,
+  "options": [
+    "Wait and resume",
+    "Abort"
+  ],
+  "recommendation": null,
+  "resume_from": "GAT-PLANS"
+}

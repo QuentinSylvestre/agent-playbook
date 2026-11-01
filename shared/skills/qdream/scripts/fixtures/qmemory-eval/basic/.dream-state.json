@@ -1,0 +1,19 @@
+{
+  "schema_version": "4.0",
+  "last_run": "2026-07-16T10:00:00Z",
+  "last_analyzed": "2026-07-16T10:00:00Z",
+  "outcome_tags": [
+    {"target": "shared/skills/qexplore/SKILL.md", "applied": "2026-07-16"},
+    {"target": "shared/skills/qclose/SKILL.md", "applied": "2026-07-16", "outcome": "recurred"},
+    {"target": "shared/skills/qdev/SKILL.md", "applied": "2026-07-16", "outcome": "not_recurred"},
+    {"target": "shared/AGENTS.md", "applied": "2026-07-16"},
+    {"target": "providers/kiro/steering/foo.md", "applied": "2026-07-16"}
+  ],
+  "episodic_ledger": [
+    {"id": 0, "session": "aaa11111", "project": "fixture"},
+    {"id": 1, "session": "bbb22222", "project": "fixture"},
+    {"id": 2, "session": "ccc33333", "project": "fixture"}
+  ],
+  "rejected_lessons": [],
+  "projects": {}
+}

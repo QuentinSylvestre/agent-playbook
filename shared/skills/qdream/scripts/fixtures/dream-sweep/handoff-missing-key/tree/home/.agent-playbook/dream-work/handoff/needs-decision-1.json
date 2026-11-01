@@ -1,0 +1,9 @@
+{
+  "phase": "gather",
+  "step": "GAT-PLANS",
+  "kind": "whatever",
+  "question": null,
+  "options": [],
+  "recommendation": null,
+  "resume_from": "GAT-PLANS"
+}

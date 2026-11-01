@@ -1,0 +1,17 @@
+{
+  "description": "A project tier larger than the remaining budget is replaced by its heading index.",
+  "cwd": "{{ROOT}}/proj",
+  "cap": 2000,
+  "contains": [
+    "heading index only",
+    "- Project heading one",
+    "- Project heading three"
+  ],
+  "absent": [
+    "BODYSENTINEL",
+    "delivered in full"
+  ],
+  "whole_lines": true,
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores"
+}

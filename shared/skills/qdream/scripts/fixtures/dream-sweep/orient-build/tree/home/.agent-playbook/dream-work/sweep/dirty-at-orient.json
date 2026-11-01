@@ -1,0 +1,15 @@
+{
+  "repo": "{ROOT}/repo",
+  "repos": {
+    "{ROOT}/repo": {
+      "head": null,
+      "upstream": null,
+      "porcelain": []
+    },
+    "{ROOT}/proj/alpha": {
+      "head": null,
+      "upstream": null,
+      "porcelain": []
+    }
+  }
+}

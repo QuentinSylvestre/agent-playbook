@@ -1,0 +1,15 @@
+{
+  "description": "The no-store read rule: no store repo on this machine, so an in-workspace memory/MEMORY.md is not shown even in a no-create folder; the missing-repo notice says to clone it.",
+  "cwd": "{{ROOT}}/proj",
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo_missing": true,
+  "contains": [
+    "Project memory: none found",
+    "Note: the store repo is missing at ",
+    "- User entry one"
+  ],
+  "absent": [
+    "Workspace entry beta",
+    "delivered in full"
+  ]
+}

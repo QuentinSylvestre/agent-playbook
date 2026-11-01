@@ -1,0 +1,33 @@
+{
+  "description": "F6/F7: a return with project_accessible false blocks the stamp though error is null; a project whose listed sessions are all deferred is not stamped (deferred-only) though its agent returned cleanly.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "coverage"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "0 project(s) stampable, 2 not"
+      ],
+      "files": {
+        "sweep/coverage.json": {
+          "projects": {
+            "{ROOT}/proj/alpha": {
+              "stamp": false,
+              "reasons": [
+                "deferred-only"
+              ]
+            },
+            "{ROOT}/proj/beta": {
+              "stamp": false,
+              "reasons": [
+                "project not accessible (A02)"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

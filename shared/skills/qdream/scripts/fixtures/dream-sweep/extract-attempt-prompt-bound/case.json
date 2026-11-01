@@ -1,0 +1,142 @@
+{
+  "description": "G1: extract --attempt N accepts only a child whose Agent prompt names attempt N's brief: attempt 1's child filed as attempt 2 is exit 3 (a retry's return is never filled from the attempt before it), attempt 2's child filed as attempt 1 too; a prompt naming a brief outside <work>/sweep/briefs/ or a stray A01.a1.md is no brief of A01's. The matching extracts work.",
+  "now": "2026-10-12T12:00:00Z",
+  "env": {
+    "CLAUDE_CODE_SESSION_ID": "5e550000-0000-4000-8000-000000000001"
+  },
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--attempt",
+        "2",
+        "--claude-agent",
+        "a1111111111111111"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not A01's attempt 2"
+      ],
+      "absent": [
+        "sweep/returns"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--claude-agent",
+        "a5555555555555555"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not A01's attempt 1"
+      ],
+      "absent": [
+        "sweep/returns"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--claude-agent",
+        "a6666666666666666"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not A01's attempt 1"
+      ],
+      "absent": [
+        "sweep/returns"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--claude-agent",
+        "a7777777777777777"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not A01's attempt 1"
+      ],
+      "absent": [
+        "sweep/returns"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--attempt",
+        "2",
+        "--claude-agent",
+        "a5555555555555555"
+      ],
+      "exit": 0,
+      "present": [
+        "sweep/returns/A01.a2.json"
+      ],
+      "absent": [
+        "sweep/returns/A01.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--claude-agent",
+        "a1111111111111111"
+      ],
+      "exit": 0,
+      "present": [
+        "sweep/returns/A01.json"
+      ]
+    },
+    {
+      "argv": [
+        "wait",
+        "--labels",
+        "A01=a5555555555555555",
+        "--attempt",
+        "2"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "A01: final (handback)"
+      ]
+    },
+    {
+      "argv": [
+        "wait",
+        "--labels",
+        "A01=a6666666666666666"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not A01's"
+      ]
+    }
+  ]
+}

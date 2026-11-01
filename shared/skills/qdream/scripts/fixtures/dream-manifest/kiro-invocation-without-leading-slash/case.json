@@ -1,0 +1,26 @@
+{
+  "description": "kiro-cli persists a skill invocation as the expanded body with no leading slash command; detection matches the body itself and keeps a bare-line argument.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "stripped": {
+      "sess_k1200000-0000-4000-8000-000000000001": {
+        "contains": [
+          "L1 [user] [skill body: qsweep] light\n"
+        ],
+        "not_contains": [
+          "reads the mode argument",
+          "re-reads every entry",
+          "/qsweep"
+        ]
+      }
+    }
+  }
+}

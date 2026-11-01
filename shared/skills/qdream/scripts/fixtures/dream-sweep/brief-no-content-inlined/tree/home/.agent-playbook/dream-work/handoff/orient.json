@@ -1,0 +1,15 @@
+{
+  "snapshot_at": "2026-10-12T12:00:00Z",
+  "since": "2026-10-01T00:00:00Z",
+  "confirmed": [
+    "{ROOT}/proj/alpha"
+  ],
+  "model_routing": {
+    "task4": "model-a",
+    "verifier": "model-a"
+  },
+  "dirty_at_orient": true,
+  "repos": [],
+  "recover_lines": [],
+  "orchestrator_sessions": []
+}

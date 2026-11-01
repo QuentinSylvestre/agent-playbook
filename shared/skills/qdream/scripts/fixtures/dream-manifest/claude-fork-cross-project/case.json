@@ -1,0 +1,54 @@
+{
+  "description": "A session whose every record is held by a larger transcript in another project is kept (no user turn is dropped) and its project's errors[] names the pair; within the project a smaller session wholly inside it still collapses into it.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "sessions": [
+            {
+              "id": "f0000000-0000-4000-8000-000000000111",
+              "boundary": "L1"
+            }
+          ],
+          "fork_collapsed": [
+            {
+              "dropped": "f0000000-0000-4000-8000-000000000110",
+              "kept": "f0000000-0000-4000-8000-000000000111",
+              "shared_records": 1
+            }
+          ],
+          "errors": [
+            "$contains:every record of Claude session f0000000-0000-4000-8000-000000000111 is also in session f0000000-0000-4000-8000-000000000112 ("
+          ]
+        },
+        "{ROOT}/proj/beta": {
+          "sessions": [
+            {
+              "id": "f0000000-0000-4000-8000-000000000112",
+              "boundary": "L1"
+            }
+          ],
+          "fork_collapsed": [],
+          "errors": []
+        }
+      }
+    },
+    "stripped": {
+      "f0000000-0000-4000-8000-000000000111": {
+        "contains": [
+          "cross question",
+          "cross answer"
+        ]
+      }
+    }
+  }
+}

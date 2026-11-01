@@ -1,0 +1,13 @@
+{
+  "description": "A session opened two folders below the git root walks up to the project's memory.",
+  "git": [
+    "proj"
+  ],
+  "cwd": "{{ROOT}}/proj/src/deep",
+  "contains": [
+    "Walk-up entry gamma",
+    "/fixture root/stores/proj-hhhhhh/memory/MEMORY.md) — delivered in full"
+  ],
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores"
+}

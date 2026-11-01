@@ -1,0 +1,55 @@
+{
+  "description": "A project absent from the state file (beta) is read only from the state's last_run (user decision 2026-09-24, option A): a Claude session with a record after last_run is listed with its boundary at that record; sessions entirely before it (one Claude, one Kiro) are not read, only counted in older_sessions_not_read. A project in the state keeps its own last_analyzed.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "new_project_baseline": {
+        "rule": "last_run",
+        "since": "2026-09-22T05:33:27Z"
+      },
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "status": "known",
+          "baseline_rule": "state",
+          "older_sessions_not_read": 0
+        },
+        "{ROOT}/proj/beta": {
+          "status": "new",
+          "baseline_rule": "last_run",
+          "older_sessions_not_read": 2,
+          "counts": {
+            "sessions": 1
+          },
+          "sessions": [
+            {
+              "id": "d1a00000-0000-4000-8000-000000000002",
+              "boundary": "L2",
+              "kind": "normal"
+            }
+          ]
+        }
+      }
+    },
+    "stripped": {
+      "d1a00000-0000-4000-8000-000000000002": {
+        "order": [
+          "L1 [user] beta prompt before the last run",
+          "=== NEW TURNS BEGIN ===",
+          "L2 [user] beta prompt after the last run"
+        ]
+      }
+    },
+    "stdout_contains": [
+      "project {ROOT}/proj/beta: status=new new=1",
+      "older_not_read=2"
+    ]
+  }
+}

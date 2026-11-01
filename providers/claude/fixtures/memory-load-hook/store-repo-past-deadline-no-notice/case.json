@@ -1,0 +1,15 @@
+{
+  "description": "plan 261016 Phase 10: past the hook's deadline the store repo's git calls are not run: a path uncommitted for over a day gets no notice rather than a late one. The hook says the store repo check was skipped (plan 261016 Step 9).",
+  "cwd": "{{ROOT}}/empty",
+  "config_repo": "{{ROOT}}/cfg",
+  "time_cap": 0,
+  "store_repo": "stores",
+  "store_git": "old-uncommitted",
+  "contains": [
+    "- User entry one",
+    "Note: store repo check skipped (the hook's time cap was spent)."
+  ],
+  "absent": [
+    "Note: the store repo"
+  ]
+}

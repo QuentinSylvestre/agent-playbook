@@ -1,0 +1,65 @@
+{
+  "description": "A commit made in a dispatched project's repo since its Orient HEAD that commits.json does not list is a foreign commit; a config-repo commit commits.json lists is not.",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/.gitignore": "memory/.dream-journal.jsonl\n",
+    "repo/memory/MEMORY.md": "# Memory\n",
+    "repo/memory/.dream-state.json": "{\"state\": \"orient\"}\n",
+    "proj/alpha/memory/MEMORY.md": "# a\n"
+  },
+  "git": [
+    "repo",
+    "proj/alpha"
+  ],
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0
+    },
+    {
+      "write": {
+        "proj/alpha/notes.txt": "x\n",
+        "repo/notes.txt": "y\n"
+      },
+      "commit": [
+        {
+          "dir": "proj/alpha",
+          "message": "Foreign session work"
+        },
+        {
+          "dir": "repo",
+          "message": "docs(memory): Apply qdream sweep"
+        }
+      ]
+    },
+    {
+      "record_commits": [
+        "repo"
+      ]
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "apply"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/drift-apply.json": {
+          "entries": [
+            {
+              "kind": "foreign-commit",
+              "repo": "{ROOT}/proj/alpha",
+              "subject": "Foreign session work",
+              "sha": "$nonnull"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

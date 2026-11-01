@@ -1,0 +1,108 @@
+{
+  "description": "G4, G11: a project repository gone since Orient is a notify-only `repo-gone` drift entry (exit 0); one whose .git vanished (the directory stays) is a check-failed entry naming it (exit 3) and git never runs in it; readers that run no git in project repositories (blast, aggregate's loaders) are not blocked by it; a `dirty` re-run refuses naming it. The config repo gone stays exit 3.",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/memory/MEMORY.md": "# Memory\n",
+    "repo/memory/.dream-state.json": "{}\n",
+    "repo/AGENTS.md": "# agents\n",
+    "proj/alpha/memory/MEMORY.md": "# alpha memory\n",
+    "proj/beta/memory/MEMORY.md": "# beta memory\n"
+  },
+  "git": [
+    "repo",
+    "proj/alpha",
+    "proj/beta"
+  ],
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "dirty: 3 repo(s)"
+      ]
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "gather"
+      ],
+      "exit": 0,
+      "stdout_not_contains": [
+        "repo-gone",
+        "CHECK FAILED"
+      ]
+    },
+    {
+      "delete": [
+        "proj/alpha"
+      ]
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "synthesize"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "repo-gone: {ROOT}/proj/alpha"
+      ],
+      "stdout_not_contains": [
+        "CHECK FAILED"
+      ],
+      "files": {
+        "sweep/drift-synthesize.json": {
+          "incident": false,
+          "check_failed": false
+        }
+      }
+    },
+    {
+      "delete": [
+        "proj/beta/.git"
+      ]
+    },
+    {
+      "argv": [
+        "blast",
+        "--file",
+        "AGENTS.md"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "apply"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "CHECK FAILED: project repository no longer a git top in {ROOT}/proj/beta"
+      ],
+      "files": {
+        "sweep/drift-apply.json": {
+          "check_failed": true,
+          "incident": false
+        }
+      }
+    },
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 3,
+      "unchanged": true,
+      "stdout_contains": [
+        "names the repository {ROOT}/proj/beta, which exists but is no longer a git top"
+      ]
+    }
+  ]
+}

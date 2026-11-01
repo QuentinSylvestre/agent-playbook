@@ -1,0 +1,36 @@
+{
+  "description": "A heading the manifest cut (an index in `shortened`) is reported `truncated` and not matched, even though a prefix match exists; headings past the cap count as dropped (total - kept).",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "feeder"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "Usage from plans: 1 bumped, 1 unresolved, 3 dropped by the manifest cap"
+      ],
+      "files": {
+        "sweep/feeder.json": {
+          "ops": [
+            {
+              "heading": "Ok heading"
+            }
+          ],
+          "unresolved": [
+            {
+              "heading": "A long head",
+              "reason": "truncated"
+            }
+          ],
+          "dropped": [
+            {
+              "plan": "261005-1200_ONE.md",
+              "count": 3
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

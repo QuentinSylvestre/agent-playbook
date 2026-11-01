@@ -1,0 +1,26 @@
+{
+  "description": "D24: an entry with only a Stale-when condition raises no flag (the script cannot test prose): stored 2 -> memory_pass null.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "quiet_sweeps": 2,
+          "memory_pass": null,
+          "memory_flags": []
+        }
+      }
+    }
+  },
+  "git": [
+    "repo"
+  ]
+}

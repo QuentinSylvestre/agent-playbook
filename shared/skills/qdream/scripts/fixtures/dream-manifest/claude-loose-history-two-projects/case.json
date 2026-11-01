@@ -1,0 +1,36 @@
+{
+  "description": "Sessionless history entries of two projects form one no-session-id group each, written to two distinct stripped files (the name carries a project hash); a sessionless entry whose text a local transcript of that project already holds is dropped.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "stripped": {
+      "{ROOT}/proj/alpha::no-session-id#history": {
+        "contains": [
+          "alpha only loose prompt"
+        ],
+        "not_contains": [
+          "beta only loose prompt",
+          "shared prompt text typed"
+        ]
+      },
+      "{ROOT}/proj/beta::no-session-id#history": {
+        "contains": [
+          "beta only loose prompt"
+        ],
+        "not_contains": [
+          "alpha only loose prompt"
+        ]
+      }
+    },
+    "json_not_contains": [
+      "refused to write"
+    ]
+  }
+}

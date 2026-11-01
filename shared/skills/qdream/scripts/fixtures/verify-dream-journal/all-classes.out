@@ -1,0 +1,9 @@
+ok: line 1: valid remove record
+ok: line 2: valid remove record
+ok: line 3: valid remove record
+ok: line 4: valid remove record
+ok: line 5: valid remove record
+ok: line 6: valid remove record
+ok: line 7: valid remove record
+ok: line 8: valid remove record
+verify-dream-journal: ok=8 fail=0 warn=0

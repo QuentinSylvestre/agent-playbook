@@ -1,0 +1,22 @@
+{
+  "description": "Review R9 (plan 261027): `Brief` matches the first user record of two sub-agent files (a second sweep in one session re-uses brief names). agent ...32 began at 10:05:00Z, ...31 at 10:00:00Z, so ...32 is taken (60 tokens, not ...31's 90) and a `note:` line names the 2 matches.",
+  "now": "2026-10-27T12:00:00Z",
+  "argv": [
+    "context",
+    "--session",
+    "{ROOT}/home/.claude/projects/-ROOT-proj/b5a00000-0000-4000-8000-000000000031.jsonl",
+    "--marker",
+    "Brief"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_contains": [
+      "note: --marker matched 2 sub-agent transcripts; took the one whose first record is the latest (agent-a0000000000000032.jsonl, 2026-10-27T10:05:00Z)\n",
+      "agent-a0000000000000032.jsonl\n",
+      "context: 60 tokens at the last model call (2026-10-27T10:05:04Z)\n"
+    ],
+    "stdout_not_contains": [
+      "90 tokens"
+    ]
+  }
+}

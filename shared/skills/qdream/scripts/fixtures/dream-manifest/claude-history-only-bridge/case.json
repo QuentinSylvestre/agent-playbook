@@ -1,0 +1,38 @@
+{
+  "description": "A history.jsonl session with no local transcript is listed as history_only, carrying its prompt text and a coverage-gap line; a session whose transcript exists is not.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "sessions": [
+            {
+              "id": "c6a00000-0000-4000-8000-00000000000b",
+              "kind": "history_only",
+              "boundary": "L2",
+              "provider": "claude"
+            }
+          ]
+        }
+      }
+    },
+    "stripped": {
+      "c6a00000-0000-4000-8000-00000000000b#history": {
+        "order": [
+          "[coverage gap:",
+          "L1 [user] bridge prompt from last week",
+          "=== NEW TURNS BEGIN ===",
+          "L2 [user] bridge prompt after the last sweep"
+        ]
+      }
+    }
+  }
+}

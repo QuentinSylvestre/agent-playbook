@@ -1,0 +1,59 @@
+{
+  "description": "A memory file outside any git repository is recorded `not-a-repo` (never committable later); a --repo that is not a repository top is exit 3 and writes nothing.",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/memory/MEMORY.md": "# Memory\n",
+    "proj/alpha/memory/MEMORY.md": "# a\n",
+    "repo/memory/.dream-state.json": "{}\n"
+  },
+  "git": [
+    "repo"
+  ],
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/proj/alpha"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not the top of a git repository"
+      ],
+      "absent": [
+        "sweep/dirty-at-orient.json",
+        "sweep/guard-hashes.json"
+      ]
+    },
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo/memory"
+      ],
+      "exit": 3,
+      "absent": [
+        "sweep"
+      ]
+    },
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/dirty-at-orient.json": {
+          "candidates": {
+            "{ROOT}/proj/alpha/memory/MEMORY.md": {
+              "repo": "not-a-repo",
+              "git": null,
+              "sha256": "fd99dedae7c3f7532f8a65d60f811a05dc9dc3e1c5936b0c554c98aafdad8c10"
+            }
+          }
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,66 @@
+{
+  "description": "A candidate memory file whose current sha equals its hashes.json record (a script wrote it) is not listed; a later edit after that record is.",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/.gitignore": "memory/.dream-journal.jsonl\n",
+    "repo/memory/MEMORY.md": "# Memory\n",
+    "repo/memory/.dream-state.json": "{\"state\": \"orient\"}\n",
+    "proj/alpha/memory/MEMORY.md": "# a\n"
+  },
+  "git": [
+    "repo",
+    "proj/alpha"
+  ],
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0
+    },
+    {
+      "write": {
+        "proj/alpha/memory/MEMORY.md": "# a\n\nsweep edit\n",
+        "home/.agent-playbook/dream-work/sweep/hashes.json": "{\n  \"version\": 1,\n  \"files\": {\n    \"{ROOT}/proj/alpha/memory/MEMORY.md\": {\n      \"sha256\": \"29bf640d024fb083ec72ee5c2d8528d40fa2624b395d5d208de64994b40d862b\",\n      \"kind\": \"memory\",\n      \"by\": \"memedit\",\n      \"at\": \"2026-10-12T12:30:00Z\",\n      \"foreign_edit\": false\n    }\n  }\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "synthesize"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/drift-synthesize.json": {
+          "entries": []
+        }
+      }
+    },
+    {
+      "write": {
+        "proj/alpha/memory/MEMORY.md": "# a\n\nsweep edit\nmore\n"
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "synthesize"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/drift-synthesize.json": {
+          "entries": [
+            {
+              "kind": "candidate-changed",
+              "recorded": true
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

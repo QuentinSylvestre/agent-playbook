@@ -1,0 +1,9 @@
+{
+  "description": "F5: removing a dead owner's sweep/write.lock is race-free. Only the holder of the reclaim mutex (sweep/write.lock.reclaim, created O_EXCL) removes a dead lock, and only after reading it again under the mutex; nothing is moved aside or restored, so the lock path is never empty while a live lock is set aside and a fourth run cannot take it (two writers). Driven from the owner-check stub: a run acting on a stale sighting leaves a live lock alone; a second reclaimer that starts while the first holds the mutex is refused (one removal, one note); a mutex left by a killed run is reported and never broken; a lock already removed, now held by a live owner or unreadable is handled without a removal.",
+  "now": "2026-10-12T12:00:00Z",
+  "setup": [],
+  "steps": [],
+  "units": [
+    "lock-reclaim"
+  ]
+}

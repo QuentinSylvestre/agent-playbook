@@ -1,0 +1,4 @@
+{
+  "chat.defaultModel": "fixture-model",
+  "cleanup.periodDays": 20
+}

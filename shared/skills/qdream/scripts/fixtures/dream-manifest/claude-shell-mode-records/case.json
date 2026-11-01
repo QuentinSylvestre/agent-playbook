@@ -1,0 +1,43 @@
+{
+  "description": "Claude `!` shell-mode records (<bash-input>, <bash-stdout>, <bash-stderr>) are harness text: neither the command nor its output reaches the stripped transcript, so a secret printed by a shell command never lands in the work folder.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "sessions": [
+            {
+              "id": "c8a00000-0000-4000-8000-000000000001",
+              "boundary": "L4"
+            }
+          ]
+        }
+      }
+    },
+    "stripped": {
+      "c8a00000-0000-4000-8000-000000000001": {
+        "contains": [
+          "L4 [user] thanks, now summarize the deploy steps",
+          "L5 [assistant] Here are the deploy steps."
+        ],
+        "not_contains": [
+          "FIXTURESECRET123",
+          "FIXTURESECRET456",
+          "bash-input",
+          "aws/credentials",
+          "L1 [",
+          "L2 [",
+          "L3 ["
+        ]
+      }
+    }
+  }
+}

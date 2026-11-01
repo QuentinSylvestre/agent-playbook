@@ -1,0 +1,50 @@
+{
+  "description": "A project with no session after last_analyzed lists none but keeps its entries and the plans archived since, from the governance-named archive path.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "$absent": ["governance_head"],
+      "sweep_due": false,
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "sessions": [],
+          "entries": [
+            {
+              "heading": "Use the helper"
+            }
+          ],
+          "plans": {
+            "archive": "{ROOT}/proj/alpha/docs/records/plans/done",
+            "archive_source": "governance",
+            "new_plans": [
+              {
+                "file": "260923-0900_NEW_ONE.md",
+                "title": "New One",
+                "decisions": [
+                  "Keep the old API for one release."
+                ],
+                "review_log": [
+                  "- 2026-09-22 -- one review, no findings."
+                ]
+              }
+            ]
+          }
+        }
+      }
+    },
+    "stdout_contains": [
+      "sweep due: no (0 new sessions, 0 projects near deletion)"
+    ]
+  },
+  "git": [
+    "repo"
+  ]
+}

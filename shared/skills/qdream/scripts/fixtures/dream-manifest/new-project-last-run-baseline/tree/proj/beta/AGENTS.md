@@ -1,0 +1,3 @@
+# beta
+
+Synthetic fixture project.

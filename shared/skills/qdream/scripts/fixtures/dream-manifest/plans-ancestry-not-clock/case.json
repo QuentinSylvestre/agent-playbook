@@ -1,0 +1,47 @@
+{
+  "description": "A plan of the config repo's own plans/ (the only archive in the repository holding the state commit, plan 261016 Q11) is new when the commit that archived it is not an ancestor of the commit that last modified the state file, whatever its commit time: a plan archived after the last sweep's state commit, on a machine whose clock is behind, is new; one archived before it is not.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/repo": {
+          "plans": {
+            "archive": "{ROOT}/repo/plans/done",
+            "new_plans": [
+              {
+                "file": "260904-1000_SKEWED_NEW.md",
+                "title": "Skewed New"
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "git_steps": [
+    {
+      "dir": "repo",
+      "date": "2026-09-21T10:00:00Z",
+      "paths": [
+        "memory/.dream-state.json",
+        "AGENTS.md",
+        "plans/done/260905-1000_OLD_ONE.md"
+      ]
+    },
+    {
+      "dir": "repo",
+      "date": "2026-09-06T10:00:00Z",
+      "paths": [
+        "plans/done/260904-1000_SKEWED_NEW.md"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,108 @@
+{
+  "description": "S9: extract --kiro without a session hint skips a session folder whose messages.jsonl was last modified before the manifest's snapshot_at (2026-10-12T12:00:00Z): it cannot hold this sweep's launches and is not read. Session X (A01 and A03 launched, messages.jsonl last written 2026-10-11) and session Y (A01 launched, last written after the snapshot): A01 is read from Y alone (no 'two session folders' refusal); A03, launched only in X, finds no launch and the refusal says one session was not read. Once X's file is fresh (2026-10-12T12:30:00Z) A03 is read from X, and A01 is launched in two sessions (exit 3). A write one second before the snapshot is inside the 2-second clock slack (read); five seconds before is not.",
+  "now": "2026-10-12T12:30:00Z",
+  "setup": [
+    {
+      "utime": {
+        "home/.kiro/sessions/0000000000000c11/sess_5e550000-0000-4000-8000-0000000000c1/messages.jsonl": "2026-10-11T00:00:00Z",
+        "home/.kiro/sessions/0000000000000c22/sess_5e550000-0000-4000-8000-0000000000c2/messages.jsonl": "2026-10-13T00:00:00Z"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--kiro"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/returns/A01.json": {
+          "session_id": "sess_5e550000-0000-4000-8000-0000000000c2",
+          "agent_id": "c0000002-0000-4000-8000-000000000000"
+        }
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A03",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no qdream_child launch of A03 attempt 1",
+        "(1 session(s) last written before this sweep's snapshot_at not read)"
+      ],
+      "absent": [
+        "sweep/returns/A03.json"
+      ]
+    },
+    {
+      "utime": {
+        "home/.kiro/sessions/0000000000000c11/sess_5e550000-0000-4000-8000-0000000000c1/messages.jsonl": "2026-10-12T11:59:59Z"
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A03",
+        "--kiro"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/returns/A03.json": {
+          "session_id": "sess_5e550000-0000-4000-8000-0000000000c1"
+        }
+      }
+    },
+    {
+      "utime": {
+        "home/.kiro/sessions/0000000000000c11/sess_5e550000-0000-4000-8000-0000000000c1/messages.jsonl": "2026-10-12T11:59:55Z"
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A03",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "(1 session(s) last written before this sweep's snapshot_at not read)"
+      ]
+    },
+    {
+      "utime": {
+        "home/.kiro/sessions/0000000000000c11/sess_5e550000-0000-4000-8000-0000000000c1/messages.jsonl": "2026-10-12T12:30:00Z"
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "launched in 2 session folders"
+      ]
+    }
+  ]
+}

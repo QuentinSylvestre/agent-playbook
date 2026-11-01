@@ -1,0 +1,12 @@
+{
+  "description": "plan 261016 Phase 10: no store repo on this machine: a one-line notice says so and how to get it.",
+  "cwd": "{{ROOT}}/empty",
+  "config_repo": "{{ROOT}}/cfg",
+  "time_cap": 20,
+  "store_repo_missing": true,
+  "contains": [
+    "Note: the store repo is missing at ",
+    "/no-store-repo; clone it (see providers/claude/README.md § Store repo on a new machine), then run /qconfig-sync.",
+    "- User entry one"
+  ]
+}

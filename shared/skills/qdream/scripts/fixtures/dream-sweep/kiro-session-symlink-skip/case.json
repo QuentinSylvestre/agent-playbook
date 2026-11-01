@@ -1,0 +1,8 @@
+{
+  "description": "X7c: kiro_session_dirs skips a sess_ folder that is a link and every sess_ folder under a folder that is a link (a unit with a mocked Path.is_symlink, plus a real link where this machine can create one); a hint naming a skipped session is refused.",
+  "now": "2026-10-12T12:00:00Z",
+  "units": [
+    "kiro-session-symlink-skip"
+  ],
+  "steps": []
+}

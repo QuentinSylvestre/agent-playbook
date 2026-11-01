@@ -1,0 +1,110 @@
+# agent-playbook
+
+Cross-provider, self-improving governance for AI coding agents.
+
+One set of agent instructions and one skill library, deployed to **Claude Code, Codex, Gemini CLI
+and Kiro** (CLI and IDE). The skills give agents a deliberate lifecycle for every change, and a
+memory system that learns from past sessions turns what went wrong into better rules.
+
+- **One source of truth.** `shared/AGENTS.md` and `shared/skills/` are linked into each provider's
+  config folder, so one edit reaches every agent. Provider-specific pieces live in `providers/`.
+- **A lifecycle, not a prompt.** `/qexplore` → `/qplan` → `/qdev` (with `/qreview` after every
+  phase) → `/qclose`. Each step has written exit criteria, review personas and guard scripts.
+- **Memory that maintains itself.** Agents record what they learn as memory entries. The `/qdream`
+  sweep reads past sessions, consolidates and re-verifies those entries, and proposes governance
+  changes for you to approve.
+- **Checked by scripts, not by trust.** Deployment, citations, memory format and plan files are
+  verified by stdlib-only Python guards with their own self-tests.
+
+> Status: 0.1, the first public release. The playbook has run one person's daily work for months;
+> as a public project it is new. Expect rough edges, and see [ROADMAP.md](ROADMAP.md).
+
+## Quickstart
+
+Requirements: git, Python 3.8+, and permission to create symlinks (on Windows, Developer Mode
+or an elevated shell). Node is optional.
+
+```bash
+git clone https://github.com/QuentinSylvestre/agent-playbook.git ~/src/agent-playbook
+cd ~/src/agent-playbook
+./setup.sh --dry-run      # see every change first; nothing is written
+./setup.sh                # interactive: pick providers, set up your store repo
+```
+
+On Windows, in PowerShell: `.\setup.ps1 -DryRun`, then `.\setup.ps1`.
+
+Interactive setup:
+
+1. Detects which providers you have and asks which ones to deploy to.
+2. Checks prerequisites.
+3. Creates the playbook's Python venv.
+4. Offers to clone your store repo or create a new one (see below).
+5. Writes `~/.agent-playbook/config`.
+
+It never replaces a file of yours without asking: it backs the file up to `.bak` first.
+
+Non-interactive: `./setup.sh --yes --providers claude,codex`. Remove everything again with
+`./setup.sh --uninstall` (add `--purge` to drop the pointer file too). See `./setup.sh --help`.
+
+Then, in any project, ask your agent to `/qexplore` a change.
+
+## The skills
+
+| Area | Skills |
+|---|---|
+| Lifecycle | `/qexplore` (requirements by interview), `/qplan` (phased plan), `/qdev` (execute phases with review), `/qreview` (persona review of a diff or plan), `/qvalidate` (plan-file grammar), `/qclose` (archive and capture learnings), `/qhandoff` (hand work to another session) |
+| Thinking tools | `/qcouncil` (advocate/prosecutor/juror panel for hard choices), `/qexplore-other` (stress-test a non-code decision), `/qprototype` (throwaway prototype to answer a design question), `/qwait-what` (re-pitch the last message) |
+| Verification | `/qqa` (verify a specific claim, PASS/FAIL/BLOCKED/SKIP), `/qtest` (test planning and runs), `/qbrowser-test` (drive a browser with Playwright) |
+| Memory | `/qdream` (the consolidation sweep), `/qmemory-eval` (memory health metrics), `/qextract` (mine an article or repo for playbook improvements) |
+| Delegation | `/qclaude-delegate`, `/qkiro-delegate` (hand a well-specified task to another agent and verify it), `/qauto-research` (autonomous experiment loop) |
+| Output | `/qexplain` (HTML walkthrough of a diff), `/qvisualize` (interactive charts and diagrams), `/qdocument-interaction` (Word, PDF, PowerPoint, Excel), `/qicon-design` |
+| Maintenance | `/qconfig-sync` (pull, verify the deployment, push), `/qmigrate-workspace` (move a workspace folder, Windows), `/qutilities-disk-cleanup` |
+
+Kiro also gets `/qwire-governance`, `/qrecover-file` and `/qfewer-permission-prompts`.
+
+## How it fits together
+
+```
+agent-playbook/ (this repo, public)         ~/.agent-playbook/
+  shared/AGENTS.md  ──linked──► ~/.claude/CLAUDE.md, ~/.codex/AGENTS.md, ~/.gemini/GEMINI.md, ~/.kiro/...
+  shared/skills/*   ──linked──► ~/.claude/skills/<skill>, ~/.codex/skills/<skill>, ...
+  providers/<name>/ ──linked or rendered──► provider-specific config
+  memory ───────────linked──► stores/user/memory/        stores/   (your private store repo)
+                                                           user/memory/       your user memory
+                                                           <workspace>-<id>/  per-project memory, plans
+                                                         config    (pointer file: root=, stores=)
+```
+
+- **Store repo.** Your memory, plans and artifacts never live in this repo. They live in a private
+  git repo of your own at `~/.agent-playbook/stores`: one store per workspace, plus `user/` for
+  your cross-project memory. Setup can create it locally; push it to a private remote to keep it
+  across machines.
+- **Engine branch.** Your clone's own improvements (from `/qconfig-sync` and `/qdream`) land on a
+  `local-improvements` branch, never on `main`. Merge to `main`, or open a pull request upstream,
+  when you choose.
+- **Coexistence.** Each skill is linked individually, so your own skills and other skill packs
+  in the same folder stay. Composing the playbook with your own global instructions is on the
+  [roadmap](ROADMAP.md).
+
+More: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and the vocabulary in
+[docs/GLOSSARY.md](docs/GLOSSARY.md).
+
+## Supported providers
+
+| Provider | Instructions | Skills | Extras |
+|---|---|---|---|
+| Claude Code | `~/.claude/CLAUDE.md` | `~/.claude/skills/` | statusline, SessionStart memory hook (manual `settings.json` entries: [providers/claude/README.md](providers/claude/README.md)) |
+| Codex | `~/.codex/AGENTS.md` | `~/.codex/skills/` | |
+| Gemini CLI | `~/.gemini/GEMINI.md` | `~/.gemini/skills/` | |
+| Kiro (CLI and IDE) | steering in `~/.kiro/steering/` | `~/.kiro/skills/` (with Kiro overlays) | `kiro_default` agent, settings seeds ([providers/kiro/README.md](providers/kiro/README.md)) |
+
+Windows, macOS and Linux are supported. Kiro and Windows get the most day-to-day use.
+
+## Contributing
+
+Contributions are welcome: see [CONTRIBUTING.md](CONTRIBUTING.md). Every change goes through a
+pull request with sign-off (DCO) and green CI. Security issues: [SECURITY.md](SECURITY.md).
+
+## License
+
+[Apache License 2.0](LICENSE). See [NOTICE](NOTICE).

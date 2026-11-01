@@ -1,0 +1,22 @@
+{
+  "description": "An entry whose Source-cited file changed in git after its Verified date is marked; later-verified and missing-path entries are not, nor is an entry that names the changed file only in its Why prose (cited_path_changed reads the Source anchor only).",
+  "git": [
+    "cfg"
+  ],
+  "git_date": "2026-09-15T12:00:00",
+  "time_cap": 20,
+  "cwd": "{{ROOT}}/empty",
+  "contains": [
+    "- Changed after verify ⚠"
+  ],
+  "regex": [
+    "^- Verified after change$",
+    "^- Cites a missing file$",
+    "^- Path only in Why$"
+  ],
+  "absent": [
+    "marks omitted"
+  ],
+  "whole_lines": true,
+  "config_repo": "{{ROOT}}/cfg"
+}

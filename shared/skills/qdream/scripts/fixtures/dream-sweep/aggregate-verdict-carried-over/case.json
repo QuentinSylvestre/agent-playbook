@@ -1,0 +1,49 @@
+{
+  "description": "G1: a verdict binds to the bytes of the data file it judged, not to an attempt number: V01's attempt-2 data is byte-identical to attempt 1's, so V01's attempt-1 verdict still counts under the attempt-2 index; V02's attempt-2 data differs, so its attempt-1 verdict does not (missing, with a summary line).",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "verifier",
+        "--label",
+        "V01",
+        "--from-file",
+        "inbox/V01.txt"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "verifier",
+        "--label",
+        "V02",
+        "--from-file",
+        "inbox/V02.txt"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "aggregate"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "4 item(s): refuted 1, missing 3",
+        "V02: verdict attempt(s) 1 not bound to sweep/briefs/V02.a2.data.json"
+      ],
+      "stdout_not_contains": [
+        "V01: verdict"
+      ],
+      "text_contains": {
+        "sweep/synth.txt": [
+          "V01-002\tmemory_proposals\trefuted\tSecond lesson\n",
+          "V02-001\timprovement_signals\tmissing\tBeta friction, re-read\n"
+        ]
+      }
+    }
+  ]
+}

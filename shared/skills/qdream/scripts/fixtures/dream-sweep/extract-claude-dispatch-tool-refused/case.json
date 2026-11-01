@@ -1,0 +1,79 @@
+{
+  "description": "F1 (Claude Code): the child check is an allowlist (shared/AGENTS.md § Dream autonomy exception: a child writes nothing and dispatches no agent). extract --claude-agent refuses (exit 3, no record written) a transcript that holds a tool_use of Agent (A02, before its SubagentHandback) or an mcp__ write tool (A03, before a final end_turn text), naming the tool, so the child counts as failed. A child that only called Read, Grep and Glob is accepted (A01 via handback, A04 via text), even though its text and tool inputs mention tool names: only a tool_use block counts.",
+  "now": "2026-10-12T12:00:00Z",
+  "env": {
+    "CLAUDE_CODE_SESSION_ID": "5e550000-0000-4000-8000-000000000001"
+  },
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--claude-agent",
+        "a1111111111111111"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/returns/A01.json": {
+          "via": "claude-transcript:handback"
+        }
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A02",
+        "--claude-agent",
+        "a2222222222222222"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "refused: transcript agent-a2222222222222222.jsonl called the tool Agent: a task4 child is read-only; record A02 as failed"
+      ],
+      "absent": [
+        "sweep/returns/A02.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A03",
+        "--claude-agent",
+        "a3333333333333333"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "called the tool mcp__claude_ai_Atlassian_Rovo__createJiraIssue"
+      ],
+      "absent": [
+        "sweep/returns/A03.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A04",
+        "--claude-agent",
+        "a4444444444444444"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/returns/A04.json": {
+          "via": "claude-transcript:text"
+        }
+      }
+    }
+  ]
+}

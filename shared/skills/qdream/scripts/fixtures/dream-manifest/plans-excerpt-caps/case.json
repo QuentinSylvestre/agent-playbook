@@ -1,0 +1,173 @@
+{
+  "description": "new_plans excerpts cap each list on its own -- at most 40 decisions rows and 60 review_log lines, each item cut to 400 characters -- so a long decisions table never crowds out the review log (both lists stay non-empty); truncated carries the kept/total counts and the number of shortened items, and is false when nothing was cut. Recent intents are capped at 400 characters.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "counts": {
+            "new_plans": 2
+          },
+          "plans": {
+            "new_plans": [
+              {
+                "file": "260923-0900_BIG_PLAN.md",
+                "truncated": {
+                  "decisions": {
+                    "kept": 40,
+                    "total": 45
+                  },
+                  "review_log": {
+                    "kept": 60,
+                    "total": 70
+                  },
+                  "items_shortened": 2
+                },
+                "decisions": [
+                  "$maxlen:400",
+                  "$contains:| D2 | Decision number 2. |",
+                  "$contains:| D3 | Decision number 3. |",
+                  "$contains:| D4 | Decision number 4. |",
+                  "$contains:| D5 | Decision number 5. |",
+                  "$contains:| D6 | Decision number 6. |",
+                  "$contains:| D7 | Decision number 7. |",
+                  "$contains:| D8 | Decision number 8. |",
+                  "$contains:| D9 | Decision number 9. |",
+                  "$contains:| D10 | Decision number 10. |",
+                  "$contains:| D11 | Decision number 11. |",
+                  "$contains:| D12 | Decision number 12. |",
+                  "$contains:| D13 | Decision number 13. |",
+                  "$contains:| D14 | Decision number 14. |",
+                  "$contains:| D15 | Decision number 15. |",
+                  "$contains:| D16 | Decision number 16. |",
+                  "$contains:| D17 | Decision number 17. |",
+                  "$contains:| D18 | Decision number 18. |",
+                  "$contains:| D19 | Decision number 19. |",
+                  "$contains:| D20 | Decision number 20. |",
+                  "$contains:| D21 | Decision number 21. |",
+                  "$contains:| D22 | Decision number 22. |",
+                  "$contains:| D23 | Decision number 23. |",
+                  "$contains:| D24 | Decision number 24. |",
+                  "$contains:| D25 | Decision number 25. |",
+                  "$contains:| D26 | Decision number 26. |",
+                  "$contains:| D27 | Decision number 27. |",
+                  "$contains:| D28 | Decision number 28. |",
+                  "$contains:| D29 | Decision number 29. |",
+                  "$contains:| D30 | Decision number 30. |",
+                  "$contains:| D31 | Decision number 31. |",
+                  "$contains:| D32 | Decision number 32. |",
+                  "$contains:| D33 | Decision number 33. |",
+                  "$contains:| D34 | Decision number 34. |",
+                  "$contains:| D35 | Decision number 35. |",
+                  "$contains:| D36 | Decision number 36. |",
+                  "$contains:| D37 | Decision number 37. |",
+                  "$contains:| D38 | Decision number 38. |",
+                  "$contains:| D39 | Decision number 39. |",
+                  "$contains:| D40 | Decision number 40. |"
+                ],
+                "review_log": [
+                  "$maxlen:400",
+                  "- 2026-09-23 -- review line #2.",
+                  "- 2026-09-23 -- review line #3.",
+                  "- 2026-09-23 -- review line #4.",
+                  "- 2026-09-23 -- review line #5.",
+                  "- 2026-09-23 -- review line #6.",
+                  "- 2026-09-23 -- review line #7.",
+                  "- 2026-09-23 -- review line #8.",
+                  "- 2026-09-23 -- review line #9.",
+                  "- 2026-09-23 -- review line #10.",
+                  "- 2026-09-23 -- review line #11.",
+                  "- 2026-09-23 -- review line #12.",
+                  "- 2026-09-23 -- review line #13.",
+                  "- 2026-09-23 -- review line #14.",
+                  "- 2026-09-23 -- review line #15.",
+                  "- 2026-09-23 -- review line #16.",
+                  "- 2026-09-23 -- review line #17.",
+                  "- 2026-09-23 -- review line #18.",
+                  "- 2026-09-23 -- review line #19.",
+                  "- 2026-09-23 -- review line #20.",
+                  "- 2026-09-23 -- review line #21.",
+                  "- 2026-09-23 -- review line #22.",
+                  "- 2026-09-23 -- review line #23.",
+                  "- 2026-09-23 -- review line #24.",
+                  "- 2026-09-23 -- review line #25.",
+                  "- 2026-09-23 -- review line #26.",
+                  "- 2026-09-23 -- review line #27.",
+                  "- 2026-09-23 -- review line #28.",
+                  "- 2026-09-23 -- review line #29.",
+                  "- 2026-09-23 -- review line #30.",
+                  "- 2026-09-23 -- review line #31.",
+                  "- 2026-09-23 -- review line #32.",
+                  "- 2026-09-23 -- review line #33.",
+                  "- 2026-09-23 -- review line #34.",
+                  "- 2026-09-23 -- review line #35.",
+                  "- 2026-09-23 -- review line #36.",
+                  "- 2026-09-23 -- review line #37.",
+                  "- 2026-09-23 -- review line #38.",
+                  "- 2026-09-23 -- review line #39.",
+                  "- 2026-09-23 -- review line #40.",
+                  "- 2026-09-23 -- review line #41.",
+                  "- 2026-09-23 -- review line #42.",
+                  "- 2026-09-23 -- review line #43.",
+                  "- 2026-09-23 -- review line #44.",
+                  "- 2026-09-23 -- review line #45.",
+                  "- 2026-09-23 -- review line #46.",
+                  "- 2026-09-23 -- review line #47.",
+                  "- 2026-09-23 -- review line #48.",
+                  "- 2026-09-23 -- review line #49.",
+                  "- 2026-09-23 -- review line #50.",
+                  "- 2026-09-23 -- review line #51.",
+                  "- 2026-09-23 -- review line #52.",
+                  "- 2026-09-23 -- review line #53.",
+                  "- 2026-09-23 -- review line #54.",
+                  "- 2026-09-23 -- review line #55.",
+                  "- 2026-09-23 -- review line #56.",
+                  "- 2026-09-23 -- review line #57.",
+                  "- 2026-09-23 -- review line #58.",
+                  "- 2026-09-23 -- review line #59.",
+                  "- 2026-09-23 -- review line #60."
+                ]
+              },
+              {
+                "file": "260923-1000_SMALL_PLAN.md",
+                "truncated": false,
+                "decisions": [
+                  "Keep it small."
+                ],
+                "review_log": [
+                  "- 2026-09-23 -- one review, no findings."
+                ]
+              }
+            ],
+            "recent": [
+              {
+                "file": "260923-1000_SMALL_PLAN.md",
+                "intent": "A short intent."
+              },
+              {
+                "file": "260923-0900_BIG_PLAN.md",
+                "intent": "$maxlen:400"
+              }
+            ]
+          }
+        }
+      }
+    },
+    "json_not_contains": [
+      "Decision number 41.",
+      "review line #61."
+    ],
+    "json_contains": [
+      "| D1 | Decision number 1. | choice",
+      "- 2026-09-23 -- review line #1. long"
+    ]
+  }
+}

@@ -1,0 +1,21 @@
+# Project Memory — fixture store
+
+## Feedback
+
+### Store entry one
+
+**Why**: the store reason.
+**How to apply**: the store action.
+**Source**: fixture-plan § Store | **Verified**: 2026-10-04
+
+## Decision
+
+### Store entry two
+
+**Why**: the second store reason.
+**How to apply**: the second store action.
+**Source**: fixture-plan § Store two | **Verified**: 2026-10-05
+
+## Pattern
+
+## Declined

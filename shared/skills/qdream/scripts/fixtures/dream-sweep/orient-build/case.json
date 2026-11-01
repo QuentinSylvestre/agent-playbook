@@ -1,0 +1,652 @@
+{
+  "description": "plan 261027 SC-5: `orient` builds handoff/orient.json from the manifest (snapshot_at, since), the user's choices (projects, provider and model per role, recover lines), the repos of dirty-at-orient.json bound to --snapshot-sha and the transcript of CLAUDE_CODE_SESSION_ID found under <home>/.claude/projects/*/<id>.jsonl (exactly one). Refused, nothing written: no --snapshot-sha, another sha, a value that is not a session id, an id with no transcript, an unlisted project, a missing required role. A re-run is unchanged; other content is refused. --append-session adds this session's transcript once (Resume) and nothing without the variable; kiro (variable unset) writes an empty list. Review R8 and R20 (plan 261027): --provider claude (or an append-session on a claude routing) without CLAUDE_CODE_SESSION_ID is refused, not written as an empty list; kiro takes the empty list; orient records the sha256 of orient.json in sweep/orient-sha.json and --append-session refuses a file that differs from it, or has no record.",
+  "now": "2026-10-12T12:00:00Z",
+  "git": [
+    "repo"
+  ],
+  "write": {
+    "repo/memory/.dream-state.json": "{}\n"
+  },
+  "steps": [
+    {
+      "write": {
+        "home/.claude/projects/-p-one/0a000000-0000-4000-8000-000000000001.jsonl": "{}\n",
+        "home/.claude/projects/-p-two/0a000000-0000-4000-8000-000000000002.jsonl": "{}\n"
+      }
+    },
+    {
+      "argv": [
+        "orient",
+        "--project",
+        "{ROOT}/proj/alpha",
+        "--provider",
+        "claude",
+        "--model",
+        "task4=opus",
+        "--model",
+        "verifier=opus",
+        "--model",
+        "drafter=sonnet",
+        "--recover-line",
+        "Recovery: one removal landed"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": "0a000000-0000-4000-8000-000000000001"
+      },
+      "exit": 3,
+      "stdout_contains": [
+        "--snapshot-sha is required"
+      ],
+      "absent": [
+        "handoff/orient.json"
+      ]
+    },
+    {
+      "argv": [
+        "orient",
+        "--project",
+        "{ROOT}/proj/alpha",
+        "--provider",
+        "claude",
+        "--model",
+        "task4=opus",
+        "--model",
+        "verifier=opus",
+        "--model",
+        "drafter=sonnet",
+        "--recover-line",
+        "Recovery: one removal landed",
+        "--snapshot-sha",
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": "0a000000-0000-4000-8000-000000000001"
+      },
+      "exit": 3,
+      "stdout_contains": [
+        "the snapshot changed after Orient"
+      ],
+      "absent": [
+        "handoff/orient.json"
+      ]
+    },
+    {
+      "argv": [
+        "orient",
+        "--project",
+        "{ROOT}/proj/alpha",
+        "--provider",
+        "claude",
+        "--model",
+        "task4=opus",
+        "--model",
+        "verifier=opus",
+        "--model",
+        "drafter=sonnet",
+        "--recover-line",
+        "Recovery: one removal landed",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": "/x/home/.claude/projects/-p-one/0a000000-0000-4000-8000-000000000001.jsonl"
+      },
+      "exit": 3,
+      "stdout_contains": [
+        "is not a session id"
+      ],
+      "absent": [
+        "handoff/orient.json"
+      ]
+    },
+    {
+      "argv": [
+        "orient",
+        "--project",
+        "{ROOT}/proj/alpha",
+        "--provider",
+        "claude",
+        "--model",
+        "task4=opus",
+        "--model",
+        "verifier=opus",
+        "--model",
+        "drafter=sonnet",
+        "--recover-line",
+        "Recovery: one removal landed",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": "0a000000-0000-4000-8000-000000000003"
+      },
+      "exit": 3,
+      "stdout_contains": [
+        "0 transcript(s)"
+      ],
+      "absent": [
+        "handoff/orient.json"
+      ]
+    },
+    {
+      "argv": [
+        "orient",
+        "--project",
+        "{ROOT}/proj/gamma",
+        "--provider",
+        "claude",
+        "--model",
+        "task4=opus",
+        "--model",
+        "verifier=opus",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": "0a000000-0000-4000-8000-000000000001"
+      },
+      "exit": 3,
+      "stdout_contains": [
+        "--project {ROOT}/proj/gamma is not a project manifest.json lists"
+      ],
+      "absent": [
+        "handoff/orient.json"
+      ]
+    },
+    {
+      "argv": [
+        "orient",
+        "--project",
+        "{ROOT}/proj/alpha",
+        "--provider",
+        "claude",
+        "--model",
+        "task4=opus",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": "0a000000-0000-4000-8000-000000000001"
+      },
+      "exit": 2,
+      "stderr_contains": [
+        "--model is required for verifier"
+      ],
+      "absent": [
+        "handoff/orient.json"
+      ]
+    },
+    {
+      "argv": [
+        "orient",
+        "--project",
+        "{ROOT}/proj/alpha",
+        "--provider",
+        "claude",
+        "--model",
+        "task4=opus",
+        "--model",
+        "verifier=opus",
+        "--model",
+        "drafter=sonnet",
+        "--recover-line",
+        "Recovery: one removal landed",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": "0a000000-0000-4000-8000-000000000001"
+      },
+      "exit": 0,
+      "stdout_contains": [
+        "orient: handoff/orient.json written; 1 confirmed project(s), 2 repo(s), 1 recover line(s), 1 orchestrator transcript(s)",
+        "orient.json sha256: {SHA256:handoff/orient.json}"
+      ],
+      "files": {
+        "handoff/orient.json": {
+          "snapshot_at": "2026-10-12T12:00:00Z",
+          "since": "2026-10-01T00:00:00Z",
+          "confirmed": [
+            "{ROOT}/proj/alpha"
+          ],
+          "model_routing": {
+            "claude": {
+              "task4": "opus",
+              "verifier": "opus",
+              "drafter": "sonnet"
+            }
+          },
+          "dirty_at_orient": true,
+          "repos": [
+            "{ROOT}/repo",
+            "{ROOT}/proj/alpha"
+          ],
+          "recover_lines": [
+            "Recovery: one removal landed"
+          ],
+          "orchestrator_sessions": [
+            "{ROOT}/home/.claude/projects/-p-one/0a000000-0000-4000-8000-000000000001.jsonl"
+          ]
+        }
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "orient.json"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "orient",
+        "--project",
+        "{ROOT}/proj/alpha",
+        "--provider",
+        "claude",
+        "--model",
+        "task4=opus",
+        "--model",
+        "verifier=opus",
+        "--model",
+        "drafter=sonnet",
+        "--recover-line",
+        "Recovery: one removal landed",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": "0a000000-0000-4000-8000-000000000001"
+      },
+      "exit": 0,
+      "stdout_contains": [
+        "handoff/orient.json unchanged"
+      ]
+    },
+    {
+      "argv": [
+        "orient",
+        "--project",
+        "{ROOT}/proj/alpha",
+        "--provider",
+        "claude",
+        "--model",
+        "task4=opus",
+        "--model",
+        "verifier=opus",
+        "--model",
+        "drafter=sonnet",
+        "--recover-line",
+        "another line",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": "0a000000-0000-4000-8000-000000000001"
+      },
+      "exit": 3,
+      "stdout_contains": [
+        "exists with other content"
+      ],
+      "files": {
+        "handoff/orient.json": {
+          "snapshot_at": "2026-10-12T12:00:00Z",
+          "since": "2026-10-01T00:00:00Z",
+          "confirmed": [
+            "{ROOT}/proj/alpha"
+          ],
+          "model_routing": {
+            "claude": {
+              "task4": "opus",
+              "verifier": "opus",
+              "drafter": "sonnet"
+            }
+          },
+          "dirty_at_orient": true,
+          "repos": [
+            "{ROOT}/repo",
+            "{ROOT}/proj/alpha"
+          ],
+          "recover_lines": [
+            "Recovery: one removal landed"
+          ],
+          "orchestrator_sessions": [
+            "{ROOT}/home/.claude/projects/-p-one/0a000000-0000-4000-8000-000000000001.jsonl"
+          ]
+        }
+      }
+    },
+    {
+      "argv": [
+        "orient",
+        "--append-session"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": "0a000000-0000-4000-8000-000000000001"
+      },
+      "exit": 0,
+      "stdout_contains": [
+        "unchanged; 1 orchestrator transcript(s)"
+      ],
+      "files": {
+        "handoff/orient.json": {
+          "snapshot_at": "2026-10-12T12:00:00Z",
+          "since": "2026-10-01T00:00:00Z",
+          "confirmed": [
+            "{ROOT}/proj/alpha"
+          ],
+          "model_routing": {
+            "claude": {
+              "task4": "opus",
+              "verifier": "opus",
+              "drafter": "sonnet"
+            }
+          },
+          "dirty_at_orient": true,
+          "repos": [
+            "{ROOT}/repo",
+            "{ROOT}/proj/alpha"
+          ],
+          "recover_lines": [
+            "Recovery: one removal landed"
+          ],
+          "orchestrator_sessions": [
+            "{ROOT}/home/.claude/projects/-p-one/0a000000-0000-4000-8000-000000000001.jsonl"
+          ]
+        }
+      }
+    },
+    {
+      "argv": [
+        "orient",
+        "--append-session"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": "0a000000-0000-4000-8000-000000000002"
+      },
+      "exit": 0,
+      "stdout_contains": [
+        "written; 2 orchestrator transcript(s)"
+      ],
+      "files": {
+        "handoff/orient.json": {
+          "snapshot_at": "2026-10-12T12:00:00Z",
+          "since": "2026-10-01T00:00:00Z",
+          "confirmed": [
+            "{ROOT}/proj/alpha"
+          ],
+          "model_routing": {
+            "claude": {
+              "task4": "opus",
+              "verifier": "opus",
+              "drafter": "sonnet"
+            }
+          },
+          "dirty_at_orient": true,
+          "repos": [
+            "{ROOT}/repo",
+            "{ROOT}/proj/alpha"
+          ],
+          "recover_lines": [
+            "Recovery: one removal landed"
+          ],
+          "orchestrator_sessions": [
+            "{ROOT}/home/.claude/projects/-p-one/0a000000-0000-4000-8000-000000000001.jsonl",
+            "{ROOT}/home/.claude/projects/-p-two/0a000000-0000-4000-8000-000000000002.jsonl"
+          ]
+        }
+      }
+    },
+    {
+      "argv": [
+        "orient",
+        "--append-session",
+        "--provider",
+        "claude"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": "0a000000-0000-4000-8000-000000000002"
+      },
+      "exit": 2,
+      "stderr_contains": [
+        "--append-session takes no other flag"
+      ]
+    },
+    {
+      "argv": [
+        "orient",
+        "--append-session"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": ""
+      },
+      "exit": 3,
+      "stdout_contains": [
+        "provider claude needs CLAUDE_CODE_SESSION_ID"
+      ]
+    },
+    {
+      "delete": [
+        "home/.agent-playbook/dream-work/handoff/orient.json"
+      ]
+    },
+    {
+      "argv": [
+        "orient",
+        "--project",
+        "{ROOT}/proj/alpha",
+        "--provider",
+        "claude",
+        "--model",
+        "task4=opus",
+        "--model",
+        "verifier=opus",
+        "--model",
+        "drafter=sonnet",
+        "--recover-line",
+        "Recovery: one removal landed",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": ""
+      },
+      "exit": 3,
+      "stdout_contains": [
+        "provider claude needs CLAUDE_CODE_SESSION_ID"
+      ],
+      "absent": [
+        "handoff/orient.json"
+      ]
+    },
+    {
+      "argv": [
+        "orient",
+        "--project",
+        "{ROOT}/proj/alpha",
+        "--provider",
+        "kiro",
+        "--model",
+        "task4=opus",
+        "--model",
+        "verifier=opus",
+        "--model",
+        "drafter=sonnet",
+        "--recover-line",
+        "Recovery: one removal landed",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": ""
+      },
+      "exit": 0,
+      "stdout_contains": [
+        "0 orchestrator transcript(s)",
+        "CLAUDE_CODE_SESSION_ID is unset"
+      ],
+      "files": {
+        "handoff/orient.json": {
+          "snapshot_at": "2026-10-12T12:00:00Z",
+          "since": "2026-10-01T00:00:00Z",
+          "confirmed": [
+            "{ROOT}/proj/alpha"
+          ],
+          "model_routing": {
+            "kiro": {
+              "task4": "opus",
+              "verifier": "opus",
+              "drafter": "sonnet"
+            }
+          },
+          "dirty_at_orient": true,
+          "repos": [
+            "{ROOT}/repo",
+            "{ROOT}/proj/alpha"
+          ],
+          "recover_lines": [
+            "Recovery: one removal landed"
+          ],
+          "orchestrator_sessions": []
+        }
+      }
+    },
+    {
+      "argv": [
+        "orient",
+        "--append-session"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": ""
+      },
+      "exit": 0,
+      "stdout_contains": [
+        "nothing appended: CLAUDE_CODE_SESSION_ID is unset"
+      ],
+      "files": {
+        "handoff/orient.json": {
+          "snapshot_at": "2026-10-12T12:00:00Z",
+          "since": "2026-10-01T00:00:00Z",
+          "confirmed": [
+            "{ROOT}/proj/alpha"
+          ],
+          "model_routing": {
+            "kiro": {
+              "task4": "opus",
+              "verifier": "opus",
+              "drafter": "sonnet"
+            }
+          },
+          "dirty_at_orient": true,
+          "repos": [
+            "{ROOT}/repo",
+            "{ROOT}/proj/alpha"
+          ],
+          "recover_lines": [
+            "Recovery: one removal landed"
+          ],
+          "orchestrator_sessions": []
+        }
+      }
+    },
+    {
+      "argv": [
+        "orient",
+        "--append-session"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": "0a000000-0000-4000-8000-000000000001"
+      },
+      "exit": 0,
+      "files": {
+        "handoff/orient.json": {
+          "snapshot_at": "2026-10-12T12:00:00Z",
+          "since": "2026-10-01T00:00:00Z",
+          "confirmed": [
+            "{ROOT}/proj/alpha"
+          ],
+          "model_routing": {
+            "kiro": {
+              "task4": "opus",
+              "verifier": "opus",
+              "drafter": "sonnet"
+            }
+          },
+          "dirty_at_orient": true,
+          "repos": [
+            "{ROOT}/repo",
+            "{ROOT}/proj/alpha"
+          ],
+          "recover_lines": [
+            "Recovery: one removal landed"
+          ],
+          "orchestrator_sessions": [
+            "{ROOT}/home/.claude/projects/-p-one/0a000000-0000-4000-8000-000000000001.jsonl"
+          ]
+        }
+      }
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/orient.json": "{\n  \"snapshot_at\": \"2026-10-11T12:00:00Z\",\n  \"since\": \"2026-10-01T00:00:00Z\",\n  \"confirmed\": [\n    \"{ROOT}/proj/alpha\"\n  ],\n  \"model_routing\": {\n    \"claude\": {\n      \"task4\": \"opus\",\n      \"verifier\": \"opus\",\n      \"drafter\": \"sonnet\"\n    }\n  },\n  \"dirty_at_orient\": true,\n  \"repos\": [\n    \"{ROOT}/repo\",\n    \"{ROOT}/proj/alpha\"\n  ],\n  \"recover_lines\": [\n    \"Recovery: one removal landed\"\n  ],\n  \"orchestrator_sessions\": [\n    \"{ROOT}/home/.claude/projects/-p-one/0a000000-0000-4000-8000-000000000001.jsonl\"\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "orient",
+        "--append-session"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": "0a000000-0000-4000-8000-000000000002"
+      },
+      "exit": 3,
+      "stdout_contains": [
+        "orient.json snapshot_at 2026-10-11T12:00:00Z differs"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/orient.json": "{\n  \"snapshot_at\": \"2026-10-12T12:00:00Z\",\n  \"since\": \"2026-10-01T00:00:00Z\",\n  \"confirmed\": [\n    \"{ROOT}/proj/alpha\"\n  ],\n  \"model_routing\": {\n    \"claude\": {\n      \"task4\": \"opus\",\n      \"verifier\": \"opus\",\n      \"drafter\": \"sonnet\"\n    }\n  },\n  \"dirty_at_orient\": true,\n  \"repos\": [\n    \"{ROOT}/repo\",\n    \"{ROOT}/proj/alpha\"\n  ],\n  \"recover_lines\": [\n    \"edited by hand\"\n  ],\n  \"orchestrator_sessions\": [\n    \"{ROOT}/home/.claude/projects/-p-one/0a000000-0000-4000-8000-000000000001.jsonl\"\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "orient",
+        "--append-session"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": "0a000000-0000-4000-8000-000000000002"
+      },
+      "exit": 3,
+      "stdout_contains": [
+        "is not the file `orient` last wrote",
+        "sweep/orient-sha.json"
+      ]
+    },
+    {
+      "delete": [
+        "home/.agent-playbook/dream-work/handoff/orient.json",
+        "home/.agent-playbook/dream-work/sweep/orient-sha.json"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/orient.json": "{\n  \"snapshot_at\": \"2026-10-12T12:00:00Z\",\n  \"since\": \"2026-10-01T00:00:00Z\",\n  \"confirmed\": [\n    \"{ROOT}/proj/alpha\"\n  ],\n  \"model_routing\": {\n    \"claude\": {\n      \"task4\": \"opus\",\n      \"verifier\": \"opus\",\n      \"drafter\": \"sonnet\"\n    }\n  },\n  \"dirty_at_orient\": true,\n  \"repos\": [\n    \"{ROOT}/repo\",\n    \"{ROOT}/proj/alpha\"\n  ],\n  \"recover_lines\": [\n    \"edited by hand\"\n  ],\n  \"orchestrator_sessions\": [\n    \"{ROOT}/home/.claude/projects/-p-one/0a000000-0000-4000-8000-000000000001.jsonl\"\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "orient",
+        "--append-session"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": "0a000000-0000-4000-8000-000000000002"
+      },
+      "exit": 3,
+      "stdout_contains": [
+        "is not the file `orient` last wrote"
+      ]
+    }
+  ]
+}

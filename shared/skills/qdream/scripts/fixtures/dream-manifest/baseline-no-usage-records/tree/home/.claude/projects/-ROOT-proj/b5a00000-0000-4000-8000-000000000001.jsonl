@@ -1,0 +1,2 @@
+{"type": "user", "message": {"role": "user", "content": "hello"}, "timestamp": "2026-09-24T09:59:00Z", "sessionId": "b5a00000-0000-4000-8000-000000000001", "cwd": "{ROOT}/proj"}
+{"type": "assistant", "message": {"id": "msg_X", "role": "assistant", "content": [{"type": "text", "text": "hi"}]}, "sessionId": "b5a00000-0000-4000-8000-000000000001"}

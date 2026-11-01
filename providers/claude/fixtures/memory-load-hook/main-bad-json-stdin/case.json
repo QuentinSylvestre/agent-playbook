@@ -1,0 +1,9 @@
+{
+  "description": "main() as a subprocess with unparseable stdin: exit 0 and the index for the process cwd (a copied hook resolves the fixture cfg/ as its config repo; no live memory is read).",
+  "stdin": "this is not json",
+  "contains": [
+    "Playbook memory index",
+    "Project memory: none found for {{ROOT}}"
+  ],
+  "config_repo": "{{ROOT}}/cfg"
+}

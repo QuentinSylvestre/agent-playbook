@@ -1,0 +1,23 @@
+{
+  "description": "With --until, a sub-agent file without records is an agent with 0 tokens, not an undated transcript (review finding 6).",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "baseline",
+    "--session",
+    "{ROOT}/home/.claude/projects/-ROOT-proj/b5a00000-0000-4000-8000-000000000003.jsonl",
+    "--until",
+    "44444444-0000-4000-8000-000000000002"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_contains": [
+      "files: 1 session + 2 sub-agent transcript(s)",
+      "0 started after the cutoff, 0 undated (of 2)",
+      "tokens: 222",
+      "agents: 2"
+    ],
+    "stdout_not_contains": [
+      "error:"
+    ]
+  }
+}

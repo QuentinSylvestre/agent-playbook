@@ -1,0 +1,27 @@
+{
+  "description": "G3, G10: each git read drift makes (governance diff, Orient blob listing, blob read, untracked status), made to fail on its own, is a check-failed entry naming it and never a silent pass or a finding read from nothing; orient_blob_sha is None when git cannot answer, `absent` only when the Orient tree has no blob there. Git older than 2.24 is refused before drift runs (compared numerically).",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/.gitignore": "memory/.dream-journal.jsonl\n",
+    "repo/memory/MEMORY.md": "# Memory\n",
+    "repo/memory/.dream-state.json": "{\"state\": \"orient\"}\n",
+    "repo/shared/skills/x/SKILL.md": "# x\n"
+  },
+  "git": [
+    "repo"
+  ],
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0
+    }
+  ],
+  "units": [
+    "drift-checks-each",
+    "git-version"
+  ]
+}

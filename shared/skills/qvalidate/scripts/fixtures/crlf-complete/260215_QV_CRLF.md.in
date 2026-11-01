@@ -1,0 +1,17 @@
+# QV fixture: a bare Complete status line, read with CRLF line endings
+
+The selftest rewrites this file with CRLF line endings at build time (the repo
+stores it with LF), so the bare status line below ends in a CR when read.
+
+> **Status**: Complete
+
+## Phases
+
+### Phase 1: Alpha
+
+- [x] first box
+- [ ] an unticked box the completeness check must find
+
+## Harness Improvement Opportunities
+
+- none observed — cost: none — suggested change: none

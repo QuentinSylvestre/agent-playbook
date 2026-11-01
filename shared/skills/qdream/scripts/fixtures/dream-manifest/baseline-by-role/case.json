@@ -1,0 +1,32 @@
+{
+  "description": "baseline --by-role (P-10): the session file is orchestrator; a sub-agent's role comes from its first user record only, first match wins (Dream Sub-agent Brief -> task4 even when it also names the verifier; Cross-validation or verifier -> verifier; case-sensitive, so a lowercase brief name is not task4); a later user record never reclassifies; message.id is deduplicated before the role split, so role totals add up to tokens: (a message.id seen in two files counts under the first file read, the session first); an empty file is other with 0 tokens.",
+  "now": "2026-10-06T12:00:00Z",
+  "argv": [
+    "baseline",
+    "--session",
+    "{ROOT}/home/.claude/projects/-ROOT-proj/b5a00000-0000-4000-8000-000000000006.jsonl",
+    "--by-role"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_contains": [
+      "files: 1 session + 5 sub-agent transcript(s)",
+      "usage records: 8, deduplicated by message.id to 6 message(s)",
+      "tokens: 7064\n",
+      "agents: 5\n",
+      "role orchestrator: files 1, tokens: 6124\n",
+      "role task4: files 1, tokens: 284\n",
+      "role verifier: files 2, tokens: 566\n",
+      "role other: files 2, tokens: 90\n",
+      "other: agent-a0000000000000004.jsonl: Summarize the open items in plans/ for the weekly report, then stop; do not edit\n",
+      "other: agent-a0000000000000005.jsonl: (no user record)\n"
+    ],
+    "stdout_not_contains": [
+      "error:",
+      "other: agent-a0000000000000001",
+      "other: agent-a0000000000000002",
+      "other: agent-a0000000000000003",
+      "do not edit files"
+    ]
+  }
+}

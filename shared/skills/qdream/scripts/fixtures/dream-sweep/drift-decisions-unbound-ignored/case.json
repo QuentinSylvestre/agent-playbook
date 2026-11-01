@@ -1,0 +1,86 @@
+{
+  "description": "F2: a new untracked governance file is listed although an unbound handoff/decisions.json names it (a phase agent can write handoff/); with --decisions-sha equal to the file's sha256 it is an Applied target and silent; with another sha drift is exit 3 and writes nothing.",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/.gitignore": "memory/.dream-journal.jsonl\n",
+    "repo/memory/MEMORY.md": "# Memory\n",
+    "repo/memory/.dream-state.json": "{\"state\": \"orient\"}\n",
+    "repo/shared/skills/x/SKILL.md": "# x\n"
+  },
+  "git": [
+    "repo"
+  ],
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0
+    },
+    {
+      "write": {
+        "repo/shared/planted.md": "planted\n",
+        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": [\n    {\n      \"target_file\": \"shared/planted.md\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "gather"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff/decisions.json not bound"
+      ],
+      "files": {
+        "sweep/drift-gather.json": {
+          "decisions_bound": false,
+          "entries": [
+            {
+              "kind": "governance-untracked-new",
+              "path": "{ROOT}/repo/shared/planted.md"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "synthesize",
+        "--decisions-sha",
+        "{SHA256:handoff/decisions.json}"
+      ],
+      "exit": 0,
+      "stdout_not_contains": [
+        "not bound (no --decisions-sha)"
+      ],
+      "files": {
+        "sweep/drift-synthesize.json": {
+          "decisions_bound": true,
+          "entries": []
+        }
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "apply",
+        "--decisions-sha",
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not the recorded one"
+      ],
+      "absent": [
+        "sweep/drift-apply.json"
+      ]
+    }
+  ]
+}

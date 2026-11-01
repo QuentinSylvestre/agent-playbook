@@ -1,0 +1,103 @@
+{
+  "description": "A project absent from the state file is read from the state's last_run, and every session it does not read is listed. gamma is named only by history.jsonl prompts that all predate last_run: it is still listed (discovered_by A), its session counted in older_sessions_not_read and listed by id and last activity in its side file, never dropped. beta (found by a Kiro session) has a history-only session before last_run: counted and listed. alpha, in the state, has a session before its last_analyzed: not counted (0) -- the count is for projects absent from the state only. delta, named only by history.jsonl and by --full, is read in full (history_only session, 0 older) and is not reported as an unknown --full path. A state key whose drive letter differs from the reported key is carried verbatim as state_key.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo",
+    "--full",
+    "{ROOT}/proj/delta"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "status": "known",
+          "baseline_rule": "state",
+          "older_sessions_not_read": 0,
+          "older_sessions": [],
+          "sessions": []
+        },
+        "{ROOT}/proj/beta": {
+          "status": "new",
+          "baseline_rule": "last_run",
+          "older_sessions_not_read": 1,
+          "older_sessions": [
+            {
+              "id": "e1a00000-0000-4000-8000-000000000001",
+              "provider": "claude",
+              "kind": "history_only",
+              "last_activity": "2026-09-11T09:00:00Z"
+            }
+          ],
+          "sessions": [
+            {
+              "id": "sess_ke000000-0000-4000-8000-000000000001",
+              "boundary": "L1"
+            }
+          ]
+        },
+        "{ROOT}/proj/gamma": {
+          "status": "new",
+          "discovered_by": [
+            "A"
+          ],
+          "baseline_rule": "last_run",
+          "older_sessions_not_read": 1,
+          "older_sessions": [
+            {
+              "id": "e1a00000-0000-4000-8000-000000000002",
+              "provider": "claude",
+              "kind": "history_only",
+              "last_activity": "2026-09-12T09:00:00Z"
+            }
+          ],
+          "sessions": []
+        },
+        "{ROOT}/proj/delta": {
+          "status": "new",
+          "baseline_rule": "full",
+          "older_sessions_not_read": 0,
+          "older_sessions": [],
+          "sessions": [
+            {
+              "id": "e1a00000-0000-4000-8000-000000000003",
+              "kind": "history_only",
+              "boundary": "L4"
+            }
+          ]
+        }
+      }
+    },
+    "index": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "$absent": [
+            "state_key",
+            "older_sessions"
+          ]
+        },
+        "{ROOT}/proj/gamma": {
+          "$absent": [
+            "older_sessions"
+          ],
+          "older_sessions_not_read": 1
+        },
+        "C:/dream-fixture-nonexistent/StateKey": {
+          "status": "removed",
+          "state_key": "c:/dream-fixture-nonexistent/StateKey"
+        }
+      }
+    },
+    "json_not_contains": [
+      "--full names no discovered project"
+    ],
+    "stdout_contains": [
+      "project {ROOT}/proj/gamma: status=new new=0",
+      "older_not_read=1"
+    ]
+  }
+}

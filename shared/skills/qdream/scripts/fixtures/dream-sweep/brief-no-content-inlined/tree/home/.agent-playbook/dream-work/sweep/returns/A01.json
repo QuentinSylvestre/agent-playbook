@@ -1,0 +1,40 @@
+{
+  "label": "A01",
+  "kind": "task4",
+  "via": "inbox",
+  "return": {
+    "memory_proposals": [
+      {
+        "type": "feedback",
+        "heading": "SENTINEL-PROPOSAL-4M",
+        "why": "w",
+        "how_to_apply": "h",
+        "source": "s",
+        "target": "project",
+        "sessions_observed_in": [],
+        "evidence_quote": "SENTINEL-QUOTE-9X"
+      }
+    ],
+    "unrelated": [
+      "SENTINEL-HEADING-7Q"
+    ],
+    "not_a_conflict": [],
+    "subsumed_entries": [],
+    "stale_entries": [],
+    "governance_conflicts": [],
+    "verified": [],
+    "task4_status": "checked",
+    "improvement_signals": [],
+    "user_skipped": [],
+    "saved_in_session": [],
+    "new_skill_candidates": [],
+    "insights_signals": [],
+    "sessions_read": [
+      "s-a1"
+    ],
+    "checkpoint_collapsed": 0,
+    "project_accessible": true,
+    "error": null,
+    "scope": "all tasks"
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "description": "Method B never walks a root that is the home directory, a filesystem root or an ancestor of home: the root is reported in errors[] and nothing below it is discovered structurally; the walk's directory count and time go to stderr.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "$absent": [
+          "{ROOT}/home/notes"
+        ]
+      }
+    },
+    "json_contains": [
+      "Method B: not walking {ROOT}/home: it is the home directory",
+      "Method B: not walking {ROOT}: it is an ancestor of the home directory"
+    ],
+    "stderr_contains": [
+      "method B: walked 0 directories under 0 root(s)"
+    ]
+  }
+}

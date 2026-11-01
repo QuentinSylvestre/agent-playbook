@@ -1,0 +1,17 @@
+Done.
+
+```json
+{
+  "current_text": null,
+  "after_heading": null,
+  "new_text": "# New\n\nA new rule.\n",
+  "behaviour": "Agents list unpushed commits before pushing.",
+  "existing_coverage": [],
+  "blast_count": 0,
+  "blast_edits": [],
+  "memory_ops": [],
+  "notes": null,
+  "handoff_prompt": null,
+  "create": true
+}
+```

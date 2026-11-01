@@ -1,0 +1,62 @@
+{
+  "description": "FIX-COUNTVERIFY-truncated: 11 headings, a union of 8 with checked self-reported -> skipped-context-budget with the three missing; an exact union -> checked; an extra heading -> skipped; a heading the file holds twice, returned once -> skipped.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "countverify"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "checked 1, skipped-context-budget 3"
+      ],
+      "files": {
+        "sweep/countverify.json": {
+          "files": [
+            {
+              "project": "{ROOT}/proj/alpha",
+              "self_reported": "checked",
+              "task4_status": "skipped-context-budget",
+              "missing": [
+                "H10",
+                "H11",
+                "H9"
+              ],
+              "extra": [],
+              "entries": 11
+            },
+            {
+              "project": "{ROOT}/proj/beta",
+              "task4_status": "checked",
+              "missing": [],
+              "extra": []
+            },
+            {
+              "project": "{ROOT}/proj/gamma",
+              "task4_status": "skipped-context-budget",
+              "missing": [],
+              "extra": [
+                "Ghost"
+              ]
+            },
+            {
+              "project": "{ROOT}/proj/delta",
+              "task4_status": "skipped-context-budget",
+              "missing": [
+                "Dup"
+              ],
+              "extra": []
+            }
+          ]
+        }
+      }
+    },
+    {
+      "argv": [
+        "countverify"
+      ],
+      "exit": 0,
+      "unchanged": true
+    }
+  ]
+}

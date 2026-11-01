@@ -1,0 +1,24 @@
+{
+  "description": "baseline --by-role per-agent cap boundary (plan 261012 Phase 3, D13; review fix): exactly eight drafter files print eight `peak context drafter <agent file name>: P` lines, the largest first, and no `(more)` line; the cap bites only at nine (baseline-peak-context-cap). Peaks 50, 80, 20, 70, 10, 60, 30, 40 for agents 1 to 8 are shuffled, so the order shows the sort.",
+  "now": "2026-10-14T12:00:00Z",
+  "argv": [
+    "baseline",
+    "--session",
+    "{ROOT}/home/.claude/projects/-ROOT-proj/b5a00000-0000-4000-8000-000000000017.jsonl",
+    "--by-role"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_contains": [
+      "role drafter: files 8, tokens: 360\n",
+      "peak context drafter: 80\n",
+      "peak context orchestrator (session): 7\n",
+      "peak context drafter agent-a0000000000000002: 80\npeak context drafter agent-a0000000000000004: 70\npeak context drafter agent-a0000000000000006: 60\npeak context drafter agent-a0000000000000001: 50\npeak context drafter agent-a0000000000000008: 40\npeak context drafter agent-a0000000000000007: 30\npeak context drafter agent-a0000000000000003: 20\npeak context drafter agent-a0000000000000005: 10\n"
+    ],
+    "stdout_not_contains": [
+      "error:",
+      "(more)",
+      "peak context orchestrator agent-"
+    ]
+  }
+}

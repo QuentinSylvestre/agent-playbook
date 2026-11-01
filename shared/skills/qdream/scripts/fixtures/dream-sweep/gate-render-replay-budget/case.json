@@ -1,0 +1,398 @@
+{
+  "description": "gate renders handoff/gate.md from gate-items.json and the extracted drafts (texts copied by the script, never by the phase agent), replaying every draft per target file in gate order against the Orient text: two drafts with the same current_text are a conflict group, an insert at the end of a file with no final newline is a glue problem, and an edit that pushes a verify-mass row over its pin gets a Budget line. extract normalizes an insert's new_text to end in a blank line. A drafts.json item missing from gate-items.json is refused. gate --decisions replays the Applied items in decisions.json order and exits 1 on a conflict or an over pin; an Applied target uncommitted at Orient is a problem line, and two identical inserts collide. handoff check refuses a gate.md edited after gate wrote it. A merge item comes after its sources and its drafter data carries their drafts; a merge that fell back leaves the merge item out and its sources listed. A gate with no drafted item needs no drafts.json.",
+  "now": "2026-10-23T12:00:00Z",
+  "write": {
+    "repo/shared/skills/demo/SKILL.md": "# Demo\n\n## Steps\n\nStep one.\nStep two.\n\n## Other\n\nKeep.\n\n## Last\n\nEnd.\n",
+    "repo/shared/skills/demo/TAIL.md": "# Tail\n\n## End\nlast line",
+    "repo/shared/AGENTS.md": "# Shared\n\nOne two three four five.\n",
+    "repo/AGENTS.md": "# Repo\n",
+    "repo/shared/skills/qconfig-sync/scripts/verify-mass.py": "#!/usr/bin/env python3\nBUDGETS = (\n    (\"shared/AGENTS.md\", 10),\n)\n",
+    "repo/.gitignore": "memory/.dream-journal.jsonl\n",
+    "repo/memory/MEMORY.md": "# Memory\n",
+    "repo/memory/.dream-state.json": "{\n  \"schema_version\": 3,\n  \"last_run\": \"2026-10-01T00:00:00Z\",\n  \"projects\": {},\n  \"rejected_lessons\": [],\n  \"outcome_tags\": [],\n  \"episodic_ledger\": [],\n  \"quiet_sweeps\": {},\n  \"cost_records\": [],\n  \"model_routing\": {},\n  \"deferred_sessions\": {}\n}\n"
+  },
+  "git": [
+    "repo"
+  ],
+  "setup": [
+    {
+      "write": {
+        "repo/shared/skills/demo/DIRTY.md": "x\n"
+      }
+    }
+  ],
+  "manifest": [],
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"## Steps\",\n      \"proposal\": \"proposal g1\",\n      \"blast\": null,\n      \"for_conflict\": null\n    },\n    {\n      \"id\": \"g2\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"## Steps\",\n      \"proposal\": \"proposal g2\",\n      \"blast\": null,\n      \"for_conflict\": null\n    },\n    {\n      \"id\": \"g3\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"## Other\",\n      \"proposal\": \"proposal g3\",\n      \"blast\": null,\n      \"for_conflict\": null\n    },\n    {\n      \"id\": \"g4\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/AGENTS.md\",\n      \"heading\": null,\n      \"proposal\": \"proposal g4\",\n      \"blast\": null,\n      \"for_conflict\": null\n    },\n    {\n      \"id\": \"g5\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/TAIL.md\",\n      \"heading\": \"## End\",\n      \"proposal\": \"proposal g5\",\n      \"blast\": null,\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "drafter",
+        "--items",
+        "drafts.json"
+      ],
+      "exit": 0
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/inbox/D01.txt": "```json\n{\n  \"current_text\": \"Step one.\",\n  \"after_heading\": null,\n  \"new_text\": \"Step one, first.\",\n  \"behaviour\": \"Agents do a thing.\",\n  \"existing_coverage\": [],\n  \"blast_count\": 0,\n  \"blast_edits\": [],\n  \"memory_ops\": [],\n  \"notes\": null,\n  \"handoff_prompt\": null,\n  \"create\": false\n}\n```\n",
+        "home/.agent-playbook/dream-work/handoff/inbox/D02.txt": "```json\n{\n  \"current_text\": \"Step one.\",\n  \"after_heading\": null,\n  \"new_text\": \"Step one, second.\",\n  \"behaviour\": \"Agents do a thing.\",\n  \"existing_coverage\": [],\n  \"blast_count\": 0,\n  \"blast_edits\": [],\n  \"memory_ops\": [],\n  \"notes\": null,\n  \"handoff_prompt\": null,\n  \"create\": false\n}\n```\n",
+        "home/.agent-playbook/dream-work/handoff/inbox/D03.txt": "```json\n{\n  \"current_text\": null,\n  \"after_heading\": \"## Other\",\n  \"new_text\": \"Added line\",\n  \"behaviour\": \"Agents do a thing.\",\n  \"existing_coverage\": [],\n  \"blast_count\": 0,\n  \"blast_edits\": [],\n  \"memory_ops\": [],\n  \"notes\": null,\n  \"handoff_prompt\": null,\n  \"create\": false\n}\n```\n",
+        "home/.agent-playbook/dream-work/handoff/inbox/D04.txt": "```json\n{\n  \"current_text\": \"One two three four five.\",\n  \"after_heading\": null,\n  \"new_text\": \"One two three four five six seven eight nine.\",\n  \"behaviour\": \"Agents do a thing.\",\n  \"existing_coverage\": [],\n  \"blast_count\": 0,\n  \"blast_edits\": [],\n  \"memory_ops\": [],\n  \"notes\": null,\n  \"handoff_prompt\": null,\n  \"create\": false\n}\n```\n",
+        "home/.agent-playbook/dream-work/handoff/inbox/D05.txt": "```json\n{\n  \"current_text\": null,\n  \"after_heading\": \"## End\",\n  \"new_text\": \"Tail line\",\n  \"behaviour\": \"Agents do a thing.\",\n  \"existing_coverage\": [],\n  \"blast_count\": 0,\n  \"blast_edits\": [],\n  \"memory_ops\": [],\n  \"notes\": null,\n  \"handoff_prompt\": null,\n  \"create\": false\n}\n```\n"
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D01",
+        "--from-file",
+        "inbox/D01.txt"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D02",
+        "--from-file",
+        "inbox/D02.txt"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D03",
+        "--from-file",
+        "inbox/D03.txt"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D04",
+        "--from-file",
+        "inbox/D04.txt"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "drafter",
+        "--label",
+        "D05",
+        "--from-file",
+        "inbox/D05.txt"
+      ],
+      "exit": 0
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"1 session in 1 project. Example: \\\"quote g1\\\"\",\n      \"options\": \"Apply (recommended: fixture) / Skip\"\n    },\n    {\n      \"id\": \"g2\",\n      \"why\": \"1 session in 1 project. Example: \\\"quote g2\\\"\",\n      \"options\": \"Apply (recommended: fixture) / Skip\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"1 session in 1 project. Example: \\\"quote g3\\\"\",\n      \"options\": \"Apply (recommended: fixture) / Skip\"\n    },\n    {\n      \"id\": \"g4\",\n      \"why\": \"1 session in 1 project. Example: \\\"quote g4\\\"\",\n      \"options\": \"Apply (recommended: fixture) / Skip\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "gate",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "drafts.json item g5 is not in gate-items.json"
+      ],
+      "absent": [
+        "handoff/gate.md"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate for the fixture sweep.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"1 session in 1 project. Example: \\\"quote g1\\\"\",\n      \"options\": \"Apply (recommended: fixture) / Skip\"\n    },\n    {\n      \"id\": \"g2\",\n      \"why\": \"1 session in 1 project. Example: \\\"quote g2\\\"\",\n      \"options\": \"Apply (recommended: fixture) / Skip\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"1 session in 1 project. Example: \\\"quote g3\\\"\",\n      \"options\": \"Apply (recommended: fixture) / Skip\"\n    },\n    {\n      \"id\": \"g4\",\n      \"why\": \"1 session in 1 project. Example: \\\"quote g4\\\"\",\n      \"options\": \"Apply (recommended: fixture) / Skip\"\n    },\n    {\n      \"id\": \"g5\",\n      \"why\": \"1 session in 1 project. Example: \\\"quote g5\\\"\",\n      \"options\": \"Apply (recommended: fixture) / Skip\"\n    },\n    {\n      \"id\": \"C1\",\n      \"kind\": \"conflict\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Old rule\",\n      \"text\": \"Gate item C1: a conflict written by the phase agent\\nOptions: Keep entry / Update governance\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "gate-items.json"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "gate",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "conflict group (merge drafter): g1, g2 in shared/skills/demo/SKILL.md",
+        "problem: glue g5: inserted at the end of a file with no final newline",
+        "OVER with every item Applied: verify-mass shared/AGENTS.md 11/10"
+      ],
+      "text_contains": {
+        "handoff/gate.md": [
+          "Gate for the fixture sweep.\n\nGate item g1: Agents do a thing.",
+          "Current text: \"Step one.\"\nNew text: \"Step one, second.\"",
+          "Conflicts with: g1 (places at Orient, not after g1",
+          "Conflicts with: g2 (g2 cannot be placed after this item)",
+          "Joins another line: g5 (inserted at the end of a file with no final newline",
+          "New text: \"Added line\n> \n> \"",
+          "Normalized by extract: new_text: an insert ends in one blank line before the next heading",
+          "Budget: verify-mass shared/AGENTS.md +4 -> 11/10 OVER",
+          "File: repo shared/AGENTS.md\n",
+          "> Gate item C1: a conflict written by the phase agent\n> Options: Keep entry / Update governance",
+          "\n\nEnd of gate: 6 items\n"
+        ]
+      },
+      "files": {
+        "sweep/gate-check.json": {
+          "over": [
+            {
+              "pin": "verify-mass shared/AGENTS.md",
+              "words": 11,
+              "pin_words": 10
+            }
+          ]
+        }
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "gate.md"
+      ],
+      "exit": 0
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/gate.md": "Gate item g1: edited by hand\n\nEnd of gate: 6 items\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "gate.md"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "gate.md changed since `dream-sweep.py gate` wrote it"
+      ]
+    },
+    {
+      "argv": [
+        "gate",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "gate.md"
+      ],
+      "exit": 0
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": [\n    {\n      \"id\": \"g7\",\n      \"kind\": \"governance\",\n      \"answer\": \"Apply\",\n      \"target_file\": \"shared/skills/demo/DIRTY.md\",\n      \"current_text\": \"x\",\n      \"new_text\": \"y\"\n    },\n    {\n      \"id\": \"g8\",\n      \"kind\": \"governance\",\n      \"answer\": \"Apply\",\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"current_text\": null,\n      \"after_heading\": \"## Last\",\n      \"new_text\": \"Same\\n\\n\"\n    },\n    {\n      \"id\": \"g9\",\n      \"kind\": \"governance\",\n      \"answer\": \"Apply\",\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"current_text\": null,\n      \"after_heading\": \"## Last\",\n      \"new_text\": \"Same\\n\\n\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "gate",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}",
+        "--decisions-sha",
+        "{SHA256:handoff/decisions.json}"
+      ],
+      "exit": 1,
+      "stdout_contains": [
+        "problem: unplaceable g7 (shared/skills/demo/DIRTY.md",
+        "was uncommitted at Orient",
+        "problem: conflict g9",
+        "inserts the same text under the same heading as g8"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"kind\": \"governance\",\n      \"answer\": \"Apply\",\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"## Steps\",\n      \"current_text\": \"Step one.\",\n      \"new_text\": \"Step one, first.\"\n    },\n    {\n      \"id\": \"g2\",\n      \"kind\": \"governance\",\n      \"answer\": \"Apply\",\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"## Steps\",\n      \"current_text\": \"Step one.\",\n      \"new_text\": \"Step one, second.\"\n    },\n    {\n      \"id\": \"g3\",\n      \"kind\": \"governance\",\n      \"answer\": \"Apply\",\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"## Other\",\n      \"current_text\": null,\n      \"after_heading\": \"## Other\",\n      \"new_text\": \"Added line\\n\\n\"\n    },\n    {\n      \"id\": \"g4\",\n      \"kind\": \"governance\",\n      \"answer\": \"Skip\",\n      \"target_file\": \"shared/AGENTS.md\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "gate",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}",
+        "--decisions-sha",
+        "{SHA256:handoff/decisions.json}"
+      ],
+      "exit": 1,
+      "stdout_contains": [
+        "3 Applied item(s) replayed",
+        "problem: conflict g2"
+      ],
+      "stdout_not_contains": [
+        "OVER:"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"kind\": \"governance\",\n      \"answer\": \"Skip\",\n      \"target_file\": \"shared/skills/demo/SKILL.md\"\n    },\n    {\n      \"id\": \"g4\",\n      \"kind\": \"governance\",\n      \"answer\": \"Apply\",\n      \"target_file\": \"shared/AGENTS.md\",\n      \"current_text\": \"One two three four five.\",\n      \"new_text\": \"One two three four five six seven eight nine.\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "gate",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}",
+        "--decisions-sha",
+        "{SHA256:handoff/decisions.json}"
+      ],
+      "exit": 1,
+      "stdout_contains": [
+        "OVER: verify-mass shared/AGENTS.md 11/10"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"## Steps\",\n      \"proposal\": \"proposal g1\",\n      \"blast\": null,\n      \"for_conflict\": null\n    },\n    {\n      \"id\": \"g2\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"## Steps\",\n      \"proposal\": \"proposal g2\",\n      \"blast\": null,\n      \"for_conflict\": null\n    },\n    {\n      \"id\": \"g3\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"## Other\",\n      \"proposal\": \"proposal g3\",\n      \"blast\": null,\n      \"for_conflict\": null\n    },\n    {\n      \"id\": \"g4\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/AGENTS.md\",\n      \"heading\": null,\n      \"proposal\": \"proposal g4\",\n      \"blast\": null,\n      \"for_conflict\": null\n    },\n    {\n      \"id\": \"g5\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/TAIL.md\",\n      \"heading\": \"## End\",\n      \"proposal\": \"proposal g5\",\n      \"blast\": null,\n      \"for_conflict\": null\n    },\n    {\n      \"id\": \"g6\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"## Steps\",\n      \"proposal\": \"proposal g6\",\n      \"blast\": null,\n      \"for_conflict\": null,\n      \"merges\": [\n        \"g1\",\n        \"g2\"\n      ]\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "drafter",
+        "--items",
+        "drafts.json"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/briefs/D06.data.json": {
+          "id": "g6",
+          "merges": [
+            "g1",
+            "g2"
+          ]
+        }
+      },
+      "text_contains": {
+        "sweep/briefs/D06.data.json": [
+          "\"merge_drafts\"",
+          "Step one, second."
+        ]
+      }
+    },
+    {
+      "argv": [
+        "gate",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "exit": 0,
+      "text_contains": {
+        "handoff/gate.md": [
+          "Conflicts with: g1 (places at Orient"
+        ]
+      }
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w\",\n      \"options\": \"Apply / Skip\"\n    },\n    {\n      \"id\": \"g6\",\n      \"why\": \"w\",\n      \"options\": \"Apply / Skip\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "gate",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "g1 is merged into g6: list g6 only"
+      ]
+    },
+    {
+      "delete": [
+        "home/.agent-playbook/dream-work/handoff/drafts.json"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"items\": [\n    {\n      \"id\": \"C1\",\n      \"kind\": \"conflict\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Old rule\",\n      \"text\": \"Gate item C1: a conflict written by the phase agent\\nOptions: Keep entry / Update governance\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "gate",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "exit": 0,
+      "text_contains": {
+        "handoff/gate.md": [
+          "Gate item C1",
+          "\n\nEnd of gate: 1 item\n"
+        ]
+      }
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"## Steps\",\n      \"proposal\": \"proposal g1\",\n      \"blast\": null,\n      \"for_conflict\": null\n    },\n    {\n      \"id\": \"g2\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"## Steps\",\n      \"proposal\": \"proposal g2\",\n      \"blast\": null,\n      \"for_conflict\": null\n    },\n    {\n      \"id\": \"g3\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"## Other\",\n      \"proposal\": \"proposal g3\",\n      \"blast\": null,\n      \"for_conflict\": null\n    },\n    {\n      \"id\": \"g4\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/AGENTS.md\",\n      \"heading\": null,\n      \"proposal\": \"proposal g4\",\n      \"blast\": null,\n      \"for_conflict\": null\n    },\n    {\n      \"id\": \"g5\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/TAIL.md\",\n      \"heading\": \"## End\",\n      \"proposal\": \"proposal g5\",\n      \"blast\": null,\n      \"for_conflict\": null\n    },\n    {\n      \"id\": \"g6\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"## Steps\",\n      \"proposal\": \"proposal g6\",\n      \"blast\": null,\n      \"for_conflict\": null,\n      \"merges\": [\n        \"g1\",\n        \"g9\"\n      ]\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "merges names g9, which is no earlier item"
+      ]
+    }
+  ]
+}

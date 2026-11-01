@@ -1,0 +1,9 @@
+MISSING	memory/topics/git.md	shared/skills/qtest/SKILL.md:not-found
+MISSING	memory/topics/powershell.md	providers/kiro/steering/powershell-syntax.md:no-reference
+MISSING	memory/topics/http-testing.md	none-cited
+MISSING	memory/topics/kiro-cli.md	none-cited
+MISSING	memory/topics/claude-code.md	none-cited
+OK	memory/topics/electron-vite.md	shared/skills/qbrowser-test/SKILL.md
+MISSING	memory/topics/house-style-docs.md	shared/skills/qtest/SKILL.md:not-found;shared/AGENTS.md:no-reference
+MISSING	memory/topics/claude-code.md	none-cited
+SUMMARY	ok=1	waived=0	missing=7

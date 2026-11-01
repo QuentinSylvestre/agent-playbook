@@ -1,0 +1,8 @@
+{
+  "description": "The config repo has no memory/ (setup has not linked user memory yet): the hook still emits its index and says loudly where user memory should be and how to get it.",
+  "cwd": "{{ROOT}}/empty",
+  "contains": [
+    "Note: no user memory at {{ROOT}}/cfg/memory: run the playbook setup to link it"
+  ],
+  "config_repo": "{{ROOT}}/cfg"
+}

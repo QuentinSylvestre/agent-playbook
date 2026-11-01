@@ -1,0 +1,15 @@
+{
+  "description": "No store serves the git project, a no-create folder under the system temp directory (the no-store read rule): the in-workspace memory/MEMORY.md at its toplevel is read from a folder two levels below it. It is shown as a labelled heading index, never in full (plan 261016 Step 9).",
+  "git": [
+    "proj"
+  ],
+  "cwd": "{{ROOT}}/proj/src/deep",
+  "contains": [
+    "- Workspace entry beta",
+    "In-workspace memory ({{ROOT}}/proj/memory/MEMORY.md) — no store serves this folder"
+  ],
+  "config_repo": "{{ROOT}}/cfg",
+  "absent": [
+    "delivered in full"
+  ]
+}

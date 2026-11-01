@@ -1,0 +1,5 @@
+ok: line 1: valid rename record
+FAIL: line 2: JSON parse error on interior line
+ok: line 3: valid remove record
+WARN: line 4: parse error on last non-empty line (torn suffix)
+verify-dream-journal: ok=2 fail=1 warn=1

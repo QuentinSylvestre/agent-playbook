@@ -1,0 +1,18 @@
+{
+  "description": "A project whose memory lives only in its store-repo store, found by STORE identity.",
+  "cwd": "{{ROOT}}/proj",
+  "contains": [
+    "Store entry alpha",
+    "/fixture root/stores/proj-aaaaaa/memory/MEMORY.md) — delivered in full",
+    "- User entry one",
+    "- Higher-order entry one",
+    "- memory/topics/git.md — a non-trivial git operation"
+  ],
+  "absent": [
+    "Declined entry heading",
+    "Project memory: none found"
+  ],
+  "whole_lines": true,
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores"
+}

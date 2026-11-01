@@ -1,0 +1,36 @@
+{
+  "description": "First run (no state file): a project is read from the config repo's last commit time, as before; its older sessions are counted in older_sessions_not_read.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "git": [
+    "repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "new_project_baseline": {
+        "rule": "first_run_commit",
+        "since": "2026-09-01T00:00:00Z"
+      },
+      "projects": {
+        "{ROOT}/proj/gamma": {
+          "status": "new",
+          "baseline_rule": "first_run_commit",
+          "older_sessions_not_read": 1,
+          "sessions": [
+            {
+              "id": "d3a00000-0000-4000-8000-000000000002",
+              "boundary": "L1"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

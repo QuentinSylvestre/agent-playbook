@@ -1,0 +1,21 @@
+Done. Summary line.
+
+```json
+{
+  "current_text": null,
+  "new_text": "New rule text.",
+  "behaviour": "Agents do X.",
+  "existing_coverage": [],
+  "blast_count": 1,
+  "blast_sites_to_edit": 1,
+  "blast_edits": [
+    {
+      "path": "shared/AGENTS.md",
+      "heading": "H",
+      "current_text": "old",
+      "new_text": "new"
+    }
+  ],
+  "notes": "target not located"
+}
+```

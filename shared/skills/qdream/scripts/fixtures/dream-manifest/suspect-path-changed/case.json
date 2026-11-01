@@ -1,0 +1,117 @@
+{
+  "description": "cited_path_changed: a cited file whose last commit is dated strictly after the entry's Verified date (inline or on its own line) is listed; an older last change, a change on the Verified day itself (day granularity), an entry without a Verified date, an untracked file are not. Only paths on the entry's Source line (its anchor) are checked: a changed path named only in Why sets no flag, and the same path on the Source line does. A date-shaped but invalid Verified value (2026-02-30, 2026-13-45) is treated as missing and named in errors[], never a crash. The repository is read with one batched git log from the oldest Verified date in the file (2026-07-01 here, so docs/b.md's 2026-08-01 commit is in that log); a tracked file named like a date (2026-12-31, committed with docs/b.md) is never read as a commit date. The flag is an input, not a trigger: memory_pass stays null; the entry is a suspect, counted per file in the index.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "git_steps": [
+    {
+      "dir": "repo",
+      "date": "2026-08-01T10:00:00Z",
+      "paths": [
+        "2026-12-31",
+        "README.md",
+        "docs/b.md"
+      ]
+    },
+    {
+      "dir": "repo",
+      "date": "2026-09-15T10:00:00Z",
+      "paths": [
+        "docs/a.md",
+        "docs/c.md"
+      ]
+    }
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_contains": [
+      "user memory {ROOT}/repo/memory/MEMORY.md: suspects=2"
+    ],
+    "json_contains": [
+      "invalid Verified date in {ROOT}/repo/memory/MEMORY.md \u00a7 Invalid Verified day",
+      "invalid Verified date in {ROOT}/repo/memory/MEMORY.md \u00a7 Invalid Verified month"
+    ],
+    "index": {
+      "user_memory": {
+        "memory_flags": [
+          "cited_path_changed"
+        ],
+        "memory_pass": null,
+        "file_flags": {
+          "{ROOT}/repo/memory/MEMORY.md": [
+            "cited_path_changed"
+          ]
+        },
+        "file_suspects": {
+          "{ROOT}/repo/memory/MEMORY.md": 2
+        },
+        "counts": {
+          "suspects": 2
+        }
+      }
+    },
+    "manifest": {
+      "user_memory": {
+        "entries": [
+          {
+            "heading": "Changed after Verified",
+            "cited_path_changed": [
+              "docs/a.md"
+            ],
+            "cited_paths_missing": [],
+            "suspect": true
+          },
+          {
+            "heading": "Unchanged since Verified",
+            "cited_path_changed": [],
+            "suspect": false
+          },
+          {
+            "heading": "Same-day change is not seen",
+            "cited_path_changed": [],
+            "suspect": false
+          },
+          {
+            "heading": "No Verified date",
+            "cited_path_changed": [],
+            "suspect": false
+          },
+          {
+            "heading": "Untracked file is not seen",
+            "cited_path_changed": [],
+            "suspect": false
+          },
+          {
+            "heading": "Invalid Verified day",
+            "cited_path_changed": [],
+            "suspect": false
+          },
+          {
+            "heading": "Invalid Verified month",
+            "cited_path_changed": [],
+            "suspect": false
+          },
+          {
+            "heading": "Path only in Why",
+            "cited_path_changed": [],
+            "cited_paths_missing": [],
+            "suspect": false
+          },
+          {
+            "heading": "Path in Source and in Why",
+            "cited_path_changed": [
+              "docs/a.md"
+            ],
+            "cited_paths_missing": [],
+            "suspect": true
+          }
+        ]
+      }
+    }
+  }
+}

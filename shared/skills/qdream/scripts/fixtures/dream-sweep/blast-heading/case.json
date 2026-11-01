@@ -1,0 +1,87 @@
+{
+  "description": "blast counts every site citing a heading or file: section citations under shared/, providers/ and memory/, backticked path citations, kiro overlays (one `overlay` hit per line), and citation-checks.tsv rows; comment rows, files outside the roots and untracked files do not count.",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/shared/skills/demo/SKILL.md": "# Demo\n\n## Target Section\n\nSee `shared/skills/demo/SKILL.md § Target Section` for the rule.\n",
+    "repo/shared/AGENTS.md": "# Shared\n\nCite § Target Section here.\nNothing on this line.\n",
+    "repo/providers/kiro/skills/demo/OVERLAY.md": "# Overlay\n\nPer `shared/skills/demo/SKILL.md § Target Section`.\n",
+    "repo/shared/skills/qconfig-sync/scripts/citation-checks.tsv": "# a comment naming shared/skills/demo/SKILL.md\nTarget Section\tTarget Section\tshared/skills/demo/SKILL.md\tshared/AGENTS.md\nOther\tOther\tshared/x.md\n",
+    "repo/memory/MEMORY.md": "# Memory\n\nmentions § Target Section\n",
+    "repo/notes/outside.md": "§ Target Section outside the scanned roots\n"
+  },
+  "git": [
+    "repo"
+  ],
+  "setup": [
+    {
+      "write": {
+        "repo/shared/untracked.md": "§ Target Section, untracked\n"
+      }
+    }
+  ],
+  "steps": [
+    {
+      "argv": [
+        "blast",
+        "--file",
+        "shared/skills/demo/SKILL.md",
+        "--heading",
+        "## Target Section"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "blast: 6 hit(s)"
+      ],
+      "files": {
+        "sweep/blast/shared-skills-demo-SKILL-md-Target-Section-ff779e3f.json": {
+          "count": 6,
+          "file": "shared/skills/demo/SKILL.md",
+          "heading": "Target Section",
+          "hits": [
+            {
+              "path": "memory/MEMORY.md",
+              "line": 3,
+              "kind": "section-citation"
+            },
+            {
+              "path": "providers/kiro/skills/demo/OVERLAY.md",
+              "line": 3,
+              "kind": "overlay"
+            },
+            {
+              "path": "shared/AGENTS.md",
+              "line": 3,
+              "kind": "section-citation"
+            },
+            {
+              "path": "shared/skills/demo/SKILL.md",
+              "line": 5,
+              "kind": "section-citation"
+            },
+            {
+              "path": "shared/skills/demo/SKILL.md",
+              "line": 5,
+              "kind": "path-citation"
+            },
+            {
+              "path": "shared/skills/qconfig-sync/scripts/citation-checks.tsv",
+              "line": 2,
+              "kind": "tsv-row"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "argv": [
+        "blast",
+        "--file",
+        "shared/skills/demo/SKILL.md",
+        "--heading",
+        "## Target Section"
+      ],
+      "exit": 0,
+      "unchanged": true
+    }
+  ]
+}

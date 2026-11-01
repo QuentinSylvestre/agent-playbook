@@ -1,0 +1,15 @@
+{
+  "description": "Inside the config repo the project tier is its store directory, never the user-tier memory/MEMORY.md.",
+  "cwd": "{{ROOT}}/cfg/shared/skills",
+  "contains": [
+    "Config repo project entry",
+    "/fixture root/stores/cfg-bbbbbb/memory/MEMORY.md) — delivered in full",
+    "- User entry one"
+  ],
+  "absent": [
+    "Project memory ({{ROOT}}/cfg/memory/MEMORY.md)",
+    "two project memory files exist"
+  ],
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores"
+}

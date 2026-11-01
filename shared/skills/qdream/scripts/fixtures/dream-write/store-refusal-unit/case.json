@@ -1,0 +1,15 @@
+{
+  "description": "plan 261016 Phase 5: a closing-commit refusal in the store repo names the store repo and /qconfig-sync and lists the waiting stores.",
+  "now": "2026-10-12T12:00:00Z",
+  "setup": [
+    {
+      "write": {
+        "repo/.gitkeep": ""
+      }
+    }
+  ],
+  "steps": [],
+  "units": [
+    "store-refusal"
+  ]
+}

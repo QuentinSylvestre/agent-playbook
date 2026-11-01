@@ -1,0 +1,23 @@
+{
+  "description": "A ### or ## line, or a Topics row, inside a ``` or ~~~ fence (the other marker nested in it) is body text, never an index line; the entries around the fences are still indexed. A Topics row of two or four cells is not a row.",
+  "git": [
+    "cfg"
+  ],
+  "cwd": "{{ROOT}}/cfg",
+  "contains": [
+    "- User entry one",
+    "- User entry two",
+    "- memory/topics/git.md — a non-trivial git operation"
+  ],
+  "absent": [
+    "Fenced backtick heading",
+    "Fenced nested heading",
+    "Fenced tilde heading",
+    "Fenced section",
+    "fenced-row",
+    "powershell.md",
+    "kiro-cli.md"
+  ],
+  "whole_lines": true,
+  "config_repo": "{{ROOT}}/cfg"
+}

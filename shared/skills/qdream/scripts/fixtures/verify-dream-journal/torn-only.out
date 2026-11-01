@@ -1,0 +1,2 @@
+WARN: line 1: parse error on last non-empty line (torn suffix)
+verify-dream-journal: ok=0 fail=0 warn=1

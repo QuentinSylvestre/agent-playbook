@@ -1,0 +1,33 @@
+{
+  "description": "plan 261016 Phase 10 review: in a no-create folder (the fixture tree sits in the system temp directory) with a readable store repo and no store for the project, the resolver's folder_fallback gives its in-workspace memory/ and plans/, which are read. The ordinary-folder case: memory-leftover-not-read.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "memory_file": "{ROOT}/proj/alpha/memory/MEMORY.md",
+          "entries": [
+            {
+              "heading": "Keep answers short"
+            }
+          ],
+          "plans": {
+            "archive": "{ROOT}/proj/alpha/plans/done",
+            "archive_source": "default"
+          }
+        }
+      }
+    }
+  },
+  "git": [
+    "repo"
+  ]
+}

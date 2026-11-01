@@ -1,0 +1,1 @@
+No topic pointer here.

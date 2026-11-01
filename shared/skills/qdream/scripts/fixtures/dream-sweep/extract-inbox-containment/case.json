@@ -1,0 +1,59 @@
+{
+  "description": "X7b: --from-file must lie inside handoff/inbox/. handoff/A01.txt (the right file name for A01, one level above the inbox) and handoff/inboxes/A02.txt (a sibling whose name merely starts with `inbox`) are refused with the containment message; the file name check alone would accept both. The real inbox files are read.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--from-file",
+        "handoff/A01.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "--from-file must be inside handoff/inbox/"
+      ],
+      "absent": [
+        "sweep/returns/A01.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A02",
+        "--from-file",
+        "handoff/inboxes/A02.txt"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "--from-file must be inside handoff/inbox/"
+      ],
+      "absent": [
+        "sweep/returns/A02.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--from-file",
+        "handoff/inbox/A01.txt"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/returns/A01.json": {
+          "via": "inbox"
+        }
+      }
+    }
+  ]
+}

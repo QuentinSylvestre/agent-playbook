@@ -1,0 +1,130 @@
+{
+  "description": "G1: verifier labels and item ids are positional, so attempt 2's V01 can hold other items than attempt 1's (here beta's signal, not alpha's lessons). aggregate reads the highest index's own data files and uses a verdict only when its record is bound to that data file's sha256: attempt 1's V01 verdict (no binding) leaves V01-001 missing with a summary line; a verdict extracted at attempt 2 counts; after the data file changes the verdict no longer binds. An index entry naming another label's data file, or another attempt's, is exit 3. `brief --kind verifier --labels` is a usage error: a render covers every positional label.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "aggregate"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "1 item(s): missing 1",
+        "V01: verdict attempt(s) 1 not bound to sweep/briefs/V01.a2.data.json"
+      ],
+      "files": {
+        "sweep/synth.json": {
+          "index": "sweep/briefs/verifier-index.a2.json",
+          "unbound": [
+            {
+              "label": "V01",
+              "verdict_attempts": [
+                1
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/inbox/V01.a2.txt": "```json\n{\n  \"verifier\": \"V01\",\n  \"verdicts\": [\n    {\n      \"item_id\": \"V01-001\",\n      \"verdict\": \"confirmed\",\n      \"spot_checked\": true,\n      \"citation\": \"span\"\n    }\n  ],\n  \"unverified_item_ids\": [],\n  \"notes\": null\n}\n```\n"
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "verifier",
+        "--label",
+        "V01",
+        "--attempt",
+        "2",
+        "--from-file",
+        "inbox/V01.a2.txt"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/verdicts/V01.a2.json": {
+          "attempt": 2,
+          "data": "sweep/briefs/V01.a2.data.json",
+          "data_sha256": "{SHA256:sweep/briefs/V01.a2.data.json}"
+        }
+      }
+    },
+    {
+      "argv": [
+        "aggregate"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "1 item(s): confirmed 1"
+      ],
+      "stdout_not_contains": [
+        "not bound"
+      ],
+      "text_contains": {
+        "sweep/synth.txt": [
+          "V01-001\timprovement_signals\tconfirmed\tBeta friction\n"
+        ]
+      }
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/sweep/briefs/V01.a2.data.json": "{\n  \"label\": \"V01\",\n  \"project\": \"{ROOT}/proj/beta\",\n  \"items\": [\n    {\n      \"item_id\": \"V01-001\",\n      \"class\": \"improvement_signals\",\n      \"observation\": \"Another friction\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "aggregate"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "1 item(s): missing 1",
+        "V01: verdict attempt(s) 1,2 not bound to sweep/briefs/V01.a2.data.json"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/sweep/briefs/verifier-index.a2.json": "{\"verifiers\": [{\"label\": \"V01\", \"data\": \"sweep/briefs/V02.data.json\"}]}\n"
+      }
+    },
+    {
+      "argv": [
+        "aggregate"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "names 'sweep/briefs/V02.data.json' as V01's data file"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/sweep/briefs/verifier-index.a2.json": "{\"verifiers\": [{\"label\": \"V01\", \"data\": \"sweep/briefs/V01.data.json\"}]}\n"
+      }
+    },
+    {
+      "argv": [
+        "aggregate"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "attempt 2's is sweep/briefs/V01.a2.data.json"
+      ]
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "verifier",
+        "--labels",
+        "V01",
+        "--attempt",
+        "3"
+      ],
+      "exit": 2,
+      "absent": [
+        "sweep/briefs/verifier-index.a3.json"
+      ]
+    }
+  ]
+}

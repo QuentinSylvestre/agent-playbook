@@ -1,0 +1,61 @@
+{
+  "description": "One session id with two transcript files in one project (review 2026-09-28, finding 1): a transcript is never a fork of itself. X: two identical files, one listed. Y: the second file adds a turn; that file is listed and the turn survives. Z: each file has a turn of its own; both are listed, the smaller from its first own turn, each with its own stripped file. errors[] names each case; nothing goes to fork_collapsed.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "sessions": [
+            {
+              "id": "f0000000-0000-4000-8000-000000000201",
+              "boundary": "L1"
+            },
+            {
+              "id": "f0000000-0000-4000-8000-000000000202",
+              "boundary": "L1",
+              "source": "$contains:-ROOT-proj-alpha-other/"
+            },
+            {
+              "id": "f0000000-0000-4000-8000-000000000203",
+              "boundary": "L3",
+              "source": "$contains:-ROOT-proj-alpha/",
+              "stripped": "$contains:f0000000-0000-4000-8000-000000000203-"
+            },
+            {
+              "id": "f0000000-0000-4000-8000-000000000203",
+              "boundary": "L1",
+              "source": "$contains:-ROOT-proj-alpha-other/",
+              "stripped": "$contains:-2.txt"
+            }
+          ],
+          "fork_collapsed": [],
+          "errors": [
+            "$contains:Claude session f0000000-0000-4000-8000-000000000201 has a second transcript file",
+            "$contains:Claude session f0000000-0000-4000-8000-000000000202 has a second transcript file",
+            "$contains:Claude session f0000000-0000-4000-8000-000000000203 has more than one transcript file with turns of its own"
+          ]
+        }
+      }
+    },
+    "stripped": {
+      "f0000000-0000-4000-8000-000000000202": {
+        "contains": [
+          "y turn only in the second copy"
+        ]
+      },
+      "f0000000-0000-4000-8000-000000000203": {
+        "contains": [
+          "z own turn in the larger copy"
+        ]
+      }
+    }
+  }
+}

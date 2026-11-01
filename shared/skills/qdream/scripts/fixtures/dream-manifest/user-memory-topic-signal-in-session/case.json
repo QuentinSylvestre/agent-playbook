@@ -1,0 +1,65 @@
+{
+  "description": "A user-scope [improvement_signal] captured in-session (plan-less governance capture) carries `Sessions: in-session <date> <session-id>, <project>` and no Source line. The manifest still parses it as a topic-file user-memory entry under its heading, attributed to the topic file, with every flag empty; only the other signal's missing backticked Target raises cited_paths_missing. A path flag does not set memory_pass (seed 2 -> null).",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "user_memory": {
+        "files": [
+          "{ROOT}/repo/memory/MEMORY.md",
+          "{ROOT}/repo/memory/topics/improvement-signals.md"
+        ],
+        "entries": [
+          {
+            "file": "{ROOT}/repo/memory/MEMORY.md",
+            "heading": "Keep answers short",
+            "ordinal": 1,
+            "cited_paths_missing": [],
+            "cited_slugs_missing": [],
+            "stale_after_passed": false,
+            "governance_conflict_open": []
+          },
+          {
+            "file": "{ROOT}/repo/memory/topics/improvement-signals.md",
+            "heading": "[improvement_signal] Alpha gap with a present target",
+            "ordinal": 1,
+            "cited_paths_missing": [],
+            "cited_slugs_missing": [],
+            "stale_after_passed": false,
+            "governance_conflict_open": [],
+            "cited_commit_missing": [],
+            "cited_path_changed": []
+          },
+          {
+            "file": "{ROOT}/repo/memory/topics/improvement-signals.md",
+            "heading": "[improvement_signal] Beta gap with a missing target",
+            "ordinal": 1,
+            "cited_paths_missing": [
+              "shared/skills/nope/SKILL.md"
+            ],
+            "cited_slugs_missing": [],
+            "stale_after_passed": false,
+            "governance_conflict_open": []
+          }
+        ],
+        "quiet_sweeps": 2,
+        "memory_pass": null,
+        "memory_flags": [
+          "cited_paths_missing"
+        ],
+        "file_flags": {
+          "{ROOT}/repo/memory/topics/improvement-signals.md": [
+            "cited_paths_missing"
+          ]
+        }
+      }
+    }
+  }
+}

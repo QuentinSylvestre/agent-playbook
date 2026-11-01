@@ -1,0 +1,36 @@
+{
+  "description": "A plan whose header has no `> **Memory relied on**:` line (archived before the field existed) gives memory_relied_on null, never []; the label is case-sensitive, so a `> **Memory Relied On**:` header line is not the field, and a line of the same shape below the header (here quoted in a section body) is not the field either.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "counts": {
+            "new_plans": 1
+          },
+          "plans": {
+            "new_plans": [
+              {
+                "file": "260923-0900_ABSENT_PLAN.md",
+                "memory_relied_on": null,
+                "memory_relied_on_truncated": false
+              }
+            ]
+          }
+        }
+      }
+    },
+    "json_not_contains": [
+      "Body decoy heading",
+      "Case decoy heading"
+    ]
+  }
+}

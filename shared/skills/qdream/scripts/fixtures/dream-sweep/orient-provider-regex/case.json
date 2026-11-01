@@ -1,0 +1,201 @@
+{
+  "description": "Review R15 (plan 261027): --provider is a lower-case harness name of 1 to 31 characters [a-z][a-z0-9-]: an upper-case name, a leading digit, a trailing newline, 32 characters, an underscore and an empty name are usage errors (exit 2); 31 characters pass (a provider with no transcripts takes the empty list).",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/memory/.dream-state.json": "{}\n"
+  },
+  "git": [
+    "repo"
+  ],
+  "steps": [
+    {
+      "write": {
+        "home/.claude/projects/-p-one/0a000000-0000-4000-8000-000000000001.jsonl": "{}\n",
+        "home/.claude/projects/-p-two/0a000000-0000-4000-8000-000000000002.jsonl": "{}\n"
+      }
+    },
+    {
+      "argv": [
+        "orient",
+        "--project",
+        "{ROOT}/proj/alpha",
+        "--provider",
+        "Claude",
+        "--model",
+        "task4=opus",
+        "--model",
+        "verifier=opus",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": ""
+      },
+      "exit": 2,
+      "stderr_contains": [
+        "--provider takes the harness name"
+      ],
+      "absent": [
+        "handoff/orient.json"
+      ]
+    },
+    {
+      "argv": [
+        "orient",
+        "--project",
+        "{ROOT}/proj/alpha",
+        "--provider",
+        "1claude",
+        "--model",
+        "task4=opus",
+        "--model",
+        "verifier=opus",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": ""
+      },
+      "exit": 2,
+      "stderr_contains": [
+        "--provider takes the harness name"
+      ],
+      "absent": [
+        "handoff/orient.json"
+      ]
+    },
+    {
+      "argv": [
+        "orient",
+        "--project",
+        "{ROOT}/proj/alpha",
+        "--provider",
+        "kiro\n",
+        "--model",
+        "task4=opus",
+        "--model",
+        "verifier=opus",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": ""
+      },
+      "exit": 2,
+      "stderr_contains": [
+        "--provider takes the harness name"
+      ],
+      "absent": [
+        "handoff/orient.json"
+      ]
+    },
+    {
+      "argv": [
+        "orient",
+        "--project",
+        "{ROOT}/proj/alpha",
+        "--provider",
+        "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+        "--model",
+        "task4=opus",
+        "--model",
+        "verifier=opus",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": ""
+      },
+      "exit": 2,
+      "stderr_contains": [
+        "--provider takes the harness name"
+      ],
+      "absent": [
+        "handoff/orient.json"
+      ]
+    },
+    {
+      "argv": [
+        "orient",
+        "--project",
+        "{ROOT}/proj/alpha",
+        "--provider",
+        "kiro_x",
+        "--model",
+        "task4=opus",
+        "--model",
+        "verifier=opus",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": ""
+      },
+      "exit": 2,
+      "stderr_contains": [
+        "--provider takes the harness name"
+      ],
+      "absent": [
+        "handoff/orient.json"
+      ]
+    },
+    {
+      "argv": [
+        "orient",
+        "--project",
+        "{ROOT}/proj/alpha",
+        "--provider",
+        "",
+        "--model",
+        "task4=opus",
+        "--model",
+        "verifier=opus",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": ""
+      },
+      "exit": 2,
+      "stderr_contains": [
+        "--provider takes the harness name"
+      ],
+      "absent": [
+        "handoff/orient.json"
+      ]
+    },
+    {
+      "argv": [
+        "orient",
+        "--project",
+        "{ROOT}/proj/alpha",
+        "--provider",
+        "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk",
+        "--model",
+        "task4=opus",
+        "--model",
+        "verifier=opus",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "env": {
+        "CLAUDE_CODE_SESSION_ID": ""
+      },
+      "exit": 0,
+      "stdout_contains": [
+        "0 orchestrator transcript(s)"
+      ],
+      "files": {
+        "handoff/orient.json": {
+          "model_routing": {
+            "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk": {
+              "task4": "opus",
+              "verifier": "opus"
+            }
+          },
+          "orchestrator_sessions": []
+        }
+      }
+    }
+  ]
+}

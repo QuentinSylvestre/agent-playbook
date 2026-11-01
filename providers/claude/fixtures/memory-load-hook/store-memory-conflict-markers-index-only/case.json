@@ -1,0 +1,15 @@
+{
+  "cwd": "{{ROOT}}/proj",
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores",
+  "description": "The store memory file holds git conflict markers (a rebase resolved without removing them): the project tier is an index with a note.",
+  "contains": [
+    "- Store entry alpha",
+    "holds git conflict markers",
+    "heading index only; read it in full"
+  ],
+  "absent": [
+    "delivered in full",
+    "<<<<<<<"
+  ]
+}

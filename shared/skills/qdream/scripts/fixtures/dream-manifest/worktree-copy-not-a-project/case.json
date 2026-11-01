@@ -1,0 +1,51 @@
+{
+  "description": "A Claude Code sub-agent worktree copy (<project>/.claude/worktrees/agent-*) is not a project of its own, whether a session cwd, a Method A path or the state file names it: its memory file is not counted again, its state entry is reported as a sessionless `removed` project (so the Removed-projects acknowledgement can delete that one key, never the parent's), and each skipped copy is named in errors[]. Its session is attributed to the parent project, so no user turn is lost.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "errors": [
+        "$contains:worktree copy {ROOT}/proj/alpha/.claude/worktrees/agent-a1b2 is not a project (its state entry is reported as removed; state for {ROOT}/proj/alpha is not changed)",
+        "$contains:is not a project (its sessions and history count toward"
+      ],
+      "projects": {
+        "{ROOT}/proj/alpha/.claude/worktrees/agent-a1b2": {
+          "status": "removed",
+          "discovered_by": [
+            "state"
+          ],
+          "sessions": [],
+          "memory_file": null,
+          "errors": [
+            "$contains:acknowledging it deletes only this state entry"
+          ]
+        },
+        "{ROOT}/proj/alpha": {
+          "status": "known",
+          "sessions": [
+            {
+              "id": "w0000000-0000-4000-8000-000000000001"
+            },
+            {
+              "id": "w0000000-0000-4000-8000-000000000002"
+            }
+          ]
+        }
+      }
+    },
+    "stripped": {
+      "w0000000-0000-4000-8000-000000000002": {
+        "contains": [
+          "copy question"
+        ]
+      }
+    }
+  }
+}

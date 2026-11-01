@@ -1,0 +1,123 @@
+{
+  "description": "Phase 8 kiro reader: --kiro finds the qdream_child a phase agent (a kiro_default sub-execution started from messages.jsonl) launched with A01's brief prompt, and reads the response of its subagent_response call byte for byte (an earlier Say and a Reasoning record hold other JSON; the sibling A02 child sorts first). Re-run is a no-op. --kiro-child naming another label's child is exit 3; --kiro-child without --kiro and --kiro with --from-file are usage errors. The return's content is never printed.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--kiro"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "source subagent_response",
+        "c0000001-0000-4000-8000-000000000000",
+        "a1000000-0000-4000-8000-000000000001"
+      ],
+      "stdout_not_contains": [
+        "SENTINEL-KIRO-RET"
+      ],
+      "files": {
+        "sweep/returns/A01.json": {
+          "label": "A01",
+          "attempt": 1,
+          "via": "kiro-transcript:subagent_response",
+          "agent_id": "c0000001-0000-4000-8000-000000000000",
+          "session_id": "sess_5e550000-0000-4000-8000-0000000000a1",
+          "phase_agent_id": "a1000000-0000-4000-8000-000000000001",
+          "return": {
+            "unrelated": [
+              "Alpha one"
+            ],
+            "notes": "SENTINEL-KIRO-RET",
+            "sessions_read": [
+              "s-a1"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--kiro"
+      ],
+      "exit": 0,
+      "unchanged": true
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A02",
+        "--kiro",
+        "--kiro-child",
+        "c0000001-0000-4000-8000-000000000000"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not A02's attempt 1"
+      ],
+      "absent": [
+        "sweep/returns/A02.json"
+      ]
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A02",
+        "--kiro-child",
+        "c0000002-0000-4000-8000-000000000000",
+        "--from-file",
+        "inbox/A02.txt"
+      ],
+      "exit": 2
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A02",
+        "--kiro",
+        "--from-file",
+        "inbox/A02.txt"
+      ],
+      "exit": 2
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A02",
+        "--kiro"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/returns/A02.json": {
+          "agent_id": "c0000002-0000-4000-8000-000000000000",
+          "return": {
+            "unrelated": [
+              "Beta two"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

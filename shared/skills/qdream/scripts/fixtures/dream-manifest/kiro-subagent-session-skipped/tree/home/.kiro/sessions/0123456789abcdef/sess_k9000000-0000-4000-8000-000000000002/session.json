@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "1.0.0",
+  "dataModelVersion": 1,
+  "id": "sess_k9000000-0000-4000-8000-000000000002",
+  "title": "fixture workflow node",
+  "agentMode": "semantic_reviewer",
+  "workspacePaths": [
+    "{ROOT}/proj/alpha"
+  ],
+  "createdAt": "2026-09-23T08:30:00.000Z",
+  "lastModifiedAt": "2026-09-23T08:45:00.000Z",
+  "modelId": "fixture-model",
+  "workflowsEnabled": true,
+  "status": "idle",
+  "rootConversationId": "sess_k9000000-0000-4000-8000-000000000001"
+}

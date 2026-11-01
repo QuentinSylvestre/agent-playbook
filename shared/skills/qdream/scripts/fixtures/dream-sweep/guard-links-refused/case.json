@@ -1,0 +1,8 @@
+{
+  "description": "F13: each guard refuses on its own: create-once through a linked directory inside the work folder (link check), '..' out of sweep/ under a rewritable prefix ('..' check), a linked directory leaving the work folder (is_inside, named as outside), handoff check on a linked handoff file (islink), a child transcript linked outside subagents/ (is_inside). SKIP without symlink or junction support.",
+  "now": "2026-10-12T12:00:00Z",
+  "units": [
+    "guard-links"
+  ],
+  "steps": []
+}

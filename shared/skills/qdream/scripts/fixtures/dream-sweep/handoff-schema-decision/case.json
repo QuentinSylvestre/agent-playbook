@@ -1,0 +1,155 @@
+{
+  "description": "decision-<n>.json: n from 1; answer and turn strings. With its needs-decision beside it, a fixed-options kind's option (else answer) must be one of the options, compared normalized.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decision-3.json": "{\n  \"answer\": \"Wait and resume\",\n  \"turn\": \"2026-10-12 user turn 41\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "decision-3.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check decision-3.json: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decision-3.json": "{\n  \"answer\": \"Wait and resume\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "decision-3.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "missing key 'turn'"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decision-3.json": "{\n  \"answer\": [\n    \"Abort\"\n  ],\n  \"turn\": \"2026-10-12 user turn 41\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "decision-3.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "key 'answer': expected str"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decision-0.json": "{\n  \"answer\": \"Wait and resume\",\n  \"turn\": \"2026-10-12 user turn 41\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "decision-0.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no handoff schema"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-4.json": "{\n  \"phase\": \"synthesize\",\n  \"step\": \"SYN-GATE\",\n  \"kind\": \"failure\",\n  \"question\": null,\n  \"options\": [\n    \"Retry\",\n    \"Skip\",\n    \"Abort\"\n  ],\n  \"recommendation\": \"Retry\",\n  \"resume_from\": \"SYN-GATE\"\n}\n"
+      }
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decision-4.json": "{\n  \"answer\": \"Retry\",\n  \"turn\": \"t\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "decision-4.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check decision-4.json: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decision-4.json": "{\n  \"answer\": \"retry it please\",\n  \"option\": \"RETRY\",\n  \"turn\": \"t\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "decision-4.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decision-4.json": "{\n  \"answer\": \"Retry\",\n  \"option\": \"Skipping\",\n  \"turn\": \"t\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "decision-4.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "option 'skipping' is not one of Retry, Skip, Abort"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decision-4.json": "{\n  \"answer\": \"Go on\",\n  \"turn\": \"t\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "decision-4.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "option 'go on' is not one of Retry, Skip, Abort"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decision-4.json": "{\n  \"answer\": \"Retry\",\n  \"option\": 5,\n  \"turn\": \"t\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "decision-4.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "option must be a string"
+      ]
+    }
+  ]
+}

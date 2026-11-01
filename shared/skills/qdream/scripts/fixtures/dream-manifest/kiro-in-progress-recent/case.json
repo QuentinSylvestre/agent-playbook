@@ -1,0 +1,36 @@
+{
+  "description": "An in_progress session modified less than 24 h before the snapshot is deferred, with the id of the last record read as its watermark.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "sessions": [
+            {
+              "id": "sess_k8000000-0000-4000-8000-000000000001",
+              "provider": "kiro",
+              "kind": "deferred",
+              "boundary": "L1",
+              "last_record": "m3"
+            }
+          ]
+        }
+      }
+    },
+    "stripped": {
+      "sess_k8000000-0000-4000-8000-000000000001": {
+        "not_contains": [
+          "TOOL RESULT TEXT"
+        ]
+      }
+    }
+  }
+}

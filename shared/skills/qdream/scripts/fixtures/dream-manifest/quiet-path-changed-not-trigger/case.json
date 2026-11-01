@@ -1,0 +1,42 @@
+{
+  "description": "Plan 261006 Phase 8 gate (user decision 2026-10-06, \"stale_when_fired only\"): cited_path_changed stays an input. A quiet project whose only flag is cited_path_changed (docs/a.md committed 2026-09-15, after Verified 2026-09-01) keeps memory_pass null at stored 2; the entry is still a suspect.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "git": [
+    "repo"
+  ],
+  "git_steps": [
+    {
+      "dir": "proj/gamma",
+      "date": "2026-09-15T10:00:00Z",
+      "paths": [
+        "AGENTS.md",
+        "docs/a.md",
+        "memory/MEMORY.md"
+      ]
+    }
+  ],
+  "expect": {
+    "exit": 0,
+    "index": {
+      "projects": {
+        "{ROOT}/proj/gamma": {
+          "quiet_sweeps": 2,
+          "memory_flags": [
+            "cited_path_changed"
+          ],
+          "memory_pass": null,
+          "counts": {
+            "suspects": 1
+          }
+        }
+      }
+    }
+  }
+}

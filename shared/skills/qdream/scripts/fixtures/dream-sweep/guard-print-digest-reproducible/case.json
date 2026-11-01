@@ -1,0 +1,8 @@
+{
+  "description": "`guard --print` on the real scripts directory equals the digest recomputed independently (git ls-files, hashlib, sorted `<path>\\t<sha256>` LF lines), so the orchestrator can reproduce it without running a guarded script.",
+  "now": "2026-10-12T12:00:00Z",
+  "units": [
+    "guard-digest-real"
+  ],
+  "steps": []
+}

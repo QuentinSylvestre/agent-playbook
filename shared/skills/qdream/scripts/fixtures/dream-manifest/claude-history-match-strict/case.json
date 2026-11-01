@@ -1,0 +1,26 @@
+{
+  "description": "History fallback matching is exact normalized equality or a common prefix of at least 20 characters: a short reply (\"ok\") does not take the date of a longer prompt that starts with it, so the boundary lands on the prompt the history entry records.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "sessions": [
+            {
+              "id": "cda00000-0000-4000-8000-000000000001",
+              "boundary": "L3"
+            }
+          ]
+        }
+      }
+    }
+  }
+}

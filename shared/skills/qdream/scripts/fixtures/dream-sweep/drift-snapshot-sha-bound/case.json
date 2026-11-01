@@ -1,0 +1,176 @@
+{
+  "description": "F3/F12: with no user-memory file in the manifest (so that cross-check is vacuous), dirty still refuses a --repo that is a git top but not the config repo (no memory/.dream-state.json, no shared/skills/qdream/); it prints the snapshot's sha256, and a re-run re-validates --repo against the snapshot and reprints the stored guard digest and that sha256. drift with the printed sha is bound; without it the summary says the snapshot is not bound; with another sha it is exit 3 and writes nothing. A --snapshot-sha that is no 64-hex sha256 is a usage error (exit 2). blast takes --snapshot-sha the same way (G2).",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "repo/.gitignore": "memory/.dream-journal.jsonl\n",
+    "repo/memory/MEMORY.md": "# Memory\n",
+    "repo/memory/.dream-state.json": "{\"state\": \"orient\"}\n",
+    "repo/shared/skills/x/SKILL.md": "# x\n",
+    "other/README.md": "another repository\n",
+    "repo2/memory/.dream-state.json": "{}\n"
+  },
+  "git": [
+    "repo",
+    "other",
+    "repo2"
+  ],
+  "steps": [
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/user_memory.json": "{\n  \"files\": [],\n  \"entries\": []\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/other"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "holds neither memory/.dream-state.json nor shared/skills/qdream/"
+      ],
+      "absent": [
+        "sweep"
+      ]
+    },
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "snapshot sha256: {SHA256:sweep/dirty-at-orient.json}"
+      ]
+    },
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0,
+      "unchanged": true,
+      "stdout_contains": [
+        "already taken",
+        "guard digest: ",
+        "snapshot sha256: {SHA256:sweep/dirty-at-orient.json}"
+      ]
+    },
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo2"
+      ],
+      "exit": 3,
+      "unchanged": true,
+      "stdout_contains": [
+        "is not the config repo of the Orient snapshot"
+      ]
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "gather",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "exit": 0,
+      "stdout_not_contains": [
+        "not bound"
+      ],
+      "files": {
+        "sweep/drift-gather.json": {
+          "snapshot_bound": true,
+          "entries": []
+        }
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "apply"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "snapshot not bound"
+      ],
+      "files": {
+        "sweep/drift-apply.json": {
+          "snapshot_bound": false
+        }
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "synthesize",
+        "--snapshot-sha",
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "the snapshot changed after Orient"
+      ],
+      "absent": [
+        "sweep/drift-synthesize.json"
+      ]
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "synthesize",
+        "--snapshot-sha",
+        "zz"
+      ],
+      "exit": 2,
+      "absent": [
+        "sweep/drift-synthesize.json"
+      ]
+    },
+    {
+      "argv": [
+        "blast",
+        "--file",
+        "AGENTS.md",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "exit": 0,
+      "stdout_not_contains": [
+        "not bound"
+      ]
+    },
+    {
+      "argv": [
+        "blast",
+        "--file",
+        "AGENTS.md"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "snapshot not bound"
+      ]
+    },
+    {
+      "argv": [
+        "blast",
+        "--file",
+        "AGENTS.md",
+        "--snapshot-sha",
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "the snapshot changed after Orient"
+      ]
+    }
+  ]
+}

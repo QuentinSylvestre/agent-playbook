@@ -1,0 +1,8 @@
+MISSING	memory/topics/git.md	providers/../skills/qqa/SKILL.md:bad-path
+MISSING	memory/topics/powershell.md	shared/skills/./SKILL.md:bad-path
+MISSING	memory/topics/kiro-cli.md	shared/skills/..\..\providers\kiro\skills\qrecover-file/SKILL.md:bad-path
+MISSING	memory/topics/http-testing.md	shared/skills/qqa./SKILL.md:bad-path
+MISSING	memory/topics/claude-code.md	shared/skills/qqa /SKILL.md:bad-path
+MISSING	memory/topics/house-style-docs.md	shared/skills/qqa/SKILL.md/:bad-path
+MISSING	memory/topics/electron-vite.md	shared/skills/qqa/SKILL.md::$DATA:bad-path
+SUMMARY	ok=0	waived=0	missing=7

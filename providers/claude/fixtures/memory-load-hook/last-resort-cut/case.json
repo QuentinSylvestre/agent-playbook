@@ -1,0 +1,10 @@
+{
+  "description": "A cap below the header and the tier paths: whole lines are cut from the end and a cut line says so.",
+  "cwd": "{{ROOT}}/empty",
+  "cap": 400,
+  "contains": [
+    "(output cut at the 400-character cap)",
+    "Playbook memory index"
+  ],
+  "config_repo": "{{ROOT}}/cfg"
+}

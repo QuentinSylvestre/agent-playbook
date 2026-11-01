@@ -1,0 +1,29 @@
+{
+  "description": "baseline --by-role, phase-agent marker (plan 261012 Phase 3, D12; review fix Q2): the explicit markers are tested before the fallback, phase marker first, on the first non-blank line; the whole-text pass tests the verifier and task4 markers only. A phase brief whose first line also names the verifier and drafter markers, and whose body names the Task-4 marker and the word verifier, is orchestrator (its tokens add to the session's); a verifier brief that mentions the phase marker below its marker line stays verifier; an agent whose body, not its first line, names the phase marker is not an orchestrator: with a verifier marker in the body it is a verifier, and with no other marker it is other (a dev agent that quotes the brief name).",
+  "now": "2026-10-14T12:00:00Z",
+  "argv": [
+    "baseline",
+    "--session",
+    "{ROOT}/home/.claude/projects/-ROOT-proj/b5a00000-0000-4000-8000-000000000011.jsonl",
+    "--by-role"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_contains": [
+      "tokens: 245\n",
+      "agents: 4\n",
+      "role orchestrator: files 2, tokens: 119\n",
+      "role task4: files 0, tokens: 0\n",
+      "role verifier: files 2, tokens: 64\n",
+      "role drafter: files 0, tokens: 0\n",
+      "role other: files 1, tokens: 62\n",
+      "other: agent-a0000000000000004.jsonl: Review the open plans. You are the Dream Phase Agent Brief for Orient;"
+    ],
+    "stdout_not_contains": [
+      "error:",
+      "other: agent-a0000000000000001",
+      "other: agent-a0000000000000002",
+      "other: agent-a0000000000000003"
+    ]
+  }
+}

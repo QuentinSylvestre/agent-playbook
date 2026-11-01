@@ -1,0 +1,36 @@
+{
+  "description": "plan 261016 Phase 10 review: with no store repo on this machine, a path-keyed state project whose folder exists but holds no marker and has no live discovery (proj/a, whose store cannot be checked) is kept known, and its note names the cause: the store repo is missing (clone it), not unreadable. The unreadable case: store-repo-unreadable.",
+  "now": "2026-09-24T12:00:00Z",
+  "no_store_repo": true,
+  "git": [
+    "proj/a"
+  ],
+  "git_origin": {
+    "proj/a": "https://example.com/Org/Proj.git"
+  },
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/a": {
+          "status": "known",
+          "memory_file": null,
+          "entries": [],
+          "errors": [
+            "$contains:store repo missing (clone it, see providers/claude/README.md):"
+          ]
+        }
+      }
+    },
+    "json_not_contains": [
+      "store repo unreadable"
+    ]
+  }
+}

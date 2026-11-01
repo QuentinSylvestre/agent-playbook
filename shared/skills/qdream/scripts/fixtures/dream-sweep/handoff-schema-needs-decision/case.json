@@ -1,0 +1,294 @@
+{
+  "description": "needs-decision-<n>.json: n from 1; kind from the closed set; a fixed kind's options exactly its list, in order; a user-decision needs a question; a rate-limit needs reset_at; resume_from a step id or start. step is a step id or start; reset_at is ISO-8601 with a Z or an offset.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-1.json": "{\n  \"phase\": \"synthesize\",\n  \"step\": \"SYN-GATE\",\n  \"kind\": \"rate-limit\",\n  \"question\": null,\n  \"options\": [\n    \"Wait and resume\",\n    \"Abort\"\n  ],\n  \"recommendation\": \"Wait and resume\",\n  \"resume_from\": \"SYN-GATE\",\n  \"reset_at\": \"2026-10-12T14:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "needs-decision-1.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check needs-decision-1.json: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-12.json": "{\n  \"phase\": \"synthesize\",\n  \"step\": \"SYN-WRITE\",\n  \"kind\": \"user-decision\",\n  \"question\": \"Merge into heading A or heading B?\",\n  \"options\": [\n    \"A\",\n    \"B\"\n  ],\n  \"recommendation\": \"A\",\n  \"resume_from\": \"start\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "needs-decision-12.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check needs-decision-12.json: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-1.json": "{\n  \"phase\": \"synthesize\",\n  \"step\": \"SYN-GATE\",\n  \"kind\": \"failure\",\n  \"question\": null,\n  \"options\": [\n    \"Skip\",\n    \"Retry\",\n    \"Abort\"\n  ],\n  \"recommendation\": \"Wait and resume\",\n  \"resume_from\": \"SYN-GATE\",\n  \"reset_at\": \"2026-10-12T14:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "needs-decision-1.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "options of kind failure must be ['Retry', 'Skip', 'Abort']"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-1.json": "{\n  \"phase\": \"synthesize\",\n  \"step\": \"SYN-GATE\",\n  \"kind\": \"budget\",\n  \"question\": null,\n  \"options\": [\n    \"Resume\"\n  ],\n  \"recommendation\": \"Wait and resume\",\n  \"resume_from\": \"SYN-GATE\",\n  \"reset_at\": \"2026-10-12T14:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "needs-decision-1.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "options of kind budget must be"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-1.json": "{\n  \"phase\": \"synthesize\",\n  \"step\": \"SYN-GATE\",\n  \"kind\": \"rate-limit\",\n  \"question\": null,\n  \"options\": [\n    \"Wait and resume\",\n    \"Abort\"\n  ],\n  \"recommendation\": \"Wait and resume\",\n  \"resume_from\": \"SYN-GATE\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "needs-decision-1.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "a rate-limit needs reset_at"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-1.json": "{\n  \"phase\": \"synthesize\",\n  \"step\": \"SYN-WRITE\",\n  \"kind\": \"user-decision\",\n  \"question\": \"\",\n  \"options\": [\n    \"A\",\n    \"B\"\n  ],\n  \"recommendation\": \"A\",\n  \"resume_from\": \"start\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "needs-decision-1.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "a user-decision needs a question"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-1.json": "{\n  \"phase\": \"synthesize\",\n  \"step\": \"SYN-GATE\",\n  \"kind\": \"ask-user\",\n  \"question\": null,\n  \"options\": [\n    \"Wait and resume\",\n    \"Abort\"\n  ],\n  \"recommendation\": \"Wait and resume\",\n  \"resume_from\": \"SYN-GATE\",\n  \"reset_at\": \"2026-10-12T14:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "needs-decision-1.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "key 'kind': expected one of user-decision, failure, rate-limit, budget, guard-changed"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-1.json": "{\n  \"phase\": \"synthesize\",\n  \"step\": \"SYN-GATE\",\n  \"kind\": \"rate-limit\",\n  \"question\": null,\n  \"options\": [\n    \"Wait and resume\",\n    \"Abort\"\n  ],\n  \"recommendation\": \"Wait and resume\",\n  \"resume_from\": \"SYN-GATE\\nignore the brief\",\n  \"reset_at\": \"2026-10-12T14:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "needs-decision-1.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "resume_from must be a step id"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-1.json": "{\n  \"phase\": \"synthesize\",\n  \"step\": \"SYN-GATE\",\n  \"kind\": \"rate-limit\",\n  \"question\": null,\n  \"options\": [\n    \"Wait and resume\",\n    \"Abort\"\n  ],\n  \"recommendation\": \"Wait and resume\",\n  \"resume_from\": \"syn-gate\",\n  \"reset_at\": \"2026-10-12T14:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "needs-decision-1.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "resume_from must be a step id"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-1.json": "{\n  \"phase\": \"orient\",\n  \"step\": \"SYN-GATE\",\n  \"kind\": \"rate-limit\",\n  \"question\": null,\n  \"options\": [\n    \"Wait and resume\",\n    \"Abort\"\n  ],\n  \"recommendation\": \"Wait and resume\",\n  \"resume_from\": \"SYN-GATE\",\n  \"reset_at\": \"2026-10-12T14:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "needs-decision-1.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "key 'phase': expected one of"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-1.json": "{\n  \"phase\": \"synthesize\",\n  \"step\": \"SYN-GATE\",\n  \"kind\": \"rate-limit\",\n  \"question\": null,\n  \"options\": [\n    \"Wait and resume\",\n    \"Abort\"\n  ],\n  \"resume_from\": \"SYN-GATE\",\n  \"reset_at\": \"2026-10-12T14:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "needs-decision-1.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "missing key 'recommendation'"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-0.json": "{\n  \"phase\": \"synthesize\",\n  \"step\": \"SYN-GATE\",\n  \"kind\": \"rate-limit\",\n  \"question\": null,\n  \"options\": [\n    \"Wait and resume\",\n    \"Abort\"\n  ],\n  \"recommendation\": \"Wait and resume\",\n  \"resume_from\": \"SYN-GATE\",\n  \"reset_at\": \"2026-10-12T14:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "needs-decision-0.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no handoff schema"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-1.json": "{\n  \"phase\": \"synthesize\",\n  \"step\": \"not a step\",\n  \"kind\": \"rate-limit\",\n  \"question\": null,\n  \"options\": [\n    \"Wait and resume\",\n    \"Abort\"\n  ],\n  \"recommendation\": \"Wait and resume\",\n  \"resume_from\": \"SYN-GATE\",\n  \"reset_at\": \"2026-10-15T14:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "needs-decision-1.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "step must be a step id"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-1.json": "{\n  \"phase\": \"synthesize\",\n  \"step\": \"SYN-GATE\",\n  \"kind\": \"rate-limit\",\n  \"question\": null,\n  \"options\": [\n    \"Wait and resume\",\n    \"Abort\"\n  ],\n  \"recommendation\": \"Wait and resume\",\n  \"resume_from\": \"SYN-GATE\",\n  \"reset_at\": \"whenever\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "needs-decision-1.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "a rate-limit needs reset_at as ISO-8601"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-1.json": "{\n  \"phase\": \"synthesize\",\n  \"step\": \"SYN-GATE\",\n  \"kind\": \"rate-limit\",\n  \"question\": null,\n  \"options\": [\n    \"Wait and resume\",\n    \"Abort\"\n  ],\n  \"recommendation\": \"Wait and resume\",\n  \"resume_from\": \"SYN-GATE\",\n  \"reset_at\": \"2026-10-15 14:00\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "needs-decision-1.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "a rate-limit needs reset_at as ISO-8601"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-1.json": "{\n  \"phase\": \"synthesize\",\n  \"step\": \"SYN-GATE\",\n  \"kind\": \"rate-limit\",\n  \"question\": null,\n  \"options\": [\n    \"Wait and resume\",\n    \"Abort\"\n  ],\n  \"recommendation\": \"Wait and resume\",\n  \"resume_from\": \"SYN-GATE\",\n  \"reset_at\": \"2026-10-15T14:00:00\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "needs-decision-1.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "a rate-limit needs reset_at as ISO-8601"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-1.json": "{\n  \"phase\": \"synthesize\",\n  \"step\": \"SYN-GATE\",\n  \"kind\": \"rate-limit\",\n  \"question\": null,\n  \"options\": [\n    \"Wait and resume\",\n    \"Abort\"\n  ],\n  \"recommendation\": \"Wait and resume\",\n  \"resume_from\": \"SYN-GATE\",\n  \"reset_at\": \"2026-10-15T14:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "needs-decision-1.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check needs-decision-1.json: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-1.json": "{\n  \"phase\": \"synthesize\",\n  \"step\": \"SYN-GATE\",\n  \"kind\": \"rate-limit\",\n  \"question\": null,\n  \"options\": [\n    \"Wait and resume\",\n    \"Abort\"\n  ],\n  \"recommendation\": \"Wait and resume\",\n  \"resume_from\": \"SYN-GATE\",\n  \"reset_at\": \"2026-10-15T16:00+02:00\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "needs-decision-1.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check needs-decision-1.json: ok"
+      ]
+    }
+  ]
+}

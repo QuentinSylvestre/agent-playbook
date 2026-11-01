@@ -1,0 +1,11 @@
+{
+  "label": "V02",
+  "project": "{ROOT}/proj/beta",
+  "items": [
+    {
+      "item_id": "V02-001",
+      "class": "improvement_signals",
+      "observation": "Beta friction"
+    }
+  ]
+}

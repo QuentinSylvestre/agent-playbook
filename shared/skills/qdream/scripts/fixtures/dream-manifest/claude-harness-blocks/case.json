@@ -1,0 +1,26 @@
+{
+  "description": "Harness prefixes are filtered per content block, so the user's block after an interruption notice survives; a <command-name> tag is rendered as a command only when the text starts with the command tags, so a tag pasted mid-sentence stays as typed.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "stripped": {
+      "c9a00000-0000-4000-8000-000000000001": {
+        "order": [
+          "L1 [user] no, use the staging db instead",
+          "L3 [user] why does <command-name>/deploy</command-name> show up in my build log?",
+          "L4 [user] /qfixture --scope parser"
+        ],
+        "not_contains": [
+          "Request interrupted"
+        ]
+      }
+    }
+  }
+}

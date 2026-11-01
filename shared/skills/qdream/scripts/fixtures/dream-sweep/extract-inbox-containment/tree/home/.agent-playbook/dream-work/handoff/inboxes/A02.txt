@@ -1,0 +1,3 @@
+```json
+{"error": null, "project_accessible": true, "sessions_read": ["s1"], "unrelated": ["inb"]}
+```

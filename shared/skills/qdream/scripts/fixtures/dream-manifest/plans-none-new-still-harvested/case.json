@@ -1,0 +1,48 @@
+{
+  "description": "A project whose archive holds plans but none new since the last sweep still gets recent and accept_and_note (Accept-and-note counts over every archived plan, every sweep); only new_plans, the excerpt list, is empty.",
+  "now": "2026-09-24T12:00:00Z",
+  "store_repo": "stores",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "{ROOT}/proj/alpha": {
+          "plans": {
+            "archive": "{ROOT}/stores/alpha-1a2b3c/plans/done",
+            "new_plans": [],
+            "recent": [
+              {
+                "file": "260905-1000_OLD_ONE.md",
+                "title": "Old One",
+                "date": "2026-09-05",
+                "intent": "Fixture plan."
+              }
+            ],
+            "accept_and_note": [
+              {
+                "plan": "260905-1000_OLD_ONE.md",
+                "item": "The archive step had no dry-run mode -- cost: one manual rollback -- suggested change: add a dry run."
+              }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "git_steps": [
+    {
+      "dir": "repo",
+      "date": "2026-09-21T10:00:00Z",
+      "paths": [
+        "memory/.dream-state.json"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,5 @@
+# v3 permissions — equivalent of --trust-all-tools in v2
+# Deployed by setup.sh / setup.ps1 (seed-file: written only when absent) to ~/.kiro/settings/permissions.yaml
+rules:
+  - capability: all
+    effect: allow

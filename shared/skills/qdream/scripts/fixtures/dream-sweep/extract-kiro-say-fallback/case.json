@@ -1,0 +1,48 @@
+{
+  "description": "Phase 8 kiro reader, live A01 attempt-1 shape: the child's subagent_response is prose, so the return is the last plain (Say) message that holds a JSON object (not an earlier draft, not a later prose Say, never a Reasoning record); via says so. A child whose JSON is only in a Reasoning record is exit 3.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A01",
+        "--kiro"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "source say"
+      ],
+      "files": {
+        "sweep/returns/A01.json": {
+          "via": "kiro-transcript:say",
+          "agent_id": "c0000001-0000-4000-8000-000000000000",
+          "return": {
+            "unrelated": [
+              "Alpha final"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A02",
+        "--kiro"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no JSON object"
+      ],
+      "absent": [
+        "sweep/returns/A02.json"
+      ]
+    }
+  ]
+}

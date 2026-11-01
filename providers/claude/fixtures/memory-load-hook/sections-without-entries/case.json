@@ -1,0 +1,18 @@
+{
+  "description": "A memory file with ## sections and no ### entries at all lists each shown section as a placeholder label (Topics and Declined are not shown); a file with entries lists no placeholder.",
+  "git": [
+    "cfg"
+  ],
+  "cwd": "{{ROOT}}/cfg",
+  "contains": [
+    "\nFeedback:\n",
+    "\nPattern:\n- Higher-order entry one",
+    "Feedback:\nPattern:\nHigher-order memory"
+  ],
+  "absent": [
+    "Topics:",
+    "Declined:"
+  ],
+  "whole_lines": true,
+  "config_repo": "{{ROOT}}/cfg"
+}

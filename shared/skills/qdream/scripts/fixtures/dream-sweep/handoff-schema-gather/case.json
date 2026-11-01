@@ -1,0 +1,70 @@
+{
+  "description": "gather.json: projects an object, failures and human_expiries lists, the three result paths strings or null.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/gather.json": "{\n  \"projects\": {\n    \"/p/alpha\": {\n      \"return\": \"sweep/returns/A01.json\"\n    }\n  },\n  \"failures\": [],\n  \"human_expiries\": [],\n  \"plans_result\": \"handoff/steps/GAT-PLANS.json\",\n  \"signals_result\": null,\n  \"native_result\": null\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "gather.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check gather.json: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/gather.json": "{\n  \"projects\": {\n    \"/p/alpha\": {\n      \"return\": \"sweep/returns/A01.json\"\n    }\n  },\n  \"failures\": [],\n  \"plans_result\": \"handoff/steps/GAT-PLANS.json\",\n  \"signals_result\": null,\n  \"native_result\": null\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "gather.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "missing key 'human_expiries'"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/gather.json": "{\n  \"projects\": {\n    \"/p/alpha\": {\n      \"return\": \"sweep/returns/A01.json\"\n    }\n  },\n  \"failures\": [],\n  \"human_expiries\": [],\n  \"plans_result\": 3,\n  \"signals_result\": null,\n  \"native_result\": null\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "gather.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "key 'plans_result': expected str?"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/gather.json": "{\n  \"projects\": [\n    \"/p/alpha\"\n  ],\n  \"failures\": [],\n  \"human_expiries\": [],\n  \"plans_result\": \"handoff/steps/GAT-PLANS.json\",\n  \"signals_result\": null,\n  \"native_result\": null\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "gather.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "key 'projects': expected obj"
+      ]
+    }
+  ]
+}

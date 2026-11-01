@@ -1,0 +1,284 @@
+---
+name: qwire-governance
+description: Wire AGENTS.md/CLAUDE.md and nested .kiro/ governance into root-level Kiro steering, and point a workspace at its store in the agent-playbook store repo. Use when working in a multi-folder project (monorepo or otherwise), when subfolder AGENTS.md/CLAUDE.md or nested .kiro/steering/ or .kiro/skills/ files exist but are not yet wired into the workspace's .kiro/steering/, when a workspace keeps its memory or project files in the store repo, or after pulling a project for the first time. Also use with --migrate to update legacy always-on wiring to fileMatch-scoped output.
+argument-hint: "[--migrate] [<path to specific AGENTS.md file>]"
+---
+
+# Wire AGENTS.md as Kiro Steering
+
+## Your role
+
+You bridge the gap between the AGENTS.md/CLAUDE.md convention (used by Claude Code, Codex, Cursor, etc.) and Kiro's steering file system. You scan the current workspace for convention files and create `.kiro/steering/` references so Kiro loads them automatically. When the workspace keeps its memory or project files in the store repo, you also wire that store in two parts (Step 3b): a generated steering file naming it, and a symlink that pulls its project memory into context.
+
+## Target file
+
+$ARGUMENTS
+
+If no path is provided, the Step 1 scan script discovers all `AGENTS.md`/`CLAUDE.md` files plus nested `.kiro/steering/**/*.md` and `.kiro/skills/<name>/SKILL.md` files (any folder depth for the `.kiro/` folder itself; one level under `skills/`; .gitignore-aware for governance files).
+
+## Process
+
+### Step 1: Discover convention and nested-Kiro files
+
+Run the scan script from the workspace root: `<python> <skill-dir>/scripts/scan.py`, where `<python>` is the playbook venv's interpreter with `-I` (`<config-repo>/.venv-agent-playbook/Scripts/python.exe -I`), never a `python` from PATH. Under any other interpreter it exits 2 with `guard did not run: venv missing`.
+
+The script emits a newline-delimited list of workspace-relative paths covering:
+- `AGENTS.md` / `CLAUDE.md` at any depth (Pass 1; respects `.gitignore` when in a git repo)
+- `*.md` files under any nested `.kiro/steering/` (Pass 2; bypasses `.gitignore` because `.kiro/` is commonly gitignored)
+- `SKILL.md` files directly under any nested `.kiro/skills/<name>/`, one level deep (Pass 2)
+
+The workspace's own root-level `.kiro/` is excluded from Pass 2 — we wire INTO it, not from it.
+
+Report the discovered paths to the user. If a specific path was provided as `$ARGUMENTS`, use only that file and skip the scan.
+
+### Step 2: Check existing steering setup
+
+For each discovered file, check if `.kiro/steering/` already exists at the appropriate project level and whether a steering file already references it. Skip files that are already wired up.
+
+### Step 3: Create steering files
+
+For each unwired source file, create one steering file under the workspace root's `.kiro/steering/` directory. The `inclusion` mode and steering filename depend on the source file's location.
+
+**Workspace-root `AGENTS.md` / `CLAUDE.md`** — `inclusion: always`:
+
+```
+---
+inclusion: always
+---
+
+#[[file:../../AGENTS.md]]
+```
+
+**Subfolder source files at any depth** — `inclusion: fileMatch` scoped to the source file's containing directory. Replace `<subfolder>` with the path from workspace root to the source's directory; the trailing `/**` covers the entire subtree:
+
+```
+---
+inclusion: fileMatch
+fileMatchPattern: '<subfolder>/**'
+---
+
+<!-- Subfolder governance from <relative-source-path>. Loaded only when work is scoped to <subfolder>/. -->
+
+#[[file:../../<relative-source-path>]]
+```
+
+**Nested `.kiro/skills/<name>/SKILL.md`** — wire as fileMatch-scoped steering content. The skill is NOT registered as a callable slash command in this workspace (Kiro slash commands are global at `~/.kiro/skills/`, not workspace-loaded). The leading comment block makes the distinction explicit:
+
+```
+---
+inclusion: fileMatch
+fileMatchPattern: '<subfolder>/**'
+---
+
+<!-- Skill content from <relative-skill-path> wired as steering. The slash command itself is not registered in this workspace. -->
+
+#[[file:../../<relative-skill-path>]]
+```
+
+**Steering filename convention**: derive from the relative source path with `/` replaced by `-`, the `.kiro` segment encoded as `__kiro__` (double-underscore-bracketed; not a legal source-path segment, so no source can collide with the encoded form), and a `.md` extension. The basename `SKILL.md` is replaced by `-skill` so a skill directory becomes one entry. Lowercased.
+
+| Source path | Steering filename |
+|---|---|
+| `AGENTS.md` | `agents.md` |
+| `CLAUDE.md` | `claude.md` |
+| `frontend/AGENTS.md` | `frontend-agents.md` |
+| `frontend/packages/ui/AGENTS.md` | `frontend-packages-ui-agents.md` |
+| `frontend/.kiro/steering/style.md` | `frontend-__kiro__-steering-style.md` |
+| `frontend/.kiro/skills/lint/SKILL.md` | `frontend-__kiro__-skills-lint-skill.md` |
+| *(no source — generated by Step 3b)* | `__store__.md`, **reserved** |
+| *(no source — symlinked by Step 3b)* | `__store_memory__.md`, **reserved** |
+
+`__store__.md` and `__store_memory__.md` are both reserved for Step 3b, and the derivation above cannot produce either: a workspace-root source yields exactly `agents.md` or `claude.md`, and every other source yields a hyphenated compound ending in `-agents.md`, `-claude.md`, `-skill.md`, or `-<stem>.md`. Neither reserved name is `agents.md` or `claude.md`, and neither contains a hyphen, so no source path can reach them. No forbidden-segment rule is needed for either.
+
+**Forbidden source segments**: a source path containing the segment `__kiro__` (case-insensitively, including any case variant like `__KIRO__` or `__Kiro__`) is rejected with the literal error `qwire-governance: source path '<path>' contains the reserved segment '__kiro__' (matched case-insensitively); rename the directory, or pass an explicit AGENTS.md path as `$ARGUMENTS` to bypass the recursive scan.` This guarantees the encoded form is unambiguous (no real source can produce it via the `/`→`-` mapping after lowercasing). Users hitting this error rename the offending directory or pass an explicit path.
+
+**Collision detection**: Before writing each derived filename, check `.kiro/steering/<filename>` for an existing file. Three cases:
+
+1. **Target does not exist** — write normally.
+2. **Target exists, content matches the legacy/current `/qwire-governance` shape** (per Step 5's content-shape predicate) and the embedded `#[[file:...]]` references the same source — treat as already-wired; skip with an "already wired" report. This is the idempotency path.
+3. **Target exists with any other content** (user-authored, different source, hand-edited) — abort the wire for this source with a clear error: `<source>: target steering filename <filename> exists with conflicting content. Rename either the steering file or the source to disambiguate.` Do not append numeric suffixes silently — that hides the conflict.
+
+The user's recovery path is to either rename the conflicting file or pass a more specific argument to the skill.
+
+**Subfolder conflict precedence**: when a subfolder's `AGENTS.md` declares its own `## Doc & Test Guidelines`, the subfolder's section wins for work scoped to that subfolder (per `shared/skills/qplan/TEMPLATES.md § Doc & Test Guidelines`). The fileMatch wiring handles scope detection — Kiro loads the subfolder steering file only when the user's open files match the pattern. No additional precedence logic is needed in the steering itself.
+
+### Step 3b: Wire the workspace store
+
+A workspace keeps its memory and its project files in the agent-playbook store repo (`~/.agent-playbook/stores`), not in the workspace (`shared/skills/qdream/memory-rules.md § Workspace Store`). This step finds the workspace's store, creates it when the workspace has none, and wires it into the workspace root's `.kiro/steering/`. It is numbered `3b` so Steps 4 and 5 keep the numbers other files cite.
+
+This step has **no source file**. Its input is the workspace folder, so it runs even when Step 1 found nothing, and it is skipped when `$ARGUMENTS` named a specific source file.
+
+**One wiring, two parts. Write both; neither replaces the other.**
+
+| Part | Artifact | What it covers | How it reaches the model |
+|---|---|---|---|
+| Pointer | `__store__.md` — a generated steering file | The **plans / tests** paths, and the fallback instruction for memory | Its own text arrives; the reads it asks for are **behavioural** |
+| Memory link | `__store_memory__.md` — a symlink to `<store-path>/memory/MEMORY.md` | The **project memory tier** | The memory file's contents arrive **mechanically**, before the agent decides anything |
+
+The pointer alone was the whole wiring until 2026-08-15. It is kept because the symlink carries memory and nothing else: the store's `plans/`, `plans/done/` and `plans/tests/` are never loaded into context and still need prose telling an agent to open them. Deleting the pointer once the symlink works would silently un-wire the artifact class the store was built for.
+
+**Ordering is an invariant, not a preference: write the pointer first, then attempt the symlink.** The symlink is a raw memory file with no room for a comment saying what it does not cover, so the guarantee that a reader is not misled by finding it alone is mechanical — `__store_memory__.md` is never created in a directory that does not already hold `__store__.md`. Every path below that fails to create the symlink leaves the pointer in place and in effect.
+
+> **Kiro follows steering symlinks — measured, `kiro-cli` v2 and v3, 2026-08-15, Windows.** A verified symlink (`LinkType: SymbolicLink`) under `<workspace>/.kiro/steering/` was loaded and its contents quoted back, and `/context` listed it. The **frontmatter-less** case is covered: the target was shaped exactly like a store `MEMORY.md` (opens `# Project Memory — <name>`, no `---` block) and still loaded, so steering frontmatter is not required and a raw memory file can be symlinked as-is. Not measured on the Kiro IDE surface — do not claim it there.
+
+**Do this first: refuse when the workspace root is the user's home directory.** There, `<workspace>/.kiro/steering/` **is** `~/.kiro/steering/`, and that changes two things at once: `kiro_default` loads `file://~/.kiro/steering/*.md` in **every** workspace, so the pointer would tell every session to read one workspace's memory; and the directory is a playbook deploy target, so the file would also be reported as an orphan by `verify-deployment`. Detect it by normalizing `<workspace>/.kiro/steering/` and `~/.kiro/steering/` per `§ Path normalization` and comparing. On a match, write **neither part** — no pointer and no symlink; a symlinked memory file there would be worse, because it would put one workspace's project memory into every session's context mechanically. Report: `qwire-governance: workspace root is the home directory, so .kiro/steering/ is the global ~/.kiro/steering/; a store pointer there would load in every workspace. Not wired — read the store by instruction instead.` The fallback is the standing instruction in `providers/kiro/steering/kiro-guidelines.md` to read the project memory tier every session at the path resolution returns. Otherwise go on.
+
+**Resolve the store with the resolver. Never compute a store directory name.** Every folder the resolver can serve gets a store. `<workspace>` is the workspace root, the folder this skill runs in. Take `<config-repo>` from `shared/AGENTS.md § Config Repo Locations`. `<py>` is `<config-repo>/.venv-agent-playbook/Scripts/python.exe -I`, and `<resolver>` is `<config-repo>/shared/skills/qdream/scripts/store-resolver.py`. Then:
+
+1. Run `<py> <resolver> find "<workspace>"`. Exit 0 prints the store directory that already serves the workspace (a store at the workspace or at a folder above it, up to the git toplevel): use it and skip step 2. Exit 3 prints nothing on stdout and a reason on stderr: the workspace has no store yet, so go on to step 2. Exit 2: write nothing and report the stderr line.
+2. Run `<py> <resolver> find-or-create "<workspace>"`. Exit 0 prints the store directory: one just created, or one another session created since step 1 (repeat any stderr notice in the Step 4 report). Exit 3 prints nothing and the stderr line gives the reason (a folder where no store is made, such as a temp folder, Downloads, a drive root or a `\\server` path): write nothing and report that reason. Exit 2: write nothing and report the stderr line.
+
+In both steps, never retry with another tool and never make the store directory by hand: exit 2 means the store repo could not be read, and a hand-made directory could duplicate a store that exists. Do not use the `resolve` subcommand here. It answers for one artifact class, prints `<source>`, a tab and `<path>`, and reports a store only when that class holds content, so it cannot find a store that is still empty.
+
+The result is `<store-path-native>`, the store directory as an absolute native path. A store the call just created is one new `STORE` file in the store repo; it stays uncommitted until `/qconfig-sync` Step 2b commits it, so tell the user.
+
+#### Step 3b.1 — the pointer
+
+**Write `<workspace>/.kiro/steering/__store__.md`** with this content. `<store-path>` is `<store-path-native>`, written `~`-rooted when it is under the user's home directory (the usual case) — that form resolves on `kiro-cli` v3 even with spaces in the path (measured 2026-08-14) — and as the full absolute native path otherwise. **`<store-path>` is the only variable**: the content is a pure function of it. Keep it that way. Content that also varied with, say, whether `plans/` is populated would change under the workspace, and the idempotency check below would then read a legitimate re-run as a conflict.
+
+```
+---
+inclusion: always
+---
+
+<!-- Generated by /qwire-governance Step 3b. Derived from <store-path>/STORE; never authoritative. Safe to delete — re-run /qwire-governance to regenerate. -->
+
+# Workspace store — where it is, and what you must open yourself
+
+This workspace keeps playbook artifacts — its memory, and possibly its project files —
+in the agent-playbook store repo rather than in the workspace. The store directory is:
+
+`<store-path>`
+
+This file is text. Kiro does not follow file references written inside a steering
+file, so nothing here loads anything for you. Open the paths below with your
+file-read tool.
+
+The memory tier is the one exception, and it is handled beside this file rather
+than by it: `__store_memory__.md` in this same directory is a **symlink** to
+`<store-path>/memory/MEMORY.md`, so when it is present that file is already in your
+context and item 1 is a no-op. It is absent whenever this machine could not create a
+symlink, and then item 1 is the whole mechanism. Item 2 — the project files — has no
+symlink and always requires you to open the paths yourself.
+
+1. Read `<store-path>/memory/MEMORY.md` at the start of every session — it is this
+   workspace's **project memory tier** — unless you can already see its contents in
+   your context. If the file does not exist yet, proceed without project memory and
+   say so.
+2. This workspace's project files live under `<store-path>/plans/` (active),
+   `plans/done/` (archived) and `plans/tests/` (test plans). Resolve each class
+   through `~/.kiro/skills/qdream/memory-rules.md § Resolution contract` before
+   reading or writing.
+
+The `STORE` file in `<store-path>` is the single authority for which workspace this
+directory serves. If it disagrees with this file, `STORE` wins and this file is
+regenerated.
+```
+
+The file is written as an instruction rather than a description because the reads it asks for are **behavioural**. `#[[file:...]]` has no resolver on either Kiro surface (re-confirmed on `kiro-cli` v2 and v3, 2026-08-15), so *transclusion* cannot pull another file into context; a steering file that carries the directive can only tell the agent to open the path. A **symlink** is a different mechanism and does work — that is what Step 3b.2 uses, and it is why the memory item above is worded as a fallback. A cold reader has to be able to act on this text without any other context, which is why it names the full path, says plainly what does and does not load, and says what to do when the file is absent.
+
+**The content stays a pure function of `<store-path>`.** The paragraph about `__store_memory__.md` is unconditional prose — it describes the wiring, not the observed state — so the pointer is byte-identical whether or not the symlink was created. Content that varied with the symlink's presence would make a legitimate re-run read as a conflict under the idempotency check below.
+
+**A pointer written from an earlier template differs from this one**, so the idempotency check below reports it as a conflict. Delete it and re-run.
+
+**Idempotency — reuse Step 5's byte-equality short-circuit; do not add a second predicate.** Compute the would-be content first, then:
+
+1. **`__store__.md` does not exist** — write it.
+2. **It exists and is byte-equal to the would-be content** after Step 5's input normalization (strip BOM, normalize CRLF/CR to LF) — skip the write, report as already wired. Re-running the skill leaves the mtime untouched.
+3. **It exists with any other content** — Step 3's case 3 applies unchanged: abort this wire and report `qwire-governance: .kiro/steering/__store__.md exists with conflicting content. If it is a stale store pointer, delete it and re-run; otherwise rename it.` Never rewrite it in place. The pointer is regenerable, so deleting it costs nothing, and a hand edit is not overwritten without the user seeing this message.
+
+`--migrate` (Step 5) deliberately leaves `__store__.md` alone: it carries no transclusion line, so it fails the content-shape predicate and is classified user-authored. That is the intended outcome — the pointer's whole lifecycle belongs to this step.
+
+#### Step 3b.2 — the memory symlink
+
+Run this only after Step 3b.1 has left `__store__.md` in place — written, or already wired. If Step 3b.1 aborted on a conflict, stop here too and report both.
+
+**The link**: `<workspace>/.kiro/steering/__store_memory__.md` → `<store-path-native>/memory/MEMORY.md`. `<store-path-native>` is the store Step 3b's resolution returned. A link left from a store that no longer serves the workspace is a "link to a different target", which the third case below reports: delete it and re-run.
+
+**Symlink the single memory file, never the store directory.** A directory symlink would put every file under the store into the steering glob's reach — `STORE`, and every artifact added there later — as steering context. The link is to one file, and it changes only when the store moves.
+
+**`<store-path-native>` is the full absolute native path, not the `~`-rooted form the pointer prints.** `~` is expanded by `kiro-cli` when it reads a resource path; it is not expanded by the filesystem when it stores a link target. This divergence between the two artifacts is deliberate — the pointer's path is read by a model, the link's path is read by the OS.
+
+> **Measured 2026-08-15, Windows, and it fails in the way that is hardest to notice.** `New-Item -ItemType SymbolicLink -Target '~/file.md'` **succeeds**, and the link it writes reports `LinkType: SymbolicLink` — so the hazard-1 check passes. But the stored target is the literal `~\file.md`, which the OS resolves relative to the link's own directory, and reading through the link fails with *"Could not find a part of the path"*. **`Test-Path` on the link still returns `True`**, because it tests the link rather than what it points at. That is why the resolvability check below is `Test-Path` against the **target** path, never against the link.
+
+**Precondition — the target must exist.** If `<store-path-native>/memory/MEMORY.md` is absent, create **no** link, and report `qwire-governance: <store-path>/memory/MEMORY.md does not exist; memory symlink not created. The pointer is wired and instructs the session to read that path when it appears. Kiro sessions do not load this workspace's memory automatically until the link exists: re-run /qwire-governance after the first memory entry is written.` This is the normal outcome for a store this run just created, which has no `memory/MEMORY.md` yet, so say it to the user in plain words in the Step 4 report; do not leave it as a bare line. A link to a file that is not there reads as wired and delivers nothing, which is worse than the pointer's honest instruction.
+
+**Decide with Step 3b.1's three cases, applied to the link rather than to content.** Compute the expected target first, then inspect `<workspace>/.kiro/steering/__store_memory__.md`:
+
+1. **It does not exist** — create it (recipe below).
+2. **It exists, is a symbolic link, its target equals the expected target** after normalizing both per `shared/skills/qdream/memory-rules.md § Path normalization`, **and that target resolves** — skip; report as already wired. Re-running the skill leaves it untouched.
+3. **It exists as anything else** — a regular file (which is what a Git Bash `ln -s` leaves behind), a directory, a junction, or a link to a different target — abort this half of the wire and report `qwire-governance: .kiro/steering/__store_memory__.md exists but is not a symlink to <expected-target>. If it is a stale or copied store link, delete it and re-run; otherwise rename it.` Never overwrite it in place. The pointer stays in effect meanwhile.
+
+   **Sub-case — right target, dangling.** A link whose target matches the expected target but no longer resolves is this skill's own artifact pointing at a store memory file that has since been moved or deleted. Delete the link, create nothing in its place, and report `qwire-governance: .kiro/steering/__store_memory__.md pointed at <expected-target>, which no longer exists; the broken link was removed. The pointer remains and instructs the session to read that path.` This is the only case that deletes a link, and it is unambiguous because the target is byte-equal to what this step would itself have written.
+
+**Creation and verification — Windows.** Create with PowerShell only. **Never with Git Bash `ln -s`**: measured 2026-08-15 on this platform, it writes a plain **copy** of the target, `LinkType` empty, and later edits to the store file do not propagate. A copy is exactly the drift the store exists to remove, and it looks correct in a directory listing.
+
+```
+pwsh -NoProfile -Command "New-Item -ItemType SymbolicLink -Path '<link>' -Target '<target>' -ErrorAction Stop"
+pwsh -NoProfile -Command "(Get-Item -LiteralPath '<link>' -Force).LinkType"
+```
+
+The second command is **not optional**. Accept only the exact string `SymbolicLink`, case-sensitively — an empty value means a copy was written, and `Junction` is a different object with different semantics. On anything else, `Remove-Item -LiteralPath '<link>' -Force` and treat the creation as **failed**, taking the fallback below. Then confirm the link resolves (`Test-Path -LiteralPath '<target>'`); a link created against a target that vanished between the precondition check and now is the dangling sub-case, and is deleted the same way.
+
+**Creation and verification — Linux / macOS.** `ln -s '<target>' '<link>'` creates a real symbolic link there and the copy hazard does not arise. Verify with `test -L '<link>' && test -e '<link>'` — the first asserts it is a link, the second that it resolves. The rejection and fallback behaviour is otherwise identical. Only the Windows recipe forbids `ln -s`, and only because Git Bash's emulation is what makes it unsafe.
+
+**Fallback — symlink creation is a per-machine privilege.** On Windows it needs Developer Mode or an elevated shell; either may be off on a machine where everything else in this skill works. When `New-Item` errors, or when the `LinkType` check rejects what it wrote, **do not retry with another tool and do not leave a partial artifact**. Delete anything that was written, then report: `qwire-governance: could not create the memory symlink (symbolic links need Developer Mode or an elevated shell on Windows). The pointer is wired and carries the memory read as an instruction. Enable Developer Mode and re-run /qwire-governance to upgrade it.` The wiring is then exactly what it was before this step existed, which is a working state and not a failure of the run.
+
+**Every failure path above degrades to the pointer, never to silence.** Absent target, insufficient privilege, a rejected `LinkType`, a conflicting file, a link gone dangling — in all five the pointer is present, names the memory path, and instructs the session to read it. That is the property to preserve when changing this step.
+
+**Then tell the user to exclude both artifacts from git.** `.kiro/` is derived, and this step never edits an ignore file. In a repo the user owns, `.gitignore` is the normal place. **In a repo the user does not own, the exclusion belongs in `.git/info/exclude`** — `.gitignore` is tracked, so editing it changes another team's repository, while `.git/info/exclude` is local to the clone.
+
+### Step 4: Report
+
+Summarize:
+- Which convention files were found (Pass 1 + Pass 2 totals)
+- Which were already wired (skipped)
+- Which new steering files were created
+- The store outcome from Step 3b, reported as **two lines, one per part**, because they fail independently:
+  - Pointer (3b.1) — one of: not wired (the resolver answered none or failed; no line needed beyond the Step 3b message), `__store__.md` written, already wired, refused (home directory), or conflict.
+  - Memory symlink (3b.2) — one of: created and `LinkType` verified, already wired, **not created: target absent**, **not created: symlink privilege unavailable — pointer alone is in effect**, broken link removed, or conflict. State the outcome even when it is the plain success, so a run that quietly stopped creating links is visible.
+  - When anything was written, repeat the git-exclusion instruction and name which ignore file applies
+- For `--migrate` runs only: per-action-class summary line in the form `rewritten=N, renamed=N, deleted=N, skipped-user-authored=N, skipped-collision=N, skipped-already-current=N`, followed by a one-sentence prose summary (e.g., "Migrated 12 legacy entries; 3 left untouched as user-authored; 1 conflict requires manual resolution")
+- Any issues encountered
+
+### Step 5: Migrate pre-existing wiring (opt-in via `--migrate`)
+
+When invoked with `--migrate`, scan the workspace's existing `.kiro/steering/` for files this skill emitted in earlier versions and rewrite or delete them in place.
+
+**Content-shape predicate (precise)**: A file is a skill-emitted artifact iff it parses as **all** of:
+
+1. **YAML frontmatter** delimited by `---` lines, parsed (not regex-matched) as YAML. The parsed mapping must contain only one of these key sets, in any key order: (a) `inclusion: always` and no other keys, OR (b) `inclusion: fileMatch` and `fileMatchPattern: '<glob>'` and no other keys. Both YAML key orders are accepted; comparison happens against the parsed structure, not raw text.
+
+   Implementation note: the agent applying this predicate should use any available YAML parser (e.g., `python -c 'import yaml,sys; print(yaml.safe_load(sys.stdin))'`, `yq`, or equivalent). Do not regex-match the frontmatter; the predicate is key-order-independent and a regex match would either over-accept or be brittle.
+2. **Optional comment block** — zero or more consecutive lines that are either blank, or HTML comments (`<!-- ... -->`) on a single line each.
+3. **Exactly one transclusion line** matching `^#\[\[file:[^\]]+\]\]\s*$`.
+4. **Trailing whitespace only** — zero or more lines of pure whitespace; no other content.
+
+Apply the predicate after **input normalization**: strip UTF-8 BOM if present, normalize CRLF/CR to LF, do not trim trailing newlines (a single optional trailing LF is permitted; multiple are tolerated as part of step 4).
+
+**A steering entry that is a symbolic link fails the predicate by construction — classify it without reading it.** Test the entry for link-ness first (`test -L`, or a non-empty `LinkType`); if it is a link, report `skipped-user-authored` and move on. Do not read through it: this skill's own `__store_memory__.md` is a link whose target may be absent, and reading through a link is how a migration run turns a missing store file into an error.
+
+A file failing any of these checks is treated as user-authored and left alone. The predicate is conservative by design: false negatives (treating a hand-edited skill artifact as user content) leave files untouched; false positives (treating user content as skill-emitted) would delete or rewrite user data and must not happen.
+
+**For each file matching the predicate**:
+
+1. If the referenced source file still exists at the transclusion path: rewrite the steering file using the new Step 3 schema. This may change `inclusion: always` to `inclusion: fileMatch` for subfolder sources, and rename the file to the new filename convention. If the rename would collide with another file, abort migration for this entry and report — same recovery path as Step 3 collision detection.
+2. If the source file no longer exists: delete the steering file (obsolete wiring).
+3. User-authored steering files (predicate fails) are skipped silently.
+
+**Idempotency**: re-running `--migrate` on an already-migrated workspace must produce no content delta. Before each rewrite, compute the would-be new file content and compare to the current file content (after the same input normalization above); if they are byte-equal, short-circuit and report as `skipped-already-current`. This avoids touching mtimes on a no-op re-run.
+
+Migration is opt-in by default to avoid surprising re-runs in already-wired workspaces. Without `--migrate`, Step 5 is skipped and existing wiring is preserved unchanged.
+
+**Migration report**: write to stdout, one action per line, in the format `<action>\t<path>\t<reason>` (tab-separated, three columns). Action values are an enumerated set: `rewritten`, `renamed`, `deleted`, `skipped-user-authored`, `skipped-collision`, `skipped-already-current`. The `<reason>` column is a short human-readable note (e.g., for `skipped-collision`: `target <other-filename> exists with conflicting content`). Step 4 (Report) summarizes counts per action class for the user.
+
+**Emission ordering**: emit each action line **after** the corresponding filesystem operation completes successfully (write, rename, or delete). Do NOT emit before the operation. This makes the report a faithful record of what is actually on disk — if the user hits Ctrl-C mid-run, every line they have already seen reflects a completed operation, and any in-progress operation that was interrupted is absent from the report. `skipped-*` actions emit immediately (no filesystem mutation involved). On filesystem error mid-operation, emit no line for that source and continue to the next; the error itself goes to stderr separately.
+
+## Rules
+
+- Never modify the original `AGENTS.md` / `CLAUDE.md` files or any source file under a subfolder's `.kiro/`. Step 3b writes nothing in the store repo except the `STORE` file that `store-resolver.py find-or-create` creates.
+- Only create, rewrite, rename, or delete files under the workspace-root `.kiro/steering/`. Rewrites and deletes are gated on the content-shape predicate in Step 5, **except the two reserved names**, which fail that predicate by design and are gated instead on Step 3b's three cases. Those cases never rewrite `__store__.md` in place, and delete `__store_memory__.md` in exactly one situation: it is a link to the target this step would itself have written, and that target no longer exists. User-authored steering is never touched either way. This skill does not edit `.gitignore` or `.git/info/exclude`; it says which one applies and leaves the edit to the user.
+- Use `inclusion: always` for workspace-root governance; `inclusion: fileMatch` with a `<subfolder>/**` pattern for subfolder governance and nested `.kiro/` content. `__store_memory__.md` carries no frontmatter at all — it is a link to a raw memory file, and steering frontmatter is not required on `kiro-cli` (measured, § Step 3b).
+- Keep the steering file minimal — frontmatter, optional one-line comment block, single transclusion line.
+- Idempotency: when a target steering filename already exists with matching content shape and the same source path, skip the write (see Step 3's collision detection for the three-case decision tree). For `__store_memory__.md` the matching test is on the link target, not on content — see Step 3b.2.
+- **Never create a symlink with Git Bash `ln -s` on Windows; it writes a copy.** Create with PowerShell `New-Item -ItemType SymbolicLink` and verify `LinkType` is exactly `SymbolicLink` afterwards. Never treat an unverified creation as success, and never leave behind an artifact that failed verification.

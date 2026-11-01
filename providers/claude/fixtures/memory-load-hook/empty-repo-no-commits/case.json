@@ -1,0 +1,16 @@
+{
+  "description": "A cited file in a repository with no commits yet: nothing to mark, and no 'marks missing' header.",
+  "git_no_commits": [
+    "cfg"
+  ],
+  "time_cap": 20,
+  "cwd": "{{ROOT}}/empty",
+  "regex": [
+    "^- Changed after verify$"
+  ],
+  "absent": [
+    "marks missing",
+    "marks omitted"
+  ],
+  "config_repo": "{{ROOT}}/cfg"
+}

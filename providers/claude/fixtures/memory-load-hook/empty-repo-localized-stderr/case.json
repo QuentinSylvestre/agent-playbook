@@ -1,0 +1,20 @@
+{
+  "description": "A repository with no commits whose git log fails with non-English stderr: decided by exit code (rev-parse), so still nothing to mark.",
+  "git_no_commits": [
+    "cfg"
+  ],
+  "time_cap": 20,
+  "cwd": "{{ROOT}}/empty",
+  "regex": [
+    "^- Changed after verify$"
+  ],
+  "absent": [
+    "marks missing",
+    "marks omitted"
+  ],
+  "config_repo": "{{ROOT}}/cfg",
+  "fake_git_log": {
+    "stderr": "fatal: Ihr aktueller Branch 'main' hat noch keine Commits\n",
+    "code": 128
+  }
+}

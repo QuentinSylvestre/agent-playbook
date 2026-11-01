@@ -1,0 +1,37 @@
+{
+  "description": "A split project: the `tasks 4-5 only` label (lower-case in dispatch.json, capital T in the return, as in the 2026-10-09 data) is merged and verified; the `sessions only` chunks are not Task-4 returns, so a heading one of them lists is not merged. A user-memory file is verified against user_memory.json's entries for that file.",
+  "now": "2026-10-12T12:00:00Z",
+  "units": [
+    "scope-names"
+  ],
+  "steps": [
+    {
+      "argv": [
+        "countverify"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/countverify.json": {
+          "files": [
+            {
+              "project": "{ROOT}/proj/alpha",
+              "labels": [
+                "A01"
+              ],
+              "task4_status": "checked",
+              "extra": [],
+              "missing": []
+            },
+            {
+              "project": "user memory",
+              "labels": [
+                "A04"
+              ],
+              "task4_status": "checked"
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

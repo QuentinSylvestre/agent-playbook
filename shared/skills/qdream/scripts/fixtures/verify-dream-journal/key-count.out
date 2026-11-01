@@ -1,0 +1,3 @@
+FAIL: line 1: must have exactly one key in {rename, remove}, got []
+FAIL: line 2: must have exactly one key in {rename, remove}, got [rename, remove]
+verify-dream-journal: ok=0 fail=2 warn=0

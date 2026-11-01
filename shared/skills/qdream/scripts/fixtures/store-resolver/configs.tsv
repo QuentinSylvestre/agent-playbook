@@ -1,0 +1,21 @@
+# .git/config fixtures for store-resolver.py --selftest. Each file in configs/ is copied to
+# <repo>/.git/config in a scratch repo, then identity(<repo>) is checked.
+# Columns: file in configs/, expected identity line ("remote host/path", or "local" meaning
+# the local identity of the repo folder). Expected values are written by hand from the Phase 2 contract.
+origin-only.config	remote github.com/owner/repo
+no-origin-one-remote.config	remote github.com/owner/repo
+two-remotes-no-origin.config	local
+origin-listed-second.config	remote github.com/org/real
+origin-without-url-one-other.config	remote github.com/org/other
+instead-of.config	remote github.com/owner/repo
+instead-of-longest.config	remote ghe.example/team/tool
+instead-of-https-mirror.config	remote mirror.example/o/r
+push-instead-of-ignored.config	remote github.com/o/r
+comments-quotes-case.config	remote github.com/owner/repo
+azure-ssh.config	remote dev.azure.com/org/proj/repo
+ssh-443.config	remote github.com/owner/repo
+credentials.config	remote git.example.internal/core/mono
+no-remote.config	local
+filesystem-remote.config	local
+include-not-followed.config	local
+continuation-line.config	remote github.com/owner/repo

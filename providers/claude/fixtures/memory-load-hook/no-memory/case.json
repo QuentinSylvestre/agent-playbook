@@ -1,0 +1,10 @@
+{
+  "description": "A folder with no store match and no memory/: the index is emitted with a none-found line.",
+  "cwd": "{{ROOT}}/empty",
+  "contains": [
+    "Project memory: none found",
+    "- User entry one",
+    "- Higher-order entry one"
+  ],
+  "config_repo": "{{ROOT}}/cfg"
+}

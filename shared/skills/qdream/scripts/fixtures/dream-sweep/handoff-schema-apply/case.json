@@ -1,0 +1,70 @@
+{
+  "description": "apply.json: commits and not_committed lists, push_plan a string or null, report a string.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/apply.json": "{\n  \"commits\": [],\n  \"not_committed\": [\n    {\n      \"path\": \"x\",\n      \"reason\": \"dirty at Orient\"\n    }\n  ],\n  \"push_plan\": null,\n  \"report\": \"handoff/report.md\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "apply.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check apply.json: ok"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/apply.json": "{\n  \"commits\": [],\n  \"not_committed\": [\n    {\n      \"path\": \"x\",\n      \"reason\": \"dirty at Orient\"\n    }\n  ],\n  \"push_plan\": null,\n  \"report\": null\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "apply.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "key 'report': expected str"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/apply.json": "{\n  \"not_committed\": [\n    {\n      \"path\": \"x\",\n      \"reason\": \"dirty at Orient\"\n    }\n  ],\n  \"push_plan\": null,\n  \"report\": \"handoff/report.md\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "apply.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "missing key 'commits'"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/apply.json": "{\n  \"commits\": [],\n  \"not_committed\": \"none\",\n  \"push_plan\": null,\n  \"report\": \"handoff/report.md\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "apply.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "key 'not_committed': expected list"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "description": "Every credential pattern fires on its positive line (right line number) and not on its near miss.",
+  "now": "2026-10-12T12:00:00Z",
+  "setup": [],
+  "steps": [],
+  "units": [
+    "credential-patterns"
+  ]
+}

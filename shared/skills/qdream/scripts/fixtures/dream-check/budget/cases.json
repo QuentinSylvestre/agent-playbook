@@ -1,0 +1,152 @@
+{
+  "description": "Budget and extract over a small tree laid out like the config repo. memory-rules.md's `## Memory File Format` holds a fenced template whose `## Feedback` heading must not end the section; `## Dedup Check Procedure` is read without its `### Native-memory harvest dedup` sub-section, and `## Type Taxonomy` without `### Provenance re-open & auto-demotion`; an --exclude naming an absent heading fails. memory/MEMORY.md + memory/HIGHER_ORDER.md hold 17 words: the memory row exits 0 under and over its pin. plan 261027 SC-4: extract --step prints one step from its `[ID]` tag line to the next step's tag line or a heading at or above the step's section level; a tag inside a fence or repeated on its own line is not a second definition, a deeper heading does not end the step, --intro prepends the section heading and its text before its first step, and a step defined twice or absent exits 1.",
+  "core": 18,
+  "lightweight": 90,
+  "memory": 17,
+  "budget_lines": [
+    "budget: core 18 words -- unpinned",
+    "budget: lightweight 90 words -- unpinned",
+    "budget: kiro core 21 words",
+    "budget: kiro lightweight 97 words",
+    "budget: memory 17 words -- unpinned (warn only)",
+    "lightweight shared/skills/qdream/memory-rules.md § ## Memory File Format (without ### [improvement_signal] sub-form, ### Governance-conflict adjudication): 24",
+    "lightweight shared/skills/qdream/memory-rules.md § ## Dedup Check Procedure (without ### Native-memory harvest dedup): 12",
+    "lightweight shared/skills/qdream/memory-rules.md § ## Type Taxonomy (without ### Provenance re-open & auto-demotion): 5"
+  ],
+  "extract_cases": [
+    {
+      "name": "fenced-heading-inside-section",
+      "file": "shared/skills/qdream/memory-rules.md",
+      "section": "## Memory File Format",
+      "contains": [
+        "fenced template words",
+        "meta words"
+      ],
+      "not_contains": [
+        "excluded one two"
+      ]
+    },
+    {
+      "name": "heading-text-any-level",
+      "file": "shared/skills/qdream/memory-rules.md",
+      "section": "Resolution contract",
+      "contains": [
+        "alpha beta gamma delta"
+      ],
+      "not_contains": [
+        "Entry format words"
+      ]
+    },
+    {
+      "name": "sub-section-excluded",
+      "file": "shared/skills/qdream/memory-rules.md",
+      "section": "## Dedup Check Procedure",
+      "exclude": [
+        "### Native-memory harvest dedup"
+      ],
+      "contains": [
+        "dedup words here",
+        "merge words"
+      ],
+      "not_contains": [
+        "native words"
+      ]
+    },
+    {
+      "name": "level-mismatch",
+      "file": "shared/skills/qdream/memory-rules.md",
+      "section": "### Exclusion List",
+      "exit": 1
+    },
+    {
+      "name": "heading-only-inside-fence",
+      "file": "shared/skills/qdream/memory-rules.md",
+      "section": "## Feedback",
+      "exit": 1
+    },
+    {
+      "name": "absent-exclude-fails",
+      "file": "shared/skills/qdream/memory-rules.md",
+      "section": "## Dedup Check Procedure",
+      "exclude": [
+        "### No such heading"
+      ],
+      "exit": 1
+    },
+    {
+      "name": "step-ends-at-next-tag",
+      "file": "shared/skills/qdream/sweep-steps.md",
+      "step": "FIX-ONE",
+      "contains": [
+        "First step words",
+        "first sub-bullet words"
+      ],
+      "not_contains": [
+        "Second step words",
+        "Phase rule words",
+        "Top intro words"
+      ]
+    },
+    {
+      "name": "step-fence-and-deeper-heading-kept",
+      "file": "shared/skills/qdream/sweep-steps.md",
+      "step": "FIX-TWO",
+      "contains": [
+        "Second step words",
+        "fenced words stay in FIX-TWO",
+        "Deeper heading words stay in FIX-TWO"
+      ],
+      "not_contains": [
+        "Last step words",
+        "First step words"
+      ]
+    },
+    {
+      "name": "step-ends-at-section-heading",
+      "file": "shared/skills/qdream/sweep-steps.md",
+      "step": "FIX-THREE",
+      "contains": [
+        "Last step words"
+      ],
+      "not_contains": [
+        "Next phase words",
+        "Doubled one"
+      ]
+    },
+    {
+      "name": "step-intro",
+      "file": "shared/skills/qdream/sweep-steps.md",
+      "step": "FIX-THREE",
+      "intro": true,
+      "contains": [
+        "### Phase 9 — Fixture",
+        "Phase rule words",
+        "Last step words"
+      ],
+      "not_contains": [
+        "First step words",
+        "Second step words",
+        "Top intro words",
+        "Next phase words"
+      ]
+    },
+    {
+      "name": "step-defined-twice",
+      "file": "shared/skills/qdream/sweep-steps.md",
+      "step": "FIX-DUP",
+      "exit": 1
+    },
+    {
+      "name": "step-fenced-only-is-absent",
+      "file": "shared/skills/qdream/sweep-steps.md",
+      "step": "FIX-FENCED",
+      "exit": 1
+    },
+    {
+      "name": "step-absent",
+      "file": "shared/skills/qdream/sweep-steps.md",
+      "step": "FIX-NONE",
+      "exit": 1
+    }
+  ]
+}

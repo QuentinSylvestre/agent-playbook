@@ -1,0 +1,20 @@
+{
+  "description": "The no-store read rule: the store repo exists but cannot be read (one STORE is a directory), so an in-workspace memory/MEMORY.md is not shown even in a no-create folder; the note says project memory cannot be shown.",
+  "cwd": "{{ROOT}}/proj",
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores",
+  "unreadable_store": [
+    "zzz-bad-000000"
+  ],
+  "contains": [
+    "Project memory: none found",
+    "Note: store repo unreadable:",
+    "project memory kept there cannot be shown (resolve it with /qconfig-sync).",
+    "- User entry one"
+  ],
+  "absent": [
+    "Workspace entry beta",
+    "delivered in full",
+    "Note: the store repo ("
+  ]
+}

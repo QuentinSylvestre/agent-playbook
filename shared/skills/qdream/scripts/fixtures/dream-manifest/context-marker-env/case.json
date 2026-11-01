@@ -1,0 +1,24 @@
+{
+  "description": "plan 261027 SC-2: without --session, `context` finds the transcript of CLAUDE_CODE_SESSION_ID under ~/.claude/projects/*/; --marker picks the one sub-agent file whose first user record contains the phase agent's brief path (context 90), and the default limit is PHASE_CONTEXT_LIMIT (200000), not exceeded.",
+  "now": "2026-10-27T12:00:00Z",
+  "env": {
+    "CLAUDE_CODE_SESSION_ID": "b5a00000-0000-4000-8000-000000000031"
+  },
+  "argv": [
+    "context",
+    "--marker",
+    "briefs/phase-synthesize-2.md"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_contains": [
+      "agent-a0000000000000031.jsonl\n",
+      "context: 90 tokens at the last model call (2026-10-27T10:00:03Z)\n",
+      "over limit: no (limit 200000)\n"
+    ],
+    "stdout_not_contains": [
+      "502 tokens",
+      "60 tokens"
+    ]
+  }
+}

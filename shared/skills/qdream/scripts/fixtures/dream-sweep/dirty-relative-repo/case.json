@@ -1,0 +1,64 @@
+{
+  "description": "Phase 8 fix: `manifest --repo .` and `dirty --repo .` run from inside the config repo record absolute candidate paths (user_memory.json's files are absolute), so a later `drift --phase gather` accepts them instead of refusing 'is outside the config repo'.",
+  "now": "2026-10-12T12:00:00Z",
+  "git": [
+    "repo"
+  ],
+  "write": {
+    "repo/README.md": "# repo\n",
+    "repo/memory/MEMORY.md": "# Memory\n",
+    "repo/memory/topics/git.md": "# Memory\n\n## Feedback\n\n### Rel one\n\n**Why**: fixture.\n**How to apply**: fixture.\n**Source**: fixture | **Verified**: 2026-09-01\n",
+    "repo/memory/.dream-state.json": "{\n  \"schema_version\": 3,\n  \"last_run\": \"2026-10-01T00:00:00Z\",\n  \"projects\": {\n    \"{ROOT}/proj/alpha\": {\n      \"last_analyzed\": \"2026-10-01T00:00:00Z\"\n    }\n  },\n  \"rejected_lessons\": [],\n  \"outcome_tags\": [],\n  \"episodic_ledger\": [],\n  \"cost_records\": [],\n  \"model_routing\": {},\n  \"deferred_sessions\": {},\n  \"quiet_sweeps\": {}\n}\n",
+    "proj/alpha/AGENTS.md": "# alpha\n"
+  },
+  "manifest": [],
+  "manifest_relative": true,
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "."
+      ],
+      "cwd": "repo",
+      "exit": 0,
+      "files": {
+        "sweep/dirty-at-orient.json": {
+          "repo": "{ROOT}/repo",
+          "candidates": {
+            "{ROOT}/repo/memory/MEMORY.md": {
+              "repo": "{ROOT}/repo",
+              "git": "tracked"
+            },
+            "{ROOT}/repo/memory/topics/git.md": {
+              "repo": "{ROOT}/repo",
+              "git": "tracked"
+            }
+          }
+        }
+      },
+      "text_not_contains": {
+        "sweep/dirty-at-orient.json": [
+          "\"memory/",
+          "\"memory\\\\"
+        ]
+      }
+    },
+    {
+      "argv": [
+        "drift",
+        "--phase",
+        "gather"
+      ],
+      "exit": 0,
+      "stdout_not_contains": [
+        "outside the config repo"
+      ],
+      "files": {
+        "sweep/drift-gather.json": {
+          "entries": []
+        }
+      }
+    }
+  ]
+}

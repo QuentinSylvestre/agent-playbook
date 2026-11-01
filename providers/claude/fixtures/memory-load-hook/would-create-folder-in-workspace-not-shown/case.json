@@ -1,0 +1,14 @@
+{
+  "description": "The no-store read rule: a normal folder (one where find-or-create would create a store; `would_create` names no system temp directory) with an in-workspace memory/MEMORY.md and no store: the copy is a leftover and is not shown.",
+  "cwd": "{{ROOT}}/proj",
+  "config_repo": "{{ROOT}}/cfg",
+  "would_create": true,
+  "contains": [
+    "Project memory: none found",
+    "- User entry one"
+  ],
+  "absent": [
+    "Workspace entry beta",
+    "delivered in full"
+  ]
+}

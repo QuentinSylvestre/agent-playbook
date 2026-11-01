@@ -1,0 +1,159 @@
+{
+  "description": "drafts.json: each item has a unique id, kind governance or retirement, code (bool), target_file, heading, proposal, blast (null or a sweep/blast/<name>.json file, no '..') and for_conflict (DRAFT_ITEM). brief --kind drafter renders one live Dream Drafter Brief per item (D01, D02 in item order) with the item, its absolute blast_path and config_repo (null here: no snapshot) in the data file, and refuses a drafts.json that fails the check (the earlier render's files stay; a refused render writes nothing new).",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"G2\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"Step 6: Push\",\n      \"proposal\": \"List unpushed commits before pushing.\",\n      \"blast\": \"sweep/blast/demo-1a2b3c4d.json\",\n      \"for_conflict\": null\n    },\n    {\n      \"id\": \"C7\",\n      \"kind\": \"retirement\",\n      \"code\": true,\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": null,\n      \"proposal\": \"List unpushed commits before pushing.\",\n      \"blast\": null,\n      \"for_conflict\": \"C3\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "handoff check drafts.json: ok"
+      ]
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "drafter",
+        "--items",
+        "drafts.json"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "Dream Drafter Brief D01. Read and follow ",
+        "Dream Drafter Brief D02. Read and follow "
+      ],
+      "text_contains": {
+        "sweep/briefs/D01.data.json": [
+          "\"id\": \"G2\"",
+          "demo-1a2b3c4d.json\""
+        ],
+        "sweep/briefs/D02.data.json": [
+          "\"id\": \"C7\"",
+          "\"blast_path\": null",
+          "\"config_repo\": null"
+        ],
+        "sweep/briefs/D01.md": [
+          "You are drafter D01 of a `/qdream` full sweep."
+        ]
+      }
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"G2\",\n      \"kind\": \"conflict\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"Step 6: Push\",\n      \"proposal\": \"List unpushed commits before pushing.\",\n      \"blast\": \"sweep/blast/demo-1a2b3c4d.json\",\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "item 1: key 'kind': expected one of governance, retirement"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"G2\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"Step 6: Push\",\n      \"proposal\": \"List unpushed commits before pushing.\",\n      \"blast\": \"sweep/blast/demo-1a2b3c4d.json\",\n      \"for_conflict\": null\n    },\n    {\n      \"id\": \"G2\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"Step 6: Push\",\n      \"proposal\": \"List unpushed commits before pushing.\",\n      \"blast\": \"sweep/blast/demo-1a2b3c4d.json\",\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "item 2: id must be non-empty and unique"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"G2\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"Step 6: Push\",\n      \"proposal\": \"List unpushed commits before pushing.\",\n      \"blast\": \"sweep/returns/A01.json\",\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "item 1: blast must name a sweep/blast/<name>.json file"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"G2\",\n      \"kind\": \"governance\",\n      \"code\": false,\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"Step 6: Push\",\n      \"proposal\": \"List unpushed commits before pushing.\",\n      \"blast\": \"sweep/blast/../returns/A01.json\",\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "item 1: blast must name a sweep/blast/<name>.json file"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"G2\",\n      \"kind\": \"governance\",\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"Step 6: Push\",\n      \"proposal\": \"List unpushed commits before pushing.\",\n      \"blast\": \"sweep/blast/demo-1a2b3c4d.json\",\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "item 1: missing key 'code'"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/drafts.json": "{\n  \"items\": [\n    {\n      \"id\": \"G2\",\n      \"kind\": \"governance\",\n      \"code\": \"no\",\n      \"target_file\": \"shared/skills/demo/SKILL.md\",\n      \"heading\": \"Step 6: Push\",\n      \"proposal\": \"List unpushed commits before pushing.\",\n      \"blast\": \"sweep/blast/demo-1a2b3c4d.json\",\n      \"for_conflict\": null\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "drafts.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "item 1: key 'code': expected bool"
+      ]
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "drafter",
+        "--items",
+        "drafts.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "refused: handoff/drafts.json: item 1: key 'code': expected bool"
+      ]
+    }
+  ]
+}

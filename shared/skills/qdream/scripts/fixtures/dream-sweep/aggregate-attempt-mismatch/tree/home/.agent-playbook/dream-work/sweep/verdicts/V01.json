@@ -1,0 +1,17 @@
+{
+  "label": "V01",
+  "kind": "verifier",
+  "return": {
+    "verdicts": [
+      {
+        "item_id": "V01-001",
+        "verdict": "confirmed",
+        "citation": "span"
+      }
+    ],
+    "unverified_item_ids": [
+      "V01-003"
+    ],
+    "notes": null
+  }
+}

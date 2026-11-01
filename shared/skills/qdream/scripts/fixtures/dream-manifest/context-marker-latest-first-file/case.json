@@ -1,0 +1,21 @@
+{
+  "description": "Review R9 (plan 261027): the same two files with the times swapped (...31 began at 10:05:00Z, ...32 at 10:00:00Z): the file taken follows the first-record time, not the file name or order (90 tokens).",
+  "now": "2026-10-27T12:00:00Z",
+  "argv": [
+    "context",
+    "--session",
+    "{ROOT}/home/.claude/projects/-ROOT-proj/b5a00000-0000-4000-8000-000000000031.jsonl",
+    "--marker",
+    "Brief"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_contains": [
+      "note: --marker matched 2 sub-agent transcripts; took the one whose first record is the latest (agent-a0000000000000031.jsonl, 2026-10-27T10:05:00Z)\n",
+      "context: 90 tokens at the last model call (2026-10-27T10:05:03Z)\n"
+    ],
+    "stdout_not_contains": [
+      "60 tokens"
+    ]
+  }
+}

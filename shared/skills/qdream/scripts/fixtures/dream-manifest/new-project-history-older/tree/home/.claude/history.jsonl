@@ -1,0 +1,4 @@
+{"display": "beta old history-only prompt", "pastedContents": {}, "timestamp": 1789117200000, "project": "{ROOT}/proj/beta", "sessionId": "e1a00000-0000-4000-8000-000000000001"}
+{"display": "gamma first old prompt", "pastedContents": {}, "timestamp": 1789030800000, "project": "{ROOT}/proj/gamma", "sessionId": "e1a00000-0000-4000-8000-000000000002"}
+{"display": "gamma second old prompt", "pastedContents": {}, "timestamp": 1789203600000, "project": "{ROOT}/proj/gamma", "sessionId": "e1a00000-0000-4000-8000-000000000002"}
+{"display": "delta old prompt read in full", "pastedContents": {}, "timestamp": 1789290000000, "project": "{ROOT}/proj/delta", "sessionId": "e1a00000-0000-4000-8000-000000000003"}

@@ -1,0 +1,28 @@
+{
+  "description": "A return written before `notes` and `sessions_unreadable` existed, and a `sessions only` return without task4_status, extract with notes null, sessions_unreadable [] and task4_status null.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "task4",
+        "--label",
+        "A05",
+        "--from-file",
+        "inbox/A05.txt"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/returns/A05.json": {
+          "return": {
+            "notes": null,
+            "sessions_unreadable": [],
+            "task4_status": null,
+            "scope": "sessions only"
+          }
+        }
+      }
+    }
+  ]
+}

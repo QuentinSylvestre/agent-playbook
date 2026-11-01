@@ -1,0 +1,46 @@
+{
+  "description": "First run (no state file) when the config repo's last commit time cannot be read (git fails: here .git names a missing directory): projects absent from the state are read in full -- baseline_rule full, never labelled first_run_commit -- and errors[] says why.",
+  "now": "2026-09-24T12:00:00Z",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "write": {
+    "repo/.git": "gitdir: {ROOT}/no-such-git-dir\n"
+  },
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "new_project_baseline": {
+        "rule": "full",
+        "since": null
+      },
+      "errors": [
+        "$contains:config repo's last commit time is unreadable"
+      ],
+      "projects": {
+        "{ROOT}/proj/gamma": {
+          "status": "new",
+          "baseline_rule": "full",
+          "older_sessions_not_read": 0,
+          "sessions": [
+            {
+              "id": "d3a00000-0000-4000-8000-000000000001",
+              "boundary": "L1"
+            },
+            {
+              "id": "d3a00000-0000-4000-8000-000000000002",
+              "boundary": "L1"
+            }
+          ]
+        }
+      }
+    },
+    "json_not_contains": [
+      "first_run_commit"
+    ]
+  }
+}

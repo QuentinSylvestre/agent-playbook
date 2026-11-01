@@ -1,0 +1,33 @@
+{
+  "description": "plan 261016 Phase 5 cycle-2 fix 4: a `store:` key whose store directory exists but whose STORE file is invalid is kept (known) with the reason, not reported removed; an unrelated key whose directory is gone is still removed. The invalid directory is named by the hash of the key's identity (sha256 of the identity line plus a newline), here e57c06.",
+  "now": "2026-09-24T12:00:00Z",
+  "store_repo": "stores",
+  "argv": [
+    "manifest",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "manifest": {
+      "projects": {
+        "store:remote example.com/org/bad": {
+          "status": "known",
+          "memory_file": null,
+          "sessions": [],
+          "errors": [
+            "$contains:its STORE file is invalid"
+          ]
+        },
+        "store:remote example.com/org/gone": {
+          "status": "removed",
+          "memory_file": null,
+          "sessions": [],
+          "errors": []
+        }
+      }
+    }
+  }
+}

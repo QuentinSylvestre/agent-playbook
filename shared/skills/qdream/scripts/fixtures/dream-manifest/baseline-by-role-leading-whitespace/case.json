@@ -1,0 +1,21 @@
+{
+  "description": "baseline --by-role: an other sub-agent whose first user record text starts with 100 whitespace characters shows the collapsed text (whitespace is collapsed before the 80-character truncation), not `(first user record has no text)`.",
+  "now": "2026-10-06T12:00:00Z",
+  "argv": [
+    "baseline",
+    "--session",
+    "{ROOT}/home/.claude/projects/-ROOT-proj/b5a00000-0000-4000-8000-000000000008.jsonl",
+    "--by-role"
+  ],
+  "expect": {
+    "exit": 0,
+    "stdout_contains": [
+      "role other: files 1, tokens: 68\n",
+      "other: agent-a0000000000000001.jsonl: Unrecognised brief marker text\n"
+    ],
+    "stdout_not_contains": [
+      "error:",
+      "(first user record has no text)"
+    ]
+  }
+}

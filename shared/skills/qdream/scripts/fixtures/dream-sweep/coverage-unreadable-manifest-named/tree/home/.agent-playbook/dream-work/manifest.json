@@ -1,0 +1,223 @@
+{
+  "snapshot_at": "2026-10-12T12:00:00Z",
+  "sweep_due": false,
+  "due_sessions": 0,
+  "new_project_baseline": {
+    "rule": "last_run",
+    "since": "2026-10-01T00:00:00Z"
+  },
+  "errors": [],
+  "empty_sessions": 0,
+  "unattributed": "unattributed.json",
+  "watermarks_to_clear": [],
+  "user_memory": {
+    "detail": "user_memory.json",
+    "counts": {
+      "files": 0,
+      "entries": 0,
+      "suspects": 0
+    },
+    "quiet_sweeps": 0,
+    "memory_pass": null,
+    "memory_flags": [],
+    "file_flags": {},
+    "file_suspects": {}
+  },
+  "projects": {
+    "{ROOT}/proj/alpha": {
+      "status": "known",
+      "discovered_by": [
+        "state"
+      ],
+      "subdirectory_of": null,
+      "baseline_rule": "state",
+      "older_sessions_not_read": 0,
+      "empty_sessions": 0,
+      "counts": {
+        "sessions": 2,
+        "entries": 1,
+        "suspects": 0,
+        "new_plans": 0,
+        "errors": 1
+      },
+      "sessions": [
+        {
+          "id": "s1",
+          "provider": "claude",
+          "source": "{ROOT}/home/.claude/projects/-ROOT-proj-alpha/s1.jsonl",
+          "first_activity": "2026-10-05T10:00:00Z",
+          "stripped": "sessions/claude-s1.txt",
+          "bytes": 10,
+          "boundary": "L1",
+          "kind": "normal"
+        },
+        {
+          "id": "s2",
+          "provider": "claude",
+          "source": "{ROOT}/home/.claude/projects/-ROOT-proj-alpha/s2.jsonl",
+          "first_activity": "2026-10-05T10:00:00Z",
+          "stripped": "sessions/claude-s2.txt",
+          "bytes": 10,
+          "boundary": "L1",
+          "kind": "normal"
+        }
+      ],
+      "errors": [
+        "unparseable line L7 in {ROOT}/home/.claude/projects/-ROOT-proj-alpha/s2.jsonl"
+      ],
+      "due": false,
+      "fork_collapsed": [],
+      "memory_file": "{ROOT}/proj/alpha/memory/MEMORY.md",
+      "detail": "projects/alpha.json",
+      "quiet_sweeps": 0,
+      "memory_pass": null,
+      "memory_flags": []
+    },
+    "{ROOT}/proj/beta": {
+      "status": "known",
+      "discovered_by": [
+        "state"
+      ],
+      "subdirectory_of": null,
+      "baseline_rule": "state",
+      "older_sessions_not_read": 0,
+      "empty_sessions": 0,
+      "counts": {
+        "sessions": 1,
+        "entries": 1,
+        "suspects": 0,
+        "new_plans": 0,
+        "errors": 1
+      },
+      "sessions": [
+        {
+          "id": "b1",
+          "provider": "claude",
+          "source": "{ROOT}/home/.claude/projects/-ROOT-proj-beta/b1.jsonl",
+          "first_activity": "2026-10-05T10:00:00Z",
+          "stripped": "sessions/claude-b1.txt",
+          "bytes": 10,
+          "boundary": "L1",
+          "kind": "normal"
+        }
+      ],
+      "errors": [
+        "unreadable {ROOT}/home/.claude/projects/-ROOT-proj-beta/b9.jsonl: OSError: [Errno 13] Permission denied"
+      ],
+      "due": false,
+      "fork_collapsed": [],
+      "memory_file": "{ROOT}/proj/beta/memory/MEMORY.md",
+      "detail": "projects/beta.json",
+      "quiet_sweeps": 0,
+      "memory_pass": null,
+      "memory_flags": []
+    },
+    "{ROOT}/proj/gamma": {
+      "status": "known",
+      "discovered_by": [
+        "state"
+      ],
+      "subdirectory_of": null,
+      "baseline_rule": "state",
+      "older_sessions_not_read": 0,
+      "empty_sessions": 0,
+      "counts": {
+        "sessions": 1,
+        "entries": 1,
+        "suspects": 0,
+        "new_plans": 0,
+        "errors": 1
+      },
+      "sessions": [
+        {
+          "id": "g1",
+          "provider": "claude",
+          "source": "{ROOT}/home/.claude/projects/-ROOT-proj-gamma/g1.jsonl",
+          "first_activity": "2026-10-05T10:00:00Z",
+          "stripped": "sessions/claude-g1.txt",
+          "bytes": 10,
+          "boundary": "L1",
+          "kind": "normal"
+        }
+      ],
+      "errors": [
+        "Kiro session k1 shows activity (lastModifiedAt 2026-10-05T10:00:00Z, createdAt 2026-10-05T09:00:00Z) but has no messages.jsonl (not read): {ROOT}/home/.kiro/sessions/x/k1"
+      ],
+      "due": false,
+      "fork_collapsed": [],
+      "memory_file": "{ROOT}/proj/gamma/memory/MEMORY.md",
+      "detail": "projects/gamma.json",
+      "quiet_sweeps": 0,
+      "memory_pass": null,
+      "memory_flags": []
+    },
+    "{ROOT}/proj/delta": {
+      "status": "known",
+      "discovered_by": [
+        "state"
+      ],
+      "subdirectory_of": null,
+      "baseline_rule": "state",
+      "older_sessions_not_read": 0,
+      "empty_sessions": 0,
+      "counts": {
+        "sessions": 1,
+        "entries": 1,
+        "suspects": 0,
+        "new_plans": 0,
+        "errors": 2
+      },
+      "sessions": [
+        {
+          "id": "d1",
+          "provider": "claude",
+          "source": "{ROOT}/home/.claude/projects/-ROOT-proj-delta/d1.jsonl",
+          "first_activity": "2026-10-05T10:00:00Z",
+          "stripped": "sessions/claude-d1.txt",
+          "bytes": 10,
+          "boundary": "L1",
+          "kind": "normal"
+        }
+      ],
+      "errors": [
+        "unreadable plan {ROOT}/proj/delta/plans/done/x.md: OSError: boom",
+        "unreadable memory file {ROOT}/proj/delta/memory/OTHER.md"
+      ],
+      "due": false,
+      "fork_collapsed": [],
+      "memory_file": "{ROOT}/proj/delta/memory/MEMORY.md",
+      "detail": "projects/delta.json",
+      "quiet_sweeps": 0,
+      "memory_pass": null,
+      "memory_flags": []
+    },
+    "{ROOT}/proj/q": {
+      "status": "known",
+      "discovered_by": [
+        "state"
+      ],
+      "subdirectory_of": null,
+      "baseline_rule": "state",
+      "older_sessions_not_read": 0,
+      "empty_sessions": 0,
+      "counts": {
+        "sessions": 0,
+        "entries": 1,
+        "suspects": 0,
+        "new_plans": 0,
+        "errors": 1
+      },
+      "sessions": [],
+      "errors": [
+        "unreadable {ROOT}/home/.claude/projects/-ROOT-proj-q/q9.jsonl: UnicodeDecodeError: bad"
+      ],
+      "due": false,
+      "fork_collapsed": [],
+      "memory_file": "{ROOT}/proj/q/memory/MEMORY.md",
+      "detail": "projects/q.json",
+      "quiet_sweeps": 0,
+      "memory_pass": null,
+      "memory_flags": []
+    }
+  }
+}

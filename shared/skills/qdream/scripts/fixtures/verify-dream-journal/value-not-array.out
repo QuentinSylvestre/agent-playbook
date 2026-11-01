@@ -1,0 +1,5 @@
+FAIL: line 1: value must be a 2-element array
+FAIL: line 2: value must be a 2-element array
+FAIL: line 3: value must be a 2-element array
+FAIL: line 4: value must be a 2-element array
+verify-dream-journal: ok=0 fail=4 warn=0

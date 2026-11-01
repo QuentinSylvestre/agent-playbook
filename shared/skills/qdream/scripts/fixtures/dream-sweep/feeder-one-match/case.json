@@ -1,0 +1,45 @@
+{
+  "description": "[SYN-WRITE] plan feeder: a heading matching exactly one entry after whitespace collapse, trim and lower-casing is bumped once even when two plans name it; punctuation is not normalized (0 matches -> unresolved); the three places include topic files.",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "feeder"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "Usage from plans: 2 bumped, 1 unresolved, 0 dropped by the manifest cap"
+      ],
+      "files": {
+        "sweep/feeder.json": {
+          "ops": [
+            {
+              "id": "feeder-001",
+              "op": "usage_bump",
+              "file": "{ROOT}/proj/alpha/memory/MEMORY.md",
+              "heading": "Use the cache wisely"
+            },
+            {
+              "id": "feeder-002",
+              "op": "usage_bump",
+              "file": "{ROOT}/repo/memory/topics/x.md",
+              "heading": "Topic lesson"
+            }
+          ],
+          "unresolved": [
+            {
+              "heading": "Use the cache wisely.",
+              "reason": "0 matches",
+              "plan": "261005-1200_ONE.md"
+            }
+          ],
+          "counts": {
+            "bumped": 2,
+            "unresolved": 1,
+            "dropped": 0
+          }
+        }
+      }
+    }
+  ]
+}

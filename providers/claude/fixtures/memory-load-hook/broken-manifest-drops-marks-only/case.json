@@ -1,0 +1,15 @@
+{
+  "cwd": "{{ROOT}}/proj",
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores",
+  "description": "dream-manifest.py cannot load: the marks are omitted (the header says so) and every tier is still shown.",
+  "broken_helper": 2,
+  "contains": [
+    "- User entry one",
+    "Store entry alpha",
+    "marks omitted: dream-manifest.py could not load"
+  ],
+  "absent": [
+    "failed open"
+  ]
+}

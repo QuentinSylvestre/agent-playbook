@@ -1,0 +1,16 @@
+{
+  "description": "Step 0: the config repo with no store of its own; its memory/ is the user tier and is never read as project memory.",
+  "git": [
+    "cfg"
+  ],
+  "cwd": "{{ROOT}}/cfg",
+  "contains": [
+    "Project memory: none found",
+    "- User entry one"
+  ],
+  "absent": [
+    "delivered in full",
+    "Project memory ("
+  ],
+  "config_repo": "{{ROOT}}/cfg"
+}

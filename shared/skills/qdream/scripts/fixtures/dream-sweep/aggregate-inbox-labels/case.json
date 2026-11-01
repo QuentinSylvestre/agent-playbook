@@ -1,0 +1,59 @@
+{
+  "description": "X6: aggregate counts and prints the verifier labels whose bound verdict came from the inbox (via inbox) and lists them in synth.json inbox_returns. V01's verdict came from the inbox, V02's from a transcript: only V01 is named; a verifier with no verdict is not an inbox label. (Item joins as in aggregate-missing-verdict.)",
+  "now": "2026-10-12T12:00:00Z",
+  "steps": [
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "verifier",
+        "--label",
+        "V01",
+        "--from-file",
+        "inbox/V01.txt"
+      ],
+      "exit": 0,
+      "files": {
+        "sweep/verdicts/V01.json": {
+          "attempt": 1,
+          "data": "sweep/briefs/V01.data.json",
+          "data_sha256": "$nonnull"
+        }
+      }
+    },
+    {
+      "argv": [
+        "extract",
+        "--kind",
+        "verifier",
+        "--label",
+        "V02",
+        "--claude-agent",
+        "a2222222222222222"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "aggregate"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "returns from the inbox (--from-file, no transcript check): 1 (V01)"
+      ],
+      "stdout_not_contains": [
+        "(V01, V02)"
+      ],
+      "files": {
+        "sweep/synth.json": {
+          "inbox_returns": [
+            "V01"
+          ]
+        }
+      }
+    }
+  ],
+  "env": {
+    "CLAUDE_CODE_SESSION_ID": "5e550000-0000-4000-8000-000000000001"
+  }
+}
