@@ -89,7 +89,8 @@ jobs:
             for f in "$RUNNER_TEMP/checks/$name".out "$RUNNER_TEMP/checks/$name".err; do
               [ -s "$f" ] || continue
               echo "::group::$name ($(basename "$f"))"
-              grep -vE '^(OK|ok|PASS)([[:space:]]|$)' "$f" | head -150
+              # no non-OK line is not an error: never let grep's exit 1 end the step under pipefail
+              { grep -vE '^(OK|ok|PASS)([[:space:]]|$)' "$f" || true; } | head -150
               echo "::endgroup::"
             done
           done
