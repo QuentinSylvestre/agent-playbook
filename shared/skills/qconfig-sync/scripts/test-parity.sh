@@ -863,9 +863,11 @@ sys.stdout.write("".join(l + "\n" for l in out))
 '
         sp_tree_listing_py() {
             local sroot="$1" home_raw="$2" repo_raw="$3" ide_prefix="$4"
-            local native_root="$sroot" repo_m="" repo_w=""
+            local native_root="$sroot" repo_m="" repo_w="" home_m="$home_raw"
             if command -v cygpath >/dev/null 2>&1; then
                 native_root="$(cygpath -w "$sroot")"
+                # the home in mixed form (C:/Users/...): setup.sh writes the pointer file's paths so
+                home_m="$(cygpath -m "$home_raw")"
                 repo_m="$(cygpath -m "$REPO_ROOT")"
                 repo_w="$(cygpath -m "$SP_REPO_ROOT_W")"
             fi
@@ -875,9 +877,10 @@ sys.stdout.write("".join(l + "\n" for l in out))
             # into Windows form before Python sees them, and those needles
             # would never match the files. native_root is converted above.
             MSYS_NO_PATHCONV=1 MSYS2_ARG_CONV_EXCL='*' \
-            parity_python -c "$SP_TREE_PY" "$native_root" "$ide_prefix" 7 \
+            parity_python -c "$SP_TREE_PY" "$native_root" "$ide_prefix" 8 \
                 "$home_raw" '<USER_HOME>' \
                 "${home_raw//\\//}" '<USER_HOME>' \
+                "$home_m" '<USER_HOME>' \
                 "$repo_raw" '<PLAYBOOK_ROOT>' \
                 "${repo_raw//\\//}" '<PLAYBOOK_ROOT>' \
                 "$REPO_ROOT" '<PLAYBOOK_ROOT>' \
@@ -903,9 +906,12 @@ sys.stdout.write("".join(l + "\n" for l in out))
             # machine where that example equals the real repo root, masking
             # only this sandbox's native form would produce a spurious
             # cross-sandbox hash mismatch on content that never differed.
+            local home_m="$home_raw"
+            command -v cygpath >/dev/null 2>&1 && home_m="$(cygpath -m "$home_raw")"
             mask="$(sp_mask_script \
                 "$home_raw" '<USER_HOME>' \
                 "${home_raw//\\//}" '<USER_HOME>' \
+                "$home_m" '<USER_HOME>' \
                 "$repo_raw" '<PLAYBOOK_ROOT>' \
                 "${repo_raw//\\//}" '<PLAYBOOK_ROOT>' \
                 "$REPO_ROOT" '<PLAYBOOK_ROOT>' \
