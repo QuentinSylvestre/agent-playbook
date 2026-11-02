@@ -13,7 +13,7 @@ conventions). Read both before a non-trivial change.
   certifying the [Developer Certificate of Origin](https://developercertificate.org/): you wrote
   the change, or have the right to submit it under the project's license (Apache-2.0). CI rejects a
   commit without a matching sign-off.
-- **CI must be green.** It runs every guard and self-test on Linux, macOS and Windows, a setup dry
+- **CI must be green.** It runs every guard and self-test on Windows and Linux, a setup dry
   run, and a scan for personal paths, emails and credentials.
 - **Governance is critical code.** `shared/AGENTS.md` and the skills load into every session of every
   user. A wrong sentence there costs more than a wrong line of code, so the review bar is high and

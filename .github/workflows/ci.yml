@@ -16,7 +16,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        # Windows is the main target, Linux is supported; macOS is not tested yet (README).
+        os: [ubuntu-latest, windows-latest]
     steps:
       # Some fixture paths are longer than Windows' 260-character MAX_PATH: git needs long paths on.
       - name: Long paths (Windows)
@@ -32,7 +33,7 @@ jobs:
       # Setup runs for real into a throwaway home: --yes creates a local store repo seeded with
       # empty user memory, links the repo's memory to it, switches the checkout to the engine
       # branch and deploys every provider. The dry run before it must succeed and change nothing.
-      - name: Setup (Linux, macOS)
+      - name: Setup (Linux)
         if: runner.os != 'Windows'
         shell: bash
         env:
@@ -61,7 +62,7 @@ jobs:
 
       # Every guard and selftest, the leak scan and test-parity (both setup twins in sandboxes),
       # against the deployment above. PARTIAL (a platform-specific case skipped) passes under --ci.
-      - name: Checks (Linux, macOS)
+      - name: Checks (Linux)
         if: runner.os != 'Windows'
         shell: bash
         env:

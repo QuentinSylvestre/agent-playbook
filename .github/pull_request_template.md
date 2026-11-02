@@ -8,7 +8,7 @@
 - [ ] Codex
 - [ ] Gemini CLI
 - [ ] Kiro (CLI / IDE)
-- Platforms: <!-- Linux / macOS / Windows -->
+- Platforms: <!-- Windows / Linux (macOS is not tested in CI) -->
 
 ## Checklist
 
