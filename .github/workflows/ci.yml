@@ -18,6 +18,11 @@ jobs:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
     steps:
+      # Some fixture paths are longer than Windows' 260-character MAX_PATH: git needs long paths on.
+      - name: Long paths (Windows)
+        if: runner.os == 'Windows'
+        run: git config --system core.longpaths true
+
       - uses: actions/checkout@v4
 
       - uses: actions/setup-python@v5
@@ -61,7 +66,7 @@ jobs:
         shell: bash
         env:
           HOME: ${{ runner.temp }}/home
-        run: .venv-agent-playbook/bin/python -I shared/skills/qconfig-sync/scripts/run-checks.py . --ci --work "$RUNNER_TEMP/checks"
+        run: .venv-agent-playbook/bin/python -I shared/skills/qconfig-sync/scripts/run-checks.py . --ci --work "$RUNNER_TEMP/checks" | tee "$RUNNER_TEMP/checks-summary.txt"
 
       - name: Checks (Windows)
         if: runner.os == 'Windows'
@@ -70,8 +75,24 @@ jobs:
           USERPROFILE: ${{ runner.temp }}\home
           APPDATA: ${{ runner.temp }}\home\AppData\Roaming
         run: |
-          .\.venv-agent-playbook\Scripts\python.exe -I shared\skills\qconfig-sync\scripts\run-checks.py . --ci --work "$env:RUNNER_TEMP\checks"
+          .\.venv-agent-playbook\Scripts\python.exe -I shared\skills\qconfig-sync\scripts\run-checks.py . --ci --work "$env:RUNNER_TEMP\checks" | Tee-Object -FilePath "$env:RUNNER_TEMP\checks-summary.txt"
           exit $LASTEXITCODE
+
+      # The output of every check that did not pass, in the log itself (the artifact below keeps it all).
+      - name: Show failing check output
+        if: failure()
+        shell: bash
+        run: |
+          summary="$RUNNER_TEMP/checks-summary.txt"
+          [ -f "$summary" ] || { echo "no check summary (setup failed before the checks ran)"; exit 0; }
+          awk '$NF ~ /^(FAIL|COULD-NOT-RUN|TIMEOUT)$/ {print $1}' "$summary" | while read -r name; do
+            for f in "$RUNNER_TEMP/checks/$name".out "$RUNNER_TEMP/checks/$name".err; do
+              [ -s "$f" ] || continue
+              echo "::group::$name ($(basename "$f"))"
+              grep -vE '^(OK|ok|PASS)([[:space:]]|$)' "$f" | head -150
+              echo "::endgroup::"
+            done
+          done
 
       - name: Keep check output
         if: failure()

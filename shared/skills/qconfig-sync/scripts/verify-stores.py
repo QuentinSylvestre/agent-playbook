@@ -891,7 +891,8 @@ def selftest():
     except Exception as exc:
         print("verify-stores selftest: SKIP: git cannot run (%s)" % exc)
         return 0
-    tmp = tempfile.mkdtemp(prefix="verify-stores-")
+    # realpath: on macOS the temp dir is a symlink (/var -> /private/var), and the guard reports real paths
+    tmp = os.path.realpath(tempfile.mkdtemp(prefix="verify-stores-"))
     # The fixtures live under the system temp directory, a no-create root; only <tmp>/nocreate counts as one.
     RESOLVER_TEST["temp"] = [os.path.join(tmp, "nocreate")]
     # Never the machine's own pointer file: a case that wants one writes it (the stores_url cases).
