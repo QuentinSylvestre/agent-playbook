@@ -695,7 +695,9 @@ try {
     Write-Host "  MISSING: symlink rights -- enable Developer Mode (Settings > System > For developers) or run elevated"
     $missing = $true
 } finally {
-    if (Test-Path (Join-Path $probe "link")) { cmd /c rmdir (Join-Path $probe "link") 2>$null }
+    # [IO.Directory]::Delete removes a directory link without following it, on every OS (no cmd.exe off Windows)
+    $probeLink = Join-Path $probe "link"
+    if (Get-Item -LiteralPath $probeLink -Force -ErrorAction SilentlyContinue) { [IO.Directory]::Delete($probeLink) }
     Remove-Item $probe -Recurse -Force -ErrorAction SilentlyContinue
 }
 if (Get-Command node -ErrorAction SilentlyContinue) { Write-Host "  OK: Node $(& node --version) (optional: qdocument-interaction, Playwright)" }
