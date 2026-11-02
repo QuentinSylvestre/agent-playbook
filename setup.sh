@@ -592,6 +592,12 @@ memory_link_step() {
             echo "  OK: $link -> $target"
             return
         fi
+        if [ "$INTERACTIVE" -eq 0 ] && [ "$YES" -eq 0 ]; then
+            # never repoint the repo's link unasked: a sandboxed run (test-parity) would aim it at a
+            # store that is deleted afterwards
+            echo "  NOTE: $link points to $(readlink "$link"), not $target; re-run with --yes or interactively to repoint it"
+            return
+        fi
         echo "  UPDATE: $link (was -> $(readlink "$link"))"
         act rm "$link"
     elif [ -e "$link" ]; then

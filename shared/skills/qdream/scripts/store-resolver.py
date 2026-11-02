@@ -421,6 +421,9 @@ def _temp_dirs() -> list:
                 raw.append(v)
         if os.name != "nt":
             raw += ["/tmp", "/var/tmp"]
+        # The resolved form too: macOS's temp dir is a link (/var/folders/... -> /private/var/folders/...),
+        # and a folder found through the real path must still count as under the temp dir.
+        raw += [os.path.realpath(r) for r in list(raw)]
     out = []
     for r in raw:
         try:

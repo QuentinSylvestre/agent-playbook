@@ -805,6 +805,11 @@ $linkMemory = $true
 if ($memItem -and ($memItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
     if ([string]($memItem.Target | Select-Object -First 1) -eq $MemTarget) {
         Write-Host "  OK: $MemLink -> $MemTarget"; $linkMemory = $false
+    } elseif (-not $Interactive -and -not $Yes) {
+        # never repoint the repo's link unasked: a sandboxed run (test-parity) would aim it at a store
+        # that is deleted afterwards
+        Write-Host "  NOTE: $MemLink points to $($memItem.Target), not $MemTarget; re-run with -Yes or interactively to repoint it"
+        $linkMemory = $false
     } else {
         Write-Host "  UPDATE: $MemLink (was -> $($memItem.Target))"
         Remove-DirLink $MemLink

@@ -1816,6 +1816,39 @@ def _run_selftest() -> int:
                 globals()["_expand_raw"] = ex_real
                 _invalidate_expand_cache()
 
+        # --- a temp dir that is a link (macOS: /var/folders -> /private/var/folders) covers its real path too ---
+        if hasattr(os, "symlink"):
+            real_t = w.root / "real-sys-temp"
+            (real_t / "scratch").mkdir(parents=True)
+            link_t = w.root / "link-sys-temp"
+            try:
+                os.symlink(str(real_t), str(link_t), target_is_directory=True)
+                linked = True
+            except (OSError, NotImplementedError):
+                linked = False
+            if linked:
+                saved_temp_env = {k: os.environ.get(k) for k in ("TMPDIR", "TEMP", "TMP")}
+                saved_t = _TEST.pop("temp", None)
+                try:
+                    for k in ("TEMP", "TMP"):
+                        os.environ.pop(k, None)
+                    os.environ["TMPDIR"] = str(link_t)
+                    # the real path itself is listed (not only covered by /tmp, which holds this fixture)
+                    chk("temp-link:real-path-under-a-linked-temp-is-no-create",
+                        _norm_path(os.path.realpath(str(link_t))) in _temp_dirs()
+                        and _no_create_reason(_norm_path(real_t / "scratch")) == "the system temp directory",
+                        repr(_temp_dirs()))
+                finally:
+                    for k, v in saved_temp_env.items():
+                        if v is None:
+                            os.environ.pop(k, None)
+                        else:
+                            os.environ[k] = v
+                    if saved_t is not None:
+                        _TEST["temp"] = saved_t
+            else:
+                skip("temp-link:real-path-under-a-linked-temp-is-no-create", "no symlink could be made")
+
         # --- the reserved user/ directory of the store repo is never a store, valid or invalid ---
         w.new_stores()
         (w.stores / USER_DIR / "memory").mkdir(parents=True)
