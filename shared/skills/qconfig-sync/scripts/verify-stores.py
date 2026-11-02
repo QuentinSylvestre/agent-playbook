@@ -32,7 +32,8 @@ Store-repo FAIL checks (exit 1):
   4. A STORE value is in the resolver's normalized form: a `local` path as norm_path writes it (forward
      slashes; case does not matter), a `remote` value lower-case with no scheme, credentials or `.git`
      suffix. A hand-edited `local` line with backslashes is valid STORE syntax that the resolver never
-     matches.
+     matches. A `local` value written on the other OS (a drive-letter path seen on Linux, a `/` path seen
+     on Windows) is judged by that OS's form, never rewritten into this OS's.
   5. No tracked file of the config repo, archived plans included, holds a term listed in the store repo's
      BLOCKLIST file (one term per line, `#` comments; matched case-insensitively). The FAIL names the file
      and the BLOCKLIST line number, never the term, so the output can be pasted anywhere. No BLOCKLIST file
@@ -315,6 +316,18 @@ def store_value_problem(R, ident):
     """Why a valid STORE value is not in the resolver's normalized form, or ''."""
     v = ident.value
     if ident.kind == "local":
+        drive = re.match(r"^[A-Za-z]:[\\/]", v) is not None
+        if os.name != "nt" and drive:
+            # Another OS's path (one store repo serves Windows and WSL): judge it by the form the resolver
+            # writes there, never by this OS's norm_path, which would glue it onto the working directory.
+            want = v.replace("\\", "/")
+            want = want if re.match(r"^[A-Za-z]:/$", want) else want.rstrip("/")
+            if v.casefold() != want.casefold():
+                return ("`local` value is not in normalized form (%s) -- the resolver never matches it; rewrite the "
+                        "line as `local %s`" % (v, want.lower()))
+            return ""
+        if os.name == "nt" and v.startswith("/"):
+            return ""   # a POSIX path, normalized on the OS that wrote it
         if v.casefold() != R.norm_path(v).casefold():
             return ("`local` value is not in normalized form (%s) -- the resolver never matches it; rewrite the "
                     "line as `local %s`" % (v, R.norm_path(v)))
@@ -1118,6 +1131,12 @@ def _selftest_stores(R, tmp, chk, skips):
     _store_text(root / "loc-111111", "local C:\\Users\\x\\proj\n")
     rc, out, _e = go(root)
     chk("un-normalized local value fails", rc == 1 and has(out, "FAIL: stores/loc-111111", "not in normalized form", "c:/users/x/proj"), repr(out))
+    if os.name != "nt":
+        root = clone()
+        _store_text(root / "win-111111", "local c:/users/x/proj\n")
+        rc, out, _e = go(root)
+        chk("other-OS normalized local value is not a FAIL", not has(out, "FAIL: stores/win-111111"), repr(out))
+        chk("other-OS value never gets a cwd-prefixed rewrite", not any("/c:/users" in l for l in out), repr(out))
     root = clone()
     _store_text(root / "dotgit-111111", "remote example.com/org/other.git\n")
     rc, out, _e = go(root)

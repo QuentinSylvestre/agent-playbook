@@ -31,7 +31,9 @@ cd ~/src/agent-playbook
 ./setup.sh                # interactive: pick providers, set up your store repo
 ```
 
-On Windows, in PowerShell: `.\setup.ps1 -DryRun`, then `.\setup.ps1`.
+On Windows, clone with long paths on, or checkout fails with "Filename too long" (some test
+fixture paths pass 260 characters): `git config --global core.longpaths true` before cloning, or
+`git clone -c core.longpaths=true ...`. Then, in PowerShell: `.\setup.ps1 -DryRun`, then `.\setup.ps1`.
 
 Interactive setup:
 
