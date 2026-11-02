@@ -859,7 +859,7 @@ if ($LASTEXITCODE -ne 0) {
             Invoke-Act "git branch $Branch" { & git -C $ScriptDir branch -q $Branch }
             Write-Host "  CREATED: branch $Branch"
         }
-        if (& git -C $ScriptDir status --porcelain --untracked-files=no 2>$null) {
+        if (& git --no-optional-locks -C $ScriptDir status --porcelain --untracked-files=no 2>$null) {
             Write-Host "  NOTE: uncommitted changes in $ScriptDir; switch yourself when ready: git -C $ScriptDir switch $Branch"
         } else {
             Invoke-Act "git switch $Branch" { & git -C $ScriptDir switch -q $Branch }
