@@ -843,7 +843,8 @@ def _run_case(case_dir, helpers):
         case = json.load(fh)
     fails = []
     saved_stores = os.environ.get("AGENT_PLAYBOOK_STORES", "")
-    scratch = tempfile.mkdtemp(prefix="memory load hook ")
+    # realpath: on macOS the temp dir is a symlink (/var -> /private/var); the hook resolves real paths
+    scratch = os.path.realpath(tempfile.mkdtemp(prefix="memory load hook "))
     try:
         root = os.path.join(scratch, "fixture root")
         shutil.copytree(os.path.join(case_dir, "tree"), root)

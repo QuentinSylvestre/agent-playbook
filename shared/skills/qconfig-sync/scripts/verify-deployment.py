@@ -1457,7 +1457,8 @@ def _st_cases(tmp, links, skip_reason):
 
 
 def selftest():
-    tmp = tempfile.mkdtemp(prefix="verify-deployment-")
+    # realpath: on macOS the temp dir is a symlink (/var -> /private/var); targets are compared after realpath
+    tmp = os.path.realpath(tempfile.mkdtemp(prefix="verify-deployment-"))
     try:
         links, reason = _symlinks_available(tmp)
         fails, checks, skipped = _st_cases(os.path.join(tmp, "base"), links, reason)

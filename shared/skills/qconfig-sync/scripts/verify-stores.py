@@ -891,7 +891,8 @@ def selftest():
     except Exception as exc:
         print("verify-stores selftest: SKIP: git cannot run (%s)" % exc)
         return 0
-    tmp = tempfile.mkdtemp(prefix="verify-stores-")
+    # realpath: on macOS the temp dir is a symlink (/var -> /private/var), and the guard reports real paths
+    tmp = os.path.realpath(tempfile.mkdtemp(prefix="verify-stores-"))
     # The fixtures live under the system temp directory, a no-create root; only <tmp>/nocreate counts as one.
     RESOLVER_TEST["temp"] = [os.path.join(tmp, "nocreate")]
     # Never the machine's own pointer file: a case that wants one writes it (the stores_url cases).
@@ -1481,12 +1482,13 @@ def _selftest_stores(R, tmp, chk, skips):
     kjson.write_text(json.dumps({"id": "sess_u", "workspacePaths": [str(proj)]}), encoding="utf-8")
     rc, out, _e = go(root, state=[str(proj)])
     chk("unwired: a Kiro session in a store-backed root with no pointer warns",
-        has(out, "WARN:", "__store__.md", "never wired", "stores/proj-abcdef", "re-run /qwire-governance in %s" % proj), repr(out))
+        has(out, "WARN:", "__store__.md", "never wired", "stores/proj-abcdef", "re-run /qwire-governance in %s" % str(proj).replace("\\", "/")), repr(out))
     chk("unwired: ...exit stays 0", rc == 0, str(rc))
     kjson.write_text(json.dumps({"id": "sess_u", "workspacePaths": [str(proj / "sub")]}), encoding="utf-8")
     rc, out, _e = go(root, state=[str(proj)])
     chk("unwired: a subfolder session names the repo root, once",
-        sum(1 for l in out if l.startswith("WARN:") and "never wired" in l and "in %s" % proj in l) == 1, repr(out))
+        sum(1 for l in out if l.startswith("WARN:") and "never wired" in l and "in %s" % str(proj).replace("\\", "/") in l) == 1,
+        repr(out))
     psteer.mkdir(parents=True, exist_ok=True)
     pointer.write_text("# pointer\n", encoding="utf-8")
     rc, out, _e = go(root, state=[str(proj)])

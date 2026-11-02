@@ -6036,7 +6036,9 @@ def run_selftest(scratch=None, fixdir=None, required=None, jobs=None, only=None,
         Path(scratch).mkdir(parents=True, exist_ok=True)
     cfg_dir = Path(tempfile.mkdtemp(prefix="dw-gitcfg-", dir=scratch))
     empty = cfg_dir / "empty-gitconfig"
-    empty.write_bytes(b"[core]\n\tlongpaths = true\n")
+    # No background maintenance: git 2.53+ can start `git maintenance` after a commit, which writes
+    # .git/objects/maintenance.lock into a fixture repo while the case snapshots or copies it.
+    empty.write_bytes(b"[core]\n\tlongpaths = true\n[maintenance]\n\tauto = false\n[gc]\n\tauto = 0\n")
     # Set before the pool starts: spawned workers inherit this environment.
     saved = {k: os.environ.get(k) for k in ("GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM")}
     os.environ["GIT_CONFIG_GLOBAL"] = str(empty)

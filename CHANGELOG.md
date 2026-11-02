@@ -20,4 +20,4 @@ First public release.
 - Pointer file `~/.agent-playbook/config`: no location is hardcoded.
 - User memory and plans live in your private store repo, never in the engine.
 - The engine branch `local-improvements` for your clone's own improvements.
-- README, CONTRIBUTING (DCO), architecture and glossary docs, CI on Linux, macOS and Windows.
+- README, CONTRIBUTING (DCO), architecture and glossary docs, CI on Windows and Linux.

@@ -695,7 +695,9 @@ try {
     Write-Host "  MISSING: symlink rights -- enable Developer Mode (Settings > System > For developers) or run elevated"
     $missing = $true
 } finally {
-    if (Test-Path (Join-Path $probe "link")) { cmd /c rmdir (Join-Path $probe "link") 2>$null }
+    # [IO.Directory]::Delete removes a directory link without following it, on every OS (no cmd.exe off Windows)
+    $probeLink = Join-Path $probe "link"
+    if (Get-Item -LiteralPath $probeLink -Force -ErrorAction SilentlyContinue) { [IO.Directory]::Delete($probeLink) }
     Remove-Item $probe -Recurse -Force -ErrorAction SilentlyContinue
 }
 if (Get-Command node -ErrorAction SilentlyContinue) { Write-Host "  OK: Node $(& node --version) (optional: qdocument-interaction, Playwright)" }
@@ -803,6 +805,11 @@ $linkMemory = $true
 if ($memItem -and ($memItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
     if ([string]($memItem.Target | Select-Object -First 1) -eq $MemTarget) {
         Write-Host "  OK: $MemLink -> $MemTarget"; $linkMemory = $false
+    } elseif (-not $Interactive -and -not $Yes) {
+        # never repoint the repo's link unasked: a sandboxed run (test-parity) would aim it at a store
+        # that is deleted afterwards
+        Write-Host "  NOTE: $MemLink points to $($memItem.Target), not $MemTarget; re-run with -Yes or interactively to repoint it"
+        $linkMemory = $false
     } else {
         Write-Host "  UPDATE: $MemLink (was -> $($memItem.Target))"
         Remove-DirLink $MemLink
