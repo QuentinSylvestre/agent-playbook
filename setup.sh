@@ -633,7 +633,7 @@ engine_branch_step() {
         act git -C "$SCRIPT_DIR" branch -q "$branch"
         echo "  CREATED: branch $branch"
     fi
-    if [ -n "$(git -C "$SCRIPT_DIR" status --porcelain --untracked-files=no)" ]; then
+    if [ -n "$(git --no-optional-locks -C "$SCRIPT_DIR" status --porcelain --untracked-files=no)" ]; then
         echo "  NOTE: uncommitted changes in $SCRIPT_DIR; switch yourself when ready: git -C $SCRIPT_DIR switch $branch"
         return
     fi
