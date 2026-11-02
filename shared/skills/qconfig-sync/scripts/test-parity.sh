@@ -697,6 +697,12 @@ if [ -z "$PS_BIN" ]; then
 elif [ ! -f "$SETUP_PS1_SCRIPT" ]; then
     SETUP_PARITY_SKIPPED=1
     echo "SETUP-PARITY SKIP: setup.ps1 not found at repo root."
+elif [ "$(uname -o 2>/dev/null)" != "Msys" ]; then
+    # setup.ps1 is the Windows twin (Windows paths, the Scripts\ venv layout, cmd.exe for links);
+    # Linux and macOS deploy with setup.sh. The tree comparison runs where both twins deploy:
+    # Windows under Git Bash. The merge and render equivalence above still run here.
+    SETUP_PARITY_SKIPPED=1
+    echo "SETUP-PARITY SKIP: not Windows -- setup.ps1 deploys on Windows only; the tree comparison runs under Git Bash there."
 else
     sp_win_path() {
         if command -v cygpath >/dev/null 2>&1; then
@@ -1071,7 +1077,7 @@ PARITY_PIDS=()
 # script's own EXIT trap removes it. The deploy's own errors (mkdir, cygpath) go
 # to a file SETUP-PARITY prints when the deploy recorded no exit code.
 ( SP_DEPLOY_PID=""
-  if [ -n "$PS_BIN" ] && [ -f "$SETUP_PS1_SCRIPT" ]; then
+  if [ -n "$PS_BIN" ] && [ -f "$SETUP_PS1_SCRIPT" ] && [ "$(uname -o 2>/dev/null)" = "Msys" ]; then
       parity_setup_ps1_deploy 2> "$TMPDIR_PARITY/setup-parity-deploy.err" &
       SP_DEPLOY_PID="$!"
       trap 'wait "$SP_DEPLOY_PID" 2>/dev/null || true' EXIT

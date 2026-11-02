@@ -7866,7 +7866,9 @@ def run_selftest(scratch=None, fixdir=None, required=None, jobs=None, only=None,
     # One setting only: long paths, so a deep --work scratch path does not
     # make the scripts' own git reads fail on Windows (they then report
     # check-failed, F8) -- the machine's config is otherwise ignored.
-    empty.write_bytes(b"[core]\n\tlongpaths = true\n")
+    # No background maintenance: git 2.53+ can start `git maintenance` after a commit, which writes
+    # .git/objects/maintenance.lock into a fixture repo while the case snapshots or copies it.
+    empty.write_bytes(b"[core]\n\tlongpaths = true\n[maintenance]\n\tauto = false\n[gc]\n\tauto = 0\n")
     # Set before the pool starts: spawned workers inherit this environment.
     saved = {k: os.environ.get(k) for k in ("GIT_CONFIG_GLOBAL", "GIT_CONFIG_NOSYSTEM",
                                             "CLAUDE_CODE_SESSION_ID", "KIRO_SESSION_ID")}

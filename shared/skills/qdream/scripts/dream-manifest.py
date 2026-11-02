@@ -4332,6 +4332,11 @@ def _fixture_time(text):
     return dt.datetime.strptime(text, "%Y-%m-%dT%H:%M:%SZ").replace(tzinfo=dt.timezone.utc)
 
 
+# Fixture git calls never start background maintenance (git 2.53+ may after a commit): it writes
+# .git/objects/maintenance.lock into a fixture repo while the case checks what was written.
+FIXTURE_GIT = ["-c", "maintenance.auto=false", "-c", "gc.auto=0"]
+
+
 def _run_case(case_dir, scratch):
     spec = json.loads(read_text(case_dir / "case.json"))
     tmp = Path(tempfile.mkdtemp(prefix="dm-", dir=scratch))
@@ -4387,10 +4392,10 @@ def _run_case(case_dir, scratch):
                        GIT_AUTHOR_NAME="t", GIT_AUTHOR_EMAIL="t@t", GIT_COMMITTER_NAME="t",
                        GIT_COMMITTER_EMAIL="t@t")
             for cmd in (["init", "-q"], ["add", "-A"], ["commit", "-q", "-m", "fixture"]):
-                subprocess.run(["git", "-C", str(root / d)] + cmd, env=env,
+                subprocess.run(["git"] + FIXTURE_GIT + ["-C", str(root / d)] + cmd, env=env,
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         for d, url in spec.get("git_origin", {}).items():
-            subprocess.run(["git", "-C", str(root / d), "remote", "add", "origin", url],
+            subprocess.run(["git"] + FIXTURE_GIT + ["-C", str(root / d), "remote", "add", "origin", url],
                            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         for step in spec.get("git_steps", []):
             gdir = root / step["dir"]
@@ -4400,7 +4405,7 @@ def _run_case(case_dir, scratch):
             cmds = [] if (gdir / ".git").exists() else [["init", "-q"]]
             cmds += [["add", "--"] + step["paths"], ["commit", "-q", "-m", step.get("message", "step")]]
             for cmd in cmds:
-                subprocess.run(["git", "-C", str(gdir)] + cmd, env=env,
+                subprocess.run(["git"] + FIXTURE_GIT + ["-C", str(gdir)] + cmd, env=env,
                                stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, check=True)
         for rel, when in spec.get("mtimes", {}).items():
             t = _fixture_time(when).timestamp()
@@ -5116,7 +5121,7 @@ def _unit_anchors_commit(root, home):
         d.mkdir()
         (d / "f.txt").write_text(name, encoding="utf-8")
         for cmd in (["init", "-q"], ["add", "f.txt"], ["commit", "-q", "-m", name]):
-            subprocess.run(["git", "-C", str(d)] + cmd, env=env, stdout=subprocess.DEVNULL,
+            subprocess.run(["git"] + FIXTURE_GIT + ["-C", str(d)] + cmd, env=env, stdout=subprocess.DEVNULL,
                            stderr=subprocess.DEVNULL)
         out = git_out(d, "rev-parse", "HEAD")
         if not out:
@@ -5147,7 +5152,7 @@ def _unit_anchors_commit(root, home):
         denv = dict(env, GIT_AUTHOR_DATE=when, GIT_COMMITTER_DATE=when)
         for cmd in ([["init", "-q"]] if name == "old.txt" else []) + [["add", name],
                                                                     ["commit", "-q", "-m", name]]:
-            subprocess.run(["git", "-C", str(d)] + cmd, env=denv, stdout=subprocess.DEVNULL,
+            subprocess.run(["git"] + FIXTURE_GIT + ["-C", str(d)] + cmd, env=denv, stdout=subprocess.DEVNULL,
                            stderr=subprocess.DEVNULL)
     anc = Anchors([str(d)], home / ".claude", home / ".kiro")
     for name, verified, want in (("new.txt", "2026-08-01", True), ("old.txt", "2026-07-01", True),
