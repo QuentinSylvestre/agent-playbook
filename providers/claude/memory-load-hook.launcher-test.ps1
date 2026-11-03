@@ -7,7 +7,9 @@
 #                              repo with fixed fixture memory, prints the same bytes
 #                              through the launcher as when run directly under the venv
 #                              python (an independent path); the output parses as
-#                              SessionStart JSON and names the fixture memory
+#                              SessionStart JSON and names the fixture memory. The
+#                              hook's time-cap notes are the one tolerated difference:
+#                              a busy runner can spend the cap in only one of the runs
 #   stdin-and-stdout-passthrough  a sandbox hook echoes stdin: non-ASCII text, CRLF,
 #                              quotes and backslashes arrive intact and come back
 #                              without a BOM or extra output
@@ -137,6 +139,15 @@ function Get-Context([byte[]]$Bytes) {
     return $null
 }
 
+# The hook's two timing notes: a busy machine can spend the hook's time cap in one of the two runs
+# and not the other, so these are the only lines the launcher and direct outputs may differ by.
+$capSkipNote = "Note: store repo check skipped (the hook's time cap was spent)."
+function Remove-TimeCapNotes([string]$Ctx) {
+    if ($null -eq $Ctx) { return $null }
+    $kept = @($Ctx -split "`n" | Where-Object { $_ -cne $capSkipNote })
+    return (($kept -join "`n") -replace ' \S+ marks omitted: the git check passed the [0-9.]+-second cap\.', '')
+}
+
 function Test-NoBom([byte[]]$Bytes) {
     return ($Bytes.Length -gt 0) -and ($Bytes[0] -eq 0x7B)
 }
@@ -262,10 +273,18 @@ try {
         $direct = Invoke-Exe -Exe $sbVenvPython -Arguments ('-I "' + $sbHook + '"') -Stdin $stdin
         $ctx = Get-Context $via.Out
         $same = ([Convert]::ToBase64String($via.Out) -eq [Convert]::ToBase64String($direct.Out))
+        # Not byte-identical only because one run hit the time cap: same context once the timing notes go.
+        $ctxDirect = Get-Context $direct.Out
+        $capOnly = $false
+        if ((-not $same) -and ($null -ne $ctx) -and ($null -ne $ctxDirect)) {
+            $a = Remove-TimeCapNotes $ctx
+            $b = Remove-TimeCapNotes $ctxDirect
+            $capOnly = ($a -ceq $b) -and (($a -cne $ctx) -or ($b -cne $ctxDirect))
+        }
         $names = ($null -ne $ctx) -and $ctx.Contains('Zeta fixture rule caf' + $eAcute) -and $ctx.Contains('Omega fixture pattern') -and $ctx.Contains('Kappa project entry')
-        $ok = ($via.ExitCode -eq 0) -and ($direct.ExitCode -eq 0) -and $same -and (Test-NoBom $via.Out) -and
+        $ok = ($via.ExitCode -eq 0) -and ($direct.ExitCode -eq 0) -and ($same -or $capOnly) -and (Test-NoBom $via.Out) -and
               ($null -ne $ctx) -and (-not $ctx.StartsWith($noticePrefix)) -and $names
-        Assert-Case "$tag real-hook-matches-direct" $ok ("launcher exit $($via.ExitCode), direct exit $($direct.ExitCode), byte-identical=$same, launcher bytes=$($via.Out.Length), direct bytes=$($direct.Out.Length), first byte ok=$(Test-NoBom $via.Out), context parsed=$($null -ne $ctx), names all three fixture entries=$names. stderr: $($via.Err)")
+        Assert-Case "$tag real-hook-matches-direct" $ok ("launcher exit $($via.ExitCode), direct exit $($direct.ExitCode), byte-identical=$same, differs only by time-cap notes=$capOnly, launcher bytes=$($via.Out.Length), direct bytes=$($direct.Out.Length), first byte ok=$(Test-NoBom $via.Out), context parsed=$($null -ne $ctx), names all three fixture entries=$names. stderr: $($via.Err)")
 
         # --- stdin and stdout pass through intact ------------------------------
         $l = New-Sandbox -HookSource $echoHook

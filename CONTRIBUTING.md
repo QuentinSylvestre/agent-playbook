@@ -42,6 +42,7 @@ Your own memory, plans and artifacts are never part of this repo: they live in y
    `local-improvements` branch. That is where your own sessions' improvements land (`/qconfig-sync`
    and `/qdream` never commit to `main`). For a contribution, branch from `main`:
    `git switch -c my-change origin/main`.
+   On Windows, turn on `core.longpaths` before cloning (see the README quickstart).
 2. **Make the change and its tests together.** A script change needs a self-test case, which can be a
    fixture under the script's `fixtures/` folder. A governance change needs every citation of what
    it renames or removes updated, and `verify-links.py` and `verify-citations.py` passing.

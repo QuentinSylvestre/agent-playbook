@@ -75,8 +75,9 @@ Output (stdout):
 Exit codes:
   0   No FAIL among the fired checks.
   1   One or more checks FAILed.
-  2   Precondition failure: bad/missing path, non-project file (basename does not
-      match ^[0-9]{6}_[A-Z0-9_]+\\.md$), a plans/done/ file, or a malformed
+  2   Precondition failure: bad/missing path, non-project file (basename matches
+      neither ^[0-9]{6}_[A-Z0-9_]+\\.md$ nor the archive form
+      ^[0-9]{6}-[0-9]{4}_[A-Z0-9_]+\\.md$), a plans/done/ file, or a malformed
       flag combination. Also "guard did not run": the venv is missing, git is
       not found (with --check-commits), a git command whose output a check
       needs failed ("git <subcommand> failed: <stderr tail>"), the
@@ -86,7 +87,10 @@ Exit codes:
 
 Applicability guard: a file whose basename does not match
 ^[0-9]{6}_[A-Z0-9_]+\\.md$, or that lives under plans/done/, is rejected with
-exit 2 (not a validatable active plan).
+exit 2 (not a validatable active plan). One exception: an active plan that
+carries the archive convention's time prefix (YYMMDD-HHMM_NAME.md) outside
+plans/done/ is validated, and filename-grammar WARNs with the rename, so its
+gates never silently stop running.
 
 Cross-repo note: when the plan lives in a workspace store inside the config
 repo (shared/skills/qdream/memory-rules.md "Workspace Store") the plan root
@@ -132,6 +136,8 @@ STATUS_GRAMMAR_SEVERITY = "FAIL"
 WS = r"[ \t\n\r\f\v]"
 A = re.ASCII
 RE_PLAN_NAME = re.compile(r"[0-9]{6}_[A-Z0-9_]+\.md", A)
+# The archive convention (YYMMDD-HHMM_NAME.md) on a file outside plans/done/: validated, with a WARN.
+RE_ARCHIVE_NAME = re.compile(r"([0-9]{6})-[0-9]{4}_([A-Z0-9_]+\.md)", A)
 RE_DONE = re.compile(r"[\\/]plans[\\/]done[\\/]", A)
 RE_STATUS_PREFIX = re.compile(r"> \*\*Status\*\*:", A)
 RE_STATUS = re.compile("^> \\*\\*Status\\*\\*: (Exploring|Draft|In Progress|Complete)( — .+)?( *<!--.*-->)? *$")
@@ -340,7 +346,7 @@ def resolve_paths(o):
                     "(a relative plan path resolves against $PWD; --project-root is the CODE root and no longer resolves it -- pass --plan-root <dir> or an absolute plan path)")
     plan_abs = os.path.abspath(plan_abs)
     base = os.path.basename(plan_abs)
-    if not RE_PLAN_NAME.fullmatch(base):
+    if not RE_PLAN_NAME.fullmatch(base) and not RE_ARCHIVE_NAME.fullmatch(base):
         raise Usage("not a project file (basename must match ^[0-9]{6}_[A-Z0-9_]+\\.md$): %s" % base)
     if RE_DONE.search(plan_abs):
         raise Usage("archived plans under plans/done/ are not validated: %s" % plan_abs)
@@ -913,7 +919,13 @@ def validate(argv, out, err):
         lines = read_plan(plan_abs)
         status_line, state = status_line_and_state(lines)
         # (The applicability guard already proved the match; emit it as a suite member.)
-        r.emit("filename-grammar", "PASS", "basename '%s' matches ^[0-9]{6}_[A-Z0-9_]+\\.md$" % basename)
+        m = RE_ARCHIVE_NAME.fullmatch(basename)
+        if m:
+            r.emit("filename-grammar", "WARN", "basename '%s' carries the archive time prefix (YYMMDD-HHMM_) but is "
+                   "not under plans/done/ -- an active plan is named YYMMDD_NAME.md; rename it to '%s_%s'"
+                   % (basename, m.group(1), m.group(2)))
+        else:
+            r.emit("filename-grammar", "PASS", "basename '%s' matches ^[0-9]{6}_[A-Z0-9_]+\\.md$" % basename)
         check_status_grammar(r, status_line)
         check_completeness(r, lines, state)
         if o["phase"] != "":
@@ -1305,7 +1317,12 @@ CASES = [
     _c("relative-against-plan-root", "plain:clean", ["--plan-root", "{dir}", "{name}"], 0, cwd="root",
        summary="pass=6 warn=0 fail=0"),
     _c("x2-not-a-plan", "plain:not-a-plan", ["{plan}"], 2),
-    _c("x2-time-suffix", "plain:time-suffix", ["{plan}"], 2),
+    _c("time-prefix-warns", "plain:time-suffix", ["{plan}"], 0,
+       expect=["CHECK\tfilename-grammar\tWARN\tbasename '260101-1200_QV_ARCHIVED.md' carries the archive time "
+               "prefix (YYMMDD-HHMM_) but is not under plans/done/ -- an active plan is named YYMMDD_NAME.md; "
+               "rename it to '260101_QV_ARCHIVED.md'", NA, HP],
+       summary="pass=5 warn=1 fail=0",
+       note="an active plan with the archive prefix is validated, never silently refused"),
     _c("x2-plans-done", "plain:archived", ["{plan}"], 2),
     _c("help", "none", ["--help"], 0, note="the header names qvalidate.py and adds --selftest"),
 ]
