@@ -27,11 +27,14 @@ Paths: `<skill>` is this skill's folder (`~/.kiro/skills/qslidedeck`). `<python>
 3. **Storyline and claims.** Propose, in one message:
    - the slide list: one idea per slide, written as the headline it will carry, each with its pattern. For a talk of N minutes, plan about N/2.5 slides. Every topic the user listed appears on a slide;
    - a **claims table**: every system, team, practice or outcome the slides will name, its maturity label, and its source, quoting the user's words where they gave them (`| System model | In production | user: "used for most multi-component work" |`). Use the user's maturity and scope words exactly ("a small group" stays "a small group"); an item without a stated maturity gets no chip; anything you inferred is marked `inferred`.
-   Get a yes on both before building. The claims table is the only list of claims the slides may make.
+   - a **brand table**: each colour and font you will use, its exact value, and where you read it (`| Main blue | #... | chart p.3 web column |`). Open the chart's colour page to fill it; never write "chart" as the source of a value you read from the logo file.
+   Get a yes on all three before building. The claims table is the only list of claims the slides may make.
 4. **Style check.** Build the title slide and the most important content slide; run build and shoot; both must pass; look at both screenshots. Show the user the two paths, then **end your turn**. Build nothing else until the user answers, even if the storyline was approved.
 5. **Build the rest**, one slide file per tool call (kiro-cli rejects one huge tool argument), each copied from its pattern.
 6. **Verify** (see Verification) until `shoot.py` prints `RESULT: PASS` and you have looked at every screenshot.
-7. **Hand over**: the deck path; how to present (arrows, F for full screen, Ctrl+P for a PDF); and a table of every slide phrase that is not in the approved claims table or the user's own words, quoting the slide text. Build it by re-reading every slide file and the `LIST:` lines from `build.py`, never from memory.
+7. **Hand over**: the deck path; how to present (arrows, F for full screen, Ctrl+P for a PDF); and two tables, built by re-reading every slide file and the `LIST:` lines from `build.py`, never from memory:
+   - every slide phrase that is not in the approved claims table or the user's own words, quoting the slide text;
+   - every `LIST:` sentence, one row each, with the matching claims-table scope beside it and `same` or `wider`. A blanket "none widen the scope" is not a review. Fix each `wider` row before handing over.
 
 ## Deck folder and scripts
 
@@ -75,7 +78,7 @@ icons.svg         optional; default <skill>/assets/icons.svg: i-reset i-eye i-fl
 | 10-tiles | 2x2 large-icon tiles | outcomes, results |
 | 11-quotes | 4 quote cards | lessons, principles |
 
-If no pattern fits, adapt the closest one and keep its sizing. Never make a card taller than its content; never push content to a card's edges with `justify-content: space-between` or `margin-top: auto`.
+If no pattern fits, adapt the closest one and keep its sizing. Never make a card taller than its content; never push content to a card's edges with `justify-content: space-between` or `margin-top: auto`. Use a pattern at most twice in a deck, and only when its shape fits the idea: replace every placeholder role with something that means something (a row of five identical "Session" pills means nothing).
 
 ## Design rules
 
@@ -84,6 +87,7 @@ If no pattern fits, adapt the closest one and keep its sizing. Never make a card
 - **Brand.** Colours only through the tokens. One accent family plus neutrals. Green, red and amber only where they mean pass, fail, against or warning. The logo as given, never redrawn. Light theme unless asked.
 - **Maturity chips** exactly as in the approved claims table: `.chip.prod` (in production), `.chip.ramp` (ramping up), `.chip.lab` (experimental), `.planned` (planned).
 - **Collisions are fixed by moving or resizing.** A line may pass under a small label that has its own background (a pill, a tag). Never fix a collision by giving a large block an opaque background over a line: that cuts the diagram visibly while passing the check.
+- **Empty space is fixed by resizing or re-centring the diagram.** Never add an element just to fill a region: every box on a slide is connected to the diagram and says something the talk needs.
 
 ## Content rules
 
