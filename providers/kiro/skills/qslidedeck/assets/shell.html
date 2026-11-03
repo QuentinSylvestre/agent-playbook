@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{TITLE}}</title>
+<style>
+/* ---------- shell: fixed 1600x900 canvas, navigation, print. Do not edit; put deck styles in theme.css ---------- */
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:#e6ecf0;font-family:var(--font,system-ui,sans-serif);color:var(--ink,#1d2731);-webkit-font-smoothing:antialiased}
+body{overflow:hidden}
+.viewport{position:fixed;inset:0;display:grid;place-items:center}
+.stage{position:relative;width:1600px;height:900px;transform-origin:center center;flex:none}
+.slide{position:absolute;inset:0;background:var(--paper,#fff);overflow:hidden;box-shadow:0 20px 60px rgba(29,39,49,.18);
+  opacity:0;visibility:hidden;transition:opacity .35s ease,visibility 0s linear .35s}
+.slide.active{opacity:1;visibility:visible;transition:opacity .35s ease}
+.nav{position:fixed;right:18px;bottom:16px;display:flex;gap:6px;align-items:center;font:600 12px var(--font,system-ui);color:#4c575f;opacity:0;transition:opacity .2s}
+body:hover .nav{opacity:.85}
+.nav button{all:unset;cursor:pointer;width:30px;height:30px;border-radius:8px;display:grid;place-items:center;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.12);font-size:15px}
+@page{size:1600px 900px;margin:0}
+@media print{
+  html,body{background:#fff;height:auto;overflow:visible}
+  .viewport{position:static;display:block}
+  .stage{transform:none!important;width:1600px;height:auto}
+  .slide{position:relative;opacity:1;visibility:visible;box-shadow:none;width:1600px;height:900px;break-after:page;page-break-after:always;transition:none}
+  .nav{display:none}
+  *{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+}
+/* shell-noanim: used by the screenshot script */
+html.noanim .slide{transition:none!important}
+</style>
+<style id="theme">
+{{THEME}}
+</style>
+</head>
+<body>
+{{ICONS}}
+<div class="viewport"><div class="stage" id="stage">
+{{SLIDES}}
+</div></div>
+<div class="nav" aria-label="Slide navigation">
+  <button id="prev" title="Previous">&#8249;</button><span id="count"></span><button id="next" title="Next">&#8250;</button>
+  <button id="fs" title="Full screen (F)">&#x26F6;</button>
+</div>
+<script>
+(function(){
+  if(/[?&]noanim/.test(location.search))document.documentElement.classList.add('noanim');
+  var stage=document.getElementById('stage');
+  var slides=[].slice.call(document.querySelectorAll('.slide'));
+  var count=document.getElementById('count');
+  var i=Math.min(Math.max((parseInt(location.hash.slice(1),10)||1)-1,0),slides.length-1);
+  slides.forEach(function(s,k){var n=s.querySelector('[data-num]');if(n)n.textContent=(k+1)+' / '+slides.length;});
+  function fit(){var s=Math.min(innerWidth/1600,innerHeight/900);stage.style.transform='scale('+s+')';}
+  function show(k){i=Math.min(Math.max(k,0),slides.length-1);
+    slides.forEach(function(s,n){s.classList.toggle('active',n===i);});
+    count.textContent=(i+1)+' / '+slides.length;try{history.replaceState(null,'','#'+(i+1));}catch(e){}}
+  function fs(){document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();}
+  addEventListener('resize',fit);
+  addEventListener('hashchange',function(){show((parseInt(location.hash.slice(1),10)||1)-1);});
+  addEventListener('keydown',function(e){
+    if(['ArrowRight','PageDown',' ','Enter'].indexOf(e.key)>=0){e.preventDefault();show(i+1);}
+    else if(['ArrowLeft','PageUp','Backspace'].indexOf(e.key)>=0){e.preventDefault();show(i-1);}
+    else if(e.key==='Home')show(0);else if(e.key==='End')show(slides.length-1);
+    else if(e.key==='f'||e.key==='F')fs();
+  });
+  document.getElementById('prev').onclick=function(){show(i-1);};
+  document.getElementById('next').onclick=function(){show(i+1);};
+  document.getElementById('fs').onclick=fs;
+  fit();show(i);
+  if(/[?&]check/.test(location.search))setTimeout(function(){qsdCheck(slides[i]);},400);
+})();
+
+/* ?check mode (used by shoot.py): find text collisions on the active slide and write them, as JSON,
+   into a pre element appended to the body. Coordinates are slide pixels (1600x900). Kinds:
+   text-overlap  two pieces of text touch;   line-on-text  a diagram line/arrow crosses text;
+   text-overflow text sticks out of the box (card, pill, chip) that holds it or out of the slide;
+   box-overlap   two boxes partly overlap (neither contains the other). */
+function qsdCheck(slide){
+  var S=slide.getBoundingClientRect(), k=S.width/1600, out=[];
+  function rel(r){return {x:(r.left-S.left)/k,y:(r.top-S.top)/k,w:r.width/k,h:r.height/k};}
+  function inter(a,b,pad){pad=pad||0;return a.x+pad<b.x+b.w-pad&&b.x+pad<a.x+a.w-pad&&a.y+pad<b.y+b.h-pad&&b.y+pad<a.y+a.h-pad;}
+  function vis(el){for(var e=el;e&&e!==slide;e=e.parentElement){var cs=getComputedStyle(e);if(cs.display==='none'||cs.visibility==='hidden'||+cs.opacity<0.05)return false;}return true;}
+  function isBox(el){if(el.namespaceURI!=='http://www.w3.org/1999/xhtml')return false;var cs=getComputedStyle(el);
+    if(cs.clipPath&&cs.clipPath!=='none')return false;
+    var bg=cs.backgroundColor,hasBg=bg&&bg!=='transparent'&&!/rgba\(.*,\s*0\)$/.test(bg)||cs.backgroundImage!=='none';
+    var hasBd=['Top','Right','Bottom','Left'].every(function(s){return parseFloat(cs['border'+s+'Width'])>0&&cs['border'+s+'Style']!=='none';})||cs.boxShadow&&/inset/.test(cs.boxShadow);
+    var r=el.getBoundingClientRect();return (hasBg||hasBd)&&r.width>24&&r.height>16;}
+  /* 1. text runs: one entry per rendered line of each text node */
+  var texts=[],w=document.createTreeWalker(slide,NodeFilter.SHOW_TEXT,null),n;
+  function opaqueBox(el){for(var e=el;e&&e!==slide;e=e.parentElement){var cs=getComputedStyle(e),bg=cs.backgroundColor;
+    if(cs.backgroundImage!=='none'||bg&&bg!=='transparent'&&!/rgba\(.*,\s*0(\.0+)?\)$/.test(bg))return e;}return null;}
+  while((n=w.nextNode())){var tv=n.nodeValue.trim();if(!tv||(tv.length===1&&!/[\w\d]/.test(tv)))continue;var el=n.parentElement;if(!vis(el))continue;
+    var rg=document.createRange();rg.selectNodeContents(n);
+    [].forEach.call(rg.getClientRects(),function(r){if(r.width>2&&r.height>2)texts.push({r:rel(r),el:el,t:n.nodeValue.trim().slice(0,40)});});}
+  /* text-overlap */
+  for(var a=0;a<texts.length;a++)for(var b=a+1;b<texts.length;b++){var A=texts[a],B=texts[b];
+    if(A.el===B.el||A.el.contains(B.el)||B.el.contains(A.el))continue;
+    if(inter(A.r,B.r,2))out.push({kind:'text-overlap',x:Math.min(A.r.x,B.r.x),y:Math.min(A.r.y,B.r.y),
+      w:Math.max(A.r.x+A.r.w,B.r.x+B.r.w)-Math.min(A.r.x,B.r.x),h:Math.max(A.r.y+A.r.h,B.r.y+B.r.h)-Math.min(A.r.y,B.r.y),what:'"'+A.t+'" / "'+B.t+'"'});}
+  /* text-overflow: text outside its nearest box ancestor, or outside the slide */
+  texts.forEach(function(T){var r=T.r;
+    if(r.x<-1||r.y<-1||r.x+r.w>1601||r.y+r.h>901){out.push({kind:'text-overflow',x:r.x,y:r.y,w:r.w,h:r.h,what:'"'+T.t+'" leaves the slide'});return;}
+    for(var e=T.el;e&&e!==slide;e=e.parentElement){if(isBox(e)){var br=rel(e.getBoundingClientRect());
+      if(r.x<br.x-1||r.y<br.y-1||r.x+r.w>br.x+br.w+1||r.y+r.h>br.y+br.h+1)out.push({kind:'text-overflow',x:r.x,y:r.y,w:r.w,h:r.h,what:'"'+T.t+'" sticks out of its box'});break;}}});
+  /* line-on-text: sample every stroked SVG line/path/polyline (not icons: those are <use>) */
+  var shapes=slide.querySelectorAll('svg path, svg line, svg polyline, svg circle, svg ellipse');
+  [].forEach.call(shapes,function(p){if(p.closest('marker,symbol,defs')||!vis(p))return;var cs=getComputedStyle(p);
+    if(cs.stroke==='none'||parseFloat(cs.strokeWidth)>6||+cs.strokeOpacity<0.3)return;
+    var L;try{L=p.getTotalLength();}catch(e){return;}var M=p.getScreenCTM();if(!M||!L)return;var hit=null;
+    var sc=Math.min(Math.hypot(M.a,M.b),Math.hypot(M.c,M.d))/k||1, step=Math.max(0.05,2/sc);
+    /* text drawn on an opaque box that is painted after (above) this line hides the line: not a collision */
+    var cand=texts.filter(function(T){var ob=opaqueBox(T.el);
+      return !(ob&&(p.compareDocumentPosition(ob)&Node.DOCUMENT_POSITION_FOLLOWING));});
+    for(var d=0;d<=L;d+=step){var q=p.getPointAtLength(d),sx=(M.a*q.x+M.c*q.y+M.e-S.left)/k,sy=(M.b*q.x+M.d*q.y+M.f-S.top)/k;
+      for(var t=0;t<cand.length;t++){var r=cand[t].r;if(sx>r.x+1&&sx<r.x+r.w-1&&sy>r.y+1&&sy<r.y+r.h-1){hit=cand[t];break;}}
+      if(hit){out.push({kind:'line-on-text',x:hit.r.x,y:hit.r.y,w:hit.r.w,h:hit.r.h,what:'a line crosses "'+hit.t+'"'});break;}}});
+  /* box-overlap: boxes that partly overlap without containment */
+  var boxes=[].filter.call(slide.querySelectorAll('*'),function(e){return isBox(e)&&vis(e);}).map(function(e){return {e:e,r:rel(e.getBoundingClientRect())};});
+  for(var a2=0;a2<boxes.length;a2++)for(var b2=a2+1;b2<boxes.length;b2++){var X=boxes[a2],Y=boxes[b2];
+    if(X.e.contains(Y.e)||Y.e.contains(X.e)||!inter(X.r,Y.r,3))continue;
+    var inside=function(p,q){return p.x>=q.x-1&&p.y>=q.y-1&&p.x+p.w<=q.x+q.w+1&&p.y+p.h<=q.y+q.h+1;};
+    if(inside(X.r,Y.r)||inside(Y.r,X.r))continue;
+    var ix=Math.max(X.r.x,Y.r.x),iy=Math.max(X.r.y,Y.r.y);
+    out.push({kind:'box-overlap',x:ix,y:iy,w:Math.min(X.r.x+X.r.w,Y.r.x+Y.r.w)-ix,h:Math.min(X.r.y+X.r.h,Y.r.y+Y.r.h)-iy,
+      what:'<'+X.e.className+'> / <'+Y.e.className+'>'});}
+  /* text-covered: an opaque box painted after (on top of) a piece of text hides part of it */
+  texts.forEach(function(T){boxes.forEach(function(B){var e=B.e;if(e.contains(T.el)||T.el.contains(e))return;
+    if(!(T.el.compareDocumentPosition(e)&Node.DOCUMENT_POSITION_FOLLOWING))return;
+    var cs=getComputedStyle(e),bg=cs.backgroundColor;if(cs.backgroundImage==='none'&&(!bg||bg==='transparent'||/rgba\(.*,\s*0(\.0+)?\)$/.test(bg)))return;
+    if(inter(T.r,B.r,2))out.push({kind:'text-covered',x:T.r.x,y:T.r.y,w:T.r.w,h:T.r.h,what:'"'+T.t+'" is hidden under <'+e.className+'>'});});});
+  /* title-mark: report the ring box around the brand mark; shoot.py checks the mark is centred in it */
+  var star=slide.querySelector('.star');if(star){var sr=rel(star.getBoundingClientRect());out.push({kind:'title-mark',x:sr.x,y:sr.y,w:sr.w,h:sr.h,what:'mark box'});}
+  var pre=document.createElement('pre');pre.id='qsd-check';pre.textContent=JSON.stringify(out);document.body.appendChild(pre);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,47 @@
+<!-- PATTERN: stack (layers). 3 bands, each: id block, 3 bullets, owner + status chip. Side panel: a 3-step loop.
+     Chips: .chip.prod (filled = in production), .chip.ramp (outlined = ramping up), .chip.lab (dashed = experimental).
+     .planned = a dashed "Planned" tag. The .promote arrow is optional. -->
+<section class="slide p-stack">
+  <div class="frame">
+    <p class="kicker">The operating model</p>
+    <h2 class="h1">Three layers every site runs on</h2>
+    <p class="lede">Sites read the model before they act. Their results flow back into it.</p>
+  </div>
+  <div class="grid">
+    <div class="layers">
+      <article class="layer sys">
+        <div class="id"><div class="n">01 &middot; NETWORK</div><h3>How goods move between sites</h3><p>Network model</p></div>
+        <ul><li>One map of every site, route and handover</li><li>Changes flow from plan to impact to rollout</li><li>Gaps between plan and floor are always reconciled</li></ul>
+        <div class="who"><span class="chip prod">In production</span><div class="owner">Owner<span>Head office</span></div><div class="use">Planning, support and sales</div></div>
+      </article>
+      <article class="layer team">
+        <div class="id"><div class="n">02 &middot; SITE</div><h3>How each floor works</h3><p>Shared playbook</p></div>
+        <ul><li>Procedures for receiving, picking and shipping</li><li>Safety rules that apply everywhere</li><li>Sites pull updates and send improvements back</li></ul>
+        <div class="who"><span class="chip ramp">Ramping up</span><div class="owner">Owner<span>Ops office</span></div><div class="use">Six pilot sites</div></div>
+      </article>
+      <article class="layer lab">
+        <div class="id"><div class="n">03 &middot; LAB</div><h3>Where new methods are tried</h3><p>Test warehouse</p></div>
+        <ul><li>New layouts trialled for a month</li><li>Independent measurement before and after</li><li>Results logged and reviewed weekly</li></ul>
+        <div class="who"><span class="chip lab">Experimental</span><div class="owner">Owner<span>Ops research</span></div><div class="use">Proven methods move up<br><span class="planned" style="margin-top:6px;font-size:10.5px;padding:2px 8px">Planned: all sites</span></div></div>
+      </article>
+      <div class="promote" aria-hidden="true">
+        <svg viewBox="0 0 44 300" preserveAspectRatio="none">
+          <defs><marker id="p3ah" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" style="fill:var(--accent)"/></marker></defs>
+          <line x1="22" y1="296" x2="22" y2="8" style="stroke:var(--accent-2)" stroke-width="2" stroke-dasharray="5 5" marker-end="url(#p3ah)" vector-effect="non-scaling-stroke"/>
+        </svg>
+        <span>Promote</span>
+      </div>
+    </div>
+    <aside class="loop">
+      <h4>Every shift</h4>
+      <p class="sub">The model is read, used, and fed</p>
+      <div class="step"><div class="dot">1</div><div><b>Read</b><p>The team loads the plan, the rules and last week's results.</p></div></div>
+      <div class="connector"></div>
+      <div class="step"><div class="dot">2</div><div><b>Act</b><p>It works inside those rules, and a second team checks the result.</p></div></div>
+      <div class="connector"></div>
+      <div class="step"><div class="dot">3</div><div><b>Write back</b><p>Lessons and measured gaps return to the right layer.</p></div></div>
+      <p class="back"><strong>The effect:</strong> improvements compound across sites instead of staying local.</p>
+    </aside>
+  </div>
+  <div class="foot"><div class="mark"></div><div>The operating model</div><div class="num" data-num></div></div>
+</section>

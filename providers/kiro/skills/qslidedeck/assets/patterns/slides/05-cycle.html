@@ -1,0 +1,38 @@
+<!-- PATTERN: cycle. 4 nodes on a ring around a central artefact, plus 3 fact cards on the right.
+     Geometry (660x540 box): ring centre (330,260), r=150. Top node (.node.t): label above the disc. Bottom node: label under the disc.
+     Side nodes (.node.r / .node.l): label beside the disc, outside the ring; keep side labels under ~130px wide.
+     Keep exactly 4 nodes and these positions; the arcs leave a gap around each disc. -->
+<section class="slide p-cycle">
+  <div class="frame">
+    <p class="kicker">Layer 02 &middot; Site</p>
+    <h2 class="h1">One loop for every improvement</h2>
+  </div>
+  <div class="body">
+    <div class="cycle">
+      <svg class="ring" viewBox="0 0 660 540">
+        <defs><marker id="p5ra" viewBox="0 0 10 10" refX="7" refY="5" markerWidth="8" markerHeight="8" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker></defs>
+        <circle cx="330" cy="260" r="150" fill="none" style="stroke:var(--accent-pale)" stroke-width="34"/>
+        <g fill="none" style="stroke:var(--accent-2)" stroke-width="2.4" marker-end="url(#p5ra)">
+          <path d="M376.4 117.3 A150 150 0 0 1 472.7 213.6"/>
+          <path d="M472.7 306.4 A150 150 0 0 1 376.4 402.7"/>
+          <path d="M283.6 402.7 A150 150 0 0 1 187.3 306.4"/>
+          <path d="M187.3 213.6 A150 150 0 0 1 283.6 117.3"/>
+        </g>
+      </svg>
+      <div class="node t" style="left:235px;top:-6px"><div class="disc"><svg class="ico"><use href="#i-compass"/></svg></div><div><b>Observe</b><span>Walk the floor first</span></div></div>
+      <div class="node r" style="left:442px;top:222px"><div class="disc"><svg class="ico"><use href="#i-list"/></svg></div><div><b>Plan</b><span>Sized to the risk</span></div></div>
+      <div class="node" style="left:235px;top:372px"><div class="disc"><svg class="ico"><use href="#i-code"/></svg></div><b>Change</b><span>One zone at a time</span></div>
+      <div class="node l" style="left:0px;top:222px"><div class="disc"><svg class="ico"><use href="#i-archive"/></svg></div><div><b>Close</b><span>Measure, record</span></div></div>
+      <div class="core"><div class="doc"><i></i><i></i><i></i><i></i></div><b>One change log</b><span>Intent, plan and result</span></div>
+    </div>
+    <div class="facts">
+      <div class="card fact"><div class="disc soft"><svg class="ico"><use href="#i-list"/></svg></div>
+        <div><b>Effort matches risk</b><div class="tiers"><i>Minor</i><i>Small</i><i>Standard</i><i>Major</i></div></div></div>
+      <div class="card fact"><div class="disc soft"><svg class="ico"><use href="#i-check"/></svg></div>
+        <div><b>Every step is checked</b><span>Change, then independent audit, then re-measure</span></div></div>
+      <div class="card fact"><div class="disc soft"><svg class="ico"><use href="#i-db"/></svg></div>
+        <div><b>Every close is recorded</b><span>Lessons are captured, not lost</span></div></div>
+    </div>
+  </div>
+  <div class="foot"><div class="mark"></div><div>Improvement loop</div><div class="num" data-num></div></div>
+</section>

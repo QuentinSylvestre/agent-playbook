@@ -1,0 +1,49 @@
+<!-- PATTERN: pipeline. A banner for the shared model, 5 chevron stages (.hot = emphasised), a fan-out from one
+     stage to 3 targets, a dashed feedback box, and a right column of 3 "used for" cards.
+     The fan SVG uses a 1084x240 viewBox matching the left column; move the paths with the boxes. -->
+<section class="slide p-pipeline">
+  <div class="frame">
+    <p class="kicker">Layer 01 &middot; Network</p>
+    <h2 class="h1">A map of the network, kept current</h2>
+    <p class="lede">It shows how sites depend on each other, which no single site can see.</p>
+  </div>
+  <div class="body">
+    <div>
+      <div class="model">
+        <svg class="ico"><use href="#i-map"/></svg>
+        <div><b>One network model</b><span>Every site, route and handover, declared exactly once</span></div>
+      </div>
+      <div class="chev">
+        <div><b>Plan</b><span>Intent and design</span></div>
+        <div><b>Impact</b><span>What it touches</span></div>
+        <div class="hot"><b>Dispatch</b><span>A brief per site</span></div>
+        <div><b>Roll out</b><span>On each floor</span></div>
+        <div class="hot"><b>Reconcile</b><span>Plan vs. reality</span></div>
+      </div>
+      <div class="fan">
+        <svg viewBox="0 0 1084 240" preserveAspectRatio="none">
+          <defs><marker id="p4fa" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--accent-2)"/></marker></defs>
+          <g style="stroke:var(--accent-2)" stroke-width="1.6" fill="none">
+            <path d="M560 4 C560 50 375 50 375 96" marker-end="url(#p4fa)"/>
+            <path d="M560 4 L560 96" marker-end="url(#p4fa)"/>
+            <path d="M560 4 C560 50 745 50 745 96" marker-end="url(#p4fa)"/>
+            <path d="M822 122 L862 122" marker-end="url(#p4fa)"/>
+            <path d="M985 96 L985 8" stroke-dasharray="5 4" marker-end="url(#p4fa)"/>
+          </g>
+        </svg>
+        <div class="repo" style="left:300px;top:96px"><svg class="ico"><use href="#i-box"/></svg>Site A</div>
+        <div class="repo" style="left:485px;top:96px"><svg class="ico"><use href="#i-box"/></svg>Site B</div>
+        <div class="repo" style="left:670px;top:96px"><svg class="ico"><use href="#i-layers"/></svg>Transport</div>
+        <div class="drift" style="top:96px"><b>Gaps are never closed silently</b>
+          <div class="chips"><span>Layout</span><span>Handover</span><span>Stock</span><span>Staffing</span></div></div>
+      </div>
+    </div>
+    <div class="uses">
+      <span class="tag">Used today for</span>
+      <div class="card"><div class="disc"><svg class="ico"><use href="#i-layers"/></svg></div><div><b>Planning</b><span>Multi-site changes</span></div></div>
+      <div class="card"><div class="disc"><svg class="ico"><use href="#i-shield"/></svg></div><div><b>Support</b><span>Trace a delay to its source</span></div></div>
+      <div class="card"><div class="disc"><svg class="ico"><use href="#i-target"/></svg></div><div><b>Sales</b><span>Answer capacity questions</span></div></div>
+    </div>
+  </div>
+  <div class="foot"><div class="mark"></div><div>Network model</div><div class="num" data-num></div></div>
+</section>

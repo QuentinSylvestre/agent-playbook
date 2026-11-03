@@ -1,0 +1,63 @@
+<!-- PATTERN: org (two diagrams side by side, each 688x420, positioned absolutely; lines in a background SVG).
+     Left: before = a relay of pills with arrows; now = one bar spanning components, experts plugged in.
+     Right: an owner -> a shared asset -> teams, with a "push back" curve and a dashed "planned" path.
+     Pills: .pill (white), .pill.me (filled), .pill.exp (soft), .pill.comp (square-ish); .cap = small caption. -->
+<section class="slide p-org">
+  <div class="frame">
+    <p class="kicker">Organisation</p>
+    <h2 class="h1">How we organised around it</h2>
+  </div>
+  <div class="body">
+    <div>
+      <h3 class="colh">Who runs a multi-site change</h3>
+      <div class="relay">
+        <svg viewBox="0 0 688 420">
+          <defs><marker id="p9a" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--grey)"/></marker></defs>
+          <g style="stroke:var(--grey)" stroke-width="1.5" marker-end="url(#p9a)"><path d="M114 51H140"/><path d="M258 51H284"/><path d="M402 51H428"/><path d="M546 51H572"/></g>
+          <g style="stroke:var(--accent)" stroke-width="2"><path d="M165 254V214"/><path d="M315 254V214"/><path d="M465 254V214"/><path d="M615 254V214"/></g>
+          <g style="stroke:var(--accent-2)" stroke-width="1.6" stroke-dasharray="5 4"><path d="M200 340V300"/><path d="M580 340V300"/></g>
+        </svg>
+        <span class="cap" style="left:0;top:0">BEFORE: A RELAY OF HAND-OFFS</span>
+        <div class="pill" style="left:0;top:28px;width:110px;justify-content:center">Plan</div>
+        <div class="pill" style="left:144px;top:28px;width:110px;justify-content:center">Site A</div>
+        <div class="pill" style="left:288px;top:28px;width:110px;justify-content:center">Site B</div>
+        <div class="pill" style="left:432px;top:28px;width:110px;justify-content:center">Transport</div>
+        <div class="pill" style="left:576px;top:28px;width:112px;justify-content:center">Sign-off</div>
+        <span class="cap" style="left:0;top:136px;color:var(--accent)">NOW: ONE LEAD, END TO END</span>
+        <div class="pill comp" style="left:100px;top:172px;width:130px;justify-content:center"><svg class="ico"><use href="#i-box"/></svg>Site A</div>
+        <div class="pill comp" style="left:250px;top:172px;width:130px;justify-content:center"><svg class="ico"><use href="#i-box"/></svg>Site B</div>
+        <div class="pill comp" style="left:400px;top:172px;width:130px;justify-content:center"><svg class="ico"><use href="#i-box"/></svg>Site C</div>
+        <div class="pill comp" style="left:550px;top:172px;width:130px;justify-content:center"><svg class="ico"><use href="#i-layers"/></svg>Transport</div>
+        <div class="pill me" style="left:100px;top:254px;width:580px;justify-content:center"><svg class="ico"><use href="#i-user"/></svg>One change lead + the playbook</div>
+        <div class="pill exp" style="left:100px;top:340px;width:200px;justify-content:center"><svg class="ico"><use href="#i-users"/></svg>Experts: plan</div>
+        <div class="pill exp" style="left:480px;top:340px;width:200px;justify-content:center"><svg class="ico"><use href="#i-users"/></svg>Experts: audit</div>
+      </div>
+    </div>
+    <div>
+      <h3 class="colh">How the playbook spreads</h3>
+      <div class="relay">
+        <svg viewBox="0 0 688 420">
+          <defs>
+            <marker id="p9b" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--accent)"/></marker>
+            <marker id="p9c" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10z" style="fill:var(--grey)"/></marker>
+          </defs>
+          <g style="stroke:var(--accent)" stroke-width="1.8" fill="none" marker-end="url(#p9b)">
+            <path d="M344 46V86"/><path d="M300 152 C300 190 94 180 94 216"/><path d="M344 152V216"/><path d="M388 152 C388 190 454 180 454 216"/>
+          </g>
+          <path d="M40 216 C40 150 110 122 190 122" style="stroke:var(--accent-2)" stroke-width="1.8" fill="none" marker-end="url(#p9b)"/>
+          <path d="M610 330 V122 H500" style="stroke:var(--grey)" stroke-width="1.8" stroke-dasharray="6 5" fill="none" marker-end="url(#p9c)"/>
+        </svg>
+        <div class="pill me" style="left:244px;top:0;width:200px;justify-content:center"><svg class="ico"><use href="#i-users"/></svg>Ops office</div>
+        <div class="pill" style="left:194px;top:90px;width:300px;height:60px;border-radius:12px;justify-content:center;border:1.5px solid var(--accent-2)"><svg class="ico" style="color:var(--accent)"><use href="#i-doc"/></svg>Shared playbook</div>
+        <div class="pill" style="left:14px;top:220px;width:160px;justify-content:center"><svg class="ico"><use href="#i-users"/></svg>Site</div>
+        <div class="pill" style="left:194px;top:220px;width:160px;justify-content:center"><svg class="ico"><use href="#i-users"/></svg>Site</div>
+        <div class="pill" style="left:374px;top:220px;width:160px;justify-content:center"><svg class="ico"><use href="#i-users"/></svg>Site</div>
+        <span class="cap" style="left:0;top:112px">Push back</span>
+        <span class="cap" style="left:494px;top:176px">Pull updates</span>
+        <div class="pill" style="left:440px;top:330px;width:248px;justify-content:center;border:1.5px dashed var(--grey);box-shadow:none;color:var(--slate)"><svg class="ico"><use href="#i-user"/></svg>Every lead's own notes</div>
+        <span class="planned" style="position:absolute;left:520px;top:280px">Planned</span>
+      </div>
+    </div>
+  </div>
+  <div class="foot"><div class="mark"></div><div>Organisation</div><div class="num" data-num></div></div>
+</section>

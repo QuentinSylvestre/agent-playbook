@@ -60,7 +60,7 @@ Then, in any project, ask your agent to `/qexplore` a change.
 | Output | `/qexplain` (HTML walkthrough of a diff), `/qvisualize` (interactive charts and diagrams), `/qdocument-interaction` (Word, PDF, PowerPoint, Excel), `/qicon-design` |
 | Maintenance | `/qconfig-sync` (pull, verify the deployment, push), `/qmigrate-workspace` (move a workspace folder, Windows), `/qutilities-disk-cleanup` |
 
-Kiro also gets `/qwire-governance`, `/qrecover-file` and `/qfewer-permission-prompts`.
+Kiro also gets `/qwire-governance`, `/qrecover-file`, `/qfewer-permission-prompts` and `/qslidedeck` (self-contained HTML slide decks with scripted layout checks).
 
 ## How it fits together
 

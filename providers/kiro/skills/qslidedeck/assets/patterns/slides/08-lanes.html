@@ -1,0 +1,20 @@
+<!-- PATTERN: lanes. Vertical lanes, one per role, left to right: input lane (.opts), role lanes, a decision lane
+     (.dec). Each lane: tag, title, one line, then a stack of chips. .pro = objection lane (red chips),
+     .jury = vote lane (filled chips), .full-only = dashed outline for optional steps, explained in the legend. -->
+<section class="slide p-lanes">
+  <div class="frame">
+    <p class="kicker">Decisions</p>
+    <h2 class="h1">A panel for hard trade-offs</h2>
+  </div>
+  <div class="lanes">
+    <div class="lane opts"><span class="tag">Input</span><h3>Options</h3><div class="stack"><span>A</span><span>B</span><span>C</span></div></div>
+    <div class="lane full-only"><span class="tag">1 &middot; Checker</span><h3>Check the facts</h3><p>Flags figures nobody verified</p><div class="stack"><span>Verified</span><span>Unverified</span></div></div>
+    <div class="lane"><span class="tag">2 &middot; Sponsors</span><h3>Best case</h3><p>One per option</p><div class="stack"><span>For A</span><span>For B</span><span>For C</span></div></div>
+    <div class="lane pro full-only"><span class="tag">3 &middot; Critics</span><h3>Strongest objection</h3><p>One per option</p><div class="stack"><span>Against A</span><span>Against B</span><span>Against C</span></div></div>
+    <div class="lane jury"><span class="tag">4 &middot; Panel</span><h3>Vote</h3><p>3 to 5 site leads; a vote can be conditional</p><div class="stack"><span>North <b>B</b></span><span>East <b>B</b></span><span>South <b>A if...</b></span></div></div>
+    <div class="lane full-only"><span class="tag">5 &middot; Stress test</span><h3>What would flip it</h3><p>Runs on a close vote</p><div class="stack"><span>Margin: 1 vote</span><span>Flips if...</span></div></div>
+    <div class="lane dec"><span class="tag">Output</span><h3>Director decides</h3><p>With the tally, the reasons and the flip conditions</p></div>
+  </div>
+  <div class="legend"><span><i class="sw a"></i>Routine: sponsors and panel</span><span><i class="sw b"></i>Added for high-stakes decisions</span></div>
+  <div class="foot"><div class="mark"></div><div>Decisions</div><div class="num" data-num></div></div>
+</section>
