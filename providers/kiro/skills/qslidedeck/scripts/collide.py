@@ -8,6 +8,7 @@ Each finding: {kind, x, y, w, h, what}, coordinates in slide pixels (1600x900). 
   text-overflow  text sticks out of the card, pill or chip that holds it, or out of the slide
   text-covered   an opaque box is painted over text
   box-overlap    two boxes partly overlap (neither contains the other)
+  line-loose-end a diagram line ends in empty space, away from any box, label or line
   title-mark     (title slide) the info record of the brand mark box, used by shoot.py
 """
 import json, os, re, shutil, subprocess, sys

@@ -34,14 +34,15 @@ Paths: `<skill>` is this skill's folder (`~/.kiro/skills/qslidedeck`). `<python>
 6. **Verify** (see Verification) until `shoot.py` prints `RESULT: PASS` and you have looked at every screenshot.
 7. **Hand over**: the deck path; how to present (arrows, F for full screen, Ctrl+P for a PDF); and two tables, built by re-reading every slide file and the `LIST:` lines from `build.py`, never from memory:
    - every slide phrase that is not in the approved claims table or the user's own words, quoting the slide text;
-   - every `LIST:` sentence, one row each, with the matching claims-table scope beside it and `same` or `wider`. A blanket "none widen the scope" is not a review. Fix each `wider` row before handing over.
+   - every `LIST:` sentence, one row each, with the matching claims-table scope beside it and `same` or `wider`. A blanket "none widen the scope" is not a review. Fix each `wider` row before handing over;
+   - every claim in `dropped`, with the closest slide text beside it, or `none`.
 
 ## Deck folder and scripts
 
 Create the deck folder where the user asked:
 
 ```
-deck.json         {"title": "...", "output": "<name>.html", "forbid": ["<internal names>"]}
+deck.json         {"title": "...", "output": "<name>.html", "forbid": ["<internal names>"], "dropped": ["<claims the user rejected>"]}
 theme.css         brand tokens on :root (below) + only the styles your deck adds
 slides/01-title.html, 02-....html   one <section class="slide p-..."> per file
 assets/           logo.svg or .png (wordmark), mark.svg or .png (symbol only); reference as asset:logo.svg
@@ -50,15 +51,17 @@ icons.svg         optional; default <skill>/assets/icons.svg: i-reset i-eye i-fl
                   i-archive i-moon i-bot i-shield i-arrow i-down i-box i-layers
 ```
 
-- `<python> <skill>/scripts/build.py <deck>` assembles one self-contained HTML file (shell + `<skill>/assets/base.css` + your theme + icons + slides, assets inlined). **FAIL** on an external URL (no web fonts or CDN: the deck must work offline during a live call) and on any `forbid` term. **WARN** when `forbid` is empty. **LIST** prints every slide sentence with an absolute scope word (all, every, always, never...); those are where scope drifts.
+- `<python> <skill>/scripts/build.py <deck>` assembles one self-contained HTML file (shell + `<skill>/assets/base.css` + your theme + icons + slides, assets inlined). **FAIL** on an external URL (no web fonts or CDN: the deck must work offline during a live call) and on any `forbid` term. **WARN** when `forbid` is empty. **LIST** prints every slide sentence with an absolute scope word (all, every, always, never...), where scope drifts, and every `dropped` claim.
 - `<python> <skill>/scripts/shoot.py <deck> [slide numbers]` screenshots each slide at 1600x900 and checks it:
   - **empty space** (all but the title): interior holes (hollow cards, empty lanes) and edge bands (the layout stops short of the bottom or a side);
-  - **collisions**: `line-on-text`, `text-overlap`, `text-covered`, `text-overflow`, `box-overlap`, printed with coordinates and the text involved;
+  - **collisions**: `line-on-text`, `text-overlap`, `text-covered`, `text-overflow`, `box-overlap`, `line-loose-end`, printed with coordinates and the text involved. Add `data-free` to a line only if it deliberately connects to nothing;
   - **title mark**: the brand mark must be centred in its rings.
   A failing slide gets `slideNN.issues.png` with every problem boxed (red hole, orange band, magenta collision). It ends with `RESULT: PASS` or `FAIL`, and checks the PDF has one page per slide.
 - The shell (`<skill>/assets/shell.html`) owns the canvas, scaling, navigation, print and the checks. Never reimplement or edit it, `base.css` or the scripts.
 
 **theme.css tokens** (all required): neutrals `--ink --slate --muted --grey --line --paper --canvas --wash`; `--accent` (main brand colour, dark enough for white text), `--accent-2`, `--accent-3` (lighter steps), `--accent-soft`, `--accent-pale` (tints); `--font`; `--shadow`; `--logo: url("asset:logo.svg")`; `--mark: url("asset:mark.svg")`. Example: `<skill>/assets/patterns/theme.css`. For the mark, prefer the brand's own symbol/icon file. If you must crop it from a wordmark SVG, set the `viewBox` to the symbol's exact bounds; `shoot.py` fails an off-centre mark.
+
+**No logo:** never invent one, even with the user's approval of a palette. Omit `--logo` and `--mark`, delete the `.star` block from the title slide, and write the organisation's name as text: `<div class="wordmark">Name</div>` in place of the title's `.logo` and of each footer's `.mark`.
 
 ## Patterns
 
@@ -77,6 +80,7 @@ icons.svg         optional; default <skill>/assets/icons.svg: i-reset i-eye i-fl
 | 09-org | two box-and-arrow diagrams | before / now, how something spreads |
 | 10-tiles | 2x2 large-icon tiles | outcomes, results |
 | 11-quotes | 4 quote cards | lessons, principles |
+| 12-bignumber | one large number + up to 3 facts | one result that carries the slide; never pad it into 2x2 tiles |
 
 If no pattern fits, adapt the closest one and keep its sizing. Never make a card taller than its content; never push content to a card's edges with `justify-content: space-between` or `margin-top: auto`. Use a pattern at most twice in a deck, and only when its shape fits the idea: replace every placeholder role with something that means something (a row of five identical "Session" pills means nothing).
 
@@ -84,6 +88,7 @@ If no pattern fits, adapt the closest one and keep its sizing. Never make a card
 
 - **One idea, one diagram.** Kicker (2-4 words), a headline stating the point (at most 10 words), one diagram. A grid of prose cards is not a diagram.
 - **Words.** About 40 words per content slide outside diagram labels. Short phrases; no paragraphs; no semicolon chains.
+- **Icons match their meaning.** If none of the 24 fits, use none rather than a rocket for gas savings.
 - **Brand.** Colours only through the tokens. One accent family plus neutrals. Green, red and amber only where they mean pass, fail, against or warning. The logo as given, never redrawn. Light theme unless asked.
 - **Maturity chips** exactly as in the approved claims table: `.chip.prod` (in production), `.chip.ramp` (ramping up), `.chip.lab` (experimental), `.planned` (planned).
 - **Collisions are fixed by moving or resizing.** A line may pass under a small label that has its own background (a pill, a tag). Never fix a collision by giving a large block an opaque background over a line: that cuts the diagram visibly while passing the check.
@@ -92,6 +97,7 @@ If no pattern fits, adapt the closest one and keep its sizing. Never make a card
 ## Content rules
 
 - **No invented numbers.** Every number, percentage, duration ("weeks", "days") and ratio comes from the user or the sources. Without one, show the idea without numbers.
+- **A claim the user drops stays dropped in any wording.** Record it in `dropped`. Softening it ("will be confirmed" for "will be scheduled") is the same claim.
 - **Only claims in the approved claims table, at the scope the user gave.** Headlines included: a punchy headline never widens "a small group" to "all teams". Do not add specifics the user never stated (who owns something, how it is installed, how often it runs, what loads automatically) to make a slide feel complete.
 - **Confidentiality.** Put every internal product, repository, host and customer name found in the sources into `forbid`, even unused ones. Describe internal systems by what they do and why, never by their structure: no file formats, tool names, folder names, command names or schema names.
 - Dates come from the real clock.

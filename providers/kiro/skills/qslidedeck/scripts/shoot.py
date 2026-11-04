@@ -7,7 +7,7 @@ Writes <deck>/screenshots/slideNN.png (1600x900) and checks every slide:
   - empty space (all but slide 1; see measure.py): interior holes (hollow cards, empty lanes) and
     edge bands (the layout stops short of the bottom or a side)
   - collisions (all slides; see collide.py): line-on-text, text-overlap, text-covered,
-    text-overflow, box-overlap
+    text-overflow, box-overlap, line-loose-end
   - title mark (a slide with the title pattern's .star): the brand mark must sit within 4 px of
     the centre of its rings
 A failing slide gets slideNN.issues.png: red = interior hole, orange = edge band, magenta =

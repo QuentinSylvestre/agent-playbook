@@ -127,8 +127,8 @@
 .uses .card span{font-size:14px;color:var(--slate)}
 
 /* ================= LOOP ================= */
-.p-cycle .body{display:grid;grid-template-columns:640px 1fr;gap:56px;align-items:center}
-.cycle{position:relative;width:600px;height:540px}
+.p-cycle .body{display:grid;grid-template-columns:660px 1fr;gap:48px;align-items:center}
+.cycle{position:relative;width:660px;height:540px}
 .cycle svg.ring{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 .node{position:absolute;width:190px;text-align:center}
 /* side nodes: label beside the disc, outside the ring, so the ring arrows never cross it */
@@ -259,3 +259,17 @@
 .lesson:nth-child(3){border-top:5px solid var(--accent-3)}
 .lesson:nth-child(4){border-top:5px solid var(--slate)}
 
+/* ================= BIG NUMBER ================= */
+.p-bignum .hero{position:absolute;left:88px;top:232px;width:640px;height:560px;border-radius:16px;background:var(--accent);color:#fff;display:flex;flex-direction:column;justify-content:center;padding:0 56px}
+.hero .n{font-size:220px;font-weight:700;letter-spacing:-.03em;line-height:1.1}
+.hero .w{font-size:38px;font-weight:600;line-height:1.2;margin-top:44px}
+.hero .c{font-size:19px;opacity:.9;margin-top:14px}
+.p-bignum .side{position:absolute;left:752px;right:88px;top:232px;height:560px;display:grid;grid-template-rows:repeat(3,1fr);gap:18px}
+.side .card{display:flex;align-items:center;gap:24px;padding:0 34px}
+.side b{display:block;font-size:26px;font-weight:650;margin-bottom:6px}
+.side span{font-size:18px;color:var(--slate);line-height:1.35}
+
+/* ================= NO LOGO: a text wordmark, never an invented mark ================= */
+.wordmark{font-weight:650;letter-spacing:-.01em;color:var(--ink);white-space:nowrap}
+.p-title .wordmark{position:absolute;left:88px;top:72px;font-size:30px}
+.foot .wordmark{font-size:15px}

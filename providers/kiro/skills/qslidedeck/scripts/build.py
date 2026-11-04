@@ -3,7 +3,8 @@
 Usage:  <python> build.py <deck-folder>
 
 Deck folder layout:
-  deck.json        {"title": "...", "output": "my-deck.html", "forbid": ["term", ...]}
+  deck.json        {"title": "...", "output": "my-deck.html", "forbid": ["term", ...],
+                    "dropped": ["claim the user rejected", ...]}
   theme.css        brand tokens on :root plus deck-specific styles. <skill>/assets/base.css (every
                    component and pattern style) is included automatically BEFORE it.
   icons.svg        optional: your own icon sprite; default is <skill>/assets/icons.svg
@@ -18,6 +19,7 @@ can look at it, but it is NOT done). Checks:
   WARN  "forbid" is empty: list every internal product, repository, host and customer name
   LIST  every on-slide sentence with an absolute scope word (all, every, always, never...):
         compare each with the approved claims table at handover; these are where scope drifts
+  LIST  every claim in deck.json "dropped": it must not appear on a slide in any wording
 """
 import base64, html as htmllib, json, mimetypes, re, sys
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -95,6 +97,12 @@ def main(deck: Path) -> int:
               "claims table; the user's scope wins (\"a small group\" never becomes \"all teams\"):")
         for name, s in scope:
             print(f"   {name}: {s[:140]}")
+    dropped = cfg.get("dropped", [])
+    if dropped:
+        print(f"LIST: {len(dropped)} claim(s) the user dropped. Search every slide for each MEANING, not its words: "
+              "a reworded dropped claim is still dropped. Remove any you find:")
+        for d in dropped:
+            print(f"   dropped: {d}")
     for p in problems:
         print("FAIL:", p)
     print("RESULT:", "PASS" if not problems else f"FAIL ({len(problems)} problem(s)): fix each FAIL above and rebuild")

@@ -128,6 +128,18 @@ function qsdCheck(slide){
     if(!(T.el.compareDocumentPosition(e)&Node.DOCUMENT_POSITION_FOLLOWING))return;
     var cs=getComputedStyle(e),bg=cs.backgroundColor;if(cs.backgroundImage==='none'&&(!bg||bg==='transparent'||/rgba\(.*,\s*0(\.0+)?\)$/.test(bg)))return;
     if(inter(T.r,B.r,2))out.push({kind:'text-covered',x:T.r.x,y:T.r.y,w:T.r.w,h:T.r.h,what:'"'+T.t+'" is hidden under <'+e.className+'>'});});});
+  /* line-loose-end: each end of a diagram line must reach a box, a label or another line (data-free opts out) */
+  var anchors=[].filter.call(slide.querySelectorAll('*'),function(e){if(e.namespaceURI!=='http://www.w3.org/1999/xhtml'||!vis(e))return false;
+    var cs=getComputedStyle(e),bg=cs.backgroundColor,r=e.getBoundingClientRect();if(r.width*r.height>0.4*S.width*S.height)return false;
+    return (cs.clipPath&&cs.clipPath!=='none')||(bg&&bg!=='transparent'&&!/rgba\(.*,\s*0(\.0+)?\)$/.test(bg))||cs.backgroundImage!=='none'||(parseFloat(cs.borderTopWidth)>0&&parseFloat(cs.borderLeftWidth)>0);
+  }).map(function(e){return rel(e.getBoundingClientRect());}).concat(texts.map(function(T){return T.r;}));
+  var ends=[];
+  [].forEach.call(slide.querySelectorAll('svg path, svg line, svg polyline'),function(p){if(p.closest('marker,symbol,defs,[data-free]')||!vis(p))return;var cs=getComputedStyle(p);
+    if(cs.stroke==='none'||parseFloat(cs.strokeWidth)>6||+cs.strokeOpacity<0.3)return;var L;try{L=p.getTotalLength();}catch(e){return;}var M=p.getScreenCTM();if(!M||!L)return;
+    [0,L].forEach(function(d){var q=p.getPointAtLength(d);ends.push({x:(M.a*q.x+M.c*q.y+M.e-S.left)/k,y:(M.b*q.x+M.d*q.y+M.f-S.top)/k,p:p});});});
+  ends.forEach(function(E){var G=14;
+    var ok=anchors.some(function(r){return E.x>r.x-G&&E.x<r.x+r.w+G&&E.y>r.y-G&&E.y<r.y+r.h+G;})||ends.some(function(O){return O.p!==E.p&&Math.hypot(O.x-E.x,O.y-E.y)<G;});
+    if(!ok)out.push({kind:'line-loose-end',x:E.x-6,y:E.y-6,w:12,h:12,what:'a line ends in empty space: connect it to its box (an SVG rescaled by its container is the usual cause), or add data-free if deliberate'});});
   /* title-mark: report the ring box around the brand mark; shoot.py checks the mark is centred in it */
   var star=slide.querySelector('.star');if(star){var sr=rel(star.getBoundingClientRect());out.push({kind:'title-mark',x:sr.x,y:sr.y,w:sr.w,h:sr.h,what:'mark box'});}
   var pre=document.createElement('pre');pre.id='qsd-check';pre.textContent=JSON.stringify(out);document.body.appendChild(pre);
