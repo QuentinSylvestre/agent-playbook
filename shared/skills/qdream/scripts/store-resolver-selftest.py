@@ -1904,6 +1904,125 @@ def _run_selftest() -> int:
                 os.environ["AGENT_PLAYBOOK_STORES"] = env_stores
             w.reset_patches()
 
+        # --- store scratch folder: creation, the age rule, and every refusal of the delete path ---
+        w.reset_patches()
+        w.new_stores()
+        os.environ["AGENT_PLAYBOOK_STORES"] = str(w.stores)
+        sc_repo = w.repo(w.area("scproj") / "r", url="https://github.com/o/scproj.git")
+        rs = scratch_folder(sc_repo, "260101-probe")
+        chk("scratch:creates-the-store-and-the-folder", rs.status == "found" and rs.path.is_dir()
+            and rs.path.parent.name == SCRATCH_DIR and (rs.path.parent.parent / STORE_FILE).is_file(), repr(rs))
+        sc_store = rs.path.parent.parent
+        chk("scratch:same-name-is-the-same-folder", scratch_folder(sc_repo, "260101-probe").path == rs.path)
+        for bad in ("../up", "a/b", "a\\b", "", ".hidden", "name.", "C:evil"):
+            chk("scratch:refuses-name:%s" % bad, scratch_folder(sc_repo, bad).status == "failed", bad)
+        rshared = scratch_folder(w.home, "260101-home")
+        chk("scratch:a-no-create-folder-uses-the-shared-root", rshared.status == "found"
+            and rshared.path == shared_scratch_root() / "260101-home" and rshared.path.is_dir(), repr(rshared))
+        rc_sc, out_sc = None, io.StringIO()
+        with contextlib.redirect_stdout(out_sc):
+            rc_sc = main(["scratch", str(sc_repo), "260101-probe"])
+        chk("scratch:cli-prints-the-path", rc_sc == 0 and out_sc.getvalue().strip() == str(rs.path), out_sc.getvalue())
+
+        def sc_make(root, name, age_days, now_):
+            d = Path(root) / name
+            (d / "sub").mkdir(parents=True, exist_ok=True)
+            f = d / "sub" / "f.txt"
+            f.write_text("x" * 2048, encoding="utf-8")
+            t = now_ - age_days * 86400.0
+            for p in (f, d / "sub", d):
+                os.utime(str(p), (t, t))
+            return d
+
+        sc_now = time.time()
+        sc_root = sc_store / SCRATCH_DIR
+        (sc_store / "plans").mkdir(exist_ok=True)
+        (sc_store / "plans" / "260101_OPEN_PLAN.md").write_text("# open\n", encoding="utf-8")
+        d_old = sc_make(sc_root, "260101-old", 15, sc_now)
+        d_edge = sc_make(sc_root, "260101-edge", 13.5, sc_now)
+        d_young_file = sc_make(sc_root, "260101-oldfolder-newfile", 40, sc_now)
+        os.utime(str(d_young_file / "sub" / "f.txt"), (sc_now - 3600, sc_now - 3600))
+        d_open = sc_make(sc_root, "260101_OPEN_PLAN", 40, sc_now)
+        d_gone_plan = sc_make(sc_root, "260101_ARCHIVED_PLAN", 15, sc_now)
+        d_shared = sc_make(shared_scratch_root(), "260101-shared-old", 15, sc_now)
+        ronly = sc_make(sc_root, "260101-readonly", 15, sc_now)
+        os.chmod(str(ronly / "sub" / "f.txt"), stat.S_IREAD)
+        os.utime(str(ronly / "sub" / "f.txt"), (sc_now - 15 * 86400, sc_now - 15 * 86400))
+        os.utime(str(ronly / "sub"), (sc_now - 15 * 86400, sc_now - 15 * 86400))
+        os.utime(str(ronly), (sc_now - 15 * 86400, sc_now - 15 * 86400))
+        keep_outside = w.area("outside")
+        (keep_outside / "precious.txt").write_text("keep\n", encoding="utf-8")
+        d_link = sc_root / "260101-link"
+        linked = False
+        try:
+            os.symlink(str(keep_outside), str(d_link), target_is_directory=True)
+            linked = True
+        except (OSError, NotImplementedError):
+            pass
+        junction_inside = sc_make(sc_root, "260101-has-junction", 15, sc_now)
+        junctioned = False
+        if os.name == "nt":
+            import subprocess
+            made_j = subprocess.run(["cmd", "/c", "mklink", "/J", str(junction_inside / "j"), str(keep_outside)],
+                                    stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            junctioned = made_j.returncode == 0 and (junction_inside / "j" / "precious.txt").is_file()
+            os.utime(str(junction_inside), (sc_now - 15 * 86400, sc_now - 15 * 86400))
+        rows = scratch_clean(now=sc_now)
+        by = {os.path.basename(r[1]): r for r in rows}
+        chk("scratch-clean:old-plan-less-folder-is-deleted", "260101-old" in by and by["260101-old"][0] == "DELETED"
+            and not d_old.exists() and by["260101-old"][2] == 2048, repr(rows))
+        chk("scratch-clean:under-the-limit-stays", d_edge.is_dir() and "260101-edge" not in by, repr(rows))
+        chk("scratch-clean:a-new-file-in-an-old-folder-keeps-it", d_young_file.is_dir()
+            and "260101-oldfolder-newfile" not in by, repr(rows))
+        chk("scratch-clean:an-open-plan-is-reported-and-kept", d_open.is_dir()
+            and by.get("260101_OPEN_PLAN", ("",))[0] == "STALE-OPEN", repr(rows))
+        chk("scratch-clean:an-archived-plans-leftover-is-plan-less", not d_gone_plan.exists()
+            and by.get("260101_ARCHIVED_PLAN", ("",))[0] == "DELETED", repr(rows))
+        chk("scratch-clean:the-shared-root-is-swept", not d_shared.exists()
+            and by.get("260101-shared-old", ("",))[0] == "DELETED", repr(rows))
+        chk("scratch-clean:read-only-files-are-deleted", not ronly.exists()
+            and by.get("260101-readonly", ("",))[0] == "DELETED", repr(rows))
+        if linked:
+            chk("scratch-clean:a-link-entry-is-refused", by.get("260101-link", ("",))[0] == "FAILED"
+                and (keep_outside / "precious.txt").is_file() and os.path.lexists(str(d_link)), repr(rows))
+            os.unlink(str(d_link))
+        else:
+            skip("scratch-clean:a-link-entry-is-refused", "this user cannot create a symlink")
+        chk("scratch-clean:nothing-left-half-renamed", not [n for n in os.listdir(str(sc_root)) if n.startswith(".deleting-")],
+            repr(os.listdir(str(sc_root))))
+        os.environ["AGENT_PLAYBOOK_STORES"] = str(w.root / "no-such-root")
+        d_shared2 = sc_make(shared_scratch_root(), "260101-shared-again", 15, sc_now)
+        rows_m = scratch_clean(now=sc_now)
+        chk("scratch-clean:a-missing-store-repo-still-sweeps-shared", not d_shared2.exists()
+            and not [r for r in rows_m if r[0] == "FAILED"], repr(rows_m))
+        os.environ["AGENT_PLAYBOOK_STORES"] = str(w.stores)
+        plan_open = sc_store / "plans" / "260101_OPEN_PLAN.md"
+        rows_c = scratch_close(plan_open)
+        chk("scratch-close:refuses-while-the-project-file-is-there", rows_c and rows_c[0][0] == "FAILED" and d_open.is_dir(), repr(rows_c))
+        plan_open.unlink()
+        rows_c = scratch_close(plan_open)
+        chk("scratch-close:deletes-only-that-plans-folder", rows_c and rows_c[0][0] == "DELETED" and not d_open.exists()
+            and d_edge.is_dir(), repr(rows_c))
+        chk("scratch-close:nothing-there-is-no-rows", scratch_close(plan_open) == [])
+        outsider = w.area("notstore") / "plans" / "260101_X.md"
+        outsider.parent.mkdir(parents=True, exist_ok=True)
+        sc_make(outsider.parent.parent / SCRATCH_DIR, "260101_X", 1, sc_now)
+        chk("scratch-close:a-plan-outside-the-store-repo-deletes-nothing", scratch_close(outsider) == []
+            and (outsider.parent.parent / SCRATCH_DIR / "260101_X").is_dir())
+        out_sc = io.StringIO()
+        sc_make(sc_root, "260101-cli", 15, sc_now)
+        with contextlib.redirect_stdout(out_sc):
+            rc_sc = main(["scratch-clean"])
+        chk("scratch-clean:cli-reports-the-deletion", rc_sc == 0 and "DELETED\t" in out_sc.getvalue()
+            and "260101-cli" in out_sc.getvalue(), out_sc.getvalue())
+        # Making the junction refreshed its folder's time, so this sweep runs with a later clock.
+        if junctioned:
+            rows_j = scratch_clean(now=sc_now + 20 * 86400.0)
+            chk("scratch-clean:a-junction-inside-does-not-reach-its-target", (keep_outside / "precious.txt").is_file()
+                and not junction_inside.exists(), repr(rows_j))
+        else:
+            skip("scratch-clean:a-junction-inside-does-not-reach-its-target", "no junction on this system")
+
         # --- the guard against a vacuous creation suite ---
         chk("meta:creation-cases-really-created", sum(1 for n in results if n.startswith(("sibling:", "non-git:creates", "race:"))) >= 5)
     except Exception:

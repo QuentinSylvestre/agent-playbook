@@ -1795,6 +1795,196 @@ def fixture_store(stores_root, dirname, text):
 
 
 # ---------------------------------------------------------------------------
+# Store scratch folder (memory-rules.md § Store scratch folder)
+# ---------------------------------------------------------------------------
+
+SCRATCH_DIR = "scratch"
+SCRATCH_MAX_AGE_DAYS = 14
+_SCRATCH_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_REPARSE_POINT = 0x400  # FILE_ATTRIBUTE_REPARSE_POINT: a symlink or a junction on Windows
+
+
+def shared_scratch_root() -> Path:
+    """Where a folder with no store keeps scratch: ~/.agent-playbook/scratch."""
+    return Path(_home_verbatim()) / ".agent-playbook" / SCRATCH_DIR
+
+
+def _scratch_is_link(path) -> bool:
+    try:
+        st = os.lstat(str(path))
+    except OSError:
+        return False
+    return stat.S_ISLNK(st.st_mode) or bool(getattr(st, "st_file_attributes", 0) & _REPARSE_POINT)
+
+
+def _scratch_long(path) -> str:
+    """The path in a form that survives Windows' 260-character limit: test runs nest deep."""
+    p = os.path.abspath(str(path))
+    if os.name != "nt" or p.startswith("\\\\?\\"):
+        return p
+    return "\\\\?\\UNC\\" + p[2:] if p.startswith("\\\\") else "\\\\?\\" + p
+
+
+def scratch_folder(folder, name):
+    """Create the scratch folder `name` for `folder` and return a Result naming it. Never raises.
+
+    `name` is the plan slug, or <YYMMDD>-<topic> for plan-less work: one path segment. It sits in the store
+    that serves `folder`, created when needed. A folder that may have no store uses shared_scratch_root()."""
+    try:
+        if not isinstance(name, str) or not _SCRATCH_NAME_RE.match(name) or name.endswith("."):
+            return Result("failed", None, reason="bad scratch name %r: use the plan slug or <YYMMDD>-<topic>" % (name,))
+        res = find_or_create(folder, "plans")
+        if res.status in ("found", "created"):
+            root = Path(res.path) / SCRATCH_DIR
+        elif res.status == "none":
+            root = shared_scratch_root()
+        else:
+            return res
+        for p in (root, root / name):
+            if _scratch_is_link(p):
+                return Result("failed", None, reason="%s is a link: refusing to use it" % p)
+        (root / name).mkdir(parents=True, exist_ok=True)
+        return Result("found", root / name, notice=res.notice)
+    except Exception as exc:
+        return Result("failed", None, reason="internal error: %s: %s" % (type(exc).__name__, exc))
+
+
+def _scratch_measure(path):
+    """(newest modification time, bytes) of a scratch entry and everything under it; links are not followed."""
+    long_path = _scratch_long(path)
+    st = os.lstat(long_path)
+    newest, size = st.st_mtime, st.st_size if not stat.S_ISDIR(st.st_mode) else 0
+    for dp, dn, fn in os.walk(long_path):
+        for nm in dn + fn:
+            try:
+                s = os.lstat(os.path.join(dp, nm))
+            except OSError:
+                continue
+            newest = max(newest, s.st_mtime)
+            if not stat.S_ISDIR(s.st_mode):
+                size += s.st_size
+    return newest, size
+
+
+def _scratch_remove(entry, root):
+    """Delete one scratch entry directly under `root`; the refusal reason, or None when it is gone.
+
+    Rename first, as dream-manifest.py's clean does: a folder a live process holds open fails here and stays
+    whole, and a swap of a path component after the check can no longer redirect the delete."""
+    entry, root = Path(entry), Path(root)
+    if _scratch_is_link(root) or _scratch_is_link(entry):
+        return "a link: left alone"
+    if os.path.normcase(os.path.realpath(str(entry.parent))) != os.path.normcase(os.path.realpath(str(root))):
+        return "resolves outside %s: left alone" % root
+    import secrets
+    import shutil
+    doomed = root / (".deleting-%d-%s" % (os.getpid(), secrets.token_hex(4)))
+    try:
+        os.rename(_scratch_long(entry), _scratch_long(doomed))
+    except OSError as exc:
+        return "could not rename it, so it may be in use: %s" % exc
+    if _scratch_is_link(doomed) or os.path.normcase(os.path.realpath(str(doomed.parent))) != os.path.normcase(os.path.realpath(str(root))):
+        return "changed during the delete: renamed folder left at %s" % doomed
+
+    def _clear_read_only(func, path, _exc):
+        os.chmod(path, stat.S_IWRITE)
+        func(path)
+    try:
+        if os.path.isdir(_scratch_long(doomed)):
+            shutil.rmtree(_scratch_long(doomed), onerror=_clear_read_only)
+        else:
+            os.remove(_scratch_long(doomed))
+    except OSError as exc:
+        return "could not delete it: %s; leftover at %s" % (exc, doomed)
+    return None
+
+
+def _scratch_row(verdict, path, size=0, age=0.0, note=""):
+    return (verdict, str(path), size, age, note)
+
+
+def scratch_clean(now=None):
+    """Delete plan-less scratch folders whose newest file is over SCRATCH_MAX_AGE_DAYS old; returns rows of
+    (verdict, path, bytes, age in days, note). Never raises.
+
+    DELETED    gone
+    STALE-OPEN its name matches a project file in the store's plans/, so age never deletes it
+    FAILED     left in place, the note says why
+    """
+    now = time.time() if now is None else now
+    rows = []
+    try:
+        st, valid, _invalid, why = scan_stores()
+        if st != "ok" and not (why or "").startswith(MISSING_ROOT):
+            rows.append(_scratch_row("FAILED", _stores_root(), note="store repo not scanned: %s" % why))
+        roots = [(Path(d) / SCRATCH_DIR, Path(d) / "plans") for d, _i in (valid if st == "ok" else [])]
+        roots.append((shared_scratch_root(), None))
+        for root, plans in roots:
+            if not os.path.lexists(str(root)):
+                continue
+            if _scratch_is_link(root) or not os.path.isdir(str(root)):
+                rows.append(_scratch_row("FAILED", root, note="a link or not a folder: left alone"))
+                continue
+            for name in sorted(os.listdir(str(root))):
+                entry = root / name
+                try:
+                    if _scratch_is_link(entry):
+                        rows.append(_scratch_row("FAILED", entry, note="a link: left alone"))
+                        continue
+                    newest, size = _scratch_measure(entry)
+                except OSError as exc:
+                    rows.append(_scratch_row("FAILED", entry, note="could not read it: %s" % exc))
+                    continue
+                age = (now - newest) / 86400.0
+                if age <= SCRATCH_MAX_AGE_DAYS:
+                    continue
+                if plans is not None and (plans / (name + ".md")).is_file():
+                    rows.append(_scratch_row("STALE-OPEN", entry, size, age, "open plan: never deleted by age"))
+                    continue
+                why_not = _scratch_remove(entry, root)
+                rows.append(_scratch_row("FAILED", entry, size, age, why_not) if why_not
+                            else _scratch_row("DELETED", entry, size, age))
+    except Exception as exc:
+        rows.append(_scratch_row("FAILED", "scratch-clean", note="internal error: %s: %s" % (type(exc).__name__, exc)))
+    return rows
+
+
+def scratch_close(plan_path):
+    """Delete the scratch folder of a plan /qclose has just archived; rows as scratch_clean. Never raises.
+
+    `plan_path` is where the project file was before the archive move. A file still there means the plan is
+    not archived yet, and nothing is deleted. A plan outside a store has no store scratch folder: no rows."""
+    try:
+        plan = Path(os.path.abspath(str(plan_path)))
+        if plan.is_file():
+            return [_scratch_row("FAILED", plan, note="the project file is still there: archive it first")]
+        store = plan.parent.parent
+        name = plan.stem
+        inside = os.path.normcase(os.path.realpath(str(store.parent))) == os.path.normcase(os.path.realpath(str(_stores_root())))
+        if plan.parent.name != "plans" or not inside or not (store / STORE_FILE).is_file() or not _SCRATCH_NAME_RE.match(name):
+            return []
+        root = store / SCRATCH_DIR
+        entry = root / name
+        if not os.path.lexists(str(entry)):
+            return []
+        if _scratch_is_link(entry):
+            return [_scratch_row("FAILED", entry, note="a link: left alone")]
+        newest, size = _scratch_measure(entry)
+        why_not = _scratch_remove(entry, root)
+        age = (time.time() - newest) / 86400.0
+        return [_scratch_row("FAILED", entry, size, age, why_not) if why_not else _scratch_row("DELETED", entry, size, age)]
+    except Exception as exc:
+        return [_scratch_row("FAILED", plan_path, note="internal error: %s: %s" % (type(exc).__name__, exc))]
+
+
+def _emit_scratch_rows(rows) -> int:
+    """Tab-separated verdict, path, size, age, note. Exit 1 when anything was left in place by a failure."""
+    for verdict, path, size, age, note in rows:
+        print("%s\t%s\t%.1f MB\t%.0f days\t%s" % (verdict, path, size / (1024.0 * 1024.0), age, note))
+    return 1 if any(r[0] == "FAILED" for r in rows) else 0
+
+
+# ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
@@ -1867,12 +2057,21 @@ def _main(argv=None) -> int:
         if extra == "kind-at":
             sp.add_argument("--at", default=None,
                             help="create at this ancestor of the folder (only when the user said so)")
+    sp = sub.add_parser("scratch", help="create and print the scratch folder for a folder")
+    sp.add_argument("folder")
+    sp.add_argument("name", help="the plan slug, or <YYMMDD>-<topic> for plan-less work")
+    sp = sub.add_parser("scratch-clean", help="delete scratch folders over the age limit, or an archived plan's")
+    sp.add_argument("--plan", default=None, help="the project file's path before the archive move")
     args = ap.parse_args(argv)
     if args.selftest:
         return _selftest()
     if args.cmd is None:
         ap.print_usage(sys.stderr)
         return 2
+    if args.cmd == "scratch":
+        return _emit(scratch_folder(args.folder, args.name))
+    if args.cmd == "scratch-clean":
+        return _emit_scratch_rows(scratch_close(args.plan) if args.plan else scratch_clean())
     if args.cmd == "paths":
         # tab-separated name, value: where this machine keeps the engine, the store repo and user memory
         root = playbook_root()

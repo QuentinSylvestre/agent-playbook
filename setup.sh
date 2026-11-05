@@ -552,6 +552,8 @@ create_store() {
     act git -C "$STORES" init -q
     write_text "$STORES/.gitignore" "user/memory/.dream-journal.jsonl
 */STORE.tmp-*
+*/visualizations/
+*/scratch/
 "
 }
 

@@ -25,7 +25,7 @@ Store-repo FAIL checks (exit 1):
   2. No two STORE files share one identity (compared with the resolver's same_identity, so case-folded;
      the same remote with a different `path` line is a different identity).
   3. Reserved folder names exist only as SC-2 lists them. The reserved names are memory, plans,
-     explanations, artifacts, visualizations (a store's top level) and done, tests (inside plans/ only).
+     explanations, artifacts, visualizations, scratch (a store's top level) and done, tests (inside plans/ only).
      A FAIL is: a reserved name as a directory at the store repo root; a reserved name inside a store that
      is a file, or is not spelled in lower case; done/ or tests/ directly in a store (they belong in
      plans/); plans/done or plans/tests that is a file.
@@ -40,8 +40,11 @@ Store-repo FAIL checks (exit 1):
      means no check.
 Store-repo WARN checks (never change the exit code):
   - a store-repo path uncommitted for over a day (the path's mtime; a deleted path uses its nearest
-    existing parent's mtime); commits not pushed for over a day (the oldest unpushed commit; no upstream
+    existing parent's mtime; a path in a store's artifacts/ is told to move to scratch/ or ask the user, not
+    to commit); commits not pushed for over a day (the oldest unpushed commit; no upstream
     means a skip line); a leftover STORE.tmp-* file;
+  - a folder directly under ~/.agent-playbook that is not a known one (KNOWN_HOME_DIRS): an agent improvised
+    it. Temporary files belong in a store scratch folder. This guard reports it and never deletes it;
   - an orphaned store: no .dream-state.json project path and no session cwd (Claude Code, Kiro) modified in
     the last 90 days resolves to it through the resolver's find (which walks from the folder up to the
     repo toplevel, so a session in a subfolder of the store's repo counts); for a `local` store, also when
@@ -85,8 +88,11 @@ SKILLS = HERE.parents[1]  # scripts -> qconfig-sync -> skills
 QDREAM_SCRIPTS = SKILLS / "qdream" / "scripts"
 DAY = 86400.0
 ORPHAN_DAYS = 90
-RESERVED_STORE_DIRS = ("memory", "plans", "explanations", "artifacts", "visualizations")
+RESERVED_STORE_DIRS = ("memory", "plans", "explanations", "artifacts", "visualizations", "scratch")
 RESERVED_PLAN_DIRS = ("done", "tests")
+# What belongs directly under ~/.agent-playbook. Anything else is a folder an agent improvised.
+KNOWN_HOME_DIRS = ("stores", "scratch", "dream-work", "qmigrate-workspace")
+KNOWN_HOME_PREFIXES = ("dream-work.deleting-", "verify-citations-selftest-")
 ASCII_WS = " \t\r\n\v\f"
 
 
@@ -372,7 +378,10 @@ def uncommitted_and_unpushed(root, rep, now):
             old.append((rel, age))
     shown = 20
     for rel, age in old[:shown]:
-        rep.warning("stores-repo  uncommitted for over a day (%s): %s -- run /qconfig-sync Step 2b to commit it" % (_human(age), rel))
+        if rel.split("/")[1:2] == ["artifacts"]:
+            rep.warning("stores-repo  uncommitted for over a day (%s): %s -- move it to the store's scratch/, or ask the user whether to keep it" % (_human(age), rel))
+        else:
+            rep.warning("stores-repo  uncommitted for over a day (%s): %s -- run /qconfig-sync Step 2b to commit it" % (_human(age), rel))
     if len(old) > shown:
         rep.warning("stores-repo  %d more paths uncommitted for over a day (%d in all; the first %d are listed)"
                     % (len(old) - shown, len(old), shown))
@@ -401,6 +410,21 @@ def uncommitted_and_unpushed(root, rep, now):
         age = now - min(times)
         if age > DAY:
             rep.warning("stores-repo  %d commit(s) not pushed, the oldest %s old -- run /qconfig-sync to push" % (len(times), _human(age)))
+
+
+def improvised_home_dirs(R, rep, home=None):
+    """WARN on a folder directly under ~/.agent-playbook that nothing owns. Read-only."""
+    home = home if home is not None else os.path.dirname(R.config_path())
+    try:
+        names = sorted(os.listdir(home))
+    except OSError:
+        return
+    for name in names:
+        if name.startswith(".") or name in KNOWN_HOME_DIRS or name.startswith(KNOWN_HOME_PREFIXES):
+            continue
+        if os.path.isdir(os.path.join(home, name)):
+            rep.warning("%s  improvised folder -- temporary files belong in a store scratch folder "
+                        "(store-resolver.py scratch); move or delete it" % os.path.join(home, name))
 
 
 TOKEN_RE = re.compile(r'(?P<s>"(?:[^"\\]|\\.)*")|(?P<q>")|(?P<p>[{}\[\]:,])')
@@ -767,6 +791,7 @@ def store_checks(R, root, rep, opts, repo, now):
         else:
             rep.good("stores/%s  %s" % (name, ident_text(idents[name])))
     uncommitted_and_unpushed(root, rep, now)
+    improvised_home_dirs(R, rep)
     origin_check(R, root, repo, rep)
     blocklist_check(root, repo, rep)
     state_keys, state_reason = load_state(opts.state)
@@ -910,7 +935,7 @@ def selftest():
     RESOLVER_TEST["temp"] = [os.path.join(tmp, "nocreate")]
     # Never the machine's own pointer file: a case that wants one writes it (the stores_url cases).
     saved_config_env = os.environ.get("AGENT_PLAYBOOK_CONFIG")
-    os.environ["AGENT_PLAYBOOK_CONFIG"] = os.path.join(tmp, "no-pointer-file")
+    os.environ["AGENT_PLAYBOOK_CONFIG"] = os.path.join(tmp, "no-playbook-home", "no-pointer-file")
     R = load_resolver()
     try:
         _selftest_cwd(tmp, chk)
@@ -1277,9 +1302,31 @@ def _selftest_stores(R, tmp, chk, skips):
     (root / "proj-abcdef" / "explanations").mkdir()
     (root / "proj-abcdef" / "artifacts").mkdir()
     (root / "proj-abcdef" / "visualizations").mkdir()
+    (root / "proj-abcdef" / "scratch").mkdir()
     (root / "proj-abcdef" / "notes").mkdir()
     rc, out, _e = go(root)
     chk("the SC-2 layout (and an unlisted folder) passes", rc == 0 and count(out, "FAIL:") == 0, repr(out))
+    (root / "proj-abcdef" / "scratch").rmdir()
+    (root / "proj-abcdef" / "scratch").write_text("a file\n", encoding="utf-8")
+    rc, out, _e = go(root)
+    chk("scratch as a file fails", rc == 1 and has(out, "FAIL: stores/proj-abcdef", "scratch is a file"), repr(out))
+    (root / "proj-abcdef" / "scratch").unlink()
+
+    # --- an improvised folder under ~/.agent-playbook warns and is left alone ---
+    home_dir = T / "pb-home"
+    (home_dir / "p17").mkdir(parents=True)
+    for known in KNOWN_HOME_DIRS + ("dream-work.deleting-1-ab", "verify-citations-selftest-x", ".hidden"):
+        (home_dir / known).mkdir()
+    (home_dir / "migration-handoff.md").write_text("a file\n", encoding="utf-8")
+    saved_cfg = os.environ.get("AGENT_PLAYBOOK_CONFIG")
+    os.environ["AGENT_PLAYBOOK_CONFIG"] = str(home_dir / "config")
+    try:
+        rc, out, _e = go(root)
+    finally:
+        os.environ["AGENT_PLAYBOOK_CONFIG"] = saved_cfg
+    improvised = [ln for ln in out if "improvised folder" in ln]
+    chk("only the improvised folder under the playbook home warns", rc == 0 and len(improvised) == 1
+        and "p17" in improvised[0] and (home_dir / "p17").is_dir(), repr(out))
     root = clone()
     os.rename(str(root / "proj-abcdef" / "memory"), str(root / "proj-abcdef" / "tmp-name"))
     os.rename(str(root / "proj-abcdef" / "tmp-name"), str(root / "proj-abcdef" / "Memory"))
@@ -1303,6 +1350,20 @@ def _selftest_stores(R, tmp, chk, skips):
         rc, out, _e = go(root)
         chk("uncommitted %dh: warn=%s" % (hours, expect), has(out, "WARN: stores-repo", "uncommitted for over a day") == expect, repr(out))
         chk("uncommitted %dh: exit 0" % hours, rc == 0, str(rc))
+    root = clone()
+    (root / "proj-abcdef" / "artifacts").mkdir()
+    f = root / "proj-abcdef" / "artifacts" / "byproduct.txt"
+    f.write_text("n\n", encoding="utf-8")
+    _backdate(f, 25 * 3600)
+    g = root / "proj-abcdef" / "memory" / "new.md"
+    g.write_text("n\n", encoding="utf-8")
+    _backdate(g, 25 * 3600)
+    rc, out, _e = go(root)
+    art_lines = [ln for ln in out if "artifacts/byproduct.txt" in ln]
+    mem_lines = [ln for ln in out if "memory/new.md" in ln]
+    chk("an uncommitted artifact is told to move to scratch, not to commit", rc == 0 and len(art_lines) == 1
+        and "move it to the store's scratch/" in art_lines[0] and "to commit it" not in art_lines[0], repr(out))
+    chk("any other uncommitted path is still told to commit", len(mem_lines) == 1 and "to commit it" in mem_lines[0], repr(out))
     root = clone()
     f = root / "proj-abcdef" / "memory" / "MEMORY.md"
     f.write_text("# Project Memory\nedited\n", encoding="utf-8")
