@@ -37,7 +37,8 @@ passing check is still to be read: SKIP, WARN and ORPHAN lines never change an e
 <verdict> is PASS (exit 0), FAIL (exit 1, or any other non-zero exit), COULD-NOT-RUN (exit 2: the check
 did not run, which is not the same as finding nothing), TIMEOUT, or PARTIAL: test-parity.sh exited 0 but
 printed its "N of M parity assertions SKIPPED" warning, or a selftest exited 0 with a SKIP case line.
-PARTIAL is never green. Then the work folder, and the wall time.
+PARTIAL is never green. Then the claude-settings check's own lines, whatever its verdict, because that check
+always exits 0 and is always reported. Then the work folder, and the wall time.
 
 Exit: 0 when every check is PASS; 1 otherwise; 2 when the runner itself cannot run (unknown --only
 name, the repo root not found).
@@ -152,6 +153,9 @@ def build_checks(repo, jobs):
     python("scan-selftest", "selftest", "providers/kiro/skills/qwire-governance/scripts/scan.py", "--selftest")
     python("qmigrate-store-rewrite-selftest", "selftest", "shared/skills/qmigrate-workspace/scripts/test_store_rewrite.py")
     python("memory-load-hook-selftest", "selftest", "providers/claude/memory-load-hook.py", "--selftest")
+    python("claude-settings", "guard", "providers/claude/settings-entries.py", "check")
+    python("claude-settings-selftest", "selftest", "providers/claude/settings-entries.py", "--selftest")
+    python("render-selftest", "selftest", "shared/skills/qvisualize/scripts/render.py", "--selftest")
 
     if WINDOWS:
         if not pwsh:
@@ -347,6 +351,9 @@ def main(argv=None):
         flagged = sum(1 for line in text.splitlines() if FLAG_RE.search(line) and not PASS_LINE_RE.match(line))
         print("%-*s  %4s  %7.1f  %7d  %s" % (width, name, code, secs, flagged, v))
         all_pass = all_pass and (v == "PASS" or (args.ci and v == "PARTIAL"))
+    # This check always exits 0 and is always reported, so its lines print whatever the verdict.
+    if "claude-settings" in results:
+        print("".join("claude-settings: %s\n" % line for line in results["claude-settings"][2].splitlines() if line.strip()), end="")
     print("work folder: %s" % work)
     print("wall time: %.1f s" % wall)
     return 0 if all_pass else 1

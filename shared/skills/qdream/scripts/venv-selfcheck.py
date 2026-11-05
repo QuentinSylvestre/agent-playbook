@@ -17,7 +17,7 @@ Not called at import time: the SessionStart hook imports qmemory-eval.py and dre
 hook's launcher owns the "venv missing" notice for it (it must always exit 0).
 
 Callers (plan 261016 Phases 5-15): every script in STUB_SCRIPTS below (the qdream scripts) and in
-OUTSIDE_STUB_SCRIPTS (the qconfig-sync guards, qvalidate.py, close-plan.py and the Kiro scan.py) carries the
+OUTSIDE_STUB_SCRIPTS (the qconfig-sync guards, qvalidate.py, close-plan.py, the Kiro scan.py and Claude's settings-entries.py) carries the
 same small stub, `_require_venv(__file__)`, which loads
 only this file by path. It is each script's first action as a run (dream-sweep.py, dream-write.py and
 dream-check.py call it at module level when run as a script, before they load dream-manifest.py), so a broken
@@ -140,7 +140,8 @@ STUB_END = "# --- end venv guard stub ---"
 OUTSIDE_STUB_SCRIPTS = tuple(("qconfig-sync", "scripts", n) for n in (
     "verify-stores.py", "verify-memory.py", "verify-citations.py", "verify-mass.py", "verify-links.py",
     "verify-deployment.py")) + (("qvalidate", "scripts", "qvalidate.py"), ("qclose", "scripts", "close-plan.py"),
-    ("..", "..", "providers", "kiro", "skills", "qwire-governance", "scripts", "scan.py"))
+    ("..", "..", "providers", "kiro", "skills", "qwire-governance", "scripts", "scan.py"),
+    ("..", "..", "providers", "claude", "settings-entries.py"))
 PATH_LINE = "path = os.path.join("
 
 

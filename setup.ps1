@@ -54,7 +54,8 @@ Deploys agent-playbook into the AI providers you choose. Safe to re-run.
   -StoresUrl URL    clone the store repo from URL when it is missing.
   -NoStores         do not set up a store repo (memory is disabled until you do).
   -Uninstall        remove what setup deployed (links into this repo, generated
-                    copies, restored .bak files) for the chosen providers.
+                    copies, restored .bak files, Claude Code settings entries)
+                    for the chosen providers.
   -Purge            with -Uninstall: also remove ~\.agent-playbook\config and the
                     repo's memory link. The store repo itself is never touched.
   -Help             this text.
@@ -608,7 +609,22 @@ function Uninstall-Mode {
 
 if ($Uninstall) {
     Write-Host "=== Uninstall: $($Chosen -join ', ') ==="
-    if (Test-Wants 'claude') { Uninstall-Mode 'claude'; Remove-SkillLinks (Join-Path $env:USERPROFILE ".claude\skills") }
+    if (Test-Wants 'claude') {
+        Uninstall-Mode 'claude'; Remove-SkillLinks (Join-Path $env:USERPROFILE ".claude\skills")
+        $uninstallPython = Join-Path $ScriptDir '.venv-agent-playbook\Scripts\python.exe'
+        if (Test-Path -LiteralPath $uninstallPython) {
+            Invoke-Act "remove the playbook's entries from ~\.claude\settings.json" {
+                $removed = $false
+                try {
+                    & $uninstallPython -I (Join-Path $ScriptDir 'providers\claude\settings-entries.py') remove --home $env:USERPROFILE
+                    $removed = ($LASTEXITCODE -eq 0)
+                } catch { $removed = $false }
+                if (-not $removed) { Write-Host "  NOTE: the venv did not run, so remove the playbook's entries from ~\.claude\settings.json by hand" }
+            }
+        } else {
+            Write-Host "  NOTE: no venv, so remove the playbook's entries from ~\.claude\settings.json by hand"
+        }
+    }
     if (Test-Wants 'codex') { Uninstall-Mode 'codex'; Remove-SkillLinks (Join-Path $env:USERPROFILE ".codex\skills") }
     if (Test-Wants 'gemini') { Uninstall-Mode 'gemini'; Remove-SkillLinks (Join-Path $env:USERPROFILE ".gemini\skills") }
     if (Test-Wants 'kiro') {
@@ -1118,9 +1134,13 @@ if (Test-Wants 'kiro') {
 Write-Host ""
 Write-Host "Done (providers: $($Chosen -join ', ')). Run '/qconfig-sync' from any agent to verify."
 if (Test-Wants 'claude') {
-    Write-Host "NOTE: statusLine and notification hooks also need manual entries in"
-    Write-Host "      ~/.claude/settings.json -- see providers/claude/README.md."
-    Write-Host "      '/qconfig-sync' does not check these; it reports OK without them."
-    Write-Host "      The SessionStart memory hook entry runs the launcher, memory-load-hook.ps1,"
-    Write-Host "      not python.exe directly (README, 'SessionStart memory hook')."
+    # Only a person at a terminal may change settings.json: an agent-run setup never gets here.
+    if ($DryRun) {
+        Write-Host "    DRY: offer the Claude Code entries in ~/.claude/settings.json"
+    } elseif ($Interactive -and (Test-Path -LiteralPath $VenvPython)) {
+        & $VenvPython -I (Join-Path $ScriptDir 'providers\claude\settings-entries.py') offer --home $env:USERPROFILE
+    } else {
+        Write-Host "NOTE: ~/.claude/settings.json was not changed. '/qconfig-sync' reports which Claude Code"
+        Write-Host "      entries are set, and providers/claude/README.md says how to add them."
+    }
 }

@@ -13,6 +13,10 @@ All notable changes to this project are recorded here. The format follows
 - Automatic cleanup: `/qclose` deletes a plan's scratch folder, and `/qconfig-sync` deletes
   plan-less scratch folders whose newest file is over 30 days old, without asking.
 - `/qconfig-sync` warns about improvised folders directly under `~/.agent-playbook`.
+- On Windows, setup at a terminal offers to add the Claude Code `settings.json` entries, and
+  uninstall removes them. `/qconfig-sync` reports their state and warns when the memory hook is
+  missing.
+- `/qconfig-sync` and CI now run the `render.py` selftest, which the runner had left out.
 
 ### Changed
 

@@ -44,19 +44,38 @@ then re-run setup, which links the config repo's `memory` to `user/memory/`.
 `/qconfig-sync` pulls, lists pending changes and pushes it. If the folder is absent,
 `/qconfig-sync` skips the store step and prints this clone command.
 
-## Manual settings.json entries required
+## settings.json entries
 
 `~/.claude/settings.json` is deliberately **not** tracked by this repo. Claude Code
 writes to it itself whenever you change model, theme, effort, TUI mode, or approve
 a permission prompt, so tracking it would dirty the working tree on every
 interactive toggle and would carry machine-local paths between machines.
 
-The consequence: the scripts below are symlinked automatically, but the
-`settings.json` entries that *point at* them are not. On a fresh environment they
-sit inert until you add the stanzas by hand, and `verify-deployment` will still
-report a clean result — it checks symlink targets, not `settings.json`.
+The scripts below are symlinked automatically, but they sit inert until
+`settings.json` points at them. `settings-entries.py` handles those entries, in
+three groups:
 
-Add all four stanzas after running setup on a new machine.
+| Group | Stanzas | Setup's default | `/qconfig-sync` when it is missing |
+|---|---|---|---|
+| Memory hook | `SessionStart` | Yes | `WARN` |
+| Status line | `statusLine` | Yes when `jq` is installed | `INFO` |
+| Sounds | `Notification`, `Stop` | No | `INFO` |
+
+- **Adding them.** On Windows, `setup.ps1` run at a terminal asks once per missing group
+  and merges the ones you accept. It keeps everything else in the file, never
+  replaces a `statusLine`, takes a backup (`settings.json.bak-playbook-<time>`) and
+  refuses a file that does not parse or that changed while it ran. Restart open
+  sessions afterwards. Setup records no answer, so it asks again next time.
+- **When nothing is written.** Setup with redirected input or `-Yes` / `--yes`
+  leaves the file alone, so a setup run by an agent or by `/qconfig-sync` never
+  changes it. On macOS and Linux, add the stanzas below by hand.
+- **Checking them.** `/qconfig-sync` reports each group. An entry counts as present
+  when its command names the script, whatever its form. It looks at
+  `settings.local.json` too, and prints only group names and states. The memory hook
+  warns on Windows only, and a home setup did not deploy to for Claude Code reports `SKIP`.
+- **Removing them.** Uninstall removes, without asking and after a backup, every entry
+  whose command names a playbook script under a `.claude` folder, and leaves every other
+  entry.
 
 ### statusLine
 
@@ -235,7 +254,7 @@ Use the same quoted `command` string as the notification hooks above:
 
 An older entry that runs `python.exe` on `memory-load-hook.py` works until the venv
 self-check lands, but it has no launcher notice and no venv: switch to the form
-above (a manual step, since `settings.json` is not tracked).
+above by hand: setup leaves an existing entry as it is.
 
 Linux and macOS are unsupported for the venv rule: `setup.sh` has no venv step
 yet, and the launcher needs PowerShell. A plain `python3` `command` + `args` entry
@@ -250,11 +269,10 @@ the entry is listed. Then open a new session in a project with memory and ask
 for one of its memory entry headings; the agent should quote it without reading
 a file.
 
-## Why not automate this
+## Why setup asks
 
-Merging a tracked fragment into the live `settings.json` at deploy time was
-considered and rejected: it needs an idempotent JSON deep-merge implemented twice
-(`setup.ps1` and `setup.sh`), a matching kind in `verify-deployment.py`,
-and a `test-parity.sh` guard — substantial machinery to save a one-time paste on
-the rare occasion a machine is rebuilt. Revisit if the number of manual stanzas
-grows well beyond the four here.
+Claude Code owns this file and rewrites it while it runs, and the sounds and the
+status line are personal choices, so nothing merges into it unattended. The merge
+lives in one Python script that both setup twins call, so it needs no twin logic,
+no `verify-deployment.py` kind and no `test-parity.sh` guard. A person at a terminal
+can consent; a setup run by an agent cannot, so it writes nothing.

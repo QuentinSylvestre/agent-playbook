@@ -19,7 +19,7 @@ If no path is provided, use the default location per `shared/AGENTS.md § Config
 
 ## Scope restriction
 
-Only read and write files within the config repository, the store repo (`~/.agent-playbook/stores`, Step 2b) and the symlink targets in provider config directories (~/.claude/, ~/.codex/, ~/.gemini/, ~/.kiro/). Do NOT read or modify any other files.
+Only read and write files within the config repository, the store repo (`~/.agent-playbook/stores`, Step 2b) and the symlink targets in provider config directories (~/.claude/, ~/.codex/, ~/.gemini/, ~/.kiro/). The Claude settings check also reads `~/.claude/settings.json` and `settings.local.json`; nothing in this skill writes them. Do NOT read or modify any other files.
 
 ## Process
 
@@ -56,7 +56,7 @@ The store repo (`~/.agent-playbook/stores`, `shared/skills/qdream/memory-rules.m
 
 ### Step 3: Verify deployment integrity
 
-**Run every check of this step with the runner, and before Step 5.** `<python> shared/skills/qconfig-sync/scripts/run-checks.py <repo>` (`<python>` as in the load-budget check below) runs all the checks listed in this step, in parallel where safe, with the invocations given below. It prints one line per check (name, exit code, seconds, flagged-line count, verdict), then the folder holding each check's full output, then the wall time. Run it in the background with its output written to a file, and allow 20 minutes: it stops any check still running after 15 minutes, with every process under it, and reports `TIMEOUT`. Then apply each check's reporting rule below to every verdict other than `PASS`, reading that check's output in the work folder. `PARTIAL` (a parity run with skipped assertions, or a selftest with a `SKIP` case), `COULD-NOT-RUN` and `TIMEOUT` are never green. The runner reads each exit code from the process itself. The invocations below remain the reference for re-running one check by hand, under the exit-code rule in `## Rules`. Resolve every failure other than deployment drift (which Steps 4-5 repair) before Step 5, under that check's own reporting rule, which usually means stopping for the user: setup then runs once per sync, where a guard failure found after setup forces a second setup and verify. When the venv is missing the runner cannot start: run setup first (`setup.ps1` creates the venv), then the runner.
+**Run every check of this step with the runner, and before Step 5.** `<python> shared/skills/qconfig-sync/scripts/run-checks.py <repo>` (`<python>` as in the load-budget check below) runs all the checks listed in this step, in parallel where safe, with the invocations given below. It prints one line per check (name, exit code, seconds, flagged-line count, verdict), then the folder holding each check's full output, then the wall time. Run it in the background with its output written to a file, and allow 20 minutes: it stops any check still running after 15 minutes, with every process under it, and reports `TIMEOUT`. Then apply each check's reporting rule below to every verdict other than `PASS`, reading that check's output in the work folder; the Claude settings check is reported on every verdict. `PARTIAL` (a parity run with skipped assertions, or a selftest with a `SKIP` case), `COULD-NOT-RUN` and `TIMEOUT` are never green. The runner reads each exit code from the process itself. The invocations below remain the reference for re-running one check by hand, under the exit-code rule in `## Rules`. Resolve every failure other than deployment drift (which Steps 4-5 repair) before Step 5, under that check's own reporting rule, which usually means stopping for the user: setup then runs once per sync, where a guard failure found after setup forces a second setup and verify. When the venv is missing the runner cannot start: run setup first (`setup.ps1` creates the venv), then the runner.
 
 Run the deployment verification script -- it enumerates every expected symlink and Kiro copy and emits one tab-separated line per result.
 
@@ -138,9 +138,17 @@ After the store-layout check, run the qdream load-budget check — it measures t
 
 **Reporting rule**: the `memory` row never changes the exit code — report an `OVER` there as a warning that the next full `/qdream` sweep will propose routing and pruning, never as a sync failure. Exit 1 is an `OVER budget` line or a missing named section; report which load exceeded its pin and by how many words — the script does not auto-repair. **Override path**: raising a pin needs the user's approval, recorded in the commit message (the rule beside the constants); otherwise cut words to return under the pin. Exit 2: usage error, the guard did not run. Venv missing (the `<python>` file does not exist, or it fails to start): report "qdream load-budget check could not run: venv missing — run setup.ps1" as exit 2, never a pass.
 
+#### Claude settings check
+
+Setup links the Claude Code scripts, but they only run once `~/.claude/settings.json` points at them. This check reports three groups: the memory hook, the status line and the sounds.
+
+**Invocation** (`<python>` as in the load-budget check above): `<python> providers/claude/settings-entries.py check`
+
+**Reporting rule**: the runner prints this check's lines under its table, whatever the verdict, and Step 7 reports them even on `PASS`. A `WARN` on `memory-hook` means sessions start without the memory index: tell the user to run setup at a terminal, where it asks before adding the entry. An `INFO` line is a personal choice, not a finding. `SKIP` means this home has no Claude Code deployment, or the platform is outside the merge. No line changes the exit code, so none fails the sync. Exit 2: the check did not run.
+
 #### Memory-script selftests
 
-After the load-budget check, run the twenty-two selftests: the memory scripts' and the guards'. The Claude Code `SessionStart` hook imports internals of `dream-manifest.py`, `qmemory-eval.py`, `store-resolver.py` and `memory-entries.py`, and it fails open: a renamed helper would silently empty every session's memory index instead of failing loudly. `dream-sweep.py` and `dream-write.py` import `dream-manifest.py` too, and `dream-write.py` is the only script that writes memory files or the state file, or runs `git commit` and `git push`. The selftests catch a break at sync time. `dream-write.py --selftest` builds throwaway git repositories in the system temp directory and runs its cases in worker processes (four by default; the runner passes `--jobs 8`). It takes minutes: 253 s for 179 cases inside the runner on the Windows development machine (2026-10-23, 22 cores), so a foreground call at a 120-300 second tool timeout is killed before it finishes. Run by hand, run it in the background with its output written to a file, and allow a timeout of at least 15 minutes. A foreground timeout alone is not a hang or a deadlock: report one only after the background run has been observed to stall.
+After the load-budget check, run the twenty-four selftests: the memory scripts' and the guards'. The Claude Code `SessionStart` hook imports internals of `dream-manifest.py`, `qmemory-eval.py`, `store-resolver.py` and `memory-entries.py`, and it fails open: a renamed helper would silently empty every session's memory index instead of failing loudly. `dream-sweep.py` and `dream-write.py` import `dream-manifest.py` too, and `dream-write.py` is the only script that writes memory files or the state file, or runs `git commit` and `git push`. The selftests catch a break at sync time. `dream-write.py --selftest` builds throwaway git repositories in the system temp directory and runs its cases in worker processes (four by default; the runner passes `--jobs 8`). It takes minutes: 253 s for 179 cases inside the runner on the Windows development machine (2026-10-23, 22 cores), so a foreground call at a 120-300 second tool timeout is killed before it finishes. Run by hand, run it in the background with its output written to a file, and allow a timeout of at least 15 minutes. A foreground timeout alone is not a hang or a deadlock: report one only after the background run has been observed to stall.
 
 **Invocation** (`<python>` as above; if that file is missing, stop and report as below), from the repo root:
 
@@ -167,8 +175,9 @@ After the load-budget check, run the twenty-two selftests: the memory scripts' a
 - `<python> shared/skills/qmigrate-workspace/scripts/test_store_rewrite.py`
 - `<python> shared/skills/qvisualize/scripts/render.py --selftest`
 - `<python> providers/claude/memory-load-hook.py --selftest`
+- `<python> providers/claude/settings-entries.py --selftest`
 
-**Reporting rule**: each exits 0 only when no case failed. Any non-zero exit fails the sync under the halt rule above: name the script and paste its failing-case lines; nothing auto-repairs. A case printed as `SKIP` (git could not build a fixture repository) is reported, never counted as a pass. Venv missing (the `<python>` file does not exist, or it fails to start): report "memory-script selftests could not run: venv missing — run setup.ps1" as exit 2, never a pass.
+**Reporting rule**: each exits 0 only when no case failed. Any non-zero exit fails the sync under the halt rule above: name the script and paste its failing-case lines; nothing auto-repairs. A case printed as `SKIP` (git could not build a fixture repository, or `render.py` found no browser) is reported, never counted as a pass. Venv missing (the `<python>` file does not exist, or it fails to start): report "memory-script selftests could not run: venv missing — run setup.ps1" as exit 2, never a pass.
 
 **Launcher test** (Windows): the hook runs through `providers/claude/memory-load-hook.ps1`, which must exit 0 and print a notice when the venv or the hook fails. Run `pwsh -ExecutionPolicy Bypass -File providers/claude/memory-load-hook.launcher-test.ps1`. Exit 0 passes, 1 fails the sync under the halt rule (paste the `FAIL` lines), 2 means it could not run (venv missing: report it, never a pass).
 
@@ -234,10 +243,11 @@ Summarize:
 - Whether local changes exist (committed or not), listing the uncommitted paths outside the Step 1 gate
 - Store repo: pulled, skipped (missing) or stopped (conflict, index lock); paths committed, left uncommitted, pushed
 - Deployment status (all intact / repaired / issues remaining)
+- Claude settings: the state of the memory hook, the status line and the sounds
 
 ## Rules
 
-- Only read and write files within the config repository, the store repo and symlink targets
+- Only read and write files within the config repository, the store repo and symlink targets; the Claude settings check only reads its two settings files
 - Never force-push. Use rebase only via `git pull --rebase` to replay local-only commits on top of the engine branch's own remote; take `main` by merge (Step 2). Never push `main` and never merge into it: that is the user's manual step.
 - Never modify files outside the config repo scope
 - Proceed autonomously through all steps. Only stop and ask the user when: uncommitted changes are detected (Step 1), store-repo changes await confirmation (Step 2b), an unexpected failure occurs (rebase conflict in either repo, a lingering store `index.lock`, precondition failure, citation drift, word-budget overage, parity mismatch), Step 4 detects local-specific edits requiring a user decision, or an action would destroy local-only changes.

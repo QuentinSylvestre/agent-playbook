@@ -110,6 +110,9 @@ jobs:
         env:
           HOME: ${{ runner.temp }}/home
         run: |
+          printf '%s\n' '{"statusLine":{"command":"bash ~/.claude/statusline-command.sh"},"keep":1}' > "$HOME/.claude/settings.json"
           ./setup.sh --uninstall --purge
           test ! -e "$HOME/.claude/CLAUDE.md"
           test ! -e "$HOME/.agent-playbook/config"
+          grep -q '"keep": 1' "$HOME/.claude/settings.json"
+          ! grep -q statusline-command "$HOME/.claude/settings.json"

@@ -96,7 +96,7 @@ More: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and the vocabulary in
 
 | Provider | Instructions | Skills | Extras |
 |---|---|---|---|
-| Claude Code | `~/.claude/CLAUDE.md` | `~/.claude/skills/` | statusline, SessionStart memory hook (manual `settings.json` entries: [providers/claude/README.md](providers/claude/README.md)) |
+| Claude Code | `~/.claude/CLAUDE.md` | `~/.claude/skills/` | statusline, sounds, SessionStart memory hook (setup offers the `settings.json` entries: [providers/claude/README.md](providers/claude/README.md)) |
 | Codex | `~/.codex/AGENTS.md` | `~/.codex/skills/` | |
 | Gemini CLI | `~/.gemini/GEMINI.md` | `~/.gemini/skills/` | |
 | Kiro (CLI and IDE) | steering in `~/.kiro/steering/` | `~/.kiro/skills/` (with Kiro overlays) | `kiro_default` agent, settings seeds ([providers/kiro/README.md](providers/kiro/README.md)) |

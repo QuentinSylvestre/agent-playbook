@@ -55,7 +55,8 @@ Deploys agent-playbook into the AI providers you choose. Safe to re-run.
   --stores-url URL   clone the store repo from URL when it is missing.
   --no-stores        do not set up a store repo (memory is disabled until you do).
   --uninstall        remove what setup deployed (links into this repo, generated
-                     copies, restored .bak files) for the chosen providers.
+                     copies, restored .bak files, Claude Code settings entries)
+                     for the chosen providers.
   --purge            with --uninstall: also remove ~/.agent-playbook/config and the
                      repo's memory link. The store repo itself is never touched.
   -h, --help         this text.
@@ -507,10 +508,14 @@ check_prereqs() {
 # Twin of setup.ps1's venv step: <repo>/.venv-agent-playbook, stdlib only, created
 # --without-pip from the system Python 3.8+, rebuilt when it no longer runs.
 
+venv_python() {
+    local vdir="$SCRIPT_DIR/.venv-agent-playbook"
+    if [ -x "$vdir/Scripts/python.exe" ]; then printf '%s' "$vdir/Scripts/python.exe"; else printf '%s' "$vdir/bin/python"; fi
+}
+
 venv_step() {
     local vdir="$SCRIPT_DIR/.venv-agent-playbook" vpy
-    vpy="$vdir/bin/python"
-    [ -x "$vdir/Scripts/python.exe" ] && vpy="$vdir/Scripts/python.exe"
+    vpy="$(venv_python)"
     if [ -x "$vpy" ] && "$vpy" -c 'import sys' 2>/dev/null; then
         echo "  OK: $vdir"
         return
@@ -964,7 +969,15 @@ uninstall_mode() {
 
 uninstall() {
     echo "=== Uninstall: ${PROVIDERS// /, } ==="
-    if wants claude; then uninstall_mode claude; unlink_skills "$HOME/.claude/skills"; fi
+    if wants claude; then
+        uninstall_mode claude; unlink_skills "$HOME/.claude/skills"
+        if [ -x "$(venv_python)" ]; then
+            act "$(venv_python)" -I "$SCRIPT_DIR/providers/claude/settings-entries.py" remove --home "$(native_path "$HOME")" \
+                || echo "  NOTE: the venv did not run, so remove the playbook's entries from ~/.claude/settings.json by hand"
+        else
+            echo "  NOTE: no venv, so remove the playbook's entries from ~/.claude/settings.json by hand"
+        fi
+    fi
     if wants codex; then uninstall_mode codex; unlink_skills "$HOME/.codex/skills"; fi
     if wants gemini; then uninstall_mode gemini; unlink_skills "$HOME/.gemini/skills"; fi
     if wants kiro; then
@@ -1023,7 +1036,14 @@ done
 echo ""
 echo "Done (providers: ${PROVIDERS// /, }). Run '/qconfig-sync' from any agent to verify."
 if wants claude; then
-    echo "NOTE: statusLine and notification hooks also need manual entries in"
-    echo "      ~/.claude/settings.json -- see providers/claude/README.md."
-    echo "      '/qconfig-sync' does not check these; it reports OK without them."
+    # Only a person at a terminal may change settings.json: an agent-run setup never gets here.
+    if [ "$DRY_RUN" -eq 1 ]; then
+        echo "    DRY: offer the Claude Code entries in ~/.claude/settings.json"
+    elif [ "$INTERACTIVE" -eq 1 ] && [ -x "$(venv_python)" ]; then
+        "$(venv_python)" -I "$SCRIPT_DIR/providers/claude/settings-entries.py" offer --home "$(native_path "$HOME")" \
+            || echo "NOTE: the venv did not run, so ~/.claude/settings.json was not changed"
+    else
+        echo "NOTE: ~/.claude/settings.json was not changed. '/qconfig-sync' reports which Claude Code"
+        echo "      entries are set, and providers/claude/README.md says how to add them."
+    fi
 fi
