@@ -4471,6 +4471,8 @@ def _shadow_plans(run, plans, pm):
 
 def rebuild_shadow(run, q):
     """Rebuilds the shadows and planned map from the queue: after a stop mid-queue or a reset."""
+    q["building"] = "rebuild"   # a stop or a refusal below leaves this set, so the next queue rebuilds again
+    save_rec(run, QUEUE, q)
     d = run.work / SHADOW_DIR
     if d.is_dir():
         for f in d.iterdir():
@@ -4543,6 +4545,9 @@ def queued_new_headings(run, q):
         for o in load_ops(run, e["ops"]):
             if o["op"] in ("insert", "replace"):
                 out.add((ds.nk(o["file"]), text_heading(o["text"])))
+            elif o["op"] == "create":
+                for en in walk(Doc(o["text"].encode("utf-8")).contents())[0]:
+                    out.add((ds.nk(o["file"]), en["heading"]))
     return out
 
 
@@ -4612,6 +4617,10 @@ def prune_plan(run):
     return ops, lines
 
 
+# A concurrent session changed or removed the entry: the only refusals apply-all drops and goes past.
+DROPPABLE_RE = re.compile(r"the entry changed after the op was queued|heading .* not found in a type section")
+
+
 def cmd_apply_all(args, ctx):
     run = Run(ctx, args)
     guard_check(run)
@@ -4638,7 +4647,8 @@ def cmd_apply_all(args, ctx):
         print(out, end="")
         if rc == EXIT_OK:
             return
-        if rc == EXIT_PRECOND and re.search(r"^refused: ", out, re.M) and "file(s) refused" in out:
+        refusals = re.findall(r"(?m)^refused: .*$", out)
+        if rc == EXIT_PRECOND and refusals and all(DROPPABLE_RE.search(r) for r in refusals):
             print("apply-all: those ops are dropped this sweep; name them in the Report")
             return
         raise Precond("apply-all stopped at `%s` (exit %d): nothing after it ran; fix it and "
