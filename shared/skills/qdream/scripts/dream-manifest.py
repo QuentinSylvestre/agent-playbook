@@ -342,6 +342,8 @@ DEFAULT_CLEANUP_DAYS = 30    # Claude Code default cleanupPeriodDays
 KIRO_CLEANUP_KEY = "cleanup.periodDays"   # kiro-cli settings/cli.json; unset = no Kiro due flag
 SWEEP_DUE_SESSIONS = 50      # memory-rules.md § Staleness nudge, work-volume arm
 SWEEP_DUE_DAYS = 14          # memory-rules.md § Staleness nudge, quiet-period arm
+SINGLETON_EXPIRY_DAYS = 60   # memory-rules.md § Singleton ledger
+SINGLETON_PROMOTE_SESSIONS = 2
 RECENT_PLANS = 50            # plan-cluster window (sweep-gather.md § GAT-PLANS)
 STRUCT_MAX_DEPTH = 6         # Method B recursion bound
 INTENT_MAX_CHARS = 400       # plans.recent[].intent excerpt cap
@@ -3905,6 +3907,38 @@ def session_tokens(session):
     return sum(by_role.values()), by_role, None
 
 
+def merge_singletons(rows, updates, today):
+    """memory-rules.md § Singleton ledger. rows: the state file's ledger; updates: {target, gist,
+    sessions[, drop]} (target and gist equal to a row's to re-observe it; `drop` removes a row
+    the sweep promoted). -> (kept rows, rows at SINGLETON_PROMOTE_SESSIONS distinct sessions, expired
+    count). today: a YYYY-MM-DD string. A row with an unreadable date never expires."""
+    by_key = {(r["target"], r["gist"]): dict(r, sessions=list(r["sessions"])) for r in rows}
+    for u in updates:
+        key = (u["target"], u["gist"])
+        if u.get("drop"):
+            by_key.pop(key, None)
+            continue
+        row = by_key.setdefault(key, {"target": u["target"], "gist": u["gist"], "sessions": [],
+                                      "first_seen": today, "last_seen": today})
+        fresh = [s for s in u["sessions"] if s not in row["sessions"]]
+        row["sessions"].extend(fresh)
+        if fresh:
+            row["last_seen"] = today
+    end = dt.date.fromisoformat(today)
+    kept, expired = [], 0
+    for row in by_key.values():
+        try:
+            age = (end - dt.date.fromisoformat(row["last_seen"])).days
+        except (TypeError, ValueError):
+            age = 0
+        if age > SINGLETON_EXPIRY_DAYS:
+            expired += 1
+        else:
+            kept.append(row)
+    promote = [r for r in kept if len(set(r["sessions"])) >= SINGLETON_PROMOTE_SESSIONS]
+    return kept, promote, expired
+
+
 # API price ratios per usage field: relative cost, not a quota percentage. The session-cost target
 # (memory-rules.md § State File Format, cost_records) is stated in these units.
 USAGE_WEIGHTS = {"input_tokens": 1, "output_tokens": 5, "cache_creation_input_tokens": 1.25,
@@ -4838,6 +4872,44 @@ def _unit_prune(root, home):
     return fails
 
 
+def _unit_singletons(root, home):
+    """merge_singletons: distinct-session count, promotion, drop, 60-day expiry."""
+    fails = []
+    base = {"target": "t", "gist": "g", "sessions": ["a"], "first_seen": "2026-01-01", "last_seen": "2026-01-01"}
+    kept, promote, expired = merge_singletons([base], [{"target": "t", "gist": "g", "sessions": ["a"]}], "2026-01-10")
+    if len(kept) != 1 or promote or kept[0]["last_seen"] != "2026-01-01":
+        fails.append("a repeated session must not count or refresh the row")
+    kept, promote, expired = merge_singletons([base], [{"target": "t", "gist": "g", "sessions": ["b"]}], "2026-01-10")
+    if len(promote) != 1 or kept[0]["last_seen"] != "2026-01-10":
+        fails.append("a second session must promote and refresh the row")
+    kept, promote, expired = merge_singletons([base], [{"target": "t", "gist": "g", "drop": True}], "2026-01-10")
+    if kept:
+        fails.append("drop must remove the row")
+    kept, promote, expired = merge_singletons([base], [], "2026-03-02")
+    if len(kept) != 1 or expired:
+        fails.append("60 days old must be kept")
+    kept, promote, expired = merge_singletons([base], [], "2026-03-03")
+    if kept or expired != 1:
+        fails.append("61 days old must expire")
+    return fails
+
+
+def _unit_digest(root, home):
+    """render_digest: boundary, tail before each user turn, clipping, closing assistant text."""
+    recs = [(1, "assistant", "old " * 400, None), (2, "user", "U" * 2000, None), (3, "assistant", "mid", None),
+            (4, "assistant", "last", None), (5, "user", "second", None), (6, "assistant", "end", None)]
+    text = render_digest(["# h"], recs, 2)
+    fails = []
+    want = ["L1 [assistant] [", "L2 [user] " + "U" * DIGEST_USER_CHARS + " [... 500 chars cut]",
+            "L4 [assistant] last", "L5 [user] second", "L6 [assistant] end"]
+    for w in want:
+        if w not in text:
+            fails.append("digest lacks %r" % w[:40])
+    if "L3 " in text:
+        fails.append("only the last assistant text before a user turn is kept")
+    return fails
+
+
 def _unit_seps(root, home):
     """The Windows comparator normalization (simulated with on=True and root
     C:\\t\\root): '\\' becomes '/' only in paths under the fixture root, in
@@ -5443,7 +5515,7 @@ def _unit_memory_budget(root, home):
 UNITS = {"baseline-unreadable": _unit_baseline_unreadable, "memory-budget": _unit_memory_budget, "due-count": _unit_due_count, "anchors-commit": _unit_anchors_commit,
          "cite-msys": _unit_cite_msys, "quiet-seed": _unit_quiet_seed, "quiet-state": _unit_quiet_state, "guard": _unit_guard, "usage": _unit_usage, "home": _unit_home,
          "races": _unit_races, "selftest-robust": _unit_selftest_robust,
-         "prune": _unit_prune, "seps": _unit_seps, "drive": _unit_drive, "caps": _unit_caps,
+         "prune": _unit_prune, "seps": _unit_seps, "singletons": _unit_singletons, "digest": _unit_digest, "drive": _unit_drive, "caps": _unit_caps,
          "entries": _unit_entries, "config-plans": _unit_config_plans}
 
 

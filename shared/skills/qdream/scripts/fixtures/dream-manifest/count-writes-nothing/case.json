@@ -20,6 +20,8 @@
     ]
   },
   "units": [
-    "memory-budget"
+    "digest",
+    "memory-budget",
+    "singletons"
   ]
 }

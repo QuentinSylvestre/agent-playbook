@@ -141,6 +141,8 @@ DEFERRED_KEY_RE = re.compile(r"^[^:]+:.+$")
 V1_KEYS = {"schema_version", "last_run", "projects"}
 V2_ONLY_KEYS = ["rejected_lessons", "outcome_tags", "episodic_ledger"]
 V3_ONLY_KEYS = ["cost_records", "model_routing", "deferred_sessions", "quiet_sweeps"]
+# Optional v3 section: absent means an empty ledger (memory-rules.md § Singleton ledger).
+SINGLETON_KEY = "singleton_ledger"
 ROUTING_ROLES = ["task4", "verifier"]
 # Optional routing roles: absent is valid, present must be a non-empty string.
 ROUTING_OPTIONAL = ["drafter"]
@@ -243,6 +245,22 @@ class _Checker(object):
             return
         if self.check_elements(name, arr, allowed, checker):
             self.ok("%s (%d records)" % (name, len(arr)))
+
+    def check_singleton(self, name, i, el):
+        good = True
+        for k in ("target", "gist"):
+            if not (isinstance(el.get(k), str) and el[k].strip()):
+                self.fail("%s[%d] -- %s must be a non-empty string" % (name, i, k))
+                good = False
+        s = el.get("sessions")
+        if not (isinstance(s, list) and s and all(isinstance(x, str) and x for x in s)):
+            self.fail("%s[%d] -- sessions must be a non-empty list of session ids" % (name, i))
+            good = False
+        for k in ("first_seen", "last_seen"):
+            if not (isinstance(el.get(k), str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", el[k])):
+                self.fail("%s[%d] -- %s must be YYYY-MM-DD" % (name, i, k))
+                good = False
+        return good
 
     def check_rejected(self, name, i, el):
         good = True
@@ -615,10 +633,10 @@ def check(path, baseline=""):
     if sv >= 2:
         allowed_top |= set(V2_ONLY_KEYS)
     if sv >= 3:
-        allowed_top |= set(V3_ONLY_KEYS)
+        allowed_top |= set(V3_ONLY_KEYS) | {SINGLETON_KEY}
     top_ok = True
     for k in sorted(set(data.keys()) - allowed_top):
-        if k in V3_ONLY_KEYS:
+        if k in V3_ONLY_KEYS or k == SINGLETON_KEY:
             c.fail('v%d file carries v3 section "%s" (half-migrated write?)' % (sv, k))
         elif k in V2_ONLY_KEYS:
             c.fail('v1 file carries v2 section "%s" (half-migrated write?)' % k)
@@ -628,6 +646,9 @@ def check(path, baseline=""):
     if top_ok:
         c.ok("top-level keys")
 
+    if SINGLETON_KEY in data and sv >= 3:
+        c.check_array(data, SINGLETON_KEY, {"target", "gist", "sessions", "first_seen", "last_seen"},
+                      c.check_singleton)
     if sv >= 2:
         c.check_array(data, "rejected_lessons", {"target", "signal", "reason", "date"}, c.check_rejected)
         c.check_array(data, "outcome_tags", {"target", "applied", "outcome", "checked"}, c.check_outcome)

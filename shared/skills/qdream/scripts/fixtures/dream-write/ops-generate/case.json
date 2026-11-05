@@ -1,5 +1,5 @@
 {
-  "description": "plan 261027 SC-5: `ops` turns handoff/ops-plan/<STEP-ID>.json into the memedit ops file handoff/ops/<step-id>-generated.json: a `new` item inserts a verified (confirmed or plausible, bound like aggregate) memory proposal rendered in the Memory File Format template, Verified dated the manifest snapshot with actor sweep, into its type section of the target's memory file; a usage_bump names one existing entry (a human-attested one included, as D28 allows). memedit accepts the ops. Refused, nothing written: no or another --snapshot-sha, a refuted or unverified proposal, a heading the file already holds (the human-attested `Use stdlib only`, or a second insert), a text carrying a human: actor, a missing section, a multi-line field, an index out of range, an ambiguous usage_bump heading, a file outside the allowlist, an unknown action (source_append), a step mismatch, and an op id memedit recorded with another op.",
+  "description": "plan 261027 SC-5: `ops` turns handoff/ops-plan/<STEP-ID>.json into the memedit ops file handoff/ops/<step-id>-generated.json: a `new` item inserts a verified (confirmed or confirmed, bound like aggregate) memory proposal rendered in the Memory File Format template, Verified dated the manifest snapshot with actor sweep, into its type section of the target's memory file; a usage_bump names one existing entry (a human-attested one included, as D28 allows). memedit accepts the ops. Refused, nothing written: no or another --snapshot-sha, a refuted or unverified proposal, a heading the file already holds (the human-attested `Use stdlib only`, or a second insert), a text carrying a human: actor, a missing section, a multi-line field, an index out of range, an ambiguous usage_bump heading, a file outside the allowlist, an unknown action (source_append), a step mismatch, and an op id memedit recorded with another op.",
   "now": "2026-10-12T12:00:00Z",
   "store_repo": "stores",
   "setup": [
@@ -49,7 +49,7 @@
     },
     {
       "write": {
-        "home/.agent-playbook/dream-work/sweep/verdicts/V01.json": "{\n  \"label\": \"V01\",\n  \"kind\": \"verifier\",\n  \"attempt\": 1,\n  \"via\": \"inbox\",\n  \"data\": \"sweep/briefs/V01.data.json\",\n  \"data_sha256\": \"{SHA256:sweep/briefs/V01.data.json}\",\n  \"return\": {\n    \"verdicts\": [\n      {\n        \"item_id\": \"V01-001\",\n        \"verdict\": \"confirmed\",\n        \"citation\": \"c\"\n      },\n      {\n        \"item_id\": \"V01-002\",\n        \"verdict\": \"plausible\",\n        \"citation\": \"c\"\n      },\n      {\n        \"item_id\": \"V01-003\",\n        \"verdict\": \"refuted\",\n        \"citation\": \"c\"\n      },\n      {\n        \"item_id\": \"V01-004\",\n        \"verdict\": \"confirmed\",\n        \"citation\": \"c\"\n      },\n      {\n        \"item_id\": \"V01-005\",\n        \"verdict\": \"confirmed\",\n        \"citation\": \"c\"\n      },\n      {\n        \"item_id\": \"V01-006\",\n        \"verdict\": \"confirmed\",\n        \"citation\": \"c\"\n      },\n      {\n        \"item_id\": \"V01-008\",\n        \"verdict\": \"confirmed\",\n        \"citation\": \"c\"\n      }\n    ],\n    \"unverified_item_ids\": []\n  }\n}\n"
+        "home/.agent-playbook/dream-work/sweep/verdicts/V01.json": "{\n  \"label\": \"V01\",\n  \"kind\": \"verifier\",\n  \"attempt\": 1,\n  \"via\": \"inbox\",\n  \"data\": \"sweep/briefs/V01.data.json\",\n  \"data_sha256\": \"{SHA256:sweep/briefs/V01.data.json}\",\n  \"return\": {\n    \"verdicts\": [\n      {\n        \"item_id\": \"V01-001\",\n        \"verdict\": \"confirmed\",\n        \"citation\": \"c\"\n      },\n      {\n        \"item_id\": \"V01-002\",\n        \"verdict\": \"confirmed\",\n        \"citation\": \"c\"\n      },\n      {\n        \"item_id\": \"V01-003\",\n        \"verdict\": \"refuted\",\n        \"citation\": \"c\"\n      },\n      {\n        \"item_id\": \"V01-004\",\n        \"verdict\": \"confirmed\",\n        \"citation\": \"c\"\n      },\n      {\n        \"item_id\": \"V01-005\",\n        \"verdict\": \"confirmed\",\n        \"citation\": \"c\"\n      },\n      {\n        \"item_id\": \"V01-006\",\n        \"verdict\": \"confirmed\",\n        \"citation\": \"c\"\n      },\n      {\n        \"item_id\": \"V01-008\",\n        \"verdict\": \"confirmed\",\n        \"citation\": \"c\"\n      }\n    ],\n    \"unverified_item_ids\": []\n  }\n}\n"
       }
     }
   ],
@@ -224,7 +224,7 @@
       ],
       "exit": 3,
       "stdout_contains": [
-        "has no confirmed or plausible verdict (refuted)"
+        "has no confirmed verdict (refuted)"
       ],
       "absent": [
         "handoff/ops/syn-stale-generated.json"
@@ -246,7 +246,7 @@
       ],
       "exit": 3,
       "stdout_contains": [
-        "has no confirmed or plausible verdict (none)"
+        "has no confirmed verdict (none)"
       ],
       "absent": [
         "handoff/ops/syn-stale-generated.json"

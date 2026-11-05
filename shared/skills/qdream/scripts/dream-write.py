@@ -169,7 +169,7 @@ Subcommands:
       `usage_bump` item names one existing entry. Op ids are
       <step id, lower case>-NNN, with no decision_id. Exit 3, nothing
       written, unless every item passes: the proposal's verdict (bound to its
-      data file as `aggregate` binds it) is confirmed or plausible; its type,
+      data file as `aggregate` binds it) is confirmed; its type,
       heading, why, how_to_apply and source are one-line strings, the heading
       at most 200 characters, the source without `|`, no free-text field
       holding a `**<Field>**:` marker or starting with `###`; the file is in
@@ -3459,6 +3459,11 @@ def compute_apply(run, obj, inp, dec):
     led = inp.get("episodic_ledger") or []
     check_ledger_records(led)
     append_ledger(new, led)
+    kept, _promote, expired = dm.merge_singletons(new.get("singleton_ledger") or [],
+                                                  inp.get("singleton_ledger") or [], today)
+    if kept or "singleton_ledger" in new:
+        new["singleton_ledger"] = kept
+        run.notes.append("singleton ledger: %d row(s), %d expired" % (len(kept), expired))
     if cost:
         cost = dict(cost)
         fill_tokens(run, cost, orient)
@@ -4074,7 +4079,7 @@ def push_repos(run, args):
 OPS_PLAN_ACTIONS = ("new", "usage_bump")
 PROPOSAL_TYPES = ("feedback", "decision", "pattern")
 PROPOSAL_FIELDS = ("type", "heading", "why", "how_to_apply", "source")
-WRITE_VERDICTS = ("confirmed", "plausible")
+WRITE_VERDICTS = ("confirmed",)
 HEADING_MAX = 200
 FIELD_MARKER_RE = re.compile(r"\*\*[A-Za-z][^*\n]*\*\*\s*:")
 OPS_PLAN_NOTES = (
@@ -4236,8 +4241,8 @@ def cmd_ops(args, ctx):
                 verified = verified_proposals(run.work)
             verdicts = [v for q, v in verified if q == p]
             if not any(v in WRITE_VERDICTS for v in verdicts):
-                probs.append("item %d: %s memory_proposals[%d] has no confirmed or plausible "
-                             "verdict (%s): only a verified proposal is written autonomously"
+                probs.append("item %d: %s memory_proposals[%d] has no confirmed "
+                             "verdict (%s): only a confirmed proposal is written autonomously"
                              % (n, it["label"], it["index"], ", ".join(verdicts) or "none"))
                 continue
             target = it.get("file")

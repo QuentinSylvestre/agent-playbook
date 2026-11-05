@@ -4244,6 +4244,27 @@ def compute_feeder(work, man, disp):
             "usage_line": line}
 
 
+def cmd_singletons(args, ctx):
+    """memory-rules.md § Singleton ledger: merges handoff/singletons.json over the state file's ledger
+    and writes sweep/singletons.json. Writes the state file never: state apply does."""
+    work, man = open_work(ctx)
+    state = Path(args.state)
+    rows = (json.loads(state.read_text(encoding="utf-8")).get("singleton_ledger") or []) \
+        if state.is_file() else []
+    inp = Path(work) / "handoff" / "singletons.json"
+    updates = json.loads(inp.read_text(encoding="utf-8")).get("rows") or [] if inp.is_file() else []
+    for n, u in enumerate(updates, 1):
+        if not (isinstance(u, dict) and isinstance(u.get("target"), str) and isinstance(u.get("gist"), str)
+                and (u.get("drop") or (isinstance(u.get("sessions"), list) and u["sessions"]))):
+            print("refused: singletons.json row %d needs target, gist and sessions (or drop)" % n)
+            return EXIT_PRECOND
+    kept, promote, expired = dm.merge_singletons(rows, updates, man["snapshot_at"][:10])
+    how = put(work, "sweep/singletons.json", dumps({"rows": kept, "promote": promote, "expired": expired}))
+    print("singletons: %d row(s), %d at the promotion count, %d expired" % (len(kept), len(promote), expired))
+    print("sweep/singletons.json %s" % how)
+    return EXIT_OK
+
+
 def cmd_feeder(args, ctx):
     work, man = open_work(ctx)
     disp = load_sweep(work, DISPATCH, "run `dispatch` first")
@@ -5966,6 +5987,8 @@ def parse_args(argv):
     p.add_argument("--rebaseline", action="store_true")
     p.add_argument("--decision")
     p.add_argument("--decision-sha")
+    p = sp.add_parser("singletons")
+    p.add_argument("--state", required=True)
     p = sp.add_parser("gate")
     p.add_argument("--snapshot-sha", required=True)
     p.add_argument("--decisions-sha")
@@ -6008,7 +6031,7 @@ def selftest_checks(args):
         raise Usage("a subcommand is required")
 
 
-COMMANDS = {"dirty": cmd_dirty, "dispatch": cmd_dispatch, "brief": cmd_brief,
+COMMANDS = {"singletons": cmd_singletons, "dirty": cmd_dirty, "dispatch": cmd_dispatch, "brief": cmd_brief,
             "extract": cmd_extract, "countverify": cmd_countverify, "coverage": cmd_coverage,
             "aggregate": cmd_aggregate, "feeder": cmd_feeder, "blast": cmd_blast,
             "drift": cmd_drift, "guard": cmd_guard, "handoff": cmd_handoff, "wait": cmd_wait,

@@ -793,6 +793,10 @@ Full detail for `shared/AGENTS.md § Memory Management > Lifecycle: promotion, b
 
 Lazy: create `memory/MEMORY.md` at first memory proposal, in the store `find-or-create` returns (`§ Resolution contract`, step 2). The store repo is git-tracked, so there is no tracking question; a folder where no store is created (step 3) keeps the file in place, and there ask the user whether to git-track it. `/qdream` full mode creates `memory/.dream-state.json` on first run.
 
+### Singleton ledger
+
+A signal or plausible lesson seen in one session is not memory yet. It is a row of `.dream-state.json` `singleton_ledger` (`target`, `gist`, `sessions`, `first_seen`, `last_seen`), loaded at no session start. Only `dream-manifest.py` `merge_singletons` counts rows: `dream-sweep.py singletons` during Synthesize, `state apply` when persisting. A row reaching `SINGLETON_PROMOTE_SESSIONS` distinct sessions re-enters `sweep-synthesize.md § SYN-PROMOTE`. A row unseen for `SINGLETON_EXPIRY_DAYS` is removed and counted in the Report's `Stages` line.
+
 ### Staleness nudge
 
 Suggest running `/qdream` for consolidation on work volume, with a limit for quiet periods, so a pass stays small enough to launch (the cost target is in `§ State File Format`, `cost_records`):
