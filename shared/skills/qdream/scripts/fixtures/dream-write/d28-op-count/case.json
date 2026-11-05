@@ -1,5 +1,5 @@
 {
-  "description": "D28: a stale Delete authorizes one delete: two ops citing it in one ops file are refused; after one applies, the entry restored by another writer, a second op citing it in a later run is refused because applied-ops.json already holds one. A budget-move Move authorizes one delete from its file plus one insert into the named file: three ops citing it are refused, the two apply.",
+  "description": "D28: a stale Delete authorizes one delete: two ops citing it in one ops file are refused; after one applies, the entry restored by another writer, a second op citing it in a later run is refused because applied-ops.json already holds one.",
   "now": "2026-10-12T12:00:00Z",
   "store_repo": "stores",
   "setup": [
@@ -41,11 +41,9 @@
     },
     {
       "write": {
-        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": [\n    {\n      \"id\": \"k1\",\n      \"kind\": \"stale\",\n      \"answer\": \"Delete\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Old heading text\"\n    },\n    {\n      \"id\": \"m1\",\n      \"kind\": \"budget-move\",\n      \"answer\": \"Move\",\n      \"file\": \"{ROOT}/repo/memory/topics/ci.md\",\n      \"to_file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Pin the runner image\",\n      \"shown_text\": \"### Pin the runner image\\n\\n**Why**: drift.\\n**How to apply**: pin.\\n**Source**: s6 | **Verified**: 2026-09-07\"\n    }\n  ]\n}\n",
+        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": [\n    {\n      \"id\": \"k1\",\n      \"kind\": \"stale\",\n      \"answer\": \"Delete\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Old heading text\"\n    }\n  ]\n}\n",
         "home/.agent-playbook/dream-work/handoff/ops/a.json": "{\n  \"ops\": [\n    {\n      \"id\": \"c1\",\n      \"op\": \"delete\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Old heading text\",\n      \"class\": \"Delete entry\",\n      \"decision_id\": \"k1\"\n    }\n  ]\n}\n",
         "home/.agent-playbook/dream-work/handoff/ops/b.json": "{\n  \"ops\": [\n    {\n      \"id\": \"c2\",\n      \"op\": \"delete\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Old heading text\",\n      \"class\": \"Delete entry\",\n      \"decision_id\": \"k1\"\n    }\n  ]\n}\n",
-        "home/.agent-playbook/dream-work/handoff/ops/m.json": "{\n  \"ops\": [\n    {\n      \"id\": \"m-del\",\n      \"op\": \"delete\",\n      \"file\": \"{ROOT}/repo/memory/topics/ci.md\",\n      \"heading\": \"Pin the runner image\",\n      \"class\": \"demoted\",\n      \"decision_id\": \"m1\"\n    },\n    {\n      \"id\": \"m-ins\",\n      \"op\": \"insert\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"section\": \"## Pattern\",\n      \"text\": \"### Pin the runner image\\n\\n**Why**: drift.\\n**How to apply**: pin.\\n**Source**: s6 | **Verified**: 2026-09-07\",\n      \"decision_id\": \"m1\"\n    },\n    {\n      \"id\": \"m-x\",\n      \"op\": \"insert\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"section\": \"## Feedback\",\n      \"text\": \"### Pin the runner image\\n\\n**Why**: drift.\\n**How to apply**: pin.\\n**Source**: s6 | **Verified**: 2026-09-07\",\n      \"decision_id\": \"m1\"\n    }\n  ]\n}\n",
-        "home/.agent-playbook/dream-work/handoff/ops/n.json": "{\n  \"ops\": [\n    {\n      \"id\": \"m-del\",\n      \"op\": \"delete\",\n      \"file\": \"{ROOT}/repo/memory/topics/ci.md\",\n      \"heading\": \"Pin the runner image\",\n      \"class\": \"demoted\",\n      \"decision_id\": \"m1\"\n    },\n    {\n      \"id\": \"m-ins\",\n      \"op\": \"insert\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"section\": \"## Pattern\",\n      \"text\": \"### Pin the runner image\\n\\n**Why**: drift.\\n**How to apply**: pin.\\n**Source**: s6 | **Verified**: 2026-09-07\",\n      \"decision_id\": \"m1\"\n    }\n  ]\n}\n",
         "home/.agent-playbook/dream-work/handoff/ops/ab.json": "{\n  \"ops\": [\n    {\n      \"id\": \"c1\",\n      \"op\": \"delete\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Old heading text\",\n      \"class\": \"Delete entry\",\n      \"decision_id\": \"k1\"\n    },\n    {\n      \"id\": \"c2\",\n      \"op\": \"delete\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Keep commits small\",\n      \"class\": \"Delete entry\",\n      \"decision_id\": \"k1\"\n    }\n  ]\n}\n"
       }
     }
@@ -108,42 +106,6 @@
         "authorizes 1 op(s), not these 2"
       ],
       "writes": []
-    },
-    {
-      "argv": [
-        "memedit",
-        "--ops",
-        "handoff/ops/m.json",
-        "--decisions",
-        "handoff/decisions.json",
-        "--decisions-sha",
-        "{SHA256:handoff/decisions.json}",
-        "--snapshot-sha",
-        "{SHA256:sweep/dirty-at-orient.json}"
-      ],
-      "exit": 3,
-      "stdout_contains": [
-        "authorizes 2 op(s), not these 3"
-      ],
-      "writes": []
-    },
-    {
-      "argv": [
-        "memedit",
-        "--ops",
-        "handoff/ops/n.json",
-        "--decisions",
-        "handoff/decisions.json",
-        "--decisions-sha",
-        "{SHA256:handoff/decisions.json}",
-        "--snapshot-sha",
-        "{SHA256:sweep/dirty-at-orient.json}"
-      ],
-      "writes": [
-        "repo/memory/MEMORY.md",
-        "repo/memory/topics/ci.md",
-        "repo/memory/.dream-journal.jsonl"
-      ]
     }
   ]
 }

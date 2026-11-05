@@ -244,7 +244,7 @@ Subcommands:
       checks them), never from gate.md. `gate` also prints `gate.md sha256:
       <hex>`, which the orchestrator holds for `decisions --gate-sha`. A
       gate-items.json text item carries the decisions.json fields kind
-      (required), file, heading, shown_text (verbatim in its text), to_file,
+      (required), file, heading, shown_text (verbatim in its text),
       variant and project (TEXT_ITEM_KEYS), and `gate` shows them in an `Acts
       on:` line of its block; a drafted item may carry variant (promotes)
       with the source entry's file and heading, shown as `Also removes memory
@@ -2765,7 +2765,7 @@ DECISION_ITEM_NOTES = (
     "current_text (non-empty) or null with after_heading; optional create (true for a new "
     "file) and blast_edits (a list of objects with path, new_text and the same anchor)",
     "handoff check also requires: an option that writes memory names file and heading; an "
-    "insert, replace, append_lines or create op also shown_text; a budget-move also to_file",
+    "insert, replace, append_lines or create op also shown_text",
 )
 
 # Readable names, for the unknown-name message only, of the HANDOFF_SCHEMAS
@@ -2872,10 +2872,9 @@ def handoff_schema(name):
                   "a kind whose option writes memory",
                   "    shown_text: the text an insert, replace, append_lines or create op "
                   "writes; it must appear verbatim in text",
-                  "    to_file: absolute path, for a budget-move",
                   "    variant: merge-downgrade, expiry-only or promotes, as the kind allows",
                   "    project: the project path key, for an item of one project",
-                  "    each of these is a non-empty string; file and to_file are absolute"]
+                  "    each of these is a non-empty string; file is absolute"]
     if pat == r"drafts\.json":
         lines.append("  also: each item is checked beyond being an object: " + "; ".join(
             "%s: %s" % (k, _type_words(t)) for k, t in DRAFT_ITEM.items()))
@@ -5068,14 +5067,14 @@ def promotes_line(e):
 
 def acts_on_line(e):
     """The line `gate` adds to a text item's block: the fields its decision
-    acts on (kind, file, heading, to_file, variant, project), generated from
+    acts on (kind, file, heading, variant, project), generated from
     gate-items.json and never from the item's own text."""
     line = "Acts on: %s" % _jq(e["kind"])
     if _is_str(e.get("file")):
         line += " " + _jq(e["file"])
     if _is_str(e.get("heading")):
         line += " \u00a7 " + _jq(e["heading"])
-    for key, word in (("to_file", "to"), ("variant", "variant"), ("project", "project")):
+    for key, word in (("variant", "variant"), ("project", "project")):
         if _is_str(e.get(key)):
             line += "; %s %s" % (word, _jq(e[key]))
     return line
@@ -5201,7 +5200,7 @@ def gate_entries_of(gi, drafts, items):
                 probs.append("%s is a drafts.json item: give its why and options, not a text" % iid)
             elif not _is_str(e.get("kind")):
                 probs.append("%s: a text gate item carries no kind (gate-items.json): it needs "
-                             "kind and, as the kind needs, file, heading, shown_text, to_file, "
+                             "kind and, as the kind needs, file, heading, shown_text, "
                              "variant, project (`handoff schema gate-items.json`)" % iid)
             continue
         if iid not in by_id:
@@ -5538,7 +5537,7 @@ DECISIONS = "handoff/decisions.json"
 # retyping it: the decisions.json fields of dream-write.py item_problems.
 # A drafted item may carry `variant` (promotes) with the source entry's
 # `file` and `heading`.
-TEXT_ITEM_KEYS = ("kind", "file", "heading", "shown_text", "to_file", "variant", "project")
+TEXT_ITEM_KEYS = ("kind", "file", "heading", "shown_text", "variant", "project")
 
 
 def text_item_problems(e, kinds):
@@ -5549,9 +5548,8 @@ def text_item_problems(e, kinds):
             out.append("%s: %s must be a non-empty string" % (iid, k))
     if _is_str(e.get("kind")) and e["kind"] not in kinds:
         out.append("%s: kind %r is not a decisions.json kind" % (iid, e["kind"][:40]))
-    for k in ("file", "to_file"):
-        if _is_str(e.get(k)) and not os.path.isabs(e[k]):
-            out.append("%s: %s must be an absolute path" % (iid, k))
+    if _is_str(e.get("file")) and not os.path.isabs(e["file"]):
+        out.append("%s: file must be an absolute path" % iid)
     if _is_str(e.get("shown_text")) and _is_str(e.get("text")) \
             and e["shown_text"] not in e["text"]:
         out.append("%s: shown_text does not appear verbatim in its text" % iid)
@@ -7528,12 +7526,10 @@ def _unit_handoff_schema_keys(root, home, ctx):
             fails.append("item_problems no longer names %r for a bad %s" % (key, key))
         if key not in text:
             fails.append("handoff schema decisions.json does not name %r" % key)
-    for key in ("current_text", "after_heading", "create", "shown_text", "file", "heading",
-                "to_file"):
+    for key in ("current_text", "after_heading", "create", "shown_text", "file", "heading"):
         if key not in text:
             fails.append("handoff schema decisions.json does not name %r" % key)
     for kind, opt, want in (("memory-proposal", "Save", {"file", "heading", "shown_text"}),
-                            ("budget-move", "Move", {"file", "heading", "shown_text", "to_file"}),
                             ("stale", "Keep", set())):
         got = set()
         for p in probs({"id": "c", "kind": kind, "answer": opt}, complete=True):

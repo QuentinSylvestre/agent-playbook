@@ -115,7 +115,7 @@ ORI-DISPATCH	ORI-DISPATCH	shared/skills/qdream/sweep-orient.md	shared/skills/qdr
 improvement-signals topic file	memory/topics/improvement-signals.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/memory-rules.md	shared/skills/qdream/sweep-orient.md	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/sweep-decide-apply.md	shared/skills/qdream/sweep-recovery.md	providers/kiro/skills/qdream/sweep-synthesize.OVERLAY.md	shared/skills/qextract/references/playbook-map.md	shared/AGENTS.md
 Prune-set exclusions	Prune-set exclusions	shared/skills/qdream/memory-rules.md	shared/skills/qdream/sweep-synthesize.md	providers/kiro/skills/qdream/OVERLAY.md
 FIX-SIZE fixtures	FIX-SIZE-	shared/skills/qdream/transition-fixtures.md	shared/skills/qdream/sweep-synthesize.md
-FIX-BUDGET fixtures	FIX-BUDGET-	shared/skills/qdream/transition-fixtures.md	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/sweep-decide-apply.md
+FIX-BUDGET fixtures	FIX-BUDGET-	shared/skills/qdream/transition-fixtures.md	shared/skills/qdream/sweep-synthesize.md
 Plan-less governance capture	Plan-less governance capture	shared/skills/qdream/memory-rules.md	shared/AGENTS.md	shared/skills/qdream/sweep-gather.md	shared/skills/qdream/sweep-synthesize.md	providers/kiro/skills/qdream/OVERLAY.md	AGENTS.md
 FIX-SIGNAL fixtures	FIX-SIGNAL-	shared/skills/qdream/transition-fixtures.md	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/sweep-decide-apply.md
 Failure gate	Failure gate	shared/skills/qdream/sweep-handoff.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/sweep-gather.md	shared/skills/qdream/sweep-synthesize.md

@@ -196,7 +196,7 @@
     },
     {
       "write": {
-        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": [\n    {\n      \"id\": \"B1\",\n      \"kind\": \"budget-move\",\n      \"answer\": \"Move\",\n      \"file\": \"/r/m.md\",\n      \"heading\": \"H\",\n      \"shown_text\": \"### H\\n\\nb\"\n    }\n  ]\n}\n"
+        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": [\n    {\n      \"id\": \"B1\",\n      \"kind\": \"memory-proposal\",\n      \"answer\": \"Save\",\n      \"file\": \"/r/m.md\",\n      \"heading\": \"H\"\n    }\n  ]\n}\n"
       }
     },
     {
@@ -207,7 +207,7 @@
       ],
       "exit": 3,
       "stdout_contains": [
-        "option 'move' needs 'to_file'"
+        "option 'save' needs 'shown_text'"
       ]
     },
     {

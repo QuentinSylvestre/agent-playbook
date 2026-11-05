@@ -270,7 +270,7 @@ heading match) and `decision_id`):
   `kind` and option (its `option`, else its `answer`, normalized: casefold,
   runs of space, `-` and `_` one space) authorize its op type in the table
   (a `variant` field swaps the slots of some options: D28_VARIANTS), the op names the
-  item's `file` (`to_file` for a budget-move insert) and `heading` (a
+  item's `file` and `heading` (a
   delete, replace or append_lines by heading; a declined_add row starts
   `- "<heading>"`; an insert or create writes that heading, except a
   harvest-merge Keep both), a replace or insert text and an append_lines
@@ -299,7 +299,7 @@ the phase brief): {"items": [{"id", "kind", "answer", "option"?, "variant"?,
   "skip_item"? (true only: the orchestrator turned an Applied governance or
   retirement item into option `Skip` at the Failure gate, `Skip item`; it is
   no rejected lesson, so the Apply phase agent writes none for it, like `for_conflict`),
-  "file"?, "heading"?, "shown_text"?, "to_file"?,
+  "file"?, "heading"?, "shown_text"?,
   "project"? (manifest project path or "user memory")}],
   "track"?: [absolute path, ...]}
   `track` lists the files the git-tracking question was answered yes for
@@ -309,7 +309,7 @@ the phase brief): {"items": [{"id", "kind", "answer", "option"?, "variant"?,
   chose (the orchestrator maps the answer to it). The scripts match on the
   option, normalized as above; without `option` the answer is normalized
   instead. Every `kind` is a D28_TABLE key (memory-proposal, stale,
-  stale-salvage, subsumed, budget-move, budget-delete, node, harvest-merge,
+  stale-salvage, subsumed, node, harvest-merge,
   governance, retirement, conflict, duplicate, human-expiry) and the option
   one of its kind's options; a `variant` is one of D28_VARIANTS (memory-
   proposal `merge-downgrade`: a Save or Edit the verifier downgraded to a
@@ -323,7 +323,7 @@ the phase brief): {"items": [{"id", "kind", "answer", "option"?, "variant"?,
   normalized answer is itself another option of the kind.
   Anything else refuses the whole file, in `dream-sweep.py handoff check
   decisions.json` (item_problems, the same code, which also needs `file`,
-  `heading`, `shown_text` and `to_file` on an item whose option authorizes a
+  `heading` and `shown_text` on an item whose option authorizes a
   memory op) and again in every script that loads it. A governance edit is a
   governance or retirement item answered `Apply` with target_file; a path is
   repo-relative (config repo) or absolute, and writes only a governance or
@@ -346,7 +346,7 @@ the phase brief): {"items": [{"id", "kind", "answer", "option"?, "variant"?,
   answered other than `Update governance` leaves its derived governance item
   unpresented: it is recorded as option `Skip` with `for_conflict` set. An item that authorizes a memory
   op names `file`, `heading` and, for a written text, `shown_text` (the text
-  the gate showed); a budget-move names the insert's `to_file`; a duplicate's
+  the gate showed); a duplicate's
   `file` is the copy to delete (class pruned); a node Keep node writes the one
   line `**Affirmed**: <date>` to HIGHER_ORDER.md; a conflict Delete entry
   deletes with class `Delete entry`; a human-expiry (Keep, Re-date-as-sweep or
@@ -598,8 +598,6 @@ _D28 = {
     "stale-salvage": {"Rewrite": (("replace",),), "Delete": (("delete",),), "Keep": (),
                       "Defer": ()},
     "subsumed": {"Remove": (("delete",),), "Keep": _AR, "Defer": ()},
-    "budget-move": {"Move": (("delete",), ("insert",)), "Keep": (), "Defer": ()},
-    "budget-delete": {"Delete": (("delete",),), "Keep": (), "Defer": ()},
     "node": {"Remove node": (("delete",),), "Keep node": (("append_lines",),), "Defer": ()},
     "harvest-merge": {"Merge": (("replace",),), "Keep both": (("insert",),),
                       "Keep harvested": (("replace",),), "Keep existing": ()},
@@ -1291,8 +1289,8 @@ def item_problems(dec, complete=False, policy=None):
     after_heading null, and `create: true` is refused on a file that existed
     (ds.new_file_problem).
     With `complete` (the handoff check at the gate) an item whose option
-    authorizes a memory op also names `file` and `heading`, `shown_text` for
-    an op that writes text and `to_file` for a budget-move."""
+    authorizes a memory op also names `file` and `heading`, and `shown_text` for
+    an op that writes text."""
     out, seen = [], set()
     out += track_problems(dec, policy)
     conflicts = {i.get("id") for i in dec["items"] if i.get("kind") == "conflict"}
@@ -1354,8 +1352,6 @@ def item_problems(dec, complete=False, policy=None):
             need += ["file", "heading"]
         if types & {"insert", "replace", "append_lines", "create"}:
             need.append("shown_text")
-        if kind == "budget-move":
-            need.append("to_file")
         out += ["item %s: option %r needs %r" % (iid, option_of(it), f) for f in need
                 if not (isinstance(it.get(f), str) and it[f].strip())]
     return out
@@ -1588,10 +1584,9 @@ def authorize_op(run, item, o, body=None):
             isinstance(item.get("shown_text"), str)
             and AFFIRMED_RE.match(item["shown_text"].strip())):
         return "a node Keep node writes one **Affirmed**: <date> line"
-    field = "to_file" if (kind == "budget-move" and o["op"] == "insert") else "file"
-    want_file = item.get(field)
+    want_file = item.get("file")
     if not isinstance(want_file, str) or ds.nk(repo_path(run, want_file)) != ds.nk(o["file"]):
-        return "the item names another file (its %s)" % field
+        return "the item names another file (its %s)" % "file"
     heading = item.get("heading")
     if not isinstance(heading, str) or not heading.strip():
         return "the item names no heading"
@@ -1644,8 +1639,7 @@ def recorded_op_refusal(run, item, rec):
             return "a node op targets memory/HIGHER_ORDER.md only"
     if rec.get("op") == "delete" and node_del != (item["kind"] == "node"):
         return "a node delete needs a node item, and a node item a node delete"
-    want = item.get("to_file") if (item["kind"] == "budget-move" and rec.get("op") == "insert") \
-        else item.get("file")
+    want = item.get("file")
     if not isinstance(want, str) or not isinstance(rec.get("file"), str) or \
             ds.nk(repo_path(run, want)) != ds.nk(rec["file"]):
         return "the op's file is not the item's"

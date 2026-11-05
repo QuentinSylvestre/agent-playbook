@@ -3,7 +3,11 @@
   "now": "2026-10-12T12:00:00Z",
   "steps": [
     {
-      "argv": ["handoff", "schema", "gather.json"],
+      "argv": [
+        "handoff",
+        "schema",
+        "gather.json"
+      ],
       "exit": 0,
       "stdout_contains": [
         "handoff schema gather.json",
@@ -14,7 +18,11 @@
       ]
     },
     {
-      "argv": ["handoff", "schema", "progress-gather.json"],
+      "argv": [
+        "handoff",
+        "schema",
+        "progress-gather.json"
+      ],
       "exit": 0,
       "stdout_contains": [
         "phase: one of gather, synthesize, apply",
@@ -27,7 +35,11 @@
       ]
     },
     {
-      "argv": ["handoff", "schema", "synthesize.json"],
+      "argv": [
+        "handoff",
+        "schema",
+        "synthesize.json"
+      ],
       "exit": 0,
       "stdout_contains": [
         "tallies: object",
@@ -37,7 +49,11 @@
       ]
     },
     {
-      "argv": ["handoff", "schema", "orient.json"],
+      "argv": [
+        "handoff",
+        "schema",
+        "orient.json"
+      ],
       "exit": 0,
       "stdout_contains": [
         "since: string or null",
@@ -45,7 +61,11 @@
       ]
     },
     {
-      "argv": ["handoff", "schema", "gate.md"],
+      "argv": [
+        "handoff",
+        "schema",
+        "gate.md"
+      ],
       "exit": 0,
       "stdout_contains": [
         "not JSON",
@@ -53,7 +73,11 @@
       ]
     },
     {
-      "argv": ["handoff", "schema", "steps/GAT-PLANS.json"],
+      "argv": [
+        "handoff",
+        "schema",
+        "steps/GAT-PLANS.json"
+      ],
       "exit": 0,
       "stdout_contains": [
         "step: string",
@@ -62,7 +86,11 @@
       ]
     },
     {
-      "argv": ["handoff", "schema", "needs-decision-1.json"],
+      "argv": [
+        "handoff",
+        "schema",
+        "needs-decision-1.json"
+      ],
       "exit": 0,
       "stdout_contains": [
         "kind: one of user-decision, failure, rate-limit, budget, guard-changed",
@@ -72,7 +100,11 @@
       ]
     },
     {
-      "argv": ["handoff", "schema", "decision-1.json"],
+      "argv": [
+        "handoff",
+        "schema",
+        "decision-1.json"
+      ],
       "exit": 0,
       "stdout_contains": [
         "answer: string",
@@ -81,7 +113,11 @@
       ]
     },
     {
-      "argv": ["handoff", "schema", "drafts.json"],
+      "argv": [
+        "handoff",
+        "schema",
+        "drafts.json"
+      ],
       "exit": 0,
       "stdout_contains": [
         "items: list of objects",
@@ -95,7 +131,11 @@
       ]
     },
     {
-      "argv": ["handoff", "schema", "decisions.json"],
+      "argv": [
+        "handoff",
+        "schema",
+        "decisions.json"
+      ],
       "exit": 0,
       "stdout_contains": [
         "item_problems",
@@ -108,12 +148,15 @@
         "for_conflict: optional",
         "skip_item: optional",
         "track: optional",
-        "an Apply on a governance or retirement item also needs target_file and new_text",
-        "a budget-move also to_file"
+        "an Apply on a governance or retirement item also needs target_file and new_text"
       ]
     },
     {
-      "argv": ["handoff", "schema", "nope.json"],
+      "argv": [
+        "handoff",
+        "schema",
+        "nope.json"
+      ],
       "exit": 2,
       "stdout_not_contains": [
         "every key below"
@@ -136,5 +179,8 @@
       ]
     }
   ],
-  "units": ["handoff-schema-names", "handoff-schema-keys"]
+  "units": [
+    "handoff-schema-names",
+    "handoff-schema-keys"
+  ]
 }

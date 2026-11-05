@@ -75,7 +75,7 @@ Scope notes for the tokens the human-attestation fixtures add:
 - **`human-expiry-gated`** is `[GAT-CLASSIFY]`: a passing expiry-forced check on a `human:` entry is routed to `human_expiries` instead of being re-dated and cleared. FIX-EXPIRY-human-precedence-terminal, tagged `[SYN-RECONCILE]`, reuses it as its VERDICT with the same meaning: after reconciliation the routing still applies.
 - **`lapse-reported`** is `[SYN-WRITE]`: a merge dropped a `human:` actor, so the Report's `Attestations lapsed on merge` line names the surviving heading.
 - **`one-gate-item`** is `[SYN-RECONCILE]`: an entry on two routes gets only the route precedence keeps, one `DEC-GATE` item, not a second one for its passing expiry. In FIX-EXPIRY-human-precedence-terminal it is the MUST NOT: the wrong outcome in which a detection that reconciliation suppressed still counts as the entry's one item.
-- **`gate-skipped`** is `[SYN-WRITE]`: a heading this sweep removed or named in a user-tier budget proposal never enters `human_expiries`, so no expiry gate item exists for it.
+- **`gate-skipped`** is `[SYN-WRITE]`: a heading this sweep removed never enters `human_expiries`, so no expiry gate item exists for it.
 - **`human-keep-redated`**, **`sweep-redated`** and **`deferred-unchanged`** are `[APP-ADJUDICATE]`: the end state of a human-attested expiry after `Keep`, `Re-date-as-sweep` and `Defer`.
 - A precedence fixture is tagged with its VERDICT token's step, except FIX-EXPIRY-human-precedence-terminal (see `human-expiry-gated` above).
 - **`silent-merge`** is `[SYN-WRITE]` and appears only as a MUST NOT: the wrong outcome in which a merge that dropped a `human:` actor leaves the Report without an `Attestations lapsed on merge` entry.
@@ -149,7 +149,7 @@ A full sweep runs. A project `memory/MEMORY.md` that is not git-tracked (a solel
 VERDICT: autonomous-size-prune
 MUST NOT: route-first-no-delete
 
-(The reader must derive: project memory files keep the entry advisory unchanged. The count is 35, over ~30, so the Size check prunes autonomously in the § Derived Utility & Pruning order, the five verification-failed entries first, records each as `pruned` in the working map, and names them in the Report. The user-tier budget proposals do not apply to a project file.)
+(The reader must derive: project memory files keep the entry advisory unchanged. The count is 35, over ~30, so the Size check prunes autonomously in the § Derived Utility & Pruning order, the five verification-failed entries first, records each as `pruned` in the working map, and names them in the Report.)
 
 ### FIX-STALE-conflict-excluded [SYN-STALE]
 
@@ -512,7 +512,7 @@ MUST NOT: pruned
 
 ### FIX-EXPIRY-human-gate [GAT-CLASSIFY]
 
-Entry H is a `feedback` entry in project P's memory file, carrying `**Verified**: 2026-03-02 (human:alice)` and `**Stale-after**: 2026-07-01`. Today's sweep runs on 2026-08-04, so the date has passed. P had no new session and no new plan. The manifest flags H `stale_after_passed`, so P's `memory_pass` is `flagged` and P gets a `Tasks 4-5 only` dispatch. Task 4 runs H's type-specific check: the artifact H names, `scripts/deploy.sh`, still exists. No governance rule is on point. The agent classifies every entry of the file, lists H in `verified` as `{"heading": "H", "expiry": "Stale-after"}`, and returns task4_status: checked; the count-verify passes. H is not merged, renamed or removed this sweep, and no budget proposal names it. What does the orchestrator do with H at Re-dating?
+Entry H is a `feedback` entry in project P's memory file, carrying `**Verified**: 2026-03-02 (human:alice)` and `**Stale-after**: 2026-07-01`. Today's sweep runs on 2026-08-04, so the date has passed. P had no new session and no new plan. The manifest flags H `stale_after_passed`, so P's `memory_pass` is `flagged` and P gets a `Tasks 4-5 only` dispatch. Task 4 runs H's type-specific check: the artifact H names, `scripts/deploy.sh`, still exists. No governance rule is on point. The agent classifies every entry of the file, lists H in `verified` as `{"heading": "H", "expiry": "Stale-after"}`, and returns task4_status: checked; the count-verify passes. H is not merged, renamed or removed this sweep. What does the orchestrator do with H at Re-dating?
 
 VERDICT: human-expiry-gated
 MUST NOT: reverify-not-stale
@@ -521,7 +521,7 @@ MUST NOT: reverify-not-stale
 
 ### FIX-EXPIRY-human-flag-only-key [GAT-CLASSIFY]
 
-Entry N is a `decision` entry in project P's memory file, carrying `**Verified**: 2026-03-02 (human:alice)` and `**Stale-after**: 2026-07-01`. Today's sweep runs on 2026-08-04. The manifest flags N `stale_after_passed`, so P gets a `Tasks 4-5 only` dispatch. Task 4 runs N's type-specific check: the artifact N names still exists. The agent lists N in `verified` as the bare heading `"N"`, with no `expiry` key, and returns task4_status: checked; the count-verify passes. N is not merged, renamed or removed this sweep, and no budget proposal names it. What does the orchestrator do with N at Re-dating?
+Entry N is a `decision` entry in project P's memory file, carrying `**Verified**: 2026-03-02 (human:alice)` and `**Stale-after**: 2026-07-01`. Today's sweep runs on 2026-08-04. The manifest flags N `stale_after_passed`, so P gets a `Tasks 4-5 only` dispatch. Task 4 runs N's type-specific check: the artifact N names still exists. The agent lists N in `verified` as the bare heading `"N"`, with no `expiry` key, and returns task4_status: checked; the count-verify passes. N is not merged, renamed or removed this sweep. What does the orchestrator do with N at Re-dating?
 
 VERDICT: human-expiry-gated
 MUST NOT: reverify-not-stale
@@ -548,7 +548,7 @@ MUST NOT: human-expiry-gated
 
 ### FIX-EXPIRY-human-precedence-reraised [SYN-RECONCILE]
 
-A full sweep runs on 2026-08-04. Project P's memory file holds entry R, a `feedback` entry with `**Verified**: 2026-02-11 (human:alice)` and `**Stale-after**: 2026-07-01`. R also carries `**Governance-conflict**: contradicts shared/AGENTS.md § Git Staging — adjudicated 2026-07-05: rule-update-pending` and a `Governance-conflict-quote`. That record is non-terminal, so the manifest flags P `governance_conflict_open` and P is dispatched. The agent did not return R in `governance_conflicts`: the fresh detection was subtracted as already adjudicated. It listed R in `verified` as `{"heading": "R", "expiry": "Stale-after"}`; its forced check passed. task4_status is checked and the count-verify passes. R is not merged, renamed or removed in § SYN-WRITE, and no budget proposal names it. How many § DEC-GATE items does R produce this sweep?
+A full sweep runs on 2026-08-04. Project P's memory file holds entry R, a `feedback` entry with `**Verified**: 2026-02-11 (human:alice)` and `**Stale-after**: 2026-07-01`. R also carries `**Governance-conflict**: contradicts shared/AGENTS.md § Git Staging — adjudicated 2026-07-05: rule-update-pending` and a `Governance-conflict-quote`. That record is non-terminal, so the manifest flags P `governance_conflict_open` and P is dispatched. The agent did not return R in `governance_conflicts`: the fresh detection was subtracted as already adjudicated. It listed R in `verified` as `{"heading": "R", "expiry": "Stale-after"}`; its forced check passed. task4_status is checked and the count-verify passes. R is not merged, renamed or removed in § SYN-WRITE. How many § DEC-GATE items does R produce this sweep?
 
 VERDICT: one-gate-item
 MUST NOT: human-expiry-gated
@@ -557,7 +557,7 @@ MUST NOT: human-expiry-gated
 
 ### FIX-EXPIRY-human-precedence-terminal [SYN-RECONCILE]
 
-A full sweep runs on 2026-08-04. Project P's memory file holds entry T, a `feedback` entry with `**Verified**: 2026-02-11 (human:alice)` and `**Stale-after**: 2026-07-01`. T carries `**Governance-conflict**: subsumed by shared/AGENTS.md § Commit Conventions — adjudicated 2026-06-20: subsumption-kept` and a `Governance-conflict-quote` that still appears, whitespace-normalized, inside that section. P's `all tasks` agent returned T in `subsumed_entries` with a `governance_span` equal to the recorded quote, and also in `verified` as `{"heading": "T", "expiry": "Stale-after"}`; its forced check passed. task4_status is checked and the count-verify passes. T is not merged, renamed or removed in § SYN-WRITE, and no budget proposal names it. Which § DEC-GATE item does T produce this sweep?
+A full sweep runs on 2026-08-04. Project P's memory file holds entry T, a `feedback` entry with `**Verified**: 2026-02-11 (human:alice)` and `**Stale-after**: 2026-07-01`. T carries `**Governance-conflict**: subsumed by shared/AGENTS.md § Commit Conventions — adjudicated 2026-06-20: subsumption-kept` and a `Governance-conflict-quote` that still appears, whitespace-normalized, inside that section. P's `all tasks` agent returned T in `subsumed_entries` with a `governance_span` equal to the recorded quote, and also in `verified` as `{"heading": "T", "expiry": "Stale-after"}`; its forced check passed. task4_status is checked and the count-verify passes. T is not merged, renamed or removed in § SYN-WRITE. Which § DEC-GATE item does T produce this sweep?
 
 VERDICT: human-expiry-gated
 MUST NOT: one-gate-item
@@ -573,18 +573,9 @@ MUST NOT: human-expiry-gated
 
 (The reader must derive: the Size check runs at § SYN-WRITE, before the count-verify. The file is over the ~30 count, J ranks first in the derived-utility order on criterion (2), `Outcome: recurred`, and a `human:` actor is only a tiebreak at criterion (5), so the Size check prunes J and records it in the working map as removed, class `pruned`. A heading removed in § SYN-WRITE this sweep, whatever the class, never enters `human_expiries`, so there is no gate item and no re-date. The existing human-attestation carve-out does not exclude an entry from the Size-check prune.)
 
-### FIX-EXPIRY-human-precedence-budget [SYN-WRITE]
-
-A full sweep runs on 2026-08-04. The config repo's user memory is over the pin `MEMORY_BUDGET_WORDS` reports. `memory/MEMORY.md` holds one `## Topics` row whose trigger is "editing a CI pipeline". Entry B is a `feedback` entry about CI caching, which that trigger covers, with `**Verified**: 2026-04-02 (human:alice)` and `**Stale-after**: 2026-07-15`. The user-memory dispatch returned B in `verified` as `{"heading": "B", "expiry": "Stale-after"}`; its forced check passed, task4_status is checked, and the count-verify passes. The Size check queued a routing proposal `Move` for B. B is not in any other Task-4 class. What does the orchestrator do with B's passing expiry check?
-
-VERDICT: gate-skipped
-MUST NOT: human-expiry-gated
-
-(The reader must derive: a heading named in a user-tier budget proposal (`Delete` or `Move`) this sweep never enters `human_expiries`, so B gets one gate item, the `Move / Keep / Defer` routing proposal. B is not re-dated and its `Stale-after` is not cleared this sweep. Wherever B lives next sweep, the expiry fires again then.)
-
 ### FIX-EXPIRY-human-precedence-duplicate [SYN-RECONCILE]
 
-A full sweep runs on 2026-08-04. An earlier `Move` was interrupted between its two writes, so the heading of entry D now appears in both `memory/MEMORY.md` and `memory/topics/ci.md`, and the manifest reports the error `duplicate heading across user-memory files` naming both files. <!-- verify-links: skip memory/topics/ci.md --> D is a `feedback` entry with `**Verified**: 2026-04-02 (human:alice)` and `**Stale-after**: 2026-07-15`. The user-memory dispatch returned D in `verified` as `{"heading": "D", "expiry": "Stale-after"}`; its forced check passed. task4_status is checked for both files and the count-verify passes. D is not merged, renamed or removed in § SYN-WRITE, no budget proposal names it, and it is in no Task-4 class other than `unrelated`. How many § DEC-GATE items does D produce this sweep?
+A full sweep runs on 2026-08-04. An earlier `Move` was interrupted between its two writes, so the heading of entry D now appears in both `memory/MEMORY.md` and `memory/topics/ci.md`, and the manifest reports the error `duplicate heading across user-memory files` naming both files. <!-- verify-links: skip memory/topics/ci.md --> D is a `feedback` entry with `**Verified**: 2026-04-02 (human:alice)` and `**Stale-after**: 2026-07-15`. The user-memory dispatch returned D in `verified` as `{"heading": "D", "expiry": "Stale-after"}`; its forced check passed. task4_status is checked for both files and the count-verify passes. D is not merged, renamed or removed in § SYN-WRITE, and it is in no Task-4 class other than `unrelated`. How many § DEC-GATE items does D produce this sweep?
 
 VERDICT: one-gate-item
 MUST NOT: human-expiry-gated

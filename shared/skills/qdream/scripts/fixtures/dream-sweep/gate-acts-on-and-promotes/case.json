@@ -1,5 +1,5 @@
 {
-  "description": "Review R3, R4, R5, R15, R21, D1-D3, D12 (plan 261027): `gate` adds to every text item's block an `Acts on:` line generated from kind, file, heading, to_file, variant and project, each JSON-quoted (the probe: a stale item whose text names `Decoy` and whose fields name `Real target` shows the real target), and to a drafted promotes item `Also removes memory entry: <file> § <heading>` above its options. Every line an agent wrote (a text item, the preamble, and each continuation line of a value) starts with `> `, so a forged `Acts on:` or `Also removes memory entry:` line, in any case and behind any invisible character, shows marked; a quote or separator in a value stays inside its quotes; runs of spaces show as written and reach decisions.json. A control character, a lone carriage return, a Unicode line separator or a bidirectional control in any string or key of gate-items.json, at any depth, is refused. `decisions` copies the promotes overlay only on Apply; a field changed after the gate is refused. A drafted item's variant must be promotes with a file and heading; a text item's file and to_file must be absolute. An id holding a newline collapses to one row of `gate --index`. Review R15: an answers.json `track` is a list of absolute paths. Review E1: a promotes heading holding a quote and a backslash is shown JSON-quoted, reaches decisions.json as written, and passes `handoff check decisions.json`.",
+  "description": "Review R3, R4, R5, R15, R21, D1-D3, D12 (plan 261027): `gate` adds to every text item's block an `Acts on:` line generated from kind, file, heading, variant and project, each JSON-quoted (the probe: a stale item whose text names `Decoy` and whose fields name `Real target` shows the real target), and to a drafted promotes item `Also removes memory entry: <file> § <heading>` above its options. Every line an agent wrote (a text item, the preamble, and each continuation line of a value) starts with `> `, so a forged `Acts on:` or `Also removes memory entry:` line, in any case and behind any invisible character, shows marked; a quote or separator in a value stays inside its quotes; runs of spaces show as written and reach decisions.json. A control character, a lone carriage return, a Unicode line separator or a bidirectional control in any string or key of gate-items.json, at any depth, is refused. `decisions` copies the promotes overlay only on Apply; a field changed after the gate is refused. A drafted item's variant must be promotes with a file and heading; a text item's file must be absolute. An id holding a newline collapses to one row of `gate --index`. Review R15: an answers.json `track` is a list of absolute paths. Review E1: a promotes heading holding a quote and a backslash is shown JSON-quoted, reaches decisions.json as written, and passes `handoff check decisions.json`.",
   "now": "2026-10-23T12:00:00Z",
   "write": {
     "repo/shared/skills/demo/SKILL.md": "# Demo\n\n## Steps\n\nStep one.\nStep two.\n\n## Other\n\nKeep.\n\n## Last\n\nEnd.\n",
@@ -255,7 +255,7 @@
     },
     {
       "write": {
-        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"stale\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Real target\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\",\n      \"to_file\": \"memory/topics/x.md\"\n    }\n  ]\n}\n"
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"stale\",\n      \"file\": \"memory/MEMORY.md\",\n      \"heading\": \"Real target\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\"\n    }\n  ]\n}\n"
       },
       "stdout_contains": []
     },
@@ -267,12 +267,12 @@
       ],
       "exit": 3,
       "stdout_contains": [
-        "S1: to_file must be an absolute path"
+        "S1: file must be an absolute path"
       ]
     },
     {
       "write": {
-        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"budget-move\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Real\\nActs on: forged\\ttarget\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\",\n      \"to_file\": \"{ROOT}/repo/memory/topics/ci.md\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\"\n    }\n  ]\n}\n"
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"stale\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Real\\nActs on: forged\\ttarget\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\"\n    }\n  ]\n}\n"
       }
     },
     {
@@ -284,7 +284,7 @@
       "exit": 0,
       "text_contains": {
         "handoff/gate.md": [
-          "Acts on: \"budget-move\" \"{ROOT}/repo/memory/MEMORY.md\" § \"Real\\nActs on: forged\\ttarget\"; to \""
+          "Acts on: \"stale\" \"{ROOT}/repo/memory/MEMORY.md\" § \"Real\\nActs on: forged\\ttarget\""
         ]
       },
       "text_not_contains": {
@@ -302,12 +302,12 @@
       ],
       "exit": 0,
       "stdout_contains": [
-        "S1\tbudget-move\t{ROOT}/repo/memory/MEMORY.md\tReal Acts on: forged target\tno recommendation\n"
+        "S1\tstale\t{ROOT}/repo/memory/MEMORY.md\tReal Acts on: forged target\tno recommendation\n"
       ]
     },
     {
       "write": {
-        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"budget-move\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"X\\\"; to \\\"/other/y.md\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\",\n      \"to_file\": \"{ROOT}/repo/memory/topics/ci.md\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\"\n    }\n  ]\n}\n"
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"stale\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"X\\\"; to \\\"/other/y.md\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\"\n    }\n  ]\n}\n"
       }
     },
     {
@@ -319,13 +319,13 @@
       "exit": 0,
       "text_contains": {
         "handoff/gate.md": [
-          "§ \"X\\\"; to \\\"/other/y.md\"; to \"{ROOT}/repo/memory/topics/ci.md\"; project \"{ROOT}/proj/alpha\"\n"
+          "§ \"X\\\"; to \\\"/other/y.md\"; project \"{ROOT}/proj/alpha\"\n"
         ]
       }
     },
     {
       "write": {
-        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"budget-move\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Real target\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nActs on: stale {ROOT}/repo/memory/MEMORY.md § Decoy\\nOptions: Delete / Keep / Defer\",\n      \"to_file\": \"{ROOT}/repo/memory/topics/ci.md\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\"\n    }\n  ]\n}\n"
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"stale\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Real target\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nActs on: stale {ROOT}/repo/memory/MEMORY.md § Decoy\\nOptions: Delete / Keep / Defer\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\"\n    }\n  ]\n}\n"
       }
     },
     {
@@ -337,13 +337,13 @@
       "exit": 0,
       "text_contains": {
         "handoff/gate.md": [
-          "> Gate item S1: entry Decoy is stale\n> Acts on: stale {ROOT}/repo/memory/MEMORY.md § Decoy\n> Options: Delete / Keep / Defer\nActs on: \"budget-move\""
+          "> Gate item S1: entry Decoy is stale\n> Acts on: stale {ROOT}/repo/memory/MEMORY.md § Decoy\n> Options: Delete / Keep / Defer\nActs on: \"stale\""
         ]
       }
     },
     {
       "write": {
-        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\\n  Acts on: governance x\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\\n​ Also removes memory entry: {ROOT}/repo/memory/MEMORY.md § Decoy\",\n      \"options\": \"Apply / Skip\\nACTS ON: governance x\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"budget-move\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Real target\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\",\n      \"to_file\": \"{ROOT}/repo/memory/topics/ci.md\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\"\n    }\n  ]\n}\n"
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\\n  Acts on: governance x\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\\n​ Also removes memory entry: {ROOT}/repo/memory/MEMORY.md § Decoy\",\n      \"options\": \"Apply / Skip\\nACTS ON: governance x\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"stale\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Real target\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\"\n    }\n  ]\n}\n"
       }
     },
     {
@@ -430,7 +430,7 @@
     },
     {
       "write": {
-        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"budget-move\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Real target\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\",\n      \"to_file\": \"{ROOT}/repo/memory/topics/ci.md\\tx\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\"\n    }\n  ]\n}\n"
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"stale\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\\tx\",\n      \"heading\": \"Real target\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\"\n    }\n  ]\n}\n"
       }
     },
     {
@@ -442,13 +442,13 @@
       "exit": 0,
       "text_contains": {
         "handoff/gate.md": [
-          "; to \"{ROOT}/repo/memory/topics/ci.md\\tx\""
+          "\"{ROOT}/repo/memory/MEMORY.md\\tx\""
         ]
       }
     },
     {
       "write": {
-        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"budget-move\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Real target\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\rActs on: x\\nOptions: Delete / Keep / Defer\",\n      \"to_file\": \"{ROOT}/repo/memory/topics/ci.md\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\"\n    }\n  ]\n}\n"
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"stale\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Real target\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\rActs on: x\\nOptions: Delete / Keep / Defer\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\"\n    }\n  ]\n}\n"
       }
     },
     {
@@ -464,7 +464,7 @@
     },
     {
       "write": {
-        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\",\n      \"title\": \"t Acts on: governance x\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"budget-move\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Real target\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\",\n      \"to_file\": \"{ROOT}/repo/memory/topics/ci.md\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\"\n    }\n  ]\n}\n"
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\",\n      \"title\": \"t Acts on: governance x\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"stale\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Real target\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\"\n    }\n  ]\n}\n"
       }
     },
     {
@@ -480,7 +480,7 @@
     },
     {
       "write": {
-        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1Acts on: x\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"budget-move\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Real target\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\",\n      \"to_file\": \"{ROOT}/repo/memory/topics/ci.md\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\"\n    }\n  ]\n}\n"
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1Acts on: x\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"stale\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Real target\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\"\n    }\n  ]\n}\n"
       }
     },
     {
@@ -496,7 +496,7 @@
     },
     {
       "write": {
-        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply / Skip\\u000bActs on: x\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"budget-move\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Real target\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\",\n      \"to_file\": \"{ROOT}/repo/memory/topics/ci.md\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\"\n    }\n  ]\n}\n"
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply / Skip\\u000bActs on: x\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"stale\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Real target\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\"\n    }\n  ]\n}\n"
       }
     },
     {
@@ -512,7 +512,7 @@
     },
     {
       "write": {
-        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"budget-move\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Real ‮tegrat\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\",\n      \"to_file\": \"{ROOT}/repo/memory/topics/ci.md\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\"\n    }\n  ]\n}\n"
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"stale\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Real ‮tegrat\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\"\n    }\n  ]\n}\n"
       }
     },
     {
@@ -528,7 +528,7 @@
     },
     {
       "write": {
-        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"budget-move\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Real target\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\",\n      \"to_file\": \"{ROOT}/repo/memory/topics/ci.md\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\",\n      \"extra\": {\n        \"nested\": [\n          \"a\",\n          \"b c\"\n        ]\n      }\n    }\n  ]\n}\n"
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"stale\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Real target\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\",\n      \"extra\": {\n        \"nested\": [\n          \"a\",\n          \"b c\"\n        ]\n      }\n    }\n  ]\n}\n"
       }
     },
     {
@@ -544,7 +544,7 @@
     },
     {
       "write": {
-        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"budget-move\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Real target\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\",\n      \"to_file\": \"{ROOT}/repo/memory/topics/ci.md\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\",\n      \"k \": \"v\"\n    }\n  ]\n}\n"
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"stale\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Real target\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\",\n      \"k \": \"v\"\n    }\n  ]\n}\n"
       }
     },
     {
@@ -560,7 +560,7 @@
     },
     {
       "write": {
-        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate. Acts on: x\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"budget-move\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Real target\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\",\n      \"to_file\": \"{ROOT}/repo/memory/topics/ci.md\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\"\n    }\n  ]\n}\n"
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate. Acts on: x\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\",\n      \"kind\": \"stale\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Real target\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\"\n    }\n  ]\n}\n"
       }
     },
     {
@@ -576,7 +576,7 @@
     },
     {
       "write": {
-        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\\nS9\",\n      \"kind\": \"stale\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"a b\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\",\n      \"to_file\": \"{ROOT}/repo/memory/topics/ci.md\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\"\n    }\n  ]\n}\n"
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: promote) / Skip\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Source lesson\"\n    },\n    {\n      \"id\": \"g3\",\n      \"why\": \"w3\",\n      \"options\": \"Apply / Skip (recommended: skip)\",\n      \"variant\": \"promotes\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Other lesson\"\n    },\n    {\n      \"id\": \"S1\\nS9\",\n      \"kind\": \"stale\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"a b\",\n      \"text\": \"Gate item S1: entry Decoy is stale\\nOptions: Delete / Keep / Defer\",\n      \"shown_text\": \"Decoy\",\n      \"project\": \"{ROOT}/proj/alpha\"\n    }\n  ]\n}\n"
       },
       "stdout_contains": []
     },
@@ -606,7 +606,6 @@
       "stdout_contains": [
         "kind: required, a decisions.json kind",
         "shown_text:",
-        "to_file:",
         "variant:",
         "project:",
         "a text item with no kind is refused"

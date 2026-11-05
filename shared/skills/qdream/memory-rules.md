@@ -449,7 +449,7 @@ The **eight** live removal classes — the vocabulary the working map records, *
 | Removal class | Executes in |
 |---|---|
 | **demoted** — provenance auto-demotion (`§ Type Taxonomy`) | § SYN-STALE |
-| **pruned** — the autonomous Size check on a project or topic file (`§ Derived Utility & Pruning`), or the user's `Delete` on a user-tier budget proposal (`§ Session-start memory context budget`) | § SYN-WRITE (autonomous), or § APP-ADJUDICATE (user-gated via Phase 4b) |
+| **pruned** — the autonomous budget prune of any tier (`§ Derived Utility & Pruning`, `§ Session-start memory context budget`) | § APP-WRITE (autonomous) |
 | **stale-entry deletion** — type-verification failure (a *distinct* cause from demotion) | § SYN-STALE (autonomous, gated), or § APP-ADJUDICATE (user-gated via Phase 4b) |
 | **promotion-removal** — the source entry is deleted once an approved promotion lands | § APP-ADJUDICATE |
 | **`[improvement_signal]` promotion-removal** — a signal crossed the frequency gate and the user chose `Apply` on the resulting proposal; the entry is removed as that promotion lands (`§ [improvement_signal] sub-form`) | § APP-ADJUDICATE |
