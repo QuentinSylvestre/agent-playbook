@@ -88,8 +88,14 @@ Subcommands:
       equal to `after_heading` (or at the end of the file); a file absent
       at Orient must equal its single edit's `new_text`. Any other
       difference refuses the record (exit 3, the others still recorded).
+  queue --ops <handoff/ops/<f>.json> [--decisions <file> --decisions-sha <sha256>]
+      Validates an ops file against the file as earlier queued ops leave it and records it.
+      Writes no memory file. Phase agents use this, never memedit.
+  apply-all --decisions <handoff/decisions.json> --decisions-sha <sha256>
+      The one write call, from the main session (sweep-decide-apply.md § APP-WRITE): ledger,
+      queued ops, governance edits, prune, state apply, commit. A re-run skips what is done.
   state migrate
-  state ledger --inputs <handoff/<f>.json>
+  state ledger [--plan] --inputs <handoff/<f>.json>
   state apply --inputs <handoff/state-inputs.json>
               --decisions <handoff/decisions.json> --decisions-sha <sha256>
       migrate: the [ORI-STATE] v1/v2 -> v3 additive migration (a v3 file and
@@ -542,6 +548,12 @@ COMMITS = "sweep/commits.json"
 PUSH_PLAN = "sweep/push-plan.json"
 PUSH_RESULTS = "sweep/push-results.json"
 GENERATED = "sweep/ops-generated.json"
+QUEUE = "sweep/write-queue.json"
+PLANNED_MAP = "sweep/planned-map.json"
+SHADOW_DIR = "sweep/shadow"
+ENTRY_PIN = 30   # memory-rules.md § Derived Utility & Pruning: a project or topic file's budget
+USAGE_LINE_RE = re.compile(r"(?m)^\*\*Usage\*\*:\s*(\d+)")
+RECURRED_RE = re.compile(r"(?m)^\*\*Outcome\*\*: recurred ")
 SEED = "handoff/working-map-seed.json"
 
 REMOVAL_CLASSES = ("demoted", "pruned", "stale-entry deletion", "promotion-removal",
@@ -2090,28 +2102,41 @@ def load_ops(run, given):
     return ops
 
 
+def synth_items(run):
+    p = run.work / "sweep" / "synth.json"
+    if not p.is_file():
+        return []
+    return (ds.load_json(p) or {}).get("items") or []
+
+
+def confirmed_subsumption(run, heading):
+    """True when the latest aggregate holds a confirmed subsumed_entries verdict for the heading:
+    the verifier found the quote normative and the entry free of residue (§ SYN-GATE)."""
+    return any(i.get("class") == "subsumed_entries" and i.get("heading") == heading
+               and i.get("verdict") == "confirmed" for i in synth_items(run))
+
+
 def needs_decision(run, op, entry_body):
     """True when the op may be run only under a user decision. An autonomous
-    op touches a `human:`-attested entry only for the Size-check prune of a
-    project memory file and the `Outcome:` stamp, and never writes an
-    `Affirmed` or `Governance-conflict` line it did not find in the entry."""
+    op touches a `human:`-attested entry only for the `Outcome:` stamp, and
+    never writes an `Affirmed` or `Governance-conflict` line it did not find in
+    the entry. A subsumption removal runs autonomously only on a confirmed
+    verifier verdict for that heading."""
     if op["op"] == "declined_add":
         return True
     ho = _real(node_file(run))
     prune = False
     if op["op"] == "delete":
-        if op["class"] in USER_GATED_CLASSES or op["class"] == NODE_CLASS:
+        if op["class"] == "subsumption removal" and confirmed_subsumption(run, op.get("heading")):
+            pass
+        elif op["class"] in USER_GATED_CLASSES or op["class"] == NODE_CLASS:
             return True
         if _real(op["file"]) == ho:
-            return True
-        if op["class"] == "pruned" and ds.nk(op["file"]) == ds.nk(run.repo / "memory" /
-                                                                   "MEMORY.md"):
             return True
         # An entry holding an unresolved governance adjudication is never
         # removed without its user.
         if entry_body is not None and NONTERMINAL_RE.search(entry_body):
             return True
-        prune = op["class"] == "pruned" and not user_tier(run, op["file"])
     stamp = (op["op"] == "replace" and entry_body is not None
              and outcome_stamp_only(entry_body, op["text"]))
     # The two exemptions bypass only this refusal of a human-attested entry.
@@ -2495,8 +2520,12 @@ def plan_file(run, fops, applied, dec, dsha, over):
     """Validates every op of one file in memory -> the persist plan; OpError
     names the first op that fails (nothing is written to the file)."""
     path = fops[0]["file"]
-    exists = os.path.isfile(path)
-    data = open(path, "rb").read() if exists else None
+    if getattr(run, "queueing", False):
+        data = read_planned(run, path)
+        exists = data is not None
+    else:
+        exists = os.path.isfile(path)
+        data = open(path, "rb").read() if exists else None
     prior = [r for r in applied["ops"].values() if ds.nk(r.get("file", "")) == ds.nk(path)]
     first_touch = not prior
     foreign = any(r.get("foreign") for r in prior)
@@ -3090,7 +3119,7 @@ def _state(run, args):
             raise Precond("the state file is schema %d: run state migrate first" % v)
         res = append_ledger(obj, recs)
         new_n = sum(1 for _i, a in res if a)
-        if new_n:
+        if new_n and not args.plan:
             state_swap(run, "ledger", obj, style, raw)
         s.add("state ledger: %d appended, %d already present" % (new_n, len(res) - new_n))
         s.add("indices: %s" % ", ".join("#%d%s" % (i, "" if a else " (present)")
@@ -4189,9 +4218,16 @@ def bootstrap_file(run, project):
     return str(sdir / "memory" / "MEMORY.md") if kind == "store" else None
 
 
-def file_headings(path):
+def file_headings(path, run=None):
+    """The file as the queued ops leave it, when run is given."""
     try:
-        text = dm.read_text(path)
+        if run is not None:
+            data = read_planned(run, path)
+            if data is None:
+                return None, None
+            text = data.decode("utf-8", "replace")
+        else:
+            text = dm.read_text(path)
     except OSError:
         return None, None
     return text, [h for h, _b in dm.parse_entries(text)]
@@ -4277,7 +4313,7 @@ def cmd_ops(args, ctx):
         if isinstance(rec, dict) and rec.get("digest") == op_digest(o):
             ops.append(o)  # memedit already ran this very op: a re-run regenerates it
             continue
-        text, heads = file_headings(nat)
+        text, heads = file_headings(nat, run)
         if text is None:
             probs.append("item %d: %s is absent or unreadable: a first memory file is a create "
                          "op, not this generator's" % (n, nat))
@@ -4335,9 +4371,244 @@ def cmd_ops(args, ctx):
           % (rel, how, len(ops), sum(o["op"] == "insert" for o in ops),
              sum(o["op"] == "usage_bump" for o in ops)))
     s.add("ops sha256: %s" % hashlib.sha256(text.encode("utf-8")).hexdigest())
-    s.add("next: dream-write.py memedit --ops %s --snapshot-sha <sha>" % rel)
+    s.add("next: dream-write.py queue --ops %s --snapshot-sha <sha>" % rel)
     s.emit()
     return EXIT_OK
+
+
+# --------------------------------------------------------------------------
+# queue and apply-all: the single write point (sweep-decide-apply.md § APP-WRITE)
+# --------------------------------------------------------------------------
+
+def shadow_file(run, path):
+    return run.work / SHADOW_DIR / (hashlib.sha256(ds.nk(path).encode("utf-8")).hexdigest()[:32] + ".bin")
+
+
+def read_planned(run, path):
+    """A memory file as the queued ops leave it: its shadow, else the file. None when neither."""
+    sh = shadow_file(run, path)
+    if sh.is_file():
+        return sh.read_bytes()
+    return open(path, "rb").read() if os.path.isfile(path) else None
+
+
+def cmd_queue(args, ctx):
+    run = Run(ctx, args)
+    guard_check(run)
+    with write_lock(run):
+        return _queue(run, args)
+
+
+def _queue(run, args):
+    """Validates an ops file against the queued state and records it. No memory file is written."""
+    run.queueing = True
+    ops = load_ops(run, args.ops)
+    dec, dsha = load_decisions(run, args.decisions, args.decisions_sha, required=False)
+    q = load_rec(run, QUEUE, {"version": 1, "entries": [], "ids": {}})
+    label = ops_label(run, args.ops)
+    digests = {o["id"]: op_digest(o) for o in ops}
+    s = ds.Summary()
+    if any(e["ops"] == label for e in q["entries"]) and \
+            all(q["ids"].get(i) == d for i, d in digests.items()):
+        s.add("queue: %s is already queued; nothing changed" % label)
+        s.emit()
+        return EXIT_OK
+    clash = [i for i, d in digests.items() if i in q["ids"]]
+    if clash:
+        raise Precond("refused: op id(s) %s are already queued: a changed plan takes a new step id"
+                      % ", ".join(sorted(clash)[:5]))
+    files = {}
+    generated = load_rec(run, GENERATED, {"version": 1, "ops": {}})
+    for o in ops:
+        if dec is not None and o.get("decision_id") is None:
+            raise Precond("refused: with --decisions every op names a decision_id (op %s)" % o["id"])
+        kind, nat = check_target(run, o["file"])
+        if kind != "memory":
+            raise Precond("op %s: %s is not a memory file" % (o["id"], o["file"]))
+        o["file"] = nat
+        why = unbound_insert(run, o, generated) or unbound_create(run, o)
+        if why:
+            raise Precond("refused: " + why)
+        files.setdefault(ds.nk(nat), []).append(o)
+    run.ops_label = label
+    run.op_digests = digests
+    none = {"version": 1, "ops": {}}
+    over = decision_counts(run, dec, ops, none)
+    plans = {}
+    try:
+        for k, fops in files.items():
+            plans[k] = plan_file(run, fops, none, dec, dsha, over)
+    except OpError as e:
+        raise Precond("refused: %s; nothing queued" % e)
+    pm = load_rec(run, PLANNED_MAP, {"version": 1, "records": []})
+    (run.work / SHADOW_DIR).mkdir(parents=True, exist_ok=True)
+    for plan in plans.values():
+        for step in plan:
+            atomic_write(str(shadow_file(run, step["path"])), step["data"])
+            if step["map"] is not None:
+                pm["records"].append({"id": step["op"]["id"], "record": step["map"]})
+    save_rec(run, PLANNED_MAP, pm)
+    q["entries"].append({"ops": args.ops if os.path.isabs(args.ops) else str(args.ops), "label": label,
+                         "decisions": dec is not None})
+    q["ids"].update(digests)
+    save_rec(run, QUEUE, q)
+    s.add("queue: %s: %d op(s) over %d file(s) validated; no memory file written" % (label, len(ops), len(files)))
+    s.add("renames and removals planned: sweep/planned-map.json (%d record(s))" % len(pm["records"]))
+    s.emit()
+    return EXIT_OK
+
+
+def entry_value(e):
+    """Lower prunes first (memory-rules.md § Derived Utility & Pruning)."""
+    body = e["body"]
+    usage = USAGE_LINE_RE.search(body)
+    return (0 if RECURRED_RE.search(body) else 1,
+            int(usage.group(1)) if usage else 0,
+            dm.memory_entries().verified(body) or "",
+            0 if e.get("section") == "Feedback" else 1)
+
+
+def prune_candidates(run, path, cands):
+    """The entries of one file a prune may select."""
+    out = []
+    data = open(path, "rb").read()
+    doc = Doc(data)
+    c = doc.contents()
+    entries, _sections = walk(c)
+    for en in entries:
+        body = "\n".join(c[en["start"]:en["end"]])
+        if en["heading"].startswith(SIGNAL_PREFIX) or HUMAN_RE.search(body) or NONTERMINAL_RE.search(body) \
+                or en["heading"] in cands:
+            continue
+        out.append({"heading": en["heading"], "section": en.get("section"), "body": body})
+    return out, len(entries)
+
+
+def prune_plan(run):
+    """Delete ops for every tier over its budget, lowest utility first, only the over-budget amount.
+    User tier: MEMORY_BUDGET_WORDS over the config repo's MEMORY.md and HIGHER_ORDER.md. A project or
+    topic file: ENTRY_PIN entries, signals and excluded entries not counted."""
+    cands = {i.get("heading") for i in synth_items(run)
+             if i.get("class") in ("subsumed_entries", "stale_entries")}
+    ops, lines = [], []
+    user_md = run.repo / "memory" / "MEMORY.md"
+    words, pin, _note = dm.memory_budget(run.repo)
+    if words > pin and user_md.is_file():
+        over = words - pin
+        pool, _n = prune_candidates(run, str(user_md), cands)
+        for e in sorted(pool, key=entry_value):
+            if over <= 0:
+                break
+            over -= len(e["body"].split())
+            ops.append({"file": str(user_md), "heading": e["heading"]})
+        if over > 0:
+            lines.append("prune: user tier still %d words over its pin: no entry left to prune" % over)
+    disp = ds.load_sweep(run.work, ds.DISPATCH, "run dream-sweep.py dispatch first")
+    seen = set()
+    for a in disp.get("agents") or []:
+        mf = a.get("memory_file")
+        if not mf or ds.nk(mf) in seen or not os.path.isfile(mf) or ds.nk(mf) == ds.nk(user_md):
+            continue
+        seen.add(ds.nk(mf))
+        if os.path.basename(mf) == "improvement-signals.md":
+            continue
+        pool, _n = prune_candidates(run, mf, cands)
+        excess = len(pool) - ENTRY_PIN
+        for e in sorted(pool, key=entry_value)[:max(excess, 0)]:
+            ops.append({"file": mf, "heading": e["heading"]})
+    return ops, lines
+
+
+def cmd_apply_all(args, ctx):
+    run = Run(ctx, args)
+    guard_check(run)
+    common = ["--snapshot-sha", args.snapshot_sha]
+    if args.guard_digest:
+        common += ["--guard-digest", args.guard_digest]
+    dargs = ["--decisions", args.decisions, "--decisions-sha", args.decisions_sha]
+    q = load_rec(run, QUEUE, {"version": 1, "entries": [], "ids": {}})
+
+    def step(*argv):
+        rc = main(list(argv), ctx)
+        if rc != EXIT_OK:
+            raise Precond("apply-all stopped at `%s` (exit %d): nothing after it ran; fix it and "
+                          "run apply-all again, which skips the writes already done"
+                          % (" ".join(argv[:2]), rc))
+
+    syn = run.work / "handoff" / "steps" / "SYN-HIGHERORDER.json"
+    if syn.is_file() and read_state(run)[0] is not None and (ds.load_json(syn) or {}).get("records"):
+        step("state", "ledger", "--inputs", "handoff/steps/SYN-HIGHERORDER.json", *common)
+    for e in q["entries"]:
+        if not e["decisions"]:
+            step("memedit", "--ops", e["ops"], *common)
+    dec, dsha = load_decisions(run, args.decisions, args.decisions_sha)
+    for p in write_governance(run, dec):
+        step("hash", "--record", p, *dargs, *common)
+    for e in q["entries"]:
+        if e["decisions"]:
+            step("memedit", "--ops", e["ops"], *dargs, *common)
+    ops, lines = prune_plan(run)
+    for ln in lines:
+        print(ln)
+    if ops:
+        rel = "handoff/ops/app-prune.json"
+        put = [{"id": "app-prune-%03d" % n, "op": "delete", "file": o["file"], "heading": o["heading"],
+                "class": "pruned"} for n, o in enumerate(ops, 1)]
+        dest = run.work / rel
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write(str(dest), json.dumps({"ops": put}, ensure_ascii=False, indent=1).encode("utf-8"))
+        step("memedit", "--ops", rel, *common)
+        print("prune: %d entr(ies) removed, all named in %s" % (len(put), rel))
+    step("state", "apply", "--inputs", "handoff/state-inputs.json", *dargs, *common)
+    feeder = run.work / "sweep" / "feeder.json"
+    usage = (ds.load_json(feeder) or {}).get("usage_line") if feeder.is_file() else None
+    orient = load_inputs(run, "handoff/orient.json", "orient.json")
+    step("commit", "--repos", *(orient.get("repos") or [str(run.repo)]), "--usage-line",
+         usage or "Usage from plans: none", *dargs, *common)
+    print("apply-all: every write done; next dream-write.py push --plan")
+    return EXIT_OK
+
+
+def write_governance(run, dec):
+    """Writes every Applied governance edit, or none when any cannot be placed. -> native paths edited.
+    A file already holding its edits is left alone, so a re-run skips it."""
+    edits = applied_edits(run, dec)
+    paths = {}
+    for it in dec.get("items", []):
+        if isinstance(it.get("target_file"), str):
+            paths.setdefault(ds.nk(repo_path(run, it["target_file"])), str(repo_path(run, it["target_file"])))
+        for be in it.get("blast_edits") or []:
+            if isinstance(be, dict) and isinstance(be.get("path"), str):
+                paths.setdefault(ds.nk(repo_path(run, be["path"])), str(repo_path(run, be["path"])))
+    ok = ds.allowed_paths(run.work, run.man, run.repo)
+    planned = []
+    for key, mine in edits.items():
+        p = paths.get(key)
+        if p is None or not ok(p):
+            raise Precond("an Applied edit names a path outside the config repo and project roots: %s" % key)
+        try:
+            governance_check(run, p, edits)
+            planned.append((p, None))
+            continue
+        except OpError:
+            pass
+        bad = ds.gov_path_problem(p, gov_policy(run))
+        if bad:
+            raise Precond("refused: %s: its path %s" % (p, bad))
+        raw = open(p, "rb").read() if os.path.isfile(p) else None
+        bom = bool(raw) and raw.startswith(BOM)
+        try:
+            text = "" if raw is None else (raw[3:] if bom else raw).decode("utf-8")
+            new = mine[0]["new_text"] if raw is None else replay_edits(text, mine)
+        except (OpError, UnicodeDecodeError) as e:
+            raise Precond("refused: %s: %s; no governance file was written. Offer Skip item "
+                          "(sweep-handoff.md § Failure gate) and run apply-all again" % (p, e))
+        planned.append((p, (BOM if bom else b"") + new.encode("utf-8")))
+    for p, data in planned:
+        if data is not None:
+            os.makedirs(os.path.dirname(p), exist_ok=True)
+            atomic_write(p, data)
+    return [p for p, _d in planned]
 
 
 def parse_args(argv):
@@ -4361,6 +4632,7 @@ def parse_args(argv):
     p.add_argument("paths", nargs="+")
     p = sp.add_parser("state")
     p.add_argument("action", choices=["migrate", "apply", "ledger"])
+    p.add_argument("--plan", action="store_true")
     p.add_argument("--inputs")
     p.add_argument("--decisions")
     p.add_argument("--decisions-sha")
@@ -4378,9 +4650,16 @@ def parse_args(argv):
     p.add_argument("--push-plan-sha")
     p = sp.add_parser("ops")
     p.add_argument("--step", required=True)
+    p = sp.add_parser("queue")
+    p.add_argument("--ops", required=True)
+    p.add_argument("--decisions")
+    p.add_argument("--decisions-sha")
+    p = sp.add_parser("apply-all")
+    p.add_argument("--decisions", required=True)
+    p.add_argument("--decisions-sha", required=True)
     # Every write-side subcommand: the Orient snapshot's sha (required, D27;
     # missing is exit 3) and, after a guard --rebaseline, the new digest.
-    for name in ("memedit", "hash", "state", "commit", "push", "ops"):
+    for name in ("memedit", "hash", "state", "commit", "push", "ops", "queue", "apply-all"):
         sp.choices[name].add_argument("--snapshot-sha")
         sp.choices[name].add_argument("--guard-digest")
     args = ap.parse_args(argv)
@@ -4393,7 +4672,8 @@ def parse_args(argv):
 
 
 COMMANDS = {"memedit": cmd_memedit, "hash": cmd_hash, "state": cmd_state,
-            "commit": cmd_commit, "push": cmd_push, "ops": cmd_ops}
+            "commit": cmd_commit, "push": cmd_push, "ops": cmd_ops, "queue": cmd_queue,
+            "apply-all": cmd_apply_all}
 
 
 def main(argv=None, ctx=None):
@@ -4428,7 +4708,7 @@ REQUIRED_CASES = [
     "memedit-wrong-section", "memedit-declined-preserved", "memedit-bom-crlf",
     "memedit-path-refused", "memedit-symlink-refused", "memedit-usage-bump",
     "memedit-rerun-idempotent", "memedit-foreign-edit-marked", "memedit-credential-refused",
-    "memedit-seed-landed-only", "memedit-journal-store-backed", "store-first-write-unit", "memedit-store-first-write", "store-refusal-unit",
+    "memedit-seed-landed-only", "memedit-journal-store-backed", "store-first-write-unit", "memedit-store-first-write", "queue-then-memedit", "apply-all-end-to-end", "store-refusal-unit",
     "memedit-crash-at-each-step-rerun", "memedit-crash-mid-journal-flush",
     "memedit-unapproved-delete-refused",
     "memedit-human-attested-refused", "apply-resume-partial-two-items",
@@ -5317,6 +5597,42 @@ def _unit_ops_bootstrap(root, home, ctx):
     return fails
 
 
+def _unit_queue_then_memedit(root, home, ctx):
+    """The single write point: `queue` writes no memory file, a later queued op sees the earlier one,
+    a repeat is a no-op, a changed op under the same id is refused, and replaying the queue writes both."""
+    work = dm.expected_work(home)
+    stores = root / "stores"
+    dirty_path = work / "sweep" / "dirty-at-orient.json"
+    dirty = json.loads(dm.read_text(dirty_path))
+    target = next(Path(c) for c in dirty["candidates"] if ds.nk(Path(c).parent.parent.parent) == ds.nk(stores)
+                  and Path(c).name == "MEMORY.md" and dirty["candidates"][c].get("note") == "would-be")
+    snap = ds.sha256_file(dirty_path)
+    text = "## Feedback\n\n## Decision\n\n## Pattern\n\n## Declined\n"
+    (work / "handoff" / "ops").mkdir(parents=True, exist_ok=True)
+    (work / "handoff" / "ops" / "q1.json").write_text(json.dumps(
+        {"ops": [{"id": "q1", "op": "create", "file": str(target), "text": text}]}), encoding="utf-8")
+    fails = []
+    code, out, _e = _run_main(["queue", "--ops", "handoff/ops/q1.json", "--snapshot-sha", snap], ctx, {})
+    if code != EXIT_OK:
+        return ["queue exit %s: %s" % (code, out.strip()[:300])]
+    if target.exists():
+        fails.append("queue wrote the memory file")
+    if not json.loads(dm.read_text(work / QUEUE))["entries"]:
+        fails.append("queue recorded nothing")
+    code, out, _e = _run_main(["queue", "--ops", "handoff/ops/q1.json", "--snapshot-sha", snap], ctx, {})
+    if code != EXIT_OK or "already queued" not in out:
+        fails.append("a repeat is not a no-op: %s" % out.strip()[:200])
+    (work / "handoff" / "ops" / "q1b.json").write_text(json.dumps(
+        {"ops": [{"id": "q1", "op": "create", "file": str(target), "text": text + "x"}]}), encoding="utf-8")
+    code, out, _e = _run_main(["queue", "--ops", "handoff/ops/q1b.json", "--snapshot-sha", snap], ctx, {})
+    if code == EXIT_OK:
+        fails.append("a changed op under a queued id was accepted")
+    code, out, _e = _run_main(["memedit", "--ops", "handoff/ops/q1.json", "--snapshot-sha", snap], ctx, {})
+    if code != EXIT_OK or not target.is_file():
+        fails.append("the replay did not write the file: %s" % out.strip()[:200])
+    return fails
+
+
 def _unit_store_first_memedit(root, home, ctx):
     """plan 261016 Phase 5, end to end: a project the manifest names no memory file for gets one through
     `memedit`. The Orient snapshot bound the would-be file in the store repo (candidate_files via
@@ -6019,6 +6335,7 @@ UNITS = {
     "journal-replay": _unit_journal_replay,
     "store-first-write": _unit_store_first_write,
     "store-first-memedit": _unit_store_first_memedit,
+    "queue-then-memedit": _unit_queue_then_memedit,
     "ops-bootstrap": _unit_ops_bootstrap,
     "fallback-store-unreadable": _unit_fallback_store_unreadable,
     "no-store-repo-refused": _unit_no_store_repo_refused,

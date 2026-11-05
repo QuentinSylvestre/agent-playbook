@@ -99,10 +99,11 @@ Always loaded. Each line names the step that owns the full rule, so these hold e
 - **Leftover work folder**: shown to the user at Orient — resume the same snapshot, discard, or stop — never silently reused; only the scripts' guarded `clean` deletes it, and any Abort after the manifest ran runs it, except after a state-file or journal incident, when the folder and its backup are kept and the next Orient offers it as a leftover folder (`§ ORI-DISCOVER`, `§ APP-CLEAN`; `shared/AGENTS.md § Dream autonomy exception`).
 - **Stamp only what was read**: `last_analyzed` and `last_run` take the manifest's `snapshot_at`, never the end-of-sweep clock; `dream-sweep.py coverage` stamps a project only when its agents returned and read every normal session, never deferred-only ones (`§ APP-STATE`).
 - **Stale deletion needs all four conditions**: a count-verified `task4_status: checked`, a `confirmed` staleness verdict, no `human:` actor on the entry's `Verified`, and a real failing check quoted in `reason`. The gate covers salvage-rewrites as well as deletions. What happens otherwise is set by `§ SYN-STALE` conditions (a)-(d); an expiry-only item (d) is not surfaced as stale, except a user-memory `pattern` entry, whose expiry is its check.
-- **Never autonomous, whatever the verdict**: a stale item from user memory, or one whose heading is also in this sweep's `governance_conflicts`, is only ever surfaced at `§ DEC-GATE` (`§ SYN-STALE`).
-- **`subsumed` beats `stale`**: an entry returned in both channels is dispositioned as subsumed, user-gated, never autonomously deleted (`§ SYN-STALE`, `§ SYN-RECONCILE`).
+- **Never autonomous, whatever the verdict**: a stale item whose heading is also in this sweep's `governance_conflicts` is only ever surfaced at `§ DEC-GATE` (`§ SYN-STALE`).
+- **One write call**: phases and children write no memory, state or governance file; `§ APP-WRITE`'s `apply-all`, in the main session, does.
+- **`subsumed` beats `stale`**: an entry returned in both channels is dispositioned as subsumed, never as stale (`§ SYN-STALE`, `§ SYN-RECONCILE`).
 - **Pending governance conflict**: never autonomously delete or salvage-rewrite an entry carrying a non-terminal `Governance-conflict` record — surface it at `§ DEC-GATE` (`shared/skills/qdream/memory-rules.md § Governance-conflict adjudication`, `§ SYN-STALE`).
-- **No autonomous governance edit**: a governance file changes only on the user's explicit Apply, executed at `§ APP-ADJUDICATE` (Rule 1).
+- **No autonomous governance edit**: a governance file changes only on the user's explicit Apply, executed at `§ APP-WRITE` (Rule 1).
 - **Journal-first**: before any rename or removal recorded in the working map, `dream-write.py memedit` records it, flushes the whole map to `memory/.dream-journal.jsonl`, then mutates (`§ SYN-WRITE`). `§ ORI-RECOVER` consumes the journal; only `§ APP-STATE` clears it.
 
 ### Phase index

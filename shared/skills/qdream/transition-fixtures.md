@@ -137,10 +137,10 @@ MUST NOT: pruned
 
 A full sweep runs. The config repo's user memory is 500 words over the pin `MEMORY_BUDGET_WORDS` reports, per `dream-check.py budget`'s `memory` row. `memory/MEMORY.md` holds 40 entries, one `## Topics` row whose trigger is "editing a CI pipeline", and no `## Declined` rows. That topic file holds 12 entries. Entry R (300 words) is a `pattern` about CI caching, which that topic's trigger covers, and has no `Usage` line. Entry P (250 words) has `Usage: 0`, verifies, ranks first in the full prune order, and is the oldest `Verified` entry. Entry G carries `Governance-conflict: ... rule-update-pending`. `memory/HIGHER_ORDER.md` holds 6 nodes, one of them with no `Usage` line. The sweep did not analyze every project. Task 4 flagged nothing. The Size check runs. What does the sweep do to the user tier?
 
-VERDICT: route-first-no-delete
-MUST NOT: pruned
+VERDICT: autonomous-prune-over-budget
+MUST NOT: gate-item
 
-(The reader must derive: the user tier is a word pin with no autonomous prune. The sweep queues a routing proposal for R first (`Move / Keep / Defer`, showing the topic file's 12 entries), then prune proposals ranked by § Derived Utility & Pruning, starting with P with its `Usage` shown, as `Delete / Keep / Defer`, all for DEC-GATE. If any queued prune candidate lacked a `Usage` line, the prune batch would carry the header `Usage absent on <N> of <M> candidates; ranking is by age`; here P has one, and R is a routing proposal, not a prune candidate. R plus P would bring the tier under the pin, so no further prune proposal is queued, and R is not also a prune candidate. G is never a candidate (non-terminal conflict), though its words count. No HIGHER_ORDER.md node is ever proposed. Nothing is deleted without the user's `Delete`.)
+(The reader must derive: `apply-all` removes the 500-word excess autonomously, lowest utility first, naming each removal; the older text of this note described a gated route and no longer holds. The sweep queues a routing proposal for R first (`Move / Keep / Defer`, showing the topic file's 12 entries), then prune proposals ranked by § Derived Utility & Pruning, starting with P with its `Usage` shown, as `Delete / Keep / Defer`, all for DEC-GATE. If any queued prune candidate lacked a `Usage` line, the prune batch would carry the header `Usage absent on <N> of <M> candidates; ranking is by age`; here P has one, and R is a routing proposal, not a prune candidate. R plus P would bring the tier under the pin, so no further prune proposal is queued, and R is not also a prune candidate. G is never a candidate (non-terminal conflict), though its words count. No HIGHER_ORDER.md node is ever proposed. Nothing is deleted without the user's `Delete`.)
 
 ### FIX-BUDGET-project-unchanged [SYN-WRITE]
 
@@ -354,10 +354,10 @@ MUST NOT: autonomous-delete
 
 User memory's `memory_pass` is `periodic`, so the topic file `memory/topics/powershell.md` got a `Tasks 4-5 only` dispatch of its own. Its entry U (`**Verified**: 2026-06-01 (sweep, plan-check)`) is a `decision` entry. The agent found the config repo's `plans/done/260801_DROP_FOO.md` reversing the decision, returned U in stale_entries quoting that plan-slug, classified U `unrelated`, and returned task4_status: checked; the count-verify passes. The verifier opened the plan and returned staleness verdict: confirmed.
 
-VERDICT: surface-not-delete
-MUST NOT: autonomous-delete
+VERDICT: autonomous-delete
+MUST NOT: gate-item
 
-(The reader must derive: conditions (a)-(d) of § SYN-STALE all hold, which would license autonomous deletion in a project memory file. But a stale item from a user-memory entry is never deleted or salvage-rewritten autonomously, whatever its verdict — the orchestrator never deletes a user-memory entry on the agent's finding alone — so U is surfaced in § DEC-GATE as `Delete / Keep / Defer` with the reversing plan shown.)
+(The reader must derive: conditions (a)-(d) of § SYN-STALE all hold and the tier does not change that; the older text of this note said a stale item from a user-memory entry was never deleted autonomously — the orchestrator never deletes a user-memory entry on the agent's finding alone — so U is surfaced in § DEC-GATE as `Delete / Keep / Defer` with the reversing plan shown.)
 
 ### FIX-STALE-fresh-conflict [SYN-STALE]
 
