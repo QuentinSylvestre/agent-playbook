@@ -27,7 +27,7 @@ Every workspace keeps its memory and its project files in the **store repo**, a 
 
 The directory name is for people: `<name>` is the folder's basename and `<hex>` keeps it unique (at least 6 hex digits; the resolver extends it by 2 on a collision). **Nothing finds a store by its name**: the resolver reads `STORE` files. Never derive, hash or invent a store directory name, and never rename one.
 
-**Every store is a shared store.** The store repo is git-tracked as a whole, and every session and harness on every machine that syncs it writes there, so whether a store is shared or solely-owned is a property of the store repo, not of one directory. `§ Derived Utility & Pruning`'s shared-store asymmetry therefore applies to every store.
+**Every store is a shared store.** The store repo is git-tracked as a whole, and every session and harness on every machine that syncs it writes there, so whether a store is shared or solely-owned is a property of the store repo, not of one directory.
 
 **`visualizations/` is reserved.** The store repo ignores `*/visualizations/`. It holds generated content, not memory, so the prune criteria of `§ Derived Utility & Pruning` do not apply to it, and its retention belongs to the qvisualize project. The same holds for any other ignored subfolder inside a store.
 
@@ -814,7 +814,7 @@ Two rules, one per scope. Neither is grounds for an agent to refuse a proposal o
 - **The ratchet**: after a deliberate reduction, the pin may be lowered to min(current pin, ceil(measured words x 1.10)). Raising it needs the user's approval, recorded in the commit message.
 - **Over the pin** (full sweep): `dream-write.py apply-all` removes the over-budget amount autonomously, by `§ Derived Utility & Pruning`, and names each removal in the Report. `memory/HIGHER_ORDER.md` nodes count toward the words but are **never** prune candidates; a node's only removal path is its own `Keep node / Remove node / Defer` gate (`§ Higher-Order Tier`). To keep an entry through a prune, attest it with a `human:` `Verified` actor or move it to a topic file.
 
-**Project memory files and topic files — the entry advisory, unchanged.** Keep each project `memory/MEMORY.md` and each `memory/topics/<topic>.md` concise — aim for under ~30 entries. Past that, the `SYN-WRITE` Size check prunes lowest-value entries first, autonomously, ranked by the derived utility signal owned and defined in `§ Derived Utility & Pruning` (importance is derived, never rated at write time); shared-store asymmetry is defined there too. This is advisory, not a hard cap — 35 high-value verified entries beat a file pruned to 30 with content lost. These files are not counted toward the user-tier word pin.
+**Project memory files and topic files — the entry budget.** Keep each project `memory/MEMORY.md` and each `memory/topics/<topic>.md` concise. Past `ENTRY_PIN` entries, `apply-all` prunes the excess, lowest value first, by `§ Derived Utility & Pruning` (importance is derived, never rated at write time). These files are not counted toward the user-tier word pin.
 
 ### Restated-context trigger
 
