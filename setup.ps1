@@ -761,7 +761,7 @@ function New-StoreRepo {
     Write-Host "  CREATE: $Stores (a new local store repo; add a remote and push it to keep it)"
     New-DirIfMissing $Stores
     Invoke-Act "git init $Stores" { & git -C $Stores init -q }
-    Write-TextFile (Join-Path $Stores ".gitignore") "user/memory/.dream-journal.jsonl`n*/STORE.tmp-*`n*/visualizations/`n*/scratch/`n"
+    Write-TextFile (Join-Path $Stores ".gitignore") "user/memory/.dream-journal.jsonl`n*/STORE.tmp-*`n*/scratch/`n"
 }
 
 function Copy-StoreRepo {

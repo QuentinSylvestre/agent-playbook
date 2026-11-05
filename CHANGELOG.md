@@ -21,7 +21,7 @@ All notable changes to this project are recorded here. The format follows
 
 ### Fixed
 
-- A store repo created by setup now ignores `visualizations/` as well as `scratch/`.
+- A store repo created by setup now ignores `scratch/`, and no longer reserves `visualizations/`.
 
 ## [0.1.0] - 2026-11-01
 

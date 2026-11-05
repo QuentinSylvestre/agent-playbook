@@ -10,7 +10,7 @@ description: "Create interactive visualizations (D3 charts, maps, system and dat
 - Use a normal Markdown table when the user asks for a table; return it directly and do not create a visualization file.
 - Use Mermaid when labeled nodes and edges fully explain a static structure of about 8 nodes or fewer and auto-layout is acceptable; return a fenced Mermaid block and no visualization file. Use HTML for system and data-flow maps, dynamics, spatial motion, adjustable inputs, and other visuals.
 - On a map or explainer, take every name, path, key, route, status and command from code, a document, or command output read in this session, never from an earlier visualization. Suffix anything you did not check with a visible `(assumed)`.
-- Work silently until the final response. Never send commentary or progress updates while reading this skill, writing files, or running render.py. The final response must be your first user-facing message.
+- Send no chat text until the final response: no commentary or progress updates while reading this skill, writing files, or running render.py. The final response must be your first user-facing message. This covers chat text only: `emit_visualization` calls are how the user sees progress, so make them.
 - In user-facing prose, describe only what the visual helps the user see or decide. Never announce this skill, HTML, scripts, local files, or implementation details.
 
 ## Read the complete skill
@@ -33,7 +33,7 @@ Write only an HTML fragment: no `<!doctype>`, `<html>`, `<head>`, or `<body>`.
 - Keep visualizations under 1 MB. Aggregate, bin, or downsample large inline datasets.
 - Load external resources only from the CDN allowlist (below). Never use `fetch`, XHR, WebSocket, or other API calls inside the fragment.
 - Check that JavaScript has no undefined identifiers, every queried element exists, and the primary interaction updates the visual.
-- `emit_visualization` takes any absolute path to the rendered `.html` file, up to 16 MB. PowerAtlas keeps its own copy, so write the files where the user asked; emitting the same file name again updates the card in place.
+- `emit_visualization` takes any absolute path to the rendered `.html` file, up to 16 MB. PowerAtlas keeps its own copy, so write the files where step 1 says; emitting the same file again updates the card in place.
 
 ## CDN allowlist
 
@@ -59,18 +59,22 @@ Build in small steps. Each response has its own output limit that your reasoning
 
 `<python>` below is `"<config-repo>\.venv-agent-playbook\Scripts\python.exe" -I` (`<config-repo>`: `shared/AGENTS.md § Config Repo Locations`), the playbook's one interpreter. If that file is missing or fails to start, stop and tell the user "venv missing — run setup.ps1"; never use a Python from `PATH`.
 
-1. **Scaffold first, before any other reasoning.** Create the skeleton in the folder the user named, else in the session working directory:
+1. **Scaffold first, before any other reasoning.** Create the skeleton in the folder the user named. If the user named none, use the folder this prints, and fall back to the session working directory only if it fails:
    ```powershell
-   & <python> <config-repo>\shared\skills\qvisualize\scripts\render.py --scaffold chart.html --title "Concise title"
+   & <python> <config-repo>\shared\skills\qdream\scripts\store-resolver.py scratch "<session working directory>" <YYMMDD>-<topic>
    ```
-   It writes a small, valid fragment with marked places: `/* STEP:STYLES */`, `/* STEP:DATA */`, `/* STEP:RENDER */`, `/* STEP:CONTROLS */`.
-2. **Show the skeleton at once** (render and deliver as below), so the user sees progress.
+   `<topic>` takes only letters, digits, `.`, `_` and `-`. That folder is deleted after 30 days without changes. If the user asks to keep a file, move it to the store's `artifacts/`, or to a folder they name when there is no store. Then scaffold in the chosen folder, by absolute path, here and in every later command:
+   ```powershell
+   & <python> <config-repo>\shared\skills\qvisualize\scripts\render.py --scaffold "<folder>\chart.html" --title "Concise title"
+   ```
+   It writes a small, valid fragment with marked places: `/* STEP:STYLES */`, `/* STEP:DATA */`, `/* STEP:RENDER */`, `/* STEP:CONTROLS */`. It refuses to overwrite: on a second visualization the same day, use a new topic.
+2. **In PowerAtlas, show the skeleton at once**: render it and emit it as below, so the user sees progress within seconds. Skip step 6's screenshot check for this render. Use the same output file for every render: a different name makes a second card.
 3. **Fill the markers one at a time**, each a separate edit of at most about 6 KB that replaces one marker (keep the marker line's neighbours intact), in this order: data, render, controls, styles. Think only about the piece in hand. After each piece that changes what is visible, render and deliver again; in PowerAtlas the card updates in place. In the standalone branch, deliver only once, at the end.
 4. Read the file back once at the end to confirm no marker is left and the script is complete.
 5. **Check every fact in a command.** For each container, bucket, port, path, URL and table name in a probe card or label, find it in a file or command output read in this session. An earlier visualization or rendered page is never a source: its facts were generated, not checked, so confirm each one in code, a document, or command output. Suffix any you cannot find with `(assumed)`.
 6. Run render.py:
    ```powershell
-   & <python> <config-repo>\shared\skills\qvisualize\scripts\render.py chart.html chart-out.html
+   & <python> <config-repo>\shared\skills\qvisualize\scripts\render.py "<folder>\chart.html" "<folder>\chart-out.html"
    ```
    Before writing, it measures every static `<figure>` SVG in a headless browser. When the fragment has none (a D3 chart drawn by script), or render.py printed `layout check skipped`, take one browser screenshot of the output instead and check it for overlapping or clipped labels; fix and render again before delivering.
 7. **If render.py exits 3**, it lists each label that overlaps another, crosses a box or circle edge, or leaves the viewBox. Move those labels or widen those boxes, then render again; repeat until it exits 0. Never pass `--no-layout-check` unless the user asks for it. **On any other non-zero exit**, surface the full stderr to the user and stop. Do not proceed to the delivery branch.
@@ -85,7 +89,7 @@ Read your session id from the shell: `$env:KIRO_SESSION_ID` (starts with `sess_`
 emit_visualization(path="<absolute-path-to-chart-out.html>", title="<concise title ≤50 chars>", session_id="<value of $env:KIRO_SESSION_ID>")
 ```
 The visualization renders as an inline iframe card in the ACP transcript.
-If `emit_visualization` returns an MCP error, surface the error message to the user and fall back to `Start-Process <absolute-path-to-chart-out.html>` to open in the browser.
+If `emit_visualization` returns an MCP error, surface the error message to the user and fall back to `Start-Process <absolute-path-to-chart-out.html>` to open in the browser, then continue as the standalone branch: deliver only once more, at the end.
 
 If `$env:POWER_ATLAS_SESSION` is set but `emit_visualization` is not in your tool list, the PowerAtlas viz MCP server did not load. Open the file with the standalone branch and say in your final message that the inline card was unavailable, so the user can report it.
 

@@ -25,7 +25,7 @@ Store-repo FAIL checks (exit 1):
   2. No two STORE files share one identity (compared with the resolver's same_identity, so case-folded;
      the same remote with a different `path` line is a different identity).
   3. Reserved folder names exist only as SC-2 lists them. The reserved names are memory, plans,
-     explanations, artifacts, visualizations, scratch (a store's top level) and done, tests (inside plans/ only).
+     explanations, artifacts, scratch (a store's top level) and done, tests (inside plans/ only).
      A FAIL is: a reserved name as a directory at the store repo root; a reserved name inside a store that
      is a file, or is not spelled in lower case; done/ or tests/ directly in a store (they belong in
      plans/); plans/done or plans/tests that is a file.
@@ -88,7 +88,7 @@ SKILLS = HERE.parents[1]  # scripts -> qconfig-sync -> skills
 QDREAM_SCRIPTS = SKILLS / "qdream" / "scripts"
 DAY = 86400.0
 ORPHAN_DAYS = 90
-RESERVED_STORE_DIRS = ("memory", "plans", "explanations", "artifacts", "visualizations", "scratch")
+RESERVED_STORE_DIRS = ("memory", "plans", "explanations", "artifacts", "scratch")
 RESERVED_PLAN_DIRS = ("done", "tests")
 # What belongs directly under ~/.agent-playbook. Anything else is a folder an agent improvised.
 KNOWN_HOME_DIRS = ("stores", "scratch", "dream-work", "qmigrate-workspace")
@@ -1119,7 +1119,7 @@ def _selftest_stores(R, tmp, chk, skips):
     _store_text(base / "proj-abcdef", "remote example.com/org/proj\n")
     (base / "proj-abcdef" / "memory").mkdir()
     (base / "proj-abcdef" / "memory" / "MEMORY.md").write_text("# Project Memory\n", encoding="utf-8")
-    (base / ".gitignore").write_text("STORE.tmp-*\nvisualizations/\n", encoding="utf-8")
+    (base / ".gitignore").write_text("STORE.tmp-*\n", encoding="utf-8")
     _commit_all(base)
     origin = T / "origin.git"
     fixture_git(T, "init", "-q", "--bare", str(origin))
@@ -1305,7 +1305,6 @@ def _selftest_stores(R, tmp, chk, skips):
     (root / "proj-abcdef" / "plans" / "tests").mkdir()
     (root / "proj-abcdef" / "explanations").mkdir()
     (root / "proj-abcdef" / "artifacts").mkdir()
-    (root / "proj-abcdef" / "visualizations").mkdir()
     (root / "proj-abcdef" / "scratch").mkdir()
     (root / "proj-abcdef" / "notes").mkdir()
     rc, out, _e = go(root)

@@ -47,7 +47,7 @@ User instructions, skill processes, and steering files are BINDING — never ski
 A request to visualize, map or diagram a system, a pipeline, a data flow or data: load the `/qvisualize` skill before reading anything else, even when the user only mentions it or names an output folder.
 
 When `/qvisualize` produces a visualization HTML file via `render.py`:
-- If `emit_visualization` is available in your tool list: call it with the absolute file path, a concise title (≤ 50 chars), and your ACP session ID as `session_id`. Read the session ID from your shell: `$env:KIRO_SESSION_ID` (starts with `sess_`). The visualization renders as an inline iframe card in the PowerAtlas transcript.
+- If `emit_visualization` is available in your tool list: call it with the absolute file path, a concise title (≤ 50 chars), and your ACP session ID as `session_id`. Read the session ID from your shell: `$env:KIRO_SESSION_ID` (starts with `sess_`). The visualization renders as an inline iframe card in the PowerAtlas transcript. Call it right after the first render of the scaffold, again after each visible change, and when the page is final, using the same file each time; the card updates in place.
 - Otherwise: open the file in a browser — `Start-Process <path>` on Windows.
 
 ## Tone

@@ -22,7 +22,6 @@ Every workspace keeps its memory and its project files in the **store repo**, a 
     plans/tests/       # test plans
     explanations/      # optional: written by /qexplain
     artifacts/         # optional: files the user asked to keep
-    visualizations/    # reserved, git-ignored: /qvisualize output
     scratch/           # reserved, git-ignored: temporary playbook working files
 ```
 
@@ -30,7 +29,7 @@ The directory name is for people: `<name>` is the folder's basename and `<hex>` 
 
 **Every store is a shared store.** The store repo is git-tracked as a whole, and every session and harness on every machine that syncs it writes there, so whether a store is shared or solely-owned is a property of the store repo, not of one directory.
 
-**`visualizations/` is reserved.** The store repo ignores `*/visualizations/`. It holds generated content, not memory, so the prune criteria of `§ Derived Utility & Pruning` do not apply to it, and its retention belongs to the qvisualize project. The same holds for any other ignored subfolder inside a store.
+**Ignored subfolders.** The prune criteria of `§ Derived Utility & Pruning` do not apply to a git-ignored subfolder inside a store: it holds generated content, not memory.
 
 **Store content is stored LF-normalised.** The store repo's `.gitattributes` carries `* text=auto eol=lf`, so a CRLF source committed into a store cannot be stored byte-identically. A check that compares a store file with a copy elsewhere compares **content under CRLF-to-LF normalisation**, never raw bytes.
 
