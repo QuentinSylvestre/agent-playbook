@@ -2429,6 +2429,7 @@ HANDOFF_SCHEMAS = [
     (r"decision-[1-9][0-9]{0,3}\.json", {"answer": "str", "turn": "str"}),
     (r"working-map-seed\.json", {"pairs": "list"}),
     (r"harvest\.json", {"items": "list:obj"}),
+    (r"singletons\.json", {"rows": "list:obj"}),
     (r"drafts\.json", {"items": "list:obj"}),
     (r"gather\.json", {
         "projects": "obj", "failures": "list", "human_expiries": "list",
@@ -4261,11 +4262,9 @@ def cmd_singletons(args, ctx):
         if state.is_file() else []
     inp = Path(work) / "handoff" / "singletons.json"
     updates = json.loads(inp.read_text(encoding="utf-8")).get("rows") or [] if inp.is_file() else []
-    for n, u in enumerate(updates, 1):
-        if not (isinstance(u, dict) and isinstance(u.get("target"), str) and isinstance(u.get("gist"), str)
-                and (u.get("drop") or (isinstance(u.get("sessions"), list) and u["sessions"]))):
-            print("refused: singletons.json row %d needs target, gist and sessions (or drop)" % n)
-            return EXIT_PRECOND
+    for why in dm.singleton_row_problems(updates):
+        print("refused: singletons.json %s" % why)
+        return EXIT_PRECOND
     kept, promote, expired = dm.merge_singletons(rows, updates, man["snapshot_at"][:10])
     how = put(work, "sweep/singletons.json", dumps({"rows": kept, "promote": promote, "expired": expired}))
     print("singletons: %d row(s), %d at the promotion count, %d expired" % (len(kept), len(promote), expired))

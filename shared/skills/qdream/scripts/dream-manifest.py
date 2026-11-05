@@ -3907,6 +3907,16 @@ def session_tokens(session):
     return sum(by_role.values()), by_role, None
 
 
+def singleton_row_problems(rows):
+    """-> [problem, ...] for handoff/singletons.json rows."""
+    out = []
+    for n, u in enumerate(rows, 1):
+        if not (isinstance(u, dict) and isinstance(u.get("target"), str) and isinstance(u.get("gist"), str)
+                and (u.get("drop") or (isinstance(u.get("sessions"), list) and u["sessions"]))):
+            out.append("row %d needs target, gist and sessions (or drop)" % n)
+    return out
+
+
 def merge_singletons(rows, updates, today):
     """memory-rules.md § Singleton ledger. rows: the state file's ledger; updates: {target, gist,
     sessions[, drop]} (target and gist equal to a row's to re-observe it; `drop` removes a row
