@@ -1269,10 +1269,17 @@ def render(header, recs, boundary, preface=None, skip=()):
 
 DIGEST_USER_CHARS = 1500       # one user turn kept in a session digest
 DIGEST_ASSISTANT_CHARS = 600   # the assistant text kept before each user turn
+DIGEST_PROPOSAL_CHARS = 4000   # the same, when it proposes a memory save: the reader needs the heading
+DIGEST_PROPOSAL_RE = re.compile(r"\[improvement_signal\]|Save / Skip")
 
 
 def _clip_head(text, limit):
     return text if len(text) <= limit else text[:limit] + " [... %d chars cut]" % (len(text) - limit)
+
+
+def _assistant_tail(text):
+    return _clip_tail(text, DIGEST_PROPOSAL_CHARS if DIGEST_PROPOSAL_RE.search(text)
+                      else DIGEST_ASSISTANT_CHARS)
 
 
 def _clip_tail(text, limit):
@@ -1297,11 +1304,11 @@ def render_digest(header, recs, boundary, skip=()):
         if not placed or ln in skip:
             continue
         if tail is not None:
-            out.append("L%d [assistant] %s" % (tail[0], _clip_tail(tail[1], DIGEST_ASSISTANT_CHARS)))
+            out.append("L%d [assistant] %s" % (tail[0], _assistant_tail(tail[1])))
             tail = None
         out.append("L%d [%s] %s" % (ln, role, _clip_head(text, DIGEST_USER_CHARS)))
     if placed and tail is not None:
-        out.append("L%d [assistant] %s" % (tail[0], _clip_tail(tail[1], DIGEST_ASSISTANT_CHARS)))
+        out.append("L%d [assistant] %s" % (tail[0], _assistant_tail(tail[1])))
     return "\n".join(out) + "\n"
 
 
@@ -2898,6 +2905,7 @@ class Run:
                 while s["stripped"][:-4] + "-%d.txt" % n in used:
                     n += 1
                 s["stripped"] = s["stripped"][:-4] + "-%d.txt" % n
+                s["digest"] = s["stripped"][:-4] + ".digest.txt"
             used.add(s["stripped"])
             p.sessions.append(s)
         # History-only sessions (bridge / cloud): prompt text only.
@@ -2997,13 +3005,17 @@ class Run:
         # "no-session-id" groups) in two files.
         ph = hashlib.sha256(norm_key(project_path).encode("utf-8")).hexdigest()[:8]
         times = [r[3] for r in recs if r[3] is not None]
+        digest = render_digest(header + ["# digest: the user's turns and the assistant text before each, cuts "
+                                         "marked; L numbers index the stripped file"], recs, boundary, skip)
         return {"id": sid, "provider": provider, "source": str(source),
                 "first_activity": iso(min(times)) if times else None,
                 "stripped": "sessions/%s-%s-%s%s.txt" % (provider, safe, ph,
                                                         "-history" if kind == "history_only" else ""),
-                "bytes": len(text.encode("utf-8")),
+                "digest": "sessions/%s-%s-%s%s.digest.txt" % (provider, safe, ph,
+                                                              "-history" if kind == "history_only" else ""),
+                "bytes": len(text.encode("utf-8")), "digest_bytes": len(digest.encode("utf-8")),
                 "boundary": boundary if boundary == "unknown" else "L%d" % boundary,
-                "kind": kind, "_text": text}
+                "kind": kind, "_text": text, "_digest": digest}
 
     def art(self, p, kind):
         """The store resolver's read of one artifact class of project `p` (plan 261016): the first
@@ -3466,13 +3478,15 @@ def cmd_manifest(args, ctx):
     for path, proj in manifest["projects"].items():
         for s in proj["sessions"]:
             text = s.pop("_text")
+            digest = s.pop("_digest")
             try:
                 write_in_work(work, s["stripped"], text)
+                write_in_work(work, s["digest"], digest)
             except FileExistsError:
                 manifest["errors"].append("refused to write %s twice (session %s of %s); "
                                           "this session's stripped text is missing"
                                           % (s["stripped"], s["id"], path))
-                s["stripped"] = None
+                s["stripped"] = s["digest"] = None
                 continue
             total_bytes += s["bytes"]
         kinds = [s["kind"] for s in proj["sessions"]]
@@ -4615,6 +4629,8 @@ def _run_case(case_dir, scratch):
                 except (OSError, TypeError):
                     fails.append("stripped file missing for %s" % sid)
                     continue
+                if not s.get("digest") or not (work / s["digest"]).is_file():
+                    fails.append("digest file missing for %s" % sid)
                 for c in checks.get("contains", []):
                     if c not in txt:
                         fails.append("%s stripped lacks %r" % (sid, c))
@@ -4910,6 +4926,10 @@ def _unit_digest(root, home):
             (4, "assistant", "last", None), (5, "user", "second", None), (6, "assistant", "end", None)]
     text = render_digest(["# h"], recs, 2)
     fails = []
+    long_save = "x" * 3000 + " [improvement_signal] heading"
+    kept = render_digest(["# h"], [(1, "assistant", long_save, None), (2, "user", "save", None)], 1)
+    if "x" * 3000 not in kept:
+        fails.append("a memory-save proposal before a user turn was cut to the plain limit")
     want = ["L1 [assistant] [", "L2 [user] " + "U" * DIGEST_USER_CHARS + " [... 500 chars cut]",
             "L4 [assistant] last", "L5 [user] second", "L6 [assistant] end"]
     for w in want:

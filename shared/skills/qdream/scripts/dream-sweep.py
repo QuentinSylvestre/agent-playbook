@@ -43,7 +43,7 @@ Subcommands:
       (projects, then user-memory files). memory_pass, quiet_sweeps and the
       flags are the manifest's own (dream-manifest.py memory_cadence); this
       script only applies the scope rules. A project whose listed sessions
-      exceed --chunk-bytes stripped bytes is split: one `Tasks 4-5 only`
+      exceed --chunk-bytes digest bytes is split: one `Tasks 4-5 only`
       agent (when it has a memory file) and N `sessions only` agents, sessions
       packed greedily in manifest order, a session over the budget alone in
       its chunk; the plan-archive task goes to chunk 1 (`plans_task`).
@@ -3091,7 +3091,7 @@ def entry_flags(entries, file=None):
 def chunk_sessions(sessions, budget):
     chunks, cur, size = [], [], 0
     for s in sessions:
-        b = int(s.get("bytes") or 0)
+        b = int(s.get("digest_bytes") or s.get("bytes") or 0)
         if cur and size + b > budget:
             chunks.append(cur)
             cur, size = [], 0
@@ -3104,7 +3104,8 @@ def chunk_sessions(sessions, budget):
 
 def session_input(work, s):
     st = s.get("stripped")
-    return {"id": s.get("id"), "provider": s.get("provider"), "kind": s.get("kind"),
+    dg = s.get("digest")
+    return {"digest": native(Path(work) / dg) if dg else None, "id": s.get("id"), "provider": s.get("provider"), "kind": s.get("kind"),
             "boundary": s.get("boundary"), "source": s.get("source"),
             "stripped": native(Path(work) / st) if st else None, "bytes": s.get("bytes")}
 
@@ -3154,7 +3155,7 @@ def build_dispatch(work, man, orient, repo, budget):
         if p.get("status") == "removed":
             quiet.append({"project": path, "reason": "removed"})
             continue
-        total = sum(int(s.get("bytes") or 0) for s in sessions)
+        total = sum(int(s.get("digest_bytes") or s.get("bytes") or 0) for s in sessions)
         if sessions or new_plans:
             if sessions and total > budget:
                 if mf and not unreadable_memory(base["errors"], mf):
