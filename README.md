@@ -73,7 +73,8 @@ agent-playbook/ (this repo, public)         ~/.agent-playbook/
   providers/<name>/ ──linked or rendered──► provider-specific config
   memory ───────────linked──► stores/user/memory/        stores/   (your private store repo)
                                                            user/memory/       your user memory
-                                                           <workspace>-<id>/  per-project memory, plans
+                                                           <workspace>-<id>/  per-project memory, plans,
+                                                                              gitignored scratch/
                                                          config    (pointer file: root=, stores=)
 ```
 

@@ -378,7 +378,9 @@ def uncommitted_and_unpushed(root, rep, now):
             old.append((rel, age))
     shown = 20
     for rel, age in old[:shown]:
-        if rel.split("/")[1:2] == ["artifacts"]:
+        if rel.split("/")[1:2] == ["scratch"]:
+            rep.warning("stores-repo  uncommitted for over a day (%s): %s -- a scratch folder Git does not ignore: add */scratch/ to the store repo's .gitignore, never commit it" % (_human(age), rel))
+        elif rel.split("/")[1:2] == ["artifacts"]:
             rep.warning("stores-repo  uncommitted for over a day (%s): %s -- move it to the store's scratch/, or ask the user whether to keep it" % (_human(age), rel))
         else:
             rep.warning("stores-repo  uncommitted for over a day (%s): %s -- run /qconfig-sync Step 2b to commit it" % (_human(age), rel))
@@ -415,6 +417,8 @@ def uncommitted_and_unpushed(root, rep, now):
 def improvised_home_dirs(R, rep, home=None):
     """WARN on a folder directly under ~/.agent-playbook that nothing owns. Read-only."""
     home = home if home is not None else os.path.dirname(R.config_path())
+    if os.path.basename(home) != ".agent-playbook":
+        return  # the pointer file was moved elsewhere (AGENT_PLAYBOOK_CONFIG): that folder is not the playbook's
     try:
         names = sorted(os.listdir(home))
     except OSError:
@@ -1313,7 +1317,7 @@ def _selftest_stores(R, tmp, chk, skips):
     (root / "proj-abcdef" / "scratch").unlink()
 
     # --- an improvised folder under ~/.agent-playbook warns and is left alone ---
-    home_dir = T / "pb-home"
+    home_dir = T / "pb-home" / ".agent-playbook"
     (home_dir / "p17").mkdir(parents=True)
     for known in KNOWN_HOME_DIRS + ("dream-work.deleting-1-ab", "verify-citations-selftest-x", ".hidden"):
         (home_dir / known).mkdir()
@@ -1364,6 +1368,15 @@ def _selftest_stores(R, tmp, chk, skips):
     chk("an uncommitted artifact is told to move to scratch, not to commit", rc == 0 and len(art_lines) == 1
         and "move it to the store's scratch/" in art_lines[0] and "to commit it" not in art_lines[0], repr(out))
     chk("any other uncommitted path is still told to commit", len(mem_lines) == 1 and "to commit it" in mem_lines[0], repr(out))
+    root = clone()
+    (root / "proj-abcdef" / "scratch").mkdir()
+    f = root / "proj-abcdef" / "scratch" / "probe.txt"
+    f.write_text("n\n", encoding="utf-8")
+    _backdate(f, 25 * 3600)
+    rc, out, _e = go(root)
+    scr_lines = [ln for ln in out if "scratch/probe.txt" in ln]
+    chk("an unignored scratch folder is told to fix the ignore file, not to commit", rc == 0 and len(scr_lines) == 1
+        and "add */scratch/" in scr_lines[0] and "to commit it" not in scr_lines[0], repr(out))
     root = clone()
     f = root / "proj-abcdef" / "memory" / "MEMORY.md"
     f.write_text("# Project Memory\nedited\n", encoding="utf-8")

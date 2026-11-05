@@ -68,6 +68,8 @@ So: (a) on a root start the project memory is usually already in context (from a
 
 A workspace keeps its memory and its project files in the store repo (`~/.agent-playbook/stores`) instead of in the workspace; the store resolver finds it, or creates it, from the folder. The layout and the resolution contract are defined in `shared/skills/qdream/memory-rules.md § Workspace Store`. This section covers only how a Kiro session is told where that store is.
 
+Kiro has no documented session scratchpad, so temporary files always go in the store scratch folder (`shared/skills/qdream/memory-rules.md § Store scratch folder`).
+
 **The wiring is one mechanism in two parts**, both under `<workspace>/.kiro/steering/` and both written by `/qwire-governance` Step 3b. `kiro_default` loads `file://.kiro/steering/**/*.md` **workspace-relative**, so anything in that directory reaches the model on a **root start**, with no agent to select, no resource list to copy and nothing to keep in step with `kiro_default`. From a subfolder start nothing in it loads — see the tier paragraph under `## Agent Definition (v3)` above.
 
 | Part | Artifact | Covers | Loading |

@@ -16,7 +16,7 @@ Hand a task to a kiro-cli agent, keep its transcript out of your context, and st
 
 **When NOT to use**: a task whose next step depends on the user's answer (the delegate cannot reach the user); a review, design call or anything else you would have to judge yourself; work needing a secret in the prompt; a task smaller than writing its brief.
 
-`<python>` below is `<config-repo>\.venv-agent-playbook\Scripts\python.exe -I` (`shared/AGENTS.md § Config Repo Locations`); `<scripts>` is this skill's `scripts/` folder as an absolute path; `<work>` is a fresh folder in your scratch space, one per delegation.
+`<python>` below is `<config-repo>\.venv-agent-playbook\Scripts\python.exe -I` (`shared/AGENTS.md § Config Repo Locations`); `<scripts>` is this skill's `scripts/` folder as an absolute path; `<work>` is a fresh folder in the session scratchpad or the store scratch folder (`shared/skills/qdream/memory-rules.md § Store scratch folder`), one per delegation.
 
 ## Process
 

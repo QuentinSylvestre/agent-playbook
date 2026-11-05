@@ -1910,7 +1910,7 @@ def _run_selftest() -> int:
         os.environ["AGENT_PLAYBOOK_STORES"] = str(w.stores)
         sc_repo = w.repo(w.area("scproj") / "r", url="https://github.com/o/scproj.git")
         rs = scratch_folder(sc_repo, "260101-probe")
-        chk("scratch:creates-the-store-and-the-folder", rs.status == "found" and rs.path.is_dir()
+        chk("scratch:creates-the-store-and-the-folder", rs.status == "created" and rs.path.is_dir()
             and rs.path.parent.name == SCRATCH_DIR and (rs.path.parent.parent / STORE_FILE).is_file(), repr(rs))
         sc_store = rs.path.parent.parent
         chk("scratch:same-name-is-the-same-folder", scratch_folder(sc_repo, "260101-probe").path == rs.path)
@@ -2015,6 +2015,236 @@ def _run_selftest() -> int:
             rc_sc = main(["scratch-clean"])
         chk("scratch-clean:cli-reports-the-deletion", rc_sc == 0 and "DELETED\t" in out_sc.getvalue()
             and "260101-cli" in out_sc.getvalue(), out_sc.getvalue())
+        # --- every refusal of the delete path, one case each ---
+        ref_now = time.time()
+        for odd in ("foo\n", "CON", "nul.txt", "LPT1"):
+            chk("scratch:refuses-name:%r" % odd, scratch_folder(sc_repo, odd).status == "failed", repr(odd))
+        fresh_repo = w.repo(w.area("scfresh") / "r", url="https://github.com/o/scfresh.git")
+        chk("scratch:reports-a-newly-created-store", scratch_folder(fresh_repo, "n").status == "created")
+        reuse = scratch_folder(sc_repo, "260101-reused").path
+        os.utime(str(reuse), (ref_now - 40 * 86400, ref_now - 40 * 86400))
+        scratch_folder(sc_repo, "260101-reused")
+        chk("scratch:reusing-a-folder-refreshes-its-time", time.time() - os.stat(str(reuse)).st_mtime < 3600)
+
+        # A junction as an entry, and a junction inside an entry: never measured through, never followed.
+        busy = w.area("busy")
+        (busy / "big.txt").write_text("y" * 4096, encoding="utf-8")
+        if os.name == "nt":
+            import subprocess
+            mk = lambda link, tgt: subprocess.run(["cmd", "/c", "mklink", "/J", str(link), str(tgt)],
+                                                  stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode == 0
+            top_j = sc_root / "260101-top-junction"
+            if mk(top_j, busy):
+                rows_t = scratch_clean(now=ref_now + 40 * 86400)
+                row_t = [r for r in rows_t if os.path.basename(r[1]) == "260101-top-junction"]
+                chk("scratch-clean:a-junction-entry-is-refused", row_t and row_t[0][0] == "FAILED"
+                    and (busy / "big.txt").is_file() and os.path.lexists(str(top_j)), repr(rows_t))
+                os.rmdir(str(top_j))
+            else:
+                skip("scratch-clean:a-junction-entry-is-refused", "no junction on this system")
+            has_j = sc_make(sc_root, "260101-measured", 1, ref_now)
+            if mk(has_j / "j", busy):
+                newest_j, size_j = _scratch_measure(has_j)
+                chk("scratch-measure:does-not-count-through-a-junction", size_j == 2048, repr(size_j))
+                real_scandir = os.scandir
+                seen_j = []
+
+                def spying_scandir(p):
+                    seen_j.append(str(p))
+                    return real_scandir(p)
+                os.scandir = spying_scandir
+                try:
+                    _scratch_measure(has_j)
+                finally:
+                    os.scandir = real_scandir
+                chk("scratch-measure:never-enters-a-junction", not [p for p in seen_j if p.endswith(os.sep + "j")], repr(seen_j))
+                os.rmdir(str(has_j / "j"))
+            else:
+                skip("scratch-measure:does-not-count-through-a-junction", "no junction on this system")
+
+        # An unreadable subfolder: the age is unknown, so nothing is deleted and the row says so.
+        unread = sc_make(sc_root, "260101-unreadable", 40, ref_now)
+        real_scandir = os.scandir
+
+        def denying_scandir(p):
+            if str(p).endswith("sub"):
+                raise PermissionError(13, "denied (selftest)")
+            return real_scandir(p)
+        os.scandir = denying_scandir
+        try:
+            rows_u = scratch_clean(now=ref_now)
+        finally:
+            os.scandir = real_scandir
+        row_u = [r for r in rows_u if os.path.basename(r[1]) == "260101-unreadable"]
+        chk("scratch-clean:an-unreadable-subfolder-fails-closed", unread.is_dir() and (unread / "sub" / "f.txt").is_file()
+            and row_u and row_u[0][0] == "FAILED", repr(rows_u))
+        # The same failure must not stop the entries after it, in this root or in the next.
+        later = sc_make(sc_root, "260101-unreadable2", 40, ref_now)
+        later_shared = sc_make(shared_scratch_root(), "260101-after-failure", 40, ref_now)
+        os.scandir = lambda p: (_ for _ in ()).throw(PermissionError(13, "denied (selftest)")) if str(p).endswith(os.sep + "260101-unreadable" + os.sep + "sub") else real_scandir(p)
+        try:
+            rows_u = scratch_clean(now=ref_now)
+        finally:
+            os.scandir = real_scandir
+        chk("scratch-clean:one-failure-does-not-stop-the-sweep", not later.exists() and not later_shared.exists()
+            and unread.is_dir(), repr(rows_u))
+        import shutil as _sc_shutil
+        _sc_shutil.rmtree(str(unread))
+
+        # A plans/ the sweep cannot read: cannot tell means left in place.
+        plan_unknown = sc_make(sc_root, "260101_UNKNOWN_PLAN", 40, ref_now)
+        real_stat = os.stat
+
+        def denying_stat(p, *a, **k):
+            if str(p).endswith("260101_UNKNOWN_PLAN.md"):
+                raise PermissionError(13, "denied (selftest)")
+            return real_stat(p, *a, **k)
+        os.stat = denying_stat
+        try:
+            rows_p = scratch_clean(now=ref_now)
+        finally:
+            os.stat = real_stat
+        row_p = [r for r in rows_p if os.path.basename(r[1]) == "260101_UNKNOWN_PLAN"]
+        chk("scratch-clean:an-unreadable-plan-check-keeps-the-folder", plan_unknown.is_dir() and row_p and row_p[0][0] == "FAILED", repr(rows_p))
+        _sc_shutil.rmtree(str(plan_unknown))
+
+        # A rename that fails leaves the entry whole; a delete that fails leaves one named leftover.
+        no_rename = sc_make(sc_root, "260101-no-rename", 40, ref_now)
+        real_rename = os.rename
+
+        def failing_rename(a, b):
+            if "260101-no-rename" in str(a):
+                raise PermissionError(32, "in use (selftest)")
+            return real_rename(a, b)
+        os.rename = failing_rename
+        try:
+            rows_r = scratch_clean(now=ref_now)
+        finally:
+            os.rename = real_rename
+        row_r = [r for r in rows_r if os.path.basename(r[1]) == "260101-no-rename"]
+        chk("scratch-clean:a-failed-rename-leaves-it-whole", (no_rename / "sub" / "f.txt").is_file() and row_r and row_r[0][0] == "FAILED"
+            and "in use" in row_r[0][4], repr(rows_r))
+        _sc_shutil.rmtree(str(no_rename))
+        no_delete = sc_make(sc_root, "260101-no-delete", 40, ref_now)
+        real_rmtree = _sc_shutil.rmtree
+
+        def failing_rmtree(*a, **k):
+            raise OSError(5, "cannot delete (selftest)")
+        _sc_shutil.rmtree = failing_rmtree
+        try:
+            rows_d = scratch_clean(now=ref_now)
+        finally:
+            _sc_shutil.rmtree = real_rmtree
+        row_d = [r for r in rows_d if os.path.basename(r[1]) == "260101-no-delete"]
+        left = [n for n in os.listdir(str(sc_root)) if n.startswith(".deleting-")]
+        chk("scratch-clean:a-failed-delete-names-its-leftover", row_d and row_d[0][0] == "FAILED" and len(left) == 1
+            and left[0] in row_d[0][4], repr(rows_d))
+        # A leftover with recent activity may be another sweep's delete: reported. An old one is retried and goes.
+        os.utime(str(sc_root / left[0]))
+        rows_l = scratch_clean(now=time.time())
+        chk("scratch-clean:a-recent-leftover-is-reported", any(os.path.basename(r[1]) == left[0] and r[0] == "FAILED" for r in rows_l), repr(rows_l))
+        rows_l = scratch_clean(now=time.time() + 2 * 86400)
+        chk("scratch-clean:an-old-leftover-is-retried", not os.path.lexists(str(sc_root / left[0])), repr(rows_l))
+
+        # A read-only file directly under a scratch root.
+        ro_file = sc_root / "260101-stray.txt"
+        ro_file.write_text("x\n", encoding="utf-8")
+        os.chmod(str(ro_file), stat.S_IREAD)
+        os.utime(str(ro_file), (ref_now - 40 * 86400, ref_now - 40 * 86400))
+        rows_f = scratch_clean(now=ref_now)
+        chk("scratch-clean:a-read-only-stray-file-goes", not ro_file.exists() and not [r for r in rows_f if r[0] == "FAILED"], repr(rows_f))
+
+        # The error hook never reaches through a link.
+        hook_target = w.area("hooktarget") / "t.txt"
+        hook_target.write_text("x\n", encoding="utf-8")
+        os.chmod(str(hook_target), stat.S_IREAD)
+        hook_link = w.area("hooklink") / "l"
+        try:
+            os.symlink(str(hook_target), str(hook_link))
+            raised = False
+            try:
+                _scratch_clear_and_retry(os.unlink, str(hook_link), PermissionError(13, "selftest"))
+            except PermissionError:
+                raised = True
+            chk("scratch-hook:a-link-is-not-chmodded", raised and not os.access(str(hook_target), os.W_OK) and os.path.lexists(str(hook_link)))
+            os.unlink(str(hook_link))
+        except (OSError, NotImplementedError):
+            skip("scratch-hook:a-link-is-not-chmodded", "this user cannot create a symlink")
+        os.chmod(str(hook_target), stat.S_IWRITE)
+        raised = False
+        try:
+            _scratch_clear_and_retry(os.open, str(hook_target), TypeError("selftest"))
+        except TypeError:
+            raised = True
+        chk("scratch-hook:only-delete-calls-are-retried", raised)
+
+        # A scratch root that is a link, or not a folder; a scan that fails; an invalid store.
+        link_store = w.store("linkroot-abcdef", "remote example.com/o/linkroot\n")
+        target_root = w.area("rootlink-target")
+        sc_make(target_root, "260101-behind-a-link", 40, ref_now)
+        try:
+            os.symlink(str(target_root), str(link_store / SCRATCH_DIR), target_is_directory=True)
+            rows_rl = scratch_clean(now=ref_now)
+            chk("scratch-clean:a-root-that-is-a-link-is-refused", (target_root / "260101-behind-a-link").is_dir()
+                and any(r[0] == "FAILED" and r[1] == str(link_store / SCRATCH_DIR) for r in rows_rl), repr(rows_rl))
+            chk("scratch:a-root-that-is-a-link-is-refused", _scratch_root_problem(link_store / SCRATCH_DIR) is not None)
+            os.unlink(str(link_store / SCRATCH_DIR))
+        except (OSError, NotImplementedError):
+            skip("scratch-clean:a-root-that-is-a-link-is-refused", "this user cannot create a symlink")
+        (link_store / SCRATCH_DIR).write_text("a file\n", encoding="utf-8")
+        rows_rf = scratch_clean(now=ref_now)
+        chk("scratch-clean:a-root-that-is-a-file-is-refused", (link_store / SCRATCH_DIR).is_file()
+            and any(r[0] == "FAILED" and r[1] == str(link_store / SCRATCH_DIR) for r in rows_rf), repr(rows_rf))
+        (link_store / SCRATCH_DIR).unlink()
+        bad_store = w.stores / "broken-abcdef"
+        bad_store.mkdir()
+        (bad_store / STORE_FILE).write_text("not a store line\n", encoding="utf-8")
+        bad_old = sc_make(bad_store / SCRATCH_DIR, "260101-in-broken", 40, ref_now)
+        rows_b = scratch_clean(now=ref_now)
+        chk("scratch-clean:an-invalid-store-is-named-and-not-swept", bad_old.is_dir()
+            and any(r[0] == "FAILED" and "invalid STORE" in r[4] for r in rows_b), repr(rows_b))
+        _sc_shutil.rmtree(str(bad_store))
+        real_scan = globals()["scan_stores"]
+        globals()["scan_stores"] = lambda root=None: ("failed", [], [], "selftest scan failure")
+        kept = sc_make(sc_root, "260101-scan-failed", 40, ref_now)
+        shared_during = sc_make(shared_scratch_root(), "260101-scan-failed-shared", 40, ref_now)
+        try:
+            rows_s = scratch_clean(now=ref_now)
+        finally:
+            globals()["scan_stores"] = real_scan
+        chk("scratch-clean:a-failed-scan-sweeps-no-store-but-still-the-shared-root", kept.is_dir() and not shared_during.exists()
+            and any(r[0] == "FAILED" and "not scanned" in r[4] for r in rows_s), repr(rows_s))
+        _sc_shutil.rmtree(str(kept))
+
+        # --plan: each gate alone.
+        gate_folder = sc_make(sc_root, "260101_GATE", 1, ref_now)
+        plans_dir = sc_store / "plans"
+        for bad_plan in (plans_dir / "260101_GATE", plans_dir / "260101_GATE.txt"):
+            rows_g = scratch_close(bad_plan)
+            chk("scratch-close:refuses-a-non-md-path:%s" % bad_plan.name, gate_folder.is_dir() and rows_g and rows_g[0][0] == "FAILED", repr(rows_g))
+        other = w.area("otherroot")
+        (other / STORE_FILE).write_text("remote example.com/o/other\n", encoding="utf-8")
+        sc_make(other / SCRATCH_DIR, "260101_GATE2", 1, ref_now)
+        (other / "plans").mkdir()
+        chk("scratch-close:a-store-outside-the-store-repo-deletes-nothing", scratch_close(other / "plans" / "260101_GATE2.md") == []
+            and (other / SCRATCH_DIR / "260101_GATE2").is_dir())
+        no_id = w.stores / "noid-abcdef"
+        sc_make(no_id / SCRATCH_DIR, "260101_GATE3", 1, ref_now)
+        (no_id / "plans").mkdir()
+        chk("scratch-close:a-folder-without-a-STORE-deletes-nothing", scratch_close(no_id / "plans" / "260101_GATE3.md") == []
+            and (no_id / SCRATCH_DIR / "260101_GATE3").is_dir())
+        _sc_shutil.rmtree(str(no_id))
+        try:
+            gate_link_target = w.area("gatelink")
+            os.symlink(str(gate_link_target), str(sc_root / "260101_GATE4"), target_is_directory=True)
+            rows_g = scratch_close(plans_dir / "260101_GATE4.md")
+            chk("scratch-close:a-link-is-refused", rows_g and rows_g[0][0] == "FAILED" and gate_link_target.is_dir(), repr(rows_g))
+            rs_l = scratch_folder(sc_repo, "260101_GATE4")
+            chk("scratch:a-name-that-is-a-link-is-refused", rs_l.status == "failed", repr(rs_l))
+            os.unlink(str(sc_root / "260101_GATE4"))
+        except (OSError, NotImplementedError):
+            skip("scratch-close:a-link-is-refused", "this user cannot create a symlink")
+
         # Making the junction refreshed its folder's time, so this sweep runs with a later clock.
         if junctioned:
             rows_j = scratch_clean(now=sc_now + 20 * 86400.0)

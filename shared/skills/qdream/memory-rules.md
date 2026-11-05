@@ -8,7 +8,7 @@ This file is the single source of truth for memory entry format, type taxonomy, 
 
 Every workspace keeps its memory and its project files in the **store repo**, a private git repository at `~/.agent-playbook/stores` (`AGENT_PLAYBOOK_STORES` overrides the location), never inside the workspace. One store directory serves one workspace identity. The store resolver, `shared/skills/qdream/scripts/store-resolver.py`, is the single implementation of identity, naming, lookup and creation: no skill, script or agent re-implements any of them.
 
-`/qexplore`, `/qplan`, `/qdev`, `/qclose`, `/qhandoff`, `/qtest`, `/qexplain`, `/qdream`, `/qmemory-eval` and `/qwire-governance` cite this section and resolve their paths through it. `/qtest` resolves the **project-files** class, then appends `tests/`; it has no artifact class of its own. `/qwire-governance` resolves **no artifact class**: it asks the resolver for the store *directory* and writes a Kiro steering file naming it. This list is hand-maintained prose, not machine-checked: `verify-citations` counts citations to this section but cannot tell whether the names above match them, so **update this sentence in the same commit that makes a skill a citer**.
+`/qexplore`, `/qplan`, `/qdev`, `/qclose`, `/qhandoff`, `/qtest`, `/qexplain`, `/qdream`, `/qmemory-eval` and `/qwire-governance` cite this section and resolve their paths through it. `/qtest` resolves the **project-files** class, then appends `tests/`; it has no artifact class of its own. `/qwire-governance` resolves **no artifact class**: it asks the resolver for the store *directory* and writes a Kiro steering file naming it. `/qconfig-sync` and the delegate skills cite only `§ Store scratch folder`. This list is hand-maintained prose, not machine-checked: `verify-citations` counts citations to this section but cannot tell whether the names above match them, so **update this sentence in the same commit that makes a skill a citer**.
 
 ### Store layout
 
@@ -21,8 +21,9 @@ Every workspace keeps its memory and its project files in the **store repo**, a 
     plans/done/        # archived project files
     plans/tests/       # test plans
     explanations/      # optional: written by /qexplain
-    artifacts/         # optional: measurement/benchmark byproducts a plan's phases produce
+    artifacts/         # optional: files the user asked to keep
     visualizations/    # reserved, git-ignored: /qvisualize output
+    scratch/           # reserved, git-ignored: temporary playbook working files
 ```
 
 The directory name is for people: `<name>` is the folder's basename and `<hex>` keeps it unique (at least 6 hex digits; the resolver extends it by 2 on a collision). **Nothing finds a store by its name**: the resolver reads `STORE` files. Never derive, hash or invent a store directory name, and never rename one.
@@ -36,6 +37,16 @@ The directory name is for people: `<name>` is the folder's basename and `<hex>` 
 **Store paths written in prose are not machine-verified.** `verify-links` resolves paths inside the config repo only; a path into the store repo is skipped. Write store paths carefully.
 
 The consolidation sweep discovers a store-backed workspace under its real path, never a store directory as a project (`sweep-orient.md § ORI-DISCOVER`). `shared/skills/qconfig-sync/scripts/verify-stores.py` checks the layout above, the `STORE` files, in-workspace `memory/` or `plans/` left in a known workspace, and store-repo paths uncommitted or unpushed for over a day, on every `/qconfig-sync` run.
+
+### Store scratch folder
+
+Temporary playbook working files: review outputs, probe scripts, test runs. Never a project's runtime state.
+
+- **Files needed only in this session** go in the harness's session scratchpad, if it has one.
+- **Files that must outlive the session**, or any file on a harness with no scratchpad, go in the folder that `store-resolver.py scratch <folder> <name>` creates and prints. `<name>` is the plan slug, or `<YYMMDD>-<topic>` for plan-less work. A folder with no store uses `~/.agent-playbook/scratch/<name>`.
+- **Scratch is disposable.** Record results as text in the project file. A file worth keeping goes to `artifacts/` only when the user says so.
+- **Cleanup.** `/qclose` deletes the plan's folder. `/qconfig-sync` deletes plan-less folders whose newest file is over 14 days old, without asking, and names each one. A folder matching an open plan in the store's `plans/` is reported, never deleted by age. A plan kept outside the store has no such protection, so its work names its folder `<YYMMDD>-<topic>` and accepts the 14 days.
+- `/qdream` has no scratch folder: a sweep writes no scratch files (`shared/skills/qdream/sweep-handoff.md`).
 
 ### The STORE file
 

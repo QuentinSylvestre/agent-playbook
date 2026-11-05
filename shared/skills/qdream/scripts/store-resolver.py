@@ -1800,21 +1800,16 @@ def fixture_store(stores_root, dirname, text):
 
 SCRATCH_DIR = "scratch"
 SCRATCH_MAX_AGE_DAYS = 14
-_SCRATCH_NAME_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+SCRATCH_LEFTOVER_RETRY_DAYS = 1
+_SCRATCH_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
+_SCRATCH_RESERVED_RE = re.compile(r"(CON|PRN|AUX|NUL|COM[0-9]|LPT[0-9])(\..*)?", re.IGNORECASE)
+_SCRATCH_LEFTOVER = ".deleting-"
 _REPARSE_POINT = 0x400  # FILE_ATTRIBUTE_REPARSE_POINT: a symlink or a junction on Windows
 
 
 def shared_scratch_root() -> Path:
     """Where a folder with no store keeps scratch: ~/.agent-playbook/scratch."""
     return Path(_home_verbatim()) / ".agent-playbook" / SCRATCH_DIR
-
-
-def _scratch_is_link(path) -> bool:
-    try:
-        st = os.lstat(str(path))
-    except OSError:
-        return False
-    return stat.S_ISLNK(st.st_mode) or bool(getattr(st, "st_file_attributes", 0) & _REPARSE_POINT)
 
 
 def _scratch_long(path) -> str:
@@ -1825,13 +1820,33 @@ def _scratch_long(path) -> str:
     return "\\\\?\\UNC\\" + p[2:] if p.startswith("\\\\") else "\\\\?\\" + p
 
 
+def _stat_is_link(st) -> bool:
+    return stat.S_ISLNK(st.st_mode) or bool(getattr(st, "st_file_attributes", 0) & _REPARSE_POINT)
+
+
+def _scratch_is_link(path) -> bool:
+    """True for a symlink or a junction. A path that cannot be read counts as one, so a caller refuses it."""
+    try:
+        return _stat_is_link(os.lstat(_scratch_long(path)))
+    except (FileNotFoundError, NotADirectoryError):
+        return False
+    except OSError:
+        return True
+
+
+def _scratch_name_ok(name) -> bool:
+    return (isinstance(name, str) and bool(_SCRATCH_NAME_RE.fullmatch(name)) and not name.endswith(".")
+            and not _SCRATCH_RESERVED_RE.fullmatch(name))
+
+
 def scratch_folder(folder, name):
     """Create the scratch folder `name` for `folder` and return a Result naming it. Never raises.
 
     `name` is the plan slug, or <YYMMDD>-<topic> for plan-less work: one path segment. It sits in the store
-    that serves `folder`, created when needed. A folder that may have no store uses shared_scratch_root()."""
+    that serves `folder`, created when needed (status created). A folder that may have no store uses
+    shared_scratch_root(). Reusing a folder refreshes its time, so a sweep does not delete it right after."""
     try:
-        if not isinstance(name, str) or not _SCRATCH_NAME_RE.match(name) or name.endswith("."):
+        if not _scratch_name_ok(name):
             return Result("failed", None, reason="bad scratch name %r: use the plan slug or <YYMMDD>-<topic>" % (name,))
         res = find_or_create(folder, "plans")
         if res.status in ("found", "created"):
@@ -1840,62 +1855,99 @@ def scratch_folder(folder, name):
             root = shared_scratch_root()
         else:
             return res
-        for p in (root, root / name):
-            if _scratch_is_link(p):
-                return Result("failed", None, reason="%s is a link: refusing to use it" % p)
+        why = _scratch_root_problem(root) if os.path.lexists(str(root)) else None
+        if why or _scratch_is_link(root / name):
+            return Result("failed", None, reason="refusing to use %s: %s" % (root / name, why or "a link"))
         (root / name).mkdir(parents=True, exist_ok=True)
-        return Result("found", root / name, notice=res.notice)
+        os.utime(_scratch_long(root / name))
+        return Result(res.status if res.status == "created" else "found", root / name, notice=res.notice)
     except Exception as exc:
         return Result("failed", None, reason="internal error: %s: %s" % (type(exc).__name__, exc))
 
 
+def _scratch_root_problem(root):
+    """Why `root` is not a scratch root this code may delete under, or None. It must really be
+    <store repo>/<store>/scratch or ~/.agent-playbook/scratch: a link at any level below those is refused."""
+    root = Path(root)
+    real = os.path.normcase(os.path.realpath(str(root)))
+    allowed = (os.path.join(os.path.realpath(str(_stores_root())), root.parent.name, SCRATCH_DIR),
+               os.path.join(os.path.realpath(_home_verbatim()), ".agent-playbook", SCRATCH_DIR))
+    if real not in [os.path.normcase(a) for a in allowed]:
+        return "resolves to %s, which is not a scratch root" % real
+    if _scratch_is_link(root) or not os.path.isdir(str(root)):
+        return "a link or not a folder"
+    return None
+
+
 def _scratch_measure(path):
-    """(newest modification time, bytes) of a scratch entry and everything under it; links are not followed."""
-    long_path = _scratch_long(path)
-    st = os.lstat(long_path)
-    newest, size = st.st_mtime, st.st_size if not stat.S_ISDIR(st.st_mode) else 0
-    for dp, dn, fn in os.walk(long_path):
-        for nm in dn + fn:
-            try:
-                s = os.lstat(os.path.join(dp, nm))
-            except OSError:
-                continue
-            newest = max(newest, s.st_mtime)
-            if not stat.S_ISDIR(s.st_mode):
-                size += s.st_size
+    """(newest modification time, bytes) of a scratch entry and everything under it. Raises OSError on anything
+    it cannot read: an unknown age must never read as old. A link counts by its own time and is never entered."""
+    top = _scratch_long(path)
+    st = os.lstat(top)
+    newest, size = st.st_mtime, 0
+    if not stat.S_ISDIR(st.st_mode) or _stat_is_link(st):
+        return newest, st.st_size
+    stack = [top]
+    while stack:
+        with os.scandir(stack.pop()) as it:
+            for e in it:
+                s = os.lstat(e.path)
+                newest = max(newest, s.st_mtime)
+                if stat.S_ISDIR(s.st_mode) and not _stat_is_link(s):
+                    stack.append(e.path)
+                elif not stat.S_ISDIR(s.st_mode):
+                    size += s.st_size
     return newest, size
+
+
+def _scratch_clear_and_retry(func, path, exc):
+    """rmtree's error hook: clear a read-only flag on the item itself, never on what a link points at, and
+    retry the same delete. Anything else propagates and leaves a named leftover."""
+    error = exc[1] if isinstance(exc, tuple) else exc
+    if func not in (os.unlink, os.rmdir, os.remove) or _scratch_is_link(path):
+        raise error
+    parent = os.path.dirname(path)
+    if os.name != "nt" and not _scratch_is_link(parent):
+        os.chmod(parent, stat.S_IRWXU)  # on POSIX a read-only folder is what stops its entries being removed
+    os.chmod(path, stat.S_IWRITE)
+    func(path)
 
 
 def _scratch_remove(entry, root):
     """Delete one scratch entry directly under `root`; the refusal reason, or None when it is gone.
 
-    Rename first, as dream-manifest.py's clean does: a folder a live process holds open fails here and stays
-    whole, and a swap of a path component after the check can no longer redirect the delete."""
-    entry, root = Path(entry), Path(root)
-    if _scratch_is_link(root) or _scratch_is_link(entry):
-        return "a link: left alone"
-    if os.path.normcase(os.path.realpath(str(entry.parent))) != os.path.normcase(os.path.realpath(str(root))):
-        return "resolves outside %s: left alone" % root
+    Rename first, as dream-manifest.py's clean does: on Windows a folder a live process holds open fails here
+    and stays whole, and on any system a swap of a path component after the check cannot redirect the delete."""
     import secrets
     import shutil
-    doomed = root / (".deleting-%d-%s" % (os.getpid(), secrets.token_hex(4)))
+    entry, root = Path(entry), Path(root)
+    why = _scratch_root_problem(root)
+    if why:
+        return why
+    if _scratch_is_link(entry):
+        return "a link: left alone"
+    doomed = root / ("%s%d-%s" % (_SCRATCH_LEFTOVER, os.getpid(), secrets.token_hex(4)))
     try:
         os.rename(_scratch_long(entry), _scratch_long(doomed))
     except OSError as exc:
         return "could not rename it, so it may be in use: %s" % exc
-    if _scratch_is_link(doomed) or os.path.normcase(os.path.realpath(str(doomed.parent))) != os.path.normcase(os.path.realpath(str(root))):
-        return "changed during the delete: renamed folder left at %s" % doomed
-
-    def _clear_read_only(func, path, _exc):
-        os.chmod(path, stat.S_IWRITE)
-        func(path)
+    target = _scratch_long(doomed)
     try:
-        if os.path.isdir(_scratch_long(doomed)):
-            shutil.rmtree(_scratch_long(doomed), onerror=_clear_read_only)
+        if _scratch_is_link(doomed):
+            return "became a link during the delete: left at %s" % doomed
+        if os.path.isdir(target):
+            hook = {"onexc": _scratch_clear_and_retry} if sys.version_info >= (3, 12) else {"onerror": _scratch_clear_and_retry}
+            shutil.rmtree(target, **hook)
         else:
-            os.remove(_scratch_long(doomed))
-    except OSError as exc:
-        return "could not delete it: %s; leftover at %s" % (exc, doomed)
+            try:
+                os.remove(target)
+            except PermissionError:
+                os.chmod(target, stat.S_IWRITE)
+                os.remove(target)
+    except Exception as exc:
+        return "could not delete it: %s: %s; leftover at %s" % (type(exc).__name__, exc, doomed)
+    if os.path.lexists(target):
+        return "still there after the delete; leftover at %s" % doomed
     return None
 
 
@@ -1903,9 +1955,35 @@ def _scratch_row(verdict, path, size=0, age=0.0, note=""):
     return (verdict, str(path), size, age, note)
 
 
+def _scratch_open_plan(plans, name):
+    """True or False, or raises OSError when it cannot tell: cannot tell must never mean deleted."""
+    try:
+        return stat.S_ISREG(os.stat(str(plans / (name + ".md"))).st_mode)
+    except (FileNotFoundError, NotADirectoryError):
+        return False
+
+
+def _scratch_sweep_entry(entry, root, plans, now):
+    """The row for one entry directly under a scratch root, or None when it is young enough to leave alone."""
+    name = entry.name
+    if _scratch_is_link(entry):
+        return _scratch_row("FAILED", entry, note="a link: left alone")
+    newest, size = _scratch_measure(entry)
+    age = (now - newest) / 86400.0
+    if name.startswith(_SCRATCH_LEFTOVER):
+        if age <= SCRATCH_LEFTOVER_RETRY_DAYS:
+            return _scratch_row("FAILED", entry, size, age, "leftover of an earlier delete, or one running now: retried after a day")
+    elif age <= SCRATCH_MAX_AGE_DAYS:
+        return None
+    elif plans is not None and _scratch_open_plan(plans, name):
+        return _scratch_row("STALE-OPEN", entry, size, age, "open plan: never deleted by age")
+    why_not = _scratch_remove(entry, root)
+    return _scratch_row("FAILED", entry, size, age, why_not) if why_not else _scratch_row("DELETED", entry, size, age)
+
+
 def scratch_clean(now=None):
     """Delete plan-less scratch folders whose newest file is over SCRATCH_MAX_AGE_DAYS old; returns rows of
-    (verdict, path, bytes, age in days, note). Never raises.
+    (verdict, path, bytes, age in days, note). Never raises, and a failure on one entry or root stops only that one.
 
     DELETED    gone
     STALE-OPEN its name matches a project file in the store's plans/, so age never deletes it
@@ -1913,55 +1991,58 @@ def scratch_clean(now=None):
     """
     now = time.time() if now is None else now
     rows = []
+    roots = []
     try:
-        st, valid, _invalid, why = scan_stores()
+        st, valid, invalid, why = scan_stores()
         if st != "ok" and not (why or "").startswith(MISSING_ROOT):
             rows.append(_scratch_row("FAILED", _stores_root(), note="store repo not scanned: %s" % why))
         roots = [(Path(d) / SCRATCH_DIR, Path(d) / "plans") for d, _i in (valid if st == "ok" else [])]
-        roots.append((shared_scratch_root(), None))
-        for root, plans in roots:
+        for d, reason in (invalid if st == "ok" else []):
+            if os.path.lexists(str(Path(d) / SCRATCH_DIR)):
+                rows.append(_scratch_row("FAILED", Path(d) / SCRATCH_DIR, note="not swept, invalid STORE: %s" % reason))
+    except Exception as exc:
+        rows.append(_scratch_row("FAILED", "scratch-clean", note="store scan: %s: %s" % (type(exc).__name__, exc)))
+    roots.append((shared_scratch_root(), None))
+    for root, plans in roots:
+        try:
             if not os.path.lexists(str(root)):
                 continue
-            if _scratch_is_link(root) or not os.path.isdir(str(root)):
-                rows.append(_scratch_row("FAILED", root, note="a link or not a folder: left alone"))
+            why = _scratch_root_problem(root)
+            if why:
+                rows.append(_scratch_row("FAILED", root, note="%s: left alone" % why))
                 continue
-            for name in sorted(os.listdir(str(root))):
-                entry = root / name
-                try:
-                    if _scratch_is_link(entry):
-                        rows.append(_scratch_row("FAILED", entry, note="a link: left alone"))
-                        continue
-                    newest, size = _scratch_measure(entry)
-                except OSError as exc:
-                    rows.append(_scratch_row("FAILED", entry, note="could not read it: %s" % exc))
-                    continue
-                age = (now - newest) / 86400.0
-                if age <= SCRATCH_MAX_AGE_DAYS:
-                    continue
-                if plans is not None and (plans / (name + ".md")).is_file():
-                    rows.append(_scratch_row("STALE-OPEN", entry, size, age, "open plan: never deleted by age"))
-                    continue
-                why_not = _scratch_remove(entry, root)
-                rows.append(_scratch_row("FAILED", entry, size, age, why_not) if why_not
-                            else _scratch_row("DELETED", entry, size, age))
-    except Exception as exc:
-        rows.append(_scratch_row("FAILED", "scratch-clean", note="internal error: %s: %s" % (type(exc).__name__, exc)))
+            names = sorted(os.listdir(_scratch_long(root)))
+        except Exception as exc:
+            rows.append(_scratch_row("FAILED", root, note="could not list it: %s: %s" % (type(exc).__name__, exc)))
+            continue
+        for name in names:
+            entry = root / name
+            try:
+                row = _scratch_sweep_entry(entry, root, plans, now)
+            except Exception as exc:
+                row = _scratch_row("FAILED", entry, note="could not read it, so left in place: %s: %s" % (type(exc).__name__, exc))
+            if row:
+                rows.append(row)
     return rows
 
 
 def scratch_close(plan_path):
     """Delete the scratch folder of a plan /qclose has just archived; rows as scratch_clean. Never raises.
 
-    `plan_path` is where the project file was before the archive move. A file still there means the plan is
-    not archived yet, and nothing is deleted. A plan outside a store has no store scratch folder: no rows."""
+    `plan_path` is the project file's path before the archive move. It must be a .md path, and a file still
+    there means the plan is not archived yet, so nothing is deleted. A plan outside a store has no store
+    scratch folder: no rows."""
     try:
         plan = Path(os.path.abspath(str(plan_path)))
-        if plan.is_file():
+        if plan.suffix != ".md":
+            return [_scratch_row("FAILED", plan, note="not a project file path: expected a .md path")]
+        if os.path.lexists(str(plan)):
             return [_scratch_row("FAILED", plan, note="the project file is still there: archive it first")]
         store = plan.parent.parent
         name = plan.stem
-        inside = os.path.normcase(os.path.realpath(str(store.parent))) == os.path.normcase(os.path.realpath(str(_stores_root())))
-        if plan.parent.name != "plans" or not inside or not (store / STORE_FILE).is_file() or not _SCRATCH_NAME_RE.match(name):
+        inside = os.path.normcase(os.path.realpath(str(store))) == os.path.normcase(
+            os.path.join(os.path.realpath(str(_stores_root())), store.name))
+        if plan.parent.name != "plans" or not inside or not (store / STORE_FILE).is_file() or not _scratch_name_ok(name):
             return []
         root = store / SCRATCH_DIR
         entry = root / name
@@ -1974,7 +2055,7 @@ def scratch_close(plan_path):
         age = (time.time() - newest) / 86400.0
         return [_scratch_row("FAILED", entry, size, age, why_not) if why_not else _scratch_row("DELETED", entry, size, age)]
     except Exception as exc:
-        return [_scratch_row("FAILED", plan_path, note="internal error: %s: %s" % (type(exc).__name__, exc))]
+        return [_scratch_row("FAILED", plan_path, note="left in place: %s: %s" % (type(exc).__name__, exc))]
 
 
 def _emit_scratch_rows(rows) -> int:

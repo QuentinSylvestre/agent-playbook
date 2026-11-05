@@ -70,7 +70,7 @@ The live sessions keep appending to `~/.claude/history.jsonl` and `~/.claude.jso
 
 ## Rollback
 
-Until OLD is deleted, everything is reversible. Close every agent first.
+Until OLD is deleted, everything is reversible. Close every agent first. Delete the per-migration work folder once the user retires OLD. It is the rollback until then.
 
 | Step | Undo |
 |---|---|

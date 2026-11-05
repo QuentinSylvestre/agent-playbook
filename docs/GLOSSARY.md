@@ -11,6 +11,8 @@ governance avoids them; so should contributions. The canonical list for the memo
 | **Engine branch** | `local-improvements`: where your clone's own engine commits land. `main` moves only by your merge. |
 | **Store repo** | Your private git repository at `~/.agent-playbook/stores` holding every workspace store and your user memory. Not "stores repo". |
 | **Workspace store** | A `<name>-<hex>` directory in the store repo holding one workspace's memory, plans and artifacts. |
+| **Store scratch folder** | The gitignored `scratch/` in a workspace store, for temporary working files that must outlive a session. It cleans itself. Not "scratch space". |
+| **Session scratchpad** | A harness's own per-session temporary folder, for files needed only in that session. |
 | **STORE file** | A store's identity file: `remote <host/owner/name>` (plus optional `path <subpath>`), or `local <path>`. |
 | **Store resolver** | `store-resolver.py`, whose `find` and `find_or_create` map a folder to its store. Not "store lookup". |
 | **User memory** | Cross-project memory: `memory/MEMORY.md` and `memory/topics/*.md`, behind the engine's `memory` link to `user/memory/`. |

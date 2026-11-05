@@ -50,3 +50,5 @@ Project-specific terms settled for the memory subsystem. Use them as written; th
 - **Store repo** — the private git repository at `~/.agent-playbook/stores` holding every workspace store. Rejected: "stores repo", "workspace store repo".
 - **STORE file** — a store directory's identity file (`remote <host/owner/name>` plus optional `path <subpath>`, or `local <path>`); replaces the `WORKSPACE` file. Rejected: "identity file", "WORKSPACE".
 - **Store resolver** — the shared Python module whose `find` and `find_or_create` map a folder to its store. Rejected: "store lookup", "resolution script".
+- **Store scratch folder** — the gitignored `scratch/` in a workspace store, for temporary playbook working files that must outlive a session. Rejected: "scratch space".
+- **Session scratchpad** — a harness's own per-session temporary folder, for files needed only in that session. **Work folder** stays reserved for a script-owned folder such as `dream-work`.
