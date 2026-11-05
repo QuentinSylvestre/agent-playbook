@@ -11,7 +11,7 @@ All notable changes to this project are recorded here. The format follows
 - Store scratch folder: `store-resolver.py scratch` creates a gitignored `scratch/<name>` in the
   workspace store, or `~/.agent-playbook/scratch/<name>` for a folder with no store.
 - Automatic cleanup: `/qclose` deletes a plan's scratch folder, and `/qconfig-sync` deletes
-  plan-less scratch folders whose newest file is over 14 days old, without asking.
+  plan-less scratch folders whose newest file is over 30 days old, without asking.
 - `/qconfig-sync` warns about improvised folders directly under `~/.agent-playbook`.
 
 ### Changed

@@ -1938,18 +1938,18 @@ def _run_selftest() -> int:
         sc_root = sc_store / SCRATCH_DIR
         (sc_store / "plans").mkdir(exist_ok=True)
         (sc_store / "plans" / "260101_OPEN_PLAN.md").write_text("# open\n", encoding="utf-8")
-        d_old = sc_make(sc_root, "260101-old", 15, sc_now)
-        d_edge = sc_make(sc_root, "260101-edge", 13.5, sc_now)
+        d_old = sc_make(sc_root, "260101-old", SCRATCH_MAX_AGE_DAYS + 1, sc_now)
+        d_edge = sc_make(sc_root, "260101-edge", SCRATCH_MAX_AGE_DAYS - 0.5, sc_now)
         d_young_file = sc_make(sc_root, "260101-oldfolder-newfile", 40, sc_now)
         os.utime(str(d_young_file / "sub" / "f.txt"), (sc_now - 3600, sc_now - 3600))
         d_open = sc_make(sc_root, "260101_OPEN_PLAN", 40, sc_now)
-        d_gone_plan = sc_make(sc_root, "260101_ARCHIVED_PLAN", 15, sc_now)
-        d_shared = sc_make(shared_scratch_root(), "260101-shared-old", 15, sc_now)
-        ronly = sc_make(sc_root, "260101-readonly", 15, sc_now)
+        d_gone_plan = sc_make(sc_root, "260101_ARCHIVED_PLAN", SCRATCH_MAX_AGE_DAYS + 1, sc_now)
+        d_shared = sc_make(shared_scratch_root(), "260101-shared-old", SCRATCH_MAX_AGE_DAYS + 1, sc_now)
+        ronly = sc_make(sc_root, "260101-readonly", SCRATCH_MAX_AGE_DAYS + 1, sc_now)
         os.chmod(str(ronly / "sub" / "f.txt"), stat.S_IREAD)
-        os.utime(str(ronly / "sub" / "f.txt"), (sc_now - 15 * 86400, sc_now - 15 * 86400))
-        os.utime(str(ronly / "sub"), (sc_now - 15 * 86400, sc_now - 15 * 86400))
-        os.utime(str(ronly), (sc_now - 15 * 86400, sc_now - 15 * 86400))
+        os.utime(str(ronly / "sub" / "f.txt"), (sc_now - (SCRATCH_MAX_AGE_DAYS + 1) * 86400, sc_now - (SCRATCH_MAX_AGE_DAYS + 1) * 86400))
+        os.utime(str(ronly / "sub"), (sc_now - (SCRATCH_MAX_AGE_DAYS + 1) * 86400, sc_now - (SCRATCH_MAX_AGE_DAYS + 1) * 86400))
+        os.utime(str(ronly), (sc_now - (SCRATCH_MAX_AGE_DAYS + 1) * 86400, sc_now - (SCRATCH_MAX_AGE_DAYS + 1) * 86400))
         keep_outside = w.area("outside")
         (keep_outside / "precious.txt").write_text("keep\n", encoding="utf-8")
         d_link = sc_root / "260101-link"
@@ -1959,14 +1959,14 @@ def _run_selftest() -> int:
             linked = True
         except (OSError, NotImplementedError):
             pass
-        junction_inside = sc_make(sc_root, "260101-has-junction", 15, sc_now)
+        junction_inside = sc_make(sc_root, "260101-has-junction", SCRATCH_MAX_AGE_DAYS + 1, sc_now)
         junctioned = False
         if os.name == "nt":
             import subprocess
             made_j = subprocess.run(["cmd", "/c", "mklink", "/J", str(junction_inside / "j"), str(keep_outside)],
                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             junctioned = made_j.returncode == 0 and (junction_inside / "j" / "precious.txt").is_file()
-            os.utime(str(junction_inside), (sc_now - 15 * 86400, sc_now - 15 * 86400))
+            os.utime(str(junction_inside), (sc_now - (SCRATCH_MAX_AGE_DAYS + 1) * 86400, sc_now - (SCRATCH_MAX_AGE_DAYS + 1) * 86400))
         rows = scratch_clean(now=sc_now)
         by = {os.path.basename(r[1]): r for r in rows}
         chk("scratch-clean:old-plan-less-folder-is-deleted", "260101-old" in by and by["260101-old"][0] == "DELETED"
@@ -1991,7 +1991,7 @@ def _run_selftest() -> int:
         chk("scratch-clean:nothing-left-half-renamed", not [n for n in os.listdir(str(sc_root)) if n.startswith(".deleting-")],
             repr(os.listdir(str(sc_root))))
         os.environ["AGENT_PLAYBOOK_STORES"] = str(w.root / "no-such-root")
-        d_shared2 = sc_make(shared_scratch_root(), "260101-shared-again", 15, sc_now)
+        d_shared2 = sc_make(shared_scratch_root(), "260101-shared-again", SCRATCH_MAX_AGE_DAYS + 1, sc_now)
         rows_m = scratch_clean(now=sc_now)
         chk("scratch-clean:a-missing-store-repo-still-sweeps-shared", not d_shared2.exists()
             and not [r for r in rows_m if r[0] == "FAILED"], repr(rows_m))
@@ -2010,7 +2010,7 @@ def _run_selftest() -> int:
         chk("scratch-close:a-plan-outside-the-store-repo-deletes-nothing", scratch_close(outsider) == []
             and (outsider.parent.parent / SCRATCH_DIR / "260101_X").is_dir())
         out_sc = io.StringIO()
-        sc_make(sc_root, "260101-cli", 15, sc_now)
+        sc_make(sc_root, "260101-cli", SCRATCH_MAX_AGE_DAYS + 1, sc_now)
         with contextlib.redirect_stdout(out_sc):
             rc_sc = main(["scratch-clean"])
         chk("scratch-clean:cli-reports-the-deletion", rc_sc == 0 and "DELETED\t" in out_sc.getvalue()
@@ -2247,7 +2247,7 @@ def _run_selftest() -> int:
 
         # Making the junction refreshed its folder's time, so this sweep runs with a later clock.
         if junctioned:
-            rows_j = scratch_clean(now=sc_now + 20 * 86400.0)
+            rows_j = scratch_clean(now=sc_now + (SCRATCH_MAX_AGE_DAYS + 6) * 86400.0)
             chk("scratch-clean:a-junction-inside-does-not-reach-its-target", (keep_outside / "precious.txt").is_file()
                 and not junction_inside.exists(), repr(rows_j))
         else:

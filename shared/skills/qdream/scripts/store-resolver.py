@@ -1799,7 +1799,7 @@ def fixture_store(stores_root, dirname, text):
 # ---------------------------------------------------------------------------
 
 SCRATCH_DIR = "scratch"
-SCRATCH_MAX_AGE_DAYS = 14
+SCRATCH_MAX_AGE_DAYS = 30
 SCRATCH_LEFTOVER_RETRY_DAYS = 1
 _SCRATCH_NAME_RE = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*")
 _SCRATCH_RESERVED_RE = re.compile(r"(CON|PRN|AUX|NUL|COM[0-9]|LPT[0-9])(\..*)?", re.IGNORECASE)

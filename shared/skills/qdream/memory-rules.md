@@ -45,7 +45,7 @@ Temporary playbook working files: review outputs, probe scripts, test runs. Neve
 - **Files needed only in this session** go in the harness's session scratchpad, if it has one.
 - **Files that must outlive the session**, or any file on a harness with no scratchpad, go in the folder that `store-resolver.py scratch <folder> <name>` creates and prints. `<name>` is the plan slug, or `<YYMMDD>-<topic>` for plan-less work. A folder with no store uses `~/.agent-playbook/scratch/<name>`.
 - **Scratch is disposable.** Record results as text in the project file. A file worth keeping goes to `artifacts/` only when the user says so.
-- **Cleanup.** `/qclose` deletes the plan's folder. `/qconfig-sync` deletes plan-less folders whose newest file is over 14 days old, without asking, and names each one. A folder matching an open plan in the store's `plans/` is reported, never deleted by age. A plan kept outside the store has no such protection, so its work names its folder `<YYMMDD>-<topic>` and accepts the 14 days.
+- **Cleanup.** `/qclose` deletes the plan's folder. `/qconfig-sync` deletes plan-less folders whose newest file is over 30 days old, without asking, and names each one. A folder matching an open plan in the store's `plans/` is reported, never deleted by age. A plan kept outside the store has no such protection, so its work names its folder `<YYMMDD>-<topic>` and accepts the 30 days.
 - `/qdream` has no scratch folder: a sweep writes no scratch files (`shared/skills/qdream/sweep-handoff.md`).
 
 ### The STORE file
