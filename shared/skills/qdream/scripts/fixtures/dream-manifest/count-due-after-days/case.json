@@ -1,0 +1,20 @@
+{
+  "description": "Below the session threshold, count still reports a sweep due once the last run is SWEEP_DUE_DAYS old and a new session exists.",
+  "now": "2026-10-06T12:00:00Z",
+  "argv": [
+    "count",
+    "--state",
+    "{ROOT}/repo/memory/.dream-state.json",
+    "--repo",
+    "{ROOT}/repo"
+  ],
+  "expect": {
+    "exit": 0,
+    "work_absent": true,
+    "stdout_contains": [
+      "sweep due: yes (11 new sessions",
+      "memory budget: 26/"
+    ],
+    "stdout_not_contains": []
+  }
+}

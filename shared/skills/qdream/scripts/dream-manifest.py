@@ -340,7 +340,8 @@ DEFERRED_HOURS = 24          # in_progress newer than this is deferred (memory-s
 DUE_MARGIN_DAYS = 7          # due at max(1, deletion age - 7) (memory-rules.md § Staleness nudge)
 DEFAULT_CLEANUP_DAYS = 30    # Claude Code default cleanupPeriodDays
 KIRO_CLEANUP_KEY = "cleanup.periodDays"   # kiro-cli settings/cli.json; unset = no Kiro due flag
-SWEEP_DUE_SESSIONS = 10      # memory-rules.md § Staleness nudge, work-volume arm
+SWEEP_DUE_SESSIONS = 50      # memory-rules.md § Staleness nudge, work-volume arm
+SWEEP_DUE_DAYS = 14          # memory-rules.md § Staleness nudge, quiet-period arm
 RECENT_PLANS = 50            # plan-cluster window (sweep-gather.md § GAT-PLANS)
 STRUCT_MAX_DEPTH = 6         # Method B recursion bound
 INTENT_MAX_CHARS = 400       # plans.recent[].intent excerpt cap
@@ -1261,6 +1262,44 @@ def render(header, recs, boundary, preface=None, skip=()):
         if placed and ln in skip:
             continue
         out.append("L%d [%s] %s" % (ln, role, text))
+    return "\n".join(out) + "\n"
+
+
+DIGEST_USER_CHARS = 1500       # one user turn kept in a session digest
+DIGEST_ASSISTANT_CHARS = 600   # the assistant text kept before each user turn
+
+
+def _clip_head(text, limit):
+    return text if len(text) <= limit else text[:limit] + " [... %d chars cut]" % (len(text) - limit)
+
+
+def _clip_tail(text, limit):
+    return text if len(text) <= limit else "[%d chars cut ...] " % (len(text) - limit) + text[-limit:]
+
+
+def render_digest(header, recs, boundary, skip=()):
+    """A session's user turns after the boundary, each with the end of the assistant text before it,
+    and the session's closing assistant text. Every line keeps its L number, which indexes the
+    stripped transcript, so a reader can open the span behind a line."""
+    out = list(header)
+    placed = False
+    tail = None
+    for ln, role, text, _ts in recs:
+        if not placed and (boundary == "unknown" or ln == boundary):
+            placed = True
+        if role == "assistant":
+            # Assistant text before the boundary still frames the first user turn after it.
+            if not (placed and ln in skip):
+                tail = (ln, text)
+            continue
+        if not placed or ln in skip:
+            continue
+        if tail is not None:
+            out.append("L%d [assistant] %s" % (tail[0], _clip_tail(tail[1], DIGEST_ASSISTANT_CHARS)))
+            tail = None
+        out.append("L%d [%s] %s" % (ln, role, _clip_head(text, DIGEST_USER_CHARS)))
+    if placed and tail is not None:
+        out.append("L%d [assistant] %s" % (tail[0], _clip_tail(tail[1], DIGEST_ASSISTANT_CHARS)))
     return "\n".join(out) + "\n"
 
 
@@ -3343,7 +3382,9 @@ def build_run(args, ctx):
     details["unattributed.json"] = {"empty_session_ids": sorted(run.empty_unattributed)}
     manifest = {
         "snapshot_at": iso(ctx.now),
-        "sweep_due": n_counted >= SWEEP_DUE_SESSIONS or n_due > 0,
+        "sweep_due": n_counted >= SWEEP_DUE_SESSIONS or n_due > 0 or (
+            n_counted > 0 and run.last_run is not None
+            and (ctx.now - run.last_run).total_seconds() >= SWEEP_DUE_DAYS * 86400),
         "due_sessions": n_counted,
         "new_project_baseline": {"rule": run.new_rule,
                                  "since": iso(run.new_baseline) if run.new_baseline else None},
@@ -3864,7 +3905,34 @@ def session_tokens(session):
     return sum(by_role.values()), by_role, None
 
 
-BASELINE_ROLES = ("orchestrator", "task4", "verifier", "drafter", "other")
+# API price ratios per usage field: relative cost, not a quota percentage. The session-cost target
+# (memory-rules.md § State File Format, cost_records) is stated in these units.
+USAGE_WEIGHTS = {"input_tokens": 1, "output_tokens": 5, "cache_creation_input_tokens": 1.25,
+                 "cache_read_input_tokens": 0.1}
+
+
+def session_weighted(session, since=None):
+    """-> (weighted tokens, problem) for one transcript and its sub-agents, counting only records at
+    or after `since` (a transcript can hold work from before the sweep). A record with no timestamp
+    counts. dream-write.py `state apply` fills the cost record's weighted_tokens with it."""
+    session = Path(session)
+    if not session.is_file():
+        return None, "no transcript at %s" % session
+    _subs, loaded, errors = load_session_files(session)
+    if not loaded or loaded[0][0] != session:
+        return None, "transcript unreadable: %s" % "; ".join(errors)
+    cut = parse_time(since) if since else None
+    if cut is not None:
+        def kept(rec):
+            ts = parse_time(rec.get("timestamp"))
+            return ts is None or ts >= cut
+        loaded = [(f, [(ln, r) for ln, r in recs if kept(r)]) for f, recs in loaded]
+    u = usage_by_message(loaded, session)
+    total = sum(USAGE_WEIGHTS.get(k, 1) * n for v in u["per_id"].values() for k, n in v.items())
+    return int(round(total)), None
+
+
+BASELINE_ROLES =("orchestrator", "task4", "verifier", "drafter", "other")
 # A call's context size (D13 peak context): everything the model read on that
 # call, so output_tokens is left out.
 CONTEXT_FIELDS = ("input_tokens", "cache_creation_input_tokens", "cache_read_input_tokens")
@@ -4091,7 +4159,7 @@ REQUIRED_CASES = [
     "kiro-in-progress-stale", "kiro-deferred-watermark", "kiro-prompt-skill-body-with-args",
     "kiro-invocation-without-leading-slash", "kiro-pasted-skill-draft", "mixed-timezone-offsets",
     "near-deletion-age", "kiro-near-deletion-age", "kiro-retention-unset", "store-backed-workspace", "store-repo-unit", "structural-subproject", "structural-config-shared", "no-new-sessions",
-    "torn-final-line", "leftover-work-folder", "guard-prefix-and-dotdot", "count-writes-nothing",
+    "torn-final-line", "leftover-work-folder", "guard-prefix-and-dotdot", "count-writes-nothing", "count-due-after-days",
     # review fixes (2026-09-24)
     "claude-shell-mode-records", "claude-harness-blocks", "claude-loose-history-two-projects",
     "user-memory-entries", "user-memory-duplicate-heading", "kiro-missing-parts", "claude-empty-local-transcript",

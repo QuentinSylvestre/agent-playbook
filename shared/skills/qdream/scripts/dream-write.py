@@ -3305,6 +3305,15 @@ def fill_tokens(run, cost, orient):
     run.notes.append("tokens: %d from %d transcript(s), by role %s (a lower bound: the "
                      "running transcripts are still being written)"
                      % (total, len(paths), ", ".join("%s=%d" % kv for kv in roles.items())))
+    weighted = 0
+    for p in paths:
+        n, why = dm.session_weighted(p, orient.get("snapshot_at"))
+        if why:
+            run.notes.append("weighted tokens: not recorded -- %s" % ascii_safe(why, 200))
+            return
+        weighted += n
+    cost["weighted_tokens"] = weighted
+    run.notes.append("weighted tokens: %d since %s" % (weighted, orient.get("snapshot_at")))
 
 
 def compute_apply(run, obj, inp, dec):
