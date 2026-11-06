@@ -175,6 +175,8 @@
   tr.add td { background: var(--add-bg); } tr.add td.ln { color: var(--add-fg); }
   tr.del td { background: var(--del-bg); } tr.del td.ln { color: var(--del-fg); }
   tr.hunk td { background: var(--hunk-bg); color: var(--hunk-fg); font-style: italic; }
+  #part-narrative :is(h1, h2, h3, h4) { scroll-margin-top: calc(var(--part-bar-h, 48px) + 12px); }
+  #part-narrative code { overflow-wrap: anywhere; }
   .file-msg { padding: 16px 20px; color: var(--muted); font-size: 12px; }
   #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(60px); background: #333; color: #fff; padding: 8px 16px; border-radius: 20px; font-size: 12px; z-index: 9999; pointer-events: none; transition: transform .25s, opacity .25s; opacity: 0; white-space: nowrap; max-width: 90vw; overflow: hidden; text-overflow: ellipsis; }
   #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
@@ -224,12 +226,13 @@
     <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
       <button class="nbtn" onclick="navHunk(-1)">Prev hunk</button><button class="nbtn" onclick="navHunk(1)">Next hunk</button>
       <button class="nbtn" onclick="navFile(-1)">Prev file</button><button class="nbtn" onclick="navFile(1)">Next file</button>
+      <button class="nbtn" id="copy-notes" onclick="copyNotes()">Copy notes</button>
       <span style="color:var(--muted);font-size:11px"><span class="kbd">j/k</span> hunk <span class="kbd">J/K</span> file <span class="kbd">m</span> mark <span class="kbd">c</span> collapse</span>
     </div>
   </div>
   <div id="nav"><div id="nav-inner"></div></div>
   <div id="nav-resizer" title="Drag to resize, double-click to reset"></div>
-  <div id="main"><div id="fc"></div></div>
+  <div id="main"><div id="excluded-note"></div><div id="fc"></div></div>
 </div>
 <div id="toast"></div>
 
@@ -445,29 +448,39 @@ function toggleTheme() {
 // Reviewed state lives under qexplain-diff-<slug>, the slug being the file name stem lowercased with _ as -.
 const FILE_STEM = decodeURIComponent(location.pathname.split('/').pop() || 'explanation').replace(/\.html?$/i, '');
 const STORE_KEY = 'qexplain-diff-' + FILE_STEM.toLowerCase().replace(/_/g, '-');
-const TYPE_ORDER = [['src', 'Source'], ['test', 'Tests'], ['config', 'Configuration'], ['doc', 'Documentation'], ['other', 'Other']];
+const TYPE_ORDER = [['src', 'Source'], ['test', 'Tests'], ['config', 'Configuration'], ['doc', 'Documentation'], ['generated', 'Generated'], ['other', 'Other']];
 function fileType(p) {
-  if (/(^|\/)(tests?|__tests__|spec|testdata)\/|[._-](test|spec)\.[^/]+$|_test\.go$/i.test(p)) return 'test';
+  // Keep in step with file_type() in scripts/qexplain_diff.py.
+  if (/(^|\/)(vendor|node_modules|dist|third_party)\/|\.min\.(js|css)$|\.generated\.|_generated\.|\.pb\.go$|(^|\/)(package-lock\.json|yarn\.lock|pnpm-lock\.yaml|go\.sum|Cargo\.lock|poetry\.lock|composer\.lock|Gemfile\.lock|uv\.lock)$/i.test(p)) return 'generated';
+  if (/(^|\/)(tests?|testing|__tests__|spec|testdata|test_data|fixtures?|__fixtures__|__snapshots__)\/|[._-](test|spec)\.[^/]+$|_test\.go$|(^|\/)test_[^/]+$|(^|\/)conftest\.py$|\.snap$/i.test(p) || /[a-z]Tests?\.(java|kt|cs|scala|swift|php)$/.test(p)) return 'test';
   if (/\.(md|mdx|rst|adoc|txt)$/i.test(p) || /(^|\/)(README|CHANGELOG|LICENSE)[^/]*$/i.test(p)) return 'doc';
   if (/\.(json|jsonc|ya?ml|toml|ini|cfg|conf|env|xml|lock|properties|gradle)$/i.test(p) || /(^|\/)(\.[^/]+|Dockerfile|Makefile|Procfile)$/i.test(p)) return 'config';
   if (/\.(go|py|js|jsx|ts|tsx|mjs|cjs|java|kt|kts|rs|c|cc|cpp|h|hpp|cs|rb|php|swift|scala|sh|bash|ps1|psm1|sql|html|css|scss|vue|svelte|lua|dart)$/i.test(p)) return 'src';
   return 'other';
 }
 function parseDiff(raw) {
-  const files = []; let cur = null;
+  const files = []; let cur = null, inHunk = false;
   for (const line of raw.split('\n')) {
     if (line.startsWith('diff --git ')) {
       if (cur) files.push(cur);
+      inHunk = false;
+      // 'a/X b/X': split at the midpoint, because X may itself hold ' b/'.
+      const rest = line.slice(11), mid = (rest.length - 1) / 2;
+      const same = Number.isInteger(mid) && rest[mid] === ' ' && rest.slice(2, mid) === rest.slice(mid + 3);
       const m = line.match(/^diff --git a\/(.*) b\/(.*)$/);
-      cur = { path: m ? m[2] : line.slice(11), lines: [], add: 0, del: 0, isNew: false, isDel: false, binary: false, renamedFrom: null };
+      const parsed = (QX.paths || [])[files.length];  // the build's parsed path, which also decodes quoted names
+      cur = { path: parsed || (same ? rest.slice(mid + 3) : (m ? m[2] : rest)), lines: [], add: 0, del: 0, isNew: false, isDel: false, binary: false, renamedFrom: null };
     } else if (cur) {
-      if (line.startsWith('new file')) cur.isNew = true;
-      else if (line.startsWith('deleted file')) cur.isDel = true;
-      else if (line.startsWith('rename from ')) cur.renamedFrom = line.slice(12);
-      else if (line.startsWith('Binary files ')) cur.binary = true;
+      if (line.startsWith('@@')) inHunk = true;
+      if (!inHunk) {
+        if (line.startsWith('new file')) cur.isNew = true;
+        else if (line.startsWith('deleted file')) cur.isDel = true;
+        else if (line.startsWith('rename from ')) cur.renamedFrom = line.slice(12);
+        else if (line.startsWith('Binary files ')) cur.binary = true;
+        else if (line.startsWith('+++ b/') && !(QX.paths || [])[files.length]) cur.path = line.slice(6).replace(/\t$/, '');
+      } else if (line.startsWith('+')) cur.add++;
+      else if (line.startsWith('-')) cur.del++;
       cur.lines.push(line);
-      if (line.startsWith('+') && !line.startsWith('+++')) cur.add++;
-      else if (line.startsWith('-') && !line.startsWith('---')) cur.del++;
     }
   }
   if (cur) files.push(cur);
@@ -528,7 +541,23 @@ function ensureDiff() {
   document.getElementById('filter-group').innerHTML = '<button class="fbtn on" onclick="setF(\'all\',this)">All</button>'
     + GROUPS.map(g => '<button class="fbtn" onclick="setF(\'' + g.f + '\',this)">' + esc(g.label) + '</button>').join('')
     + '<button class="fbtn" onclick="setF(\'ur\',this)">Unreviewed</button>';
-  buildNav(); buildFiles(); initNavResize(); measureHeader();
+  renderExcluded(); buildNav(); buildFiles(); initNavResize(); measureHeader();
+}
+// Files left out of the page: their names, counts and reasons only.
+function renderExcluded() {
+  const items = QX.excluded || [];
+  if (!items.length) return;
+  document.getElementById('excluded-note').innerHTML = '<div class="callout"><strong>Left out of this page.</strong> Review these yourself in a terminal. If a path starts with a repo label, leave the label out there.<ul>'
+    + items.map(x => '<li><code style="overflow-wrap:anywhere">' + esc(x.path) + '</code> +' + x.add + ' -' + x.del + ' (' + esc(x.reason || 'left out') + ')</li>').join('') + '</ul></div>';
+}
+// Copies every file note as Markdown, ready to paste into a merge request or a follow-up list.
+function copyNotes() {
+  const noted = ordered.filter(p => (ST[p + '__n'] || '').trim());
+  if (!noted.length) { showToast('No notes yet'); return; }
+  const reviewed = ordered.filter(p => ST[p]).length;
+  const lines = ['# Review notes: ' + baseTitle, '', 'Base: ' + QX.base + '. Head: ' + QX.head + '. Reviewed ' + reviewed + ' of ' + ordered.length + ' files.', ''];
+  noted.forEach(p => lines.push('- `' + p + '`' + (ST[p] ? ' (reviewed)' : '') + ': ' + ST[p + '__n'].trim().replace(/\n/g, '\n  ')));
+  copyText(lines.join('\n') + '\n', 'Copied notes on ' + noted.length + ' files', document.getElementById('copy-notes'));
 }
 function setNavView(v, btn) {
   navMode = v;

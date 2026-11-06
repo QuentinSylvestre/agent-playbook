@@ -5,7 +5,8 @@ Checks the generated HTML against the guarantees the skill promises: external
 libraries are version-pinned and from a known CDN, nothing depends on an API
 that dies on a file:// origin, code blocks keep their newlines, every link
 resolves, every part and map tab has a panel (and every part-panel has a
-matching control and vice versa), and no emoji.
+matching control and vice versa), the Narrative part says what was verified,
+and no emoji.
 
 Standard library only; nothing to install. <python> is <config-repo>/.venv-agent-playbook/Scripts/python.exe -I.
 
@@ -212,13 +213,29 @@ def run(path):
         pdetail.append("part panels with no control: " + ", ".join(sorted(panels - controls)))
     check("parts-wired", not pdetail, "; ".join(pdetail))
 
-    found = EMOJI.findall(source)
+    # The section must sit in the Narrative part and say something after its heading.
+    narrative = re.search(r"""id=["']part-narrative["'](.*?)id=["']part-maps["']""", source, re.S)
+    section = re.search(r"""<(h[1-6])\b[^<>]{0,512}\bid=["']verified["'][^<>]{0,512}>.*?</\1>(.*?)(?=<h[1-6]\b|\Z)""",
+                        narrative.group(1) if narrative else "", re.S | re.I)
+    body = re.sub(r"<[^>]+>", " ", section.group(2)) if section else ""
+    check("verified-section", len(body.split()) >= 5,
+          'no heading with id="verified" and text after it in the Narrative part -- '
+          "it must say what was and was not verified")
+
+    # The rule covers what the agent writes. The diff is the repo's own text, shown as it is.
+    start = source.find('"rawDiff": "')
+    end = source.find('"excluded":', start) if start >= 0 else -1
+    written = source[:start] + source[end:] if start >= 0 and end >= 0 else source
+    found = EMOJI.findall(written)
     check("no-emoji", not found, "emoji present: " + " ".join(sorted(set(found))[:8]))
 
     return results
 
 
 def main():
+    # -I ignores PYTHONIOENCODING, and a piped Windows console cannot print every character.
+    sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("path", help="path to the generated explanation HTML file")
     args = ap.parse_args()

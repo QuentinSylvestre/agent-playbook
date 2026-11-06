@@ -11,9 +11,26 @@ Standard library only; nothing to install. <python> is <config-repo>/.venv-agent
 Usage:
     <python> build-explanation.py --out <path.html> --title <text> \
         --base <base-ref> --head <head-ref> \
-        (--diff-args "<git diff arguments>" | --diff-file <unified.diff>) \
+        (--diff-args "<git diff arguments>" | --diff-file <unified.diff> \
+         | --target "<label>=<repo>::<git diff arguments>" ...) \
         --narrative <narrative.html> --summary <summary.html> \
-        --maps <maps.json> --rationales <rationales.json> [--repo <dir>]
+        --maps <maps.json> --rationales <rationales.json> [--repo <dir>] \
+        [--exclude <glob>]... [--allow-credential <path>:<side>:<line>]...
+
+--target may repeat, one per repo. Each repo's paths then start with <label>/, and
+rationales.json uses those labelled paths. Give --base and --head one readable text
+that names each repo's ref.
+
+--exclude leaves a file out of the page, on top of a built-in list of secret-bearing file
+names. The page names each file left out, with its line counts and never its content.
+
+Any remaining credential-shaped text stops the build, with its path and line and never its
+value. Exclude the file, or pass --allow-credential with the match's path, side and line as
+measure-change.py prints them (for example a_test.go:new:12), which the build accepts only for
+a match marked made-up-test-value=yes. --mask-credential takes the same form for any match: it
+replaces the value on the page and keeps the rest of the file, so prefer it for a test file.
+--user-confirmed-credential is for a match the user has personally said is not a live credential.
+Text in the content files, title and refs cannot be allowed; reword it.
 
 Content files:
     narrative.html, summary.html  HTML fragments, placed inside the part's page column.
@@ -40,11 +57,13 @@ import html
 import json
 import os
 import re
-import shlex
 import subprocess
 import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)  # -I leaves the script's folder off the path
+import qexplain_diff as qd  # noqa: E402
+
 TEMPLATE = os.path.join(HERE, "..", "assets", "template.html")
 VALIDATOR = os.path.join(HERE, "validate-explanation.py")
 VIEW_ORDER = ["system", "dataflow", "deps", "actions", "sequence"]
@@ -58,10 +77,10 @@ def fail(msg):
 
 def read(path):
     try:
-        with open(path, "r", encoding="utf-8") as fh:
+        with open(path, "r", encoding="utf-8-sig") as fh:
             return fh.read()
-    except OSError as exc:
-        fail(f"cannot read {path}: {exc}")
+    except (OSError, UnicodeError) as exc:
+        fail(f"cannot read {path} as UTF-8: {exc}")
 
 
 def read_json(path):
@@ -74,20 +93,14 @@ def read_json(path):
 def capture_diff(args):
     if args.diff_file:
         return read(args.diff_file)
-    cmd = ["git", "-C", args.repo, "-c", "core.quotepath=off", "diff", "--unified=3", "--no-color",
-           "--no-ext-diff", "--src-prefix=a/", "--dst-prefix=b/"] + shlex.split(args.diff_args)
-    proc = subprocess.run(cmd, capture_output=True)
-    if proc.returncode != 0:
-        fail("git diff failed: " + proc.stderr.decode("utf-8", "replace").strip())
-    return proc.stdout.decode("utf-8", "replace")
-
-
-def changed_paths(raw):
-    paths = []
-    for line in raw.split("\n"):
-        if line.startswith("diff --git a/") and " b/" in line:
-            paths.append(line.rsplit(" b/", 1)[1])
-    return paths
+    try:
+        if args.target:
+            parts = [qd.capture(repo, diff_args, label)
+                     for label, repo, diff_args in (qd.parse_target(t) for t in args.target)]
+            return "\n".join(p.rstrip("\n") for p in parts if p.strip()) + "\n"
+        return qd.capture(args.repo, args.diff_args)
+    except (ValueError, RuntimeError) as exc:
+        fail(str(exc))
 
 
 def check_views(maps):
@@ -134,6 +147,9 @@ def script_json(data):
 
 
 def main():
+    # -I ignores PYTHONIOENCODING, and a piped Windows console cannot print every file name.
+    sys.stdout.reconfigure(encoding="utf-8", errors="backslashreplace")
+    sys.stderr.reconfigure(encoding="utf-8", errors="backslashreplace")
     ap = argparse.ArgumentParser(description=__doc__.split("\n")[0])
     ap.add_argument("--out", required=True)
     ap.add_argument("--title", required=True)
@@ -142,6 +158,14 @@ def main():
     src = ap.add_mutually_exclusive_group(required=True)
     src.add_argument("--diff-args", help='arguments for git diff, e.g. "abc123..def456" or "main...HEAD -- src/"')
     src.add_argument("--diff-file", help="a unified diff already captured as UTF-8 (e.g. from a PR)")
+    src.add_argument("--target", action="append", help='one per repo: "<label>=<repo>::<git diff arguments>"')
+    ap.add_argument("--exclude", action="append", default=[], help="glob of a path to leave out of the page")
+    ap.add_argument("--allow-credential", action="append", default=[],
+                    help="<path>:<side>:<line> of one match marked made-up-test-value=yes")
+    ap.add_argument("--mask-credential", action="append", default=[],
+                    help="<path>:<side>:<line> of one match whose value is hidden on the page")
+    ap.add_argument("--user-confirmed-credential", action="append", default=[],
+                    help="<path>:<side>:<line> of one match the user has said is not a live credential")
     ap.add_argument("--repo", default=".")
     ap.add_argument("--narrative", required=True)
     ap.add_argument("--summary", required=True)
@@ -152,22 +176,55 @@ def main():
     raw = capture_diff(args)
     if not raw.strip():
         fail("the diff is empty")
+    kept, left_out, unused = qd.filter_files(qd.split_files(raw), args.exclude)
+    if not kept:
+        fail("no file can be shown: every file was left out, or the input holds no diff. "
+             "Check the LEFT-OUT lines from measure-change.py and tell the user this change has no page")
+    kept, unmatched = qd.mask_files(kept, args.mask_credential)
+    if unmatched:
+        fail("--mask-credential matched nothing: " + ", ".join(qd.safe_path(k) for k in unmatched))
+    for key in args.mask_credential:
+        print(f"MASKED\t{qd.safe_path(key)}")
+    raw = "\n".join(block for _, block in kept) + "\n"
+    if unused:
+        fail("--exclude matched nothing, so a file meant to stay out may be on the page: " + ", ".join(unused))
     rationales = read_json(args.rationales)
     if not isinstance(rationales, dict):
         fail("rationales.json must map file paths to sentences")
     views = check_views(read_json(args.maps))
+    narrative, summary = read(args.narrative), read(args.summary)
+
+    diff_hits = qd.scan_files(kept)
+    for key in args.allow_credential:
+        matched = [h for h in diff_hits if qd.hit_key(h) == key]
+        if any(not qd.looks_made_up(h) for h in matched):
+            fail(f"--allow-credential {qd.safe_path(key)} is not marked made-up-test-value=yes. Exclude the file, or ask the user")
+    allowed = set(args.allow_credential) | set(args.user_confirmed_credential)
+    for key in sorted(allowed):
+        n = sum(1 for h in diff_hits if qd.hit_key(h) == key)
+        print(f"ALLOWED\t{qd.safe_path(key)}\t{n} match(es)" if n else f"WARN\tallowed match {qd.safe_path(key)} is not in the diff")
+    hits = [h for h in diff_hits if qd.hit_key(h) not in allowed]
+    for name, text in (("narrative", narrative), ("summary", summary), ("maps.json", read(args.maps)),
+                       ("rationales.json", read(args.rationales)), ("title and refs", f"{args.title}\n{args.base}\n{args.head}")):
+        hits += qd.scan_content_file(name, text)
+    if hits:
+        for hit in hits:
+            print(qd.hit_line(hit), file=sys.stderr)
+        fail("credential-shaped text found; nothing written. Exclude the file, allow a made-up test value by its "
+             "path:side:line, or reword your own text")
 
     page = read(TEMPLATE)
     slots = {
         "{{TITLE}}": html.escape(args.title),
         "{{BASE_REF}}": html.escape(args.base),
         "{{HEAD_REF}}": html.escape(args.head),
-        "<!--@NARRATIVE-->": read(args.narrative),
+        "<!--@NARRATIVE-->": narrative,
         "<!--@MAPS-->": maps_html(views),
-        "<!--@SUMMARY-->": read(args.summary),
+        "<!--@SUMMARY-->": summary,
         "/*@DATA*/": "const QX = " + script_json({
             "base": args.base, "head": args.head, "views": views,
-            "rationales": rationales, "rawDiff": raw,
+            "rationales": rationales, "rawDiff": raw, "excluded": left_out,
+            "paths": [path for path, _ in kept],
         }) + ";",
     }
     for marker in slots:
@@ -176,15 +233,16 @@ def main():
     # One pass, so text inside a filled slot is never mistaken for another slot.
     page = re.sub("|".join(re.escape(m) for m in slots), lambda m: slots[m.group(0)], page)
 
-    paths = changed_paths(raw)
+    paths = [path for path, _ in kept]
+    for item in left_out:
+        print(f"LEFT-OUT\t{qd.safe_path(item['path'])}\t+{item['add']} -{item['del']}\t{item['reason']}")
     for p in paths:
         if p not in rationales:
-            print(f"WARN\tno rationale for {p}")
+            print(f"WARN\tno rationale for {qd.safe_path(p)}")
     for p in rationales:
         if p not in paths:
-            print(f"WARN\trationale for {p}, which is not in the diff")
-    changed = sum(1 for line in raw.split("\n")
-                  if line[:1] in "+-" and not line.startswith(("+++", "---")))
+            print(f"WARN\trationale for {qd.safe_path(p)}, which is not in the diff")
+    changed = sum(sum(qd.counts(block)) for _, block in kept)
     if changed > 2000:
         print("NOTE\tThis diff is large; the artifact may take a few seconds to parse on first load.")
 

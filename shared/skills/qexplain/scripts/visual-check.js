@@ -27,7 +27,8 @@
  *      counts; state survives a reload under qexplain-diff-<slug>; j and m work; a
  *      type filter narrows the list; added rows are coloured; clicking a cell wraps
  *      and unwraps it; tree view shows directories; the sidebar resizes, persists,
- *      and resets on double-click; both hash pills copy.
+ *      and resets on double-click; both hash pills copy; Copy notes exports a note with
+ *      its file path; every file left out is named; the verified section exists.
  *   7. At 390px wide no part scrolls the page sideways. No page errors.
  *
  * Exit codes: 0 every check OK, 1 at least one BAD, 2 could not run.
@@ -44,7 +45,7 @@ catch (e) { console.error('ERROR\tplaywright is not installed or not resolvable 
 const out = opt('--out') || fs.mkdtempSync(path.join(os.tmpdir(), 'qexplain-shots-'));
 fs.mkdirSync(out, { recursive: true });
 const libs = opt('--libs');
-const url = 'file://' + path.resolve(file);
+const url = require('url').pathToFileURL(path.resolve(file)).href;
 const stem = path.basename(file).replace(/\.html?$/i, '');
 const storeKey = 'qexplain-diff-' + stem.toLowerCase().replace(/_/g, '-');
 
@@ -182,6 +183,20 @@ async function routeLibs(target) {
     if ((await page.evaluate(() => navigator.clipboard.readText().catch(() => ''))).length) copied++;
   }
   log(copied === 2, `both hash pills copy (${copied}/2)`);
+  const noteText = 'visual-check note';
+  await page.evaluate(() => { const b = document.querySelector('.fbtn'); if (b) b.click(); });
+  const noteBox = await page.$('.fc:not(.iscol):not(.hide) .notearea');
+  if (noteBox) {
+    await noteBox.fill(noteText);
+    await page.click('#copy-notes'); await wait(200);
+    const notes = await page.evaluate(() => navigator.clipboard.readText().catch(() => ''));
+    const cardPath = await noteBox.evaluate(t => t.closest('.fc').dataset.p);
+    log(notes.includes(noteText) && notes.includes(cardPath), 'Copy notes exports the note with its file path');
+    await noteBox.fill('');
+  } else log(false, 'Copy notes: no open file card to write a note on');
+  const leftOut = await page.evaluate(() => (QX.excluded || []).length);
+  if (leftOut) log(await page.$$eval('#excluded-note li', n => n.length) === leftOut, `Diff review names all ${leftOut} files left out`);
+  log(await page.$('#verified') !== null, 'Narrative part has the verified section');
 
   // 7. Phone width
   const phone = await browser.newPage({ viewport: { width: 390, height: 800 } }); watch(phone);

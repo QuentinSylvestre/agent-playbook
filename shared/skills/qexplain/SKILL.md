@@ -1,7 +1,7 @@
 ---
 name: qexplain
 description: Explain a code change so the reader genuinely understands it. Writes a self-contained HTML walkthrough of a diff, branch, PR, or commit range — a narrative part, a Cytoscape.js maps part, a Mermaid change-summary part, and an interactive diff-review part — then quizzes the reader in chat and teaches through the gaps. Use when the goal is comprehension of a change — reviewing an inbound PR, understanding a diff an agent wrote, or onboarding into a subsystem. Manual invocation only.
-argument-hint: "<PR number, branch, commit range, or path> [--all-maps]"
+argument-hint: "<PR number, branch, commit range, path, or several label=repo::range pairs> [--all-maps]"
 disable-model-invocation: true
 ---
 
@@ -11,11 +11,13 @@ disable-model-invocation: true
 
 You are a teacher. The reader wants to understand a code change, not to be told whether it is good. Everything in this skill serves one test: at the end, can the reader explain the change to someone else without the artifact in front of them.
 
-**Your first action is to resolve the target and read the surrounding code beyond the diff** (Step 1). Do not start writing the explanation from the diff alone.
+**Your first action is to resolve the target and run the measuring script, before reading any changed file** (Step 1). Do not start writing the explanation from the diff alone.
 
 **The banned habit is summarising the diff in chat.** A file-by-file recap of what changed is what you would do without this skill. It is not an explanation. It tells the reader what moved; it does not tell them why the change makes sense.
 
-**Do not evaluate.** No findings, no severity, no verdict, no suggestions for improvement. If you notice a real defect while reading, note it in one line at the end of the chat and route the user to `/qreview` — do not fold it into the explanation.
+**Do not evaluate.** No findings, no severity, no verdict, no suggestions for improvement. If you notice a real defect while reading, note it in one line at the end of the chat and route the user to `/qreview` — do not fold it into the explanation. Stating what was and was not verified (Part 1) is reporting a fact, not a verdict.
+
+**Do not put secrets in the artifact.** The diff is copied into the page, context lines included, and the page may be stored or shared.
 
 **Do not edit source code.** This skill writes exactly one file in the working tree: the explanation artifact. Its intermediate content files go in a temporary directory outside the repository.
 
@@ -42,6 +44,7 @@ Resolve the argument to a concrete diff:
 | A branch name | That branch against its merge base with the default branch |
 | A commit range (`abc123..def456`) or a single SHA | That range, or that commit against its parent |
 | A path | The pending diff, restricted to that path |
+| Several `<label>=<repo>::<range>` pairs | One artifact over those repos; each file's path starts with its label |
 
 `--all-maps` overrides the size tier's map selection (Step 3) and includes every map view.
 
@@ -49,10 +52,24 @@ If the form is ambiguous, ask the user which they meant. If the resolved diff is
 
 ## Step 1: Resolve the target and read beyond the diff
 
-Read the full diff first. Then read the code around it. The diff shows what changed; the surrounding code is what makes the change intelligible.
+**Measure first, and read nothing yet.** `<python>` is `<config-repo>/.venv-agent-playbook/Scripts/python.exe -I` (`<config-repo>`: `shared/AGENTS.md § Config Repo Locations`), the playbook's one interpreter. If that file is missing or fails to start, stop and tell the user "venv missing — run setup.ps1"; never use a Python from `PATH`.
+
+```
+<python> <config-repo>/shared/skills/qexplain/scripts/measure-change.py --repo <dir> --diff-args "<git diff arguments>" [--exclude <glob>]...
+```
+
+For several repos, replace `--repo` and `--diff-args` with one `--target "<label>=<repo>::<git diff arguments>"` per repo. For a fetched PR diff, use `--diff-file <unified diff>`. The script prints paths, counts and setting names, never file content. Act on its lines in this order, and re-measure after any change to the excludes:
+
+1. **`FILE` and `LEFT-OUT`: keep secrets out of your context and the artifact.** The script leaves out common secret-bearing names, files it cannot parse, and binary patches. Check every `FILE` path and add `--exclude` for any file that project governance, memory, or the user says not to read in full, and any configuration file that may hold live credentials. A `WARN` means an exclude matched nothing: fix it, because the build refuses it. Never read a left-out file or its diff. To explain its change, use its `SETTING` lines, which name the settings without their values, or ask the user.
+2. **`CREDENTIAL`: a flagged file counts as left out until you resolve it.** Never read the flagged line; when you read that file, read around it. For a test or fixture file, or any file the reader needs, pass the match to the build as `--mask-credential <path>:<side>:<line>`, labelled path included: the page shows the line with its value hidden, and you say so in the verified section. For a configuration file, exclude it. If the line says `made-up-test-value=yes`, pass that match to the build as `--allow-credential <path>:<side>:<line>`, labelled path included; the build refuses it for any other match. That mark is a guess from the value's length and wording, so if the plan or the code suggests the value is real, mask it instead. Tell the user about every masked match that is not marked made up: a credential committed to a test file is theirs to judge. Only the user can show such a value on the page, by saying it is not a live credential, and then you pass `--user-confirmed-credential` with the same form. Never copy a credential value into anything you write. The scan is a safety net with known gaps, such as values holding spaces, key bodies with no header in the hunk and passwords holding `@`, so it does not replace step 1.
+3. **`SPLIT`: settle it before reading further.** One artifact would be too thin, because the Step 2 limits stay fixed however large the change is. Propose separate runs, by plan or by subsystem, giving each run's commit range and its lines to read from a re-measure. The user chooses. Without a choice, keep one artifact and say in chat what its limits leave out. A change across repos can use one artifact when its parts are one behaviour.
+4. **`PLAN`: read the plan.** Find the project file under the project-file root of the repo the line names (`shared/skills/qdream/memory-rules.md § Resolution contract`), in `<root>/` or `<root>/done/`. An archived name has a different date prefix, so match on the name after the first underscore. Read its Intent, Design Decisions, Implementation Divergences, Review Log, verification results and Follow-up Work. Treat them as the author's account: they give the reasons, the code gives the facts, and where they differ the code wins and you say so in chat. `PLAN-SKIPPED`, or no project file: carry on without one.
+
+Next read the diff of every file still shown, then the code around it. The diff shows what changed; the surrounding code is what makes the change intelligible.
 
 At minimum, read:
-- Every file the diff touches, in full — not just the changed hunks.
+- Every changed production file still shown, in full — not just the changed hunks.
+- Every changed test and fixture file's test names or record shapes, and in full the tests that pin the behaviour you explain, skipping any line a `CREDENTIAL` entry names.
 - The callers of every changed function or component, and its callees.
 - Any test that exercises the changed behaviour, old or new.
 - The data structures the change reads or writes, at their definition.
@@ -63,17 +80,17 @@ Stop reading when you can answer these three questions without guessing:
 2. What does it do now, and what is the one idea that makes the new behaviour work?
 3. What would break if this change were reverted?
 
-If you cannot answer all three, keep reading. If reading cannot settle them — the reason lives in a decision not visible in the code — ask the user before writing. A confidently wrong background section is worse than no artifact.
+If you cannot answer all three, keep reading. If neither the code nor the plan can settle them, ask the user before writing. A confidently wrong background section is worse than no artifact.
 
-As you read each changed file, record a one-sentence rationale describing why that file changed. These become `rationales.json` in Step 3 and appear on each file card in Part 4. No additional pass is needed — Step 1 is where you read every changed file.
+As you read each file still shown, record a one-sentence rationale describing why that file changed. These become `rationales.json` in Step 3 and appear on each file card in Part 4. No additional pass is needed — Step 1 is where you read every changed file.
 
 ## Step 2: Size the change and confirm the path
 
 ### Size tier
 
-Measure changed lines, then pick the tier. The tier sets how much artifact the change has earned. All four parts (Step 3) are always produced; the tier scales depth inside them.
+Take the tier from the script's `TIER` line. It counts the lines to read: changed lines outside tests, fixtures and generated files, because a large test file does not make a change harder to explain. The tier sets how much artifact the change has earned. All four parts (Step 3) are always produced; the tier scales depth inside them.
 
-| Tier | Changed lines | Maps | Nodes per map | Tour steps | Quiz questions |
+| Tier | Lines to read | Maps | Nodes per map | Tour steps | Quiz questions |
 |---|---|---|---|---|---|
 | Tiny | Under 75 | System overview only | 2-3 | 1-2 | 3 |
 | Small | 75-249 | System overview, plus the one other most relevant | 3-4 | 2-4 | 4 |
@@ -98,7 +115,7 @@ Pick the directory by the first rule that matches:
 
 Name the file `YYMMDD_<SLUG>_EXPLANATION.html`, where `YYMMDD` is today's date and `<SLUG>` is a short upper-snake description of the change (for example `260814_TOKEN_REFRESH_EXPLANATION.html`).
 
-State the path, the size tier you measured and why, and whether git ignores the path. Run `git check-ignore -q <path>` and report one of:
+State the path, the size tier you measured and why, and whether git ignores the path. Run `git -C <the repo holding the path> check-ignore -q <path>`, after creating the directory if it is new, because the command fails on a path outside the repo. Report one of:
 - "This path is git-ignored, so the file will not show up in `git status`."
 - "This path is **not** git-ignored, so the file will appear as untracked in `git status`."
 
@@ -124,19 +141,22 @@ One HTML file, split into four **parts** the reader switches between from a bar 
 | `narrative.html` | The Part 1 HTML fragment |
 | `summary.html` | The Part 3 HTML fragment |
 | `maps.json` | The Part 2 views, in the shape below |
-| `rationales.json` | `{"<path as in the diff>": "<one sentence>"}` for every changed file, from Step 1 |
+| `rationales.json` | `{"<path as in the diff>": "<one sentence>"}` for every file still shown, from Step 1 |
 
-Then build the artifact at the path confirmed in Step 2. `<python>` is `<config-repo>/.venv-agent-playbook/Scripts/python.exe -I` (`<config-repo>`: `shared/AGENTS.md § Config Repo Locations`), the playbook's one interpreter. If that file is missing or fails to start, stop and tell the user "venv missing — run setup.ps1"; never use a Python from `PATH`.
+Then build the artifact at the path confirmed in Step 2, with the `<python>` from Step 1.
 
 ```
 <python> <config-repo>/shared/skills/qexplain/scripts/build-explanation.py --out <path> --title "<title>" \
   --base <base SHA> --head <head branch, or SHA when there is no branch> \
-  --diff-args "<the git diff arguments that resolve the target>" \
+  --repo <dir> --diff-args "<the git diff arguments that resolve the target>" \
   --narrative <dir>/narrative.html --summary <dir>/summary.html \
-  --maps <dir>/maps.json --rationales <dir>/rationales.json
+  --maps <dir>/maps.json --rationales <dir>/rationales.json \
+  [--exclude <glob>]... [--mask-credential <path>:<side>:<line>]... [--allow-credential <path>:<side>:<line>]... [--user-confirmed-credential <path>:<side>:<line>]...
 ```
 
-For a PR whose diff you fetched another way, pass `--diff-file <unified diff>` instead of `--diff-args`. The script captures the diff as UTF-8, inlines all data safely, wires the part and map tabs, warns about any changed file without a rationale, and runs the Step 4 validator. Fix every warning before moving on.
+For a PR whose diff you fetched another way, pass `--diff-file <unified diff>` instead of `--diff-args`. For several repos, pass one `--target` per repo instead, key `rationales.json` by the labelled paths, and give `--base` and `--head` a readable text naming each repo's ref. Pass the same `--exclude` values you measured with. The scripts accept only revisions, paths, `--cached`, `--merge-base` and `-U<n>` in those arguments. A value starting with a dash needs the `=` form: `--diff-args=--cached`.
+
+The script captures the diff as UTF-8, removes the excluded files, inlines all data safely, wires the part and map tabs, warns about any changed file without a rationale, and runs the Step 4 validator. Fix every warning before moving on. It stops with nothing written if it finds credential-shaped text in the diff or in your content files; reword your own text, because it cannot be allowed.
 
 Inside the Narrative part, the content stays one scrolling page with its own table of contents — the argument has to be readable straight through, so do not tab it up.
 
@@ -157,13 +177,23 @@ The core idea, and only the core idea. Details belong in the next section.
 
 - Lead with the one sentence a reader should remember.
 - Use concrete toy data. Invent small, readable examples — three records, two users, one request — and walk them through the old behaviour and then the new. Named values beat abstract descriptions.
-- Use diagrams here more than anywhere else in this part.
+- Use diagrams here more than anywhere else in this part. Mermaid renders only in the Maps and Change summary parts, so draw these with styled HTML.
 
 #### Code walkthrough
 
 Walk the changes at a high level. Group and order them so they build on each other — the entry point first, then what it calls, then the supporting edits. Never walk the files in the order git printed them, and never in alphabetical order.
 
 For each group: what it does, and why it had to change given the idea from the Intuition section. Show short excerpts, not whole files. Skip mechanical churn (renames, import reordering, formatting) in one line rather than narrating it.
+
+#### What was and was not verified
+
+A heading with `id="verified"`; the validator fails without it. State facts only, so the reader knows what the evidence covers:
+
+- What ran, and where: test suites, reviews, lab runs, and the environment each used.
+- What did not run, among the environments and paths the plan or the code names. Name a review that ran without restating its findings.
+- Where each fact comes from: a test name, a plan section, or a command you ran. Say "not recorded" when no source says.
+
+No judgement of whether that is enough. List the files left out here too, with what you could not explain because of them.
 
 ### Part 2 — Maps
 
@@ -197,12 +227,12 @@ Dagre parks a node with no edges far from the rest. Connect each isolated node t
 
 Two things, in order:
 
-1. **Change inventory** — a table of every changed file, one row each: path, what it does, why it changed. Link each path to its anchor in the PR's Files-changed tab when a PR URL is known.
+1. **Change inventory** — a table of every file still shown, one row each: path, what it does, why it changed. Link each path to its anchor in the PR's Files-changed tab when a PR URL is known.
 2. **Sequence diagrams** — Mermaid `sequenceDiagram` blocks for the interactions the change touches: API calls, event flows, async work. One diagram per scenario, and a one-line caption above each saying which scenario it traces. If the change touches no interaction between participants, say so in one line and omit the diagrams rather than inventing one.
 
 ### Part 4 — Diff review
 
-The template builds this part from the diff and `rationales.json`: a file sidebar (grouped by type, or as a tree), a split-pane diff per file, the rationale on each card, reviewed tracking that survives a reload, keyboard navigation, and base and head pills. Your inputs are the rationales and the `--base` and `--head` values. Give `--head` the branch name when the head is a branch, so the pill is readable.
+The template builds this part from the diff and `rationales.json`: a file sidebar (grouped by type, or as a tree), a split-pane diff per file, the rationale on each card, reviewed tracking and per-file notes that survive a reload, a Copy notes button that exports the notes as Markdown, a list of the files left out, keyboard navigation, and base and head pills. Your inputs are the rationales and the `--base` and `--head` values. Give `--head` the branch name when the head is a branch, so the pill is readable.
 
 Reviewed state persists in the browser under `qexplain-diff-<slug>`, where `<slug>` is the artifact's file name stem lowercased with underscores turned into hyphens. The key follows the file name, so renaming the file starts a fresh review.
 
@@ -214,6 +244,7 @@ These cover the content you write. The template already meets them for the page 
 - **The artifact's own data is inlined.** No `fetch` or XHR in your fragments; they fail on a `file://` origin.
 - **Links out are fine.** Anchor each changed-file row and code excerpt to its diff when a PR URL is known.
 - **No ASCII diagrams.** Everything visual is Cytoscape.js, Mermaid, or styled HTML.
+- **No emoji in what you write.** The check does not read the diff, which shows the repo's own text as it is, so never leave a file out because of one.
 - **Mermaid notes**: use `Note right of X`, not `Note over X,Y` — a spanning note is as wide as the span whatever its text. Reserve `Note over X,Y` for intentional full-width section headers. `<br/>` does not work in note text; split a long note into separate `Note right of` lines. Never use `#10;`, which renders as a literal space. The template resizes note boxes to their text after every render.
 - **Code blocks use `<pre>`.** Wide content (tables, large figures) goes in a `<div class="table-wrap">` so it scrolls inside itself, not the page.
 - **Callouts** (`<div class="callout">`) for definitions, key concepts, and edge cases that would otherwise interrupt the flow.
@@ -227,7 +258,7 @@ The build script ends by running the static validator; you can re-run it alone:
 <python> <config-repo>/shared/skills/qexplain/scripts/validate-explanation.py <path-to-html>
 ```
 
-Standard library only — nothing to install in the venv. It emits one `PASS`/`FAIL` line per check and exits non-zero if any check failed. The ten checks: `document-shape`, `title-present`, `remote-assets-pinned`, `no-module-scripts`, `no-runtime-fetch`, `code-whitespace`, `anchors-resolve`, `tabs-wired`, `parts-wired`, `no-emoji`.
+Standard library only — nothing to install in the venv. It emits one `PASS`/`FAIL` line per check and exits non-zero if any check failed. The eleven checks, where `verified-section` needs the heading in the Narrative part with text after it: `document-shape`, `title-present`, `remote-assets-pinned`, `no-module-scripts`, `no-runtime-fetch`, `code-whitespace`, `anchors-resolve`, `tabs-wired`, `parts-wired`, `verified-section`, `no-emoji`.
 
 **A FAIL is a blocker.** Fix the content and rebuild until the suite is clean. Do not report the artifact as ready on a failing run, and do not describe a failed check as a caveat — repair it.
 
