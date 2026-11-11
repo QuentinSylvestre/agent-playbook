@@ -127,3 +127,6 @@ v3-deferred-entry-string.json	1	-	FAIL: deferred_sessions["kiro:3f2a9c10-1111-42
 v3-quiet-user-memory-negative.json	1	-	FAIL: quiet_sweeps -- user_memory must be a non-negative integer
 v3-quiet-projects-array.json	1	-	FAIL: quiet_sweeps -- projects must be an object
 v3-quiet-missing.json	1	-	FAIL: quiet_sweeps missing or not an object (required in v3)
+v3-similar-declined.json	0	ledger-baseline.json	ok: similar_declined (1 records)
+v3-similar-bad-sha.json	1	-	FAIL: similar_declined[0] -- a must be a lowercase 64-hex sha256
+v2-with-similar-declined.json	1	-	FAIL: v2 file carries v3 section "similar_declined" (half-migrated write?)

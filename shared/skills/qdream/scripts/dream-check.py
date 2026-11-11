@@ -32,6 +32,17 @@ Subcommands:
       under, or the end of the file. --intro first prints that heading and
       its text before its first step (the phase's own rules). Exit 1 when
       the file does not define the step or defines it twice.
+  similar --entry-file <md> --target <memory file> [--repo <dir>] [--stores <dir>]
+      The write-time repeat check (memory-rules.md § Dedup Check Procedure,
+      step 4): scores the one entry in --entry-file (written under its type
+      heading, `## Feedback`, `## Decision` or `## Pattern`) against user
+      memory and its topic files (improvement-signals.md excluded) and every
+      store's memory/MEMORY.md (--stores, default the store repo the
+      resolver names), never against --target, the file it would be
+      written to. Prints each entry at or above dream-manifest.py's
+      SIMILAR_THRESHOLD and one verdict line: it restates the user tier
+      (update that entry), it repeats another project (propose user scope),
+      or no repeat. Read-only; exit 0 whatever it finds.
   --selftest
       Runs the fixture cases under fixtures/dream-check/budget/.
 
@@ -426,14 +437,77 @@ def cmd_extract(args, ctx):
 
 
 # --------------------------------------------------------------------------
+# similar: the write-time repeat check (memory-rules.md § Dedup Check Procedure)
+# --------------------------------------------------------------------------
+
+def similar_corpus(repo, stores, target):
+    """-> similarity documents of user memory and its topic files (improvement signals excluded)
+    and every store's memory/MEMORY.md but the user store. Entries of `target` (the file the new
+    entry would go to) share the candidate's store key, so they are never its pair."""
+    tkey = dm.norm_key(dm.canon_path(str(target)))
+    docs = []
+    mem = Path(repo) / "memory"
+    files = [mem / "MEMORY.md"] + sorted((mem / "topics").glob("*.md"))
+    for f in files:
+        if f.is_file() and f.name.lower() != "improvement-signals.md":
+            k = dm.norm_key(dm.canon_path(str(f)))
+            docs += dm.similar_docs(f, "user", "candidate" if k == tkey else "user")
+    real_user = os.path.realpath(str(mem))
+    for f in sorted(Path(stores).glob("*/memory/MEMORY.md")) if stores else []:
+        if os.path.realpath(str(f.parent)) == real_user:
+            continue
+        k = dm.norm_key(dm.canon_path(str(f)))
+        docs += dm.similar_docs(f, "project", "candidate" if k == tkey else k)
+    return docs
+
+
+def cmd_similar(args, ctx):
+    repo = Path(args.repo) if args.repo else default_repo(ctx)
+    stores = args.stores or dm.resolver().store_repo_root()
+    if not os.path.isfile(args.entry_file):
+        raise Failure("cannot read %s" % args.entry_file)
+    tdir = os.path.realpath(str(Path(repo) / "memory"))
+    tier = "user" if os.path.realpath(str(Path(args.target).parent)) in (tdir, os.path.join(tdir, "topics")) \
+        else "project"
+    cand = [dict(d, tier=tier, store="candidate", file="(new entry)", bar=None)
+            for d in dm.similar_docs(args.entry_file, tier, "candidate")]
+    if len(cand) != 1:
+        raise Failure("%s holds %d entries under a type section; write the proposed entry as one `### ` "
+                      "entry under its `## Feedback`, `## Decision` or `## Pattern` heading"
+                      % (args.entry_file, len(cand)))
+    docs = similar_corpus(repo, stores, args.target) + cand
+    offered, excluded = dm.similar_pairs(docs)
+    mine = [p for p in offered + excluded if "(new entry)" in (p["a"]["file"], p["b"]["file"])]
+    mine.sort(key=lambda p: -p["score"])
+    if not mine:
+        print("similar: no repeat at or above %.2f; write it at the narrowest true scope" % dm.SIMILAR_THRESHOLD)
+        return EXIT_OK
+    def other(p):
+        return p["b"] if p["a"]["file"] == "(new entry)" else p["a"]
+
+    for p in mine:
+        o = other(p)
+        print("%.2f %s %s § %s%s" % (p["score"], o["tier"], o["file"], o["heading"],
+                                          "  (excluded: %s)" % p["why"] if p.get("why") else ""))
+    if any(other(p)["tier"] == "user" for p in mine):
+        print("similar: restates the user tier: update that entry instead of saving a copy")
+    elif tier == "project" and any(not p.get("why") for p in mine):
+        print("similar: repeats another project: propose user scope (promotion to user memory); "
+              "the user decides, and the next /qdream sweep offers to remove the other copy")
+    else:
+        print("similar: related entries only (excluded by a bar); write it at the narrowest true scope")
+    return EXIT_OK
+
+
+# --------------------------------------------------------------------------
 # CLI
 # --------------------------------------------------------------------------
 
 def parse_args(argv):
     ap = argparse.ArgumentParser(prog="dream-check.py", description=__doc__,
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("command", nargs="?", choices=["budget", "extract"])
-    for opt in ("--repo", "--file", "--section", "--step"):
+    ap.add_argument("command", nargs="?", choices=["budget", "extract", "similar"])
+    for opt in ("--repo", "--file", "--section", "--step", "--entry-file", "--target", "--stores"):
         ap.add_argument(opt)
     ap.add_argument("--exclude", action="append")
     ap.add_argument("--intro", action="store_true")
@@ -450,9 +524,10 @@ def parse_args(argv):
     need = {
         "budget": (set(), {"repo"}),
         "extract": ({"file", "section"}, {"exclude"}),
+        "similar": ({"entry_file", "target"}, {"repo", "stores"}),
     }
     if not args.command:
-        raise Usage("a subcommand is required: budget | extract")
+        raise Usage("a subcommand is required: budget | extract | similar")
     if args.command == "extract" and "step" in given:
         if given & {"section", "exclude"}:
             raise Usage("extract takes --section [--exclude] or --step [--intro], not both")
@@ -478,7 +553,7 @@ def main(argv=None, ctx=None):
     if args.selftest:
         return run_selftest()
     ctx = ctx or dm.Ctx()
-    fn = {"budget": cmd_budget, "extract": cmd_extract}[args.command]
+    fn = {"budget": cmd_budget, "extract": cmd_extract, "similar": cmd_similar}[args.command]
     try:
         return fn(args, ctx)
     except Failure as e:
@@ -680,6 +755,67 @@ def _case_usage():
     return [("usage/argument-errors", fails)]
 
 
+def _case_similar():
+    """`similar`: a draft that restates a user-tier entry says so; one that repeats another store's
+    entry proposes user scope; an unrelated one, or one whose only match sits in --target itself,
+    finds no repeat; a file with no typed entry is refused."""
+    import shutil
+    import tempfile
+    fails = []
+    tmp = Path(tempfile.mkdtemp(prefix="dream-check-similar-"))
+
+    def put(rel, text):
+        p = tmp / rel
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(text, encoding="utf-8")
+        return p
+
+    def ent(h, why, how):
+        return "### %s\n\n**Why**: %s\n**How to apply**: %s\n**Source**: s | **Verified**: 2026-10-01\n\n" % (h, why, how)
+
+    filler = "".join(ent("Filler %s note" % w, "The %s note is unrelated." % w, "Leave the %s note." % w)
+                     for w in ("amber", "basalt", "cedar", "dune", "ember", "fjord"))
+    put("repo/memory/MEMORY.md", "# Memory\n\n## Feedback\n\n" + ent(
+        "Tram timetable exports drop night service rows", "A tram timetable export dropped night service rows.",
+        "Count night service rows after a tram timetable export.") + filler + "## Declined\n")
+    put("repo/memory/topics/improvement-signals.md", "# Signals\n\n## Feedback\n\n" + ent(
+        "Glacier archive restores take twelve hours", "Glacier archive restores took twelve hours.",
+        "Plan glacier archive restores twelve hours ahead."))
+    put("stores/alpha-000001/memory/MEMORY.md", "# Alpha\n\n## Feedback\n\n" + ent(
+        "Orchard sensor batteries fail below minus ten", "Orchard sensor batteries failed below minus ten.",
+        "Fit cold-rated orchard sensor batteries before winter.") + filler)
+    target = put("stores/beta-000002/memory/MEMORY.md", "# Beta\n\n## Feedback\n\n" + ent(
+        "Violin rosin dust fouls pickup contacts", "Violin rosin dust fouled pickup contacts.",
+        "Wipe violin rosin dust off pickup contacts weekly.") + filler)
+    drafts = {
+        "user": ("Tram timetable exports lose night service rows", "Night service rows vanished from a tram timetable export.",
+                 "Check night service rows of each tram timetable export.", "restates the user tier"),
+        "project": ("Orchard sensor batteries die below minus ten", "Orchard sensor batteries died below minus ten.",
+                    "Use cold-rated orchard sensor batteries in winter.", "repeats another project"),
+        "own-store": ("Violin rosin dust on pickup contacts", "Violin rosin dust fouled the pickup contacts.",
+                      "Wipe the pickup contacts free of violin rosin dust.", "no repeat"),
+        "signals": ("Glacier archive restore lead time", "Glacier archive restores took twelve hours.",
+                    "Ask for glacier archive restores twelve hours ahead.", "no repeat"),
+        "none": ("Lighthouse lamp filaments crack on cold restarts", "Lighthouse lamp filaments cracked.",
+                 "Warm lighthouse lamp filaments first.", "no repeat"),
+    }
+    try:
+        for name, (h, why, how, want) in drafts.items():
+            f = put("draft-%s.md" % name, "## Feedback\n\n" + ent(h, why, how))
+            code, out, err = _run(["similar", "--entry-file", str(f), "--target", str(target),
+                                   "--repo", str(tmp / "repo"), "--stores", str(tmp / "stores")], dm.Ctx())
+            if code != EXIT_OK or want not in out:
+                fails.append("%s: exit %s, expected %r in %r %r" % (name, code, want, out[-300:], err[-200:]))
+        bare = put("draft-bare.md", ent("No section", "w", "h"))
+        code, _o, err = _run(["similar", "--entry-file", str(bare), "--target", str(target),
+                              "--repo", str(tmp / "repo"), "--stores", str(tmp / "stores")], dm.Ctx())
+        if code != EXIT_FAIL or "under its" not in err:
+            fails.append("no type section: exit %s, %r" % (code, err[-200:]))
+    finally:
+        shutil.rmtree(str(tmp), ignore_errors=True)
+    return [("similar/write-time-verdicts", fails)]
+
+
 def _case_default_repo():
     """`budget` without --repo: the script's own checkout only when it holds
     the qdream skill; else the manifest's config repo; else a refusal naming
@@ -795,7 +931,7 @@ def _case_default_repo():
 
 def run_selftest():
     results = []
-    for fn in (_case_budget, _case_load_block, _case_default_repo, _case_usage):
+    for fn in (_case_budget, _case_load_block, _case_default_repo, _case_usage, _case_similar):
         try:
             results.extend(fn())
         except Exception as e:  # one broken group never stops the run

@@ -2884,7 +2884,10 @@ def handoff_schema(name):
                   "writes; it must appear verbatim in text",
                   "    variant: merge-downgrade, expiry-only or promotes, as the kind allows",
                   "    project: the project path key, for an item of one project",
-                  "    each of these is a non-empty string; file is absolute"]
+                  "    dest_file, dest_heading: for a promotion, the user-tier file and entry the "
+                  "lesson goes to; file2, heading2: its second project copy, if any; pair_a, "
+                  "pair_b: the two entry shas of its sweep/similar.json pair",
+                  "    each of these is a non-empty string; file, dest_file and file2 are absolute"]
     if pat == r"drafts\.json":
         lines.append("  also: each item is checked beyond being an object: " + "; ".join(
             "%s: %s" % (k, _type_words(t)) for k, t in DRAFT_ITEM.items()))
@@ -5128,6 +5131,14 @@ def acts_on_line(e):
     for key, word in (("variant", "variant"), ("project", "project")):
         if _is_str(e.get(key)):
             line += "; %s %s" % (word, _jq(e[key]))
+    if _is_str(e.get("file2")):
+        line += "; and %s" % _jq(e["file2"])
+        if _is_str(e.get("heading2")):
+            line += " § " + _jq(e["heading2"])
+    if _is_str(e.get("dest_file")):
+        line += "; into %s" % _jq(e["dest_file"])
+        if _is_str(e.get("dest_heading")):
+            line += " § " + _jq(e["dest_heading"])
     return line
 
 
@@ -5588,7 +5599,12 @@ DECISIONS = "handoff/decisions.json"
 # retyping it: the decisions.json fields of dream-write.py item_problems.
 # A drafted item may carry `variant` (promotes) with the source entry's
 # `file` and `heading`.
-TEXT_ITEM_KEYS = ("kind", "file", "heading", "shown_text", "variant", "project")
+# A promotion item (promotion to user memory) also names the user-tier entry the lesson goes to
+# (dest_file, dest_heading), an optional second project copy (file2, heading2) and the two entry
+# shas a "Not the same lesson" answer records (pair_a, pair_b; sweep/similar.json).
+TEXT_ITEM_KEYS = ("kind", "file", "heading", "shown_text", "variant", "project",
+                  "dest_file", "dest_heading", "file2", "heading2", "pair_a", "pair_b")
+TEXT_ITEM_PATHS = ("file", "dest_file", "file2")
 
 
 def text_item_problems(e, kinds):
@@ -5599,8 +5615,9 @@ def text_item_problems(e, kinds):
             out.append("%s: %s must be a non-empty string" % (iid, k))
     if _is_str(e.get("kind")) and e["kind"] not in kinds:
         out.append("%s: kind %r is not a decisions.json kind" % (iid, e["kind"][:40]))
-    if _is_str(e.get("file")) and not os.path.isabs(e["file"]):
-        out.append("%s: file must be an absolute path" % iid)
+    for k in TEXT_ITEM_PATHS:
+        if _is_str(e.get(k)) and not os.path.isabs(e[k]):
+            out.append("%s: %s must be an absolute path" % (iid, k))
     if _is_str(e.get("shown_text")) and _is_str(e.get("text")) \
             and e["shown_text"] not in e["text"]:
         out.append("%s: shown_text does not appear verbatim in its text" % iid)

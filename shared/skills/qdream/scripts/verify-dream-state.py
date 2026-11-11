@@ -143,6 +143,9 @@ V2_ONLY_KEYS = ["rejected_lessons", "outcome_tags", "episodic_ledger"]
 V3_ONLY_KEYS = ["cost_records", "model_routing", "deferred_sessions", "quiet_sweeps"]
 # Optional v3 section: absent means an empty ledger (memory-rules.md § Singleton ledger).
 SINGLETON_KEY = "singleton_ledger"
+# Optional v3 section: the user's "Not the same lesson" answers (memory-rules.md § State File Format).
+SIMILAR_KEY = "similar_declined"
+SHA_RE = re.compile(r"^[0-9a-f]{64}$")
 ROUTING_ROLES = ["task4", "verifier"]
 # Optional routing roles: absent is valid, present must be a non-empty string.
 ROUTING_OPTIONAL = ["drafter"]
@@ -260,6 +263,20 @@ class _Checker(object):
             if not (isinstance(el.get(k), str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", el[k])):
                 self.fail("%s[%d] -- %s must be YYYY-MM-DD" % (name, i, k))
                 good = False
+        return good
+
+    def check_similar(self, name, i, el):
+        good = True
+        for k in ("a", "b"):
+            if not (isinstance(el.get(k), str) and SHA_RE.match(el[k])):
+                self.fail("%s[%d] -- %s must be a lowercase 64-hex sha256" % (name, i, k))
+                good = False
+        if isinstance(el.get("a"), str) and el.get("a") == el.get("b"):
+            self.fail("%s[%d] -- a and b must be two entries" % (name, i))
+            good = False
+        if not (nonempty_str(el.get("date")) and DATE_RE.match(el["date"])):
+            self.fail("%s[%d] -- date must be YYYY-MM-DD" % (name, i))
+            good = False
         return good
 
     def check_rejected(self, name, i, el):
@@ -633,10 +650,10 @@ def check(path, baseline=""):
     if sv >= 2:
         allowed_top |= set(V2_ONLY_KEYS)
     if sv >= 3:
-        allowed_top |= set(V3_ONLY_KEYS) | {SINGLETON_KEY}
+        allowed_top |= set(V3_ONLY_KEYS) | {SINGLETON_KEY, SIMILAR_KEY}
     top_ok = True
     for k in sorted(set(data.keys()) - allowed_top):
-        if k in V3_ONLY_KEYS or k == SINGLETON_KEY:
+        if k in V3_ONLY_KEYS or k in (SINGLETON_KEY, SIMILAR_KEY):
             c.fail('v%d file carries v3 section "%s" (half-migrated write?)' % (sv, k))
         elif k in V2_ONLY_KEYS:
             c.fail('v1 file carries v2 section "%s" (half-migrated write?)' % k)
@@ -649,6 +666,8 @@ def check(path, baseline=""):
     if SINGLETON_KEY in data and sv >= 3:
         c.check_array(data, SINGLETON_KEY, {"target", "gist", "sessions", "first_seen", "last_seen"},
                       c.check_singleton)
+    if SIMILAR_KEY in data and sv >= 3:
+        c.check_array(data, SIMILAR_KEY, {"a", "b", "date"}, c.check_similar)
     if sv >= 2:
         c.check_array(data, "rejected_lessons", {"target", "signal", "reason", "date"}, c.check_rejected)
         c.check_array(data, "outcome_tags", {"target", "applied", "outcome", "checked"}, c.check_outcome)

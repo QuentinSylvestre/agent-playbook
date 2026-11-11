@@ -1,0 +1,56 @@
+{
+  "schema_version": 2,
+  "last_run": "2026-09-22T07:33:27+02:00",
+  "projects": {
+    "/home/user/proj-a": {
+      "last_analyzed": "2026-09-22T07:33:27+02:00"
+    }
+  },
+  "rejected_lessons": [
+    {
+      "target": "shared/AGENTS.md \u00a7 Memory Management",
+      "signal": "example suppressed signal",
+      "reason": "refuted",
+      "date": "2026-07-10"
+    }
+  ],
+  "outcome_tags": [
+    {
+      "target": "shared/skills/qdev/SKILL.md \u00a7 Process",
+      "applied": "2026-07-01"
+    },
+    {
+      "target": "entry: example memory entry",
+      "applied": "2026-06-01",
+      "outcome": "not-recurred",
+      "checked": "2026-07-10"
+    }
+  ],
+  "episodic_ledger": [
+    {
+      "what": "wrote feedback entry",
+      "where": "260709_EXAMPLE_PLAN \u00a7 Intent",
+      "when": "2026-07-10",
+      "outcome": "written",
+      "support_set": [
+        "memory/MEMORY.md ### example entry"
+      ]
+    },
+    {
+      "what": "entry subsumed by governance: example",
+      "where": "example entry + shared/AGENTS.md \u00a7 Commit Conventions",
+      "when": "2026-08-01",
+      "outcome": "subsumed",
+      "support_set": [
+        "memory/MEMORY.md ### example two"
+      ]
+    }
+  ],
+  "similar_declined": [
+    {
+      "a": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "b": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "date": "2026-10-12"
+    }
+  ]
+}

@@ -310,7 +310,7 @@ the phase brief): {"items": [{"id", "kind", "answer", "option"?, "variant"?,
   option, normalized as above; without `option` the answer is normalized
   instead. Every `kind` is a D28_TABLE key (memory-proposal, stale,
   stale-salvage, subsumed, node, harvest-merge,
-  governance, retirement, conflict, duplicate, human-expiry) and the option
+  governance, retirement, conflict, duplicate, promotion, human-expiry) and the option
   one of its kind's options; a `variant` is one of D28_VARIANTS (memory-
   proposal `merge-downgrade`: a Save or Edit the verifier downgraded to a
   merge or update replaces the named existing entry; stale `expiry-only`:
@@ -347,7 +347,15 @@ the phase brief): {"items": [{"id", "kind", "answer", "option"?, "variant"?,
   unpresented: it is recorded as option `Skip` with `for_conflict` set. An item that authorizes a memory
   op names `file`, `heading` and, for a written text, `shown_text` (the text
   the gate showed); a duplicate's
-  `file` is the copy to delete (class pruned); a node Keep node writes the one
+  `file` is the copy to delete (class pruned); a promotion answered Promote
+  or Remove copy (promotion to user memory) also names `dest_file` and
+  `dest_heading`, the user-tier entry the lesson goes to (an insert of
+  `shown_text`, or a replace of that entry by it), and optionally `file2`
+  and `heading2`, a second project copy: it authorizes that one write and a
+  delete, class promotion-removal, of each project copy, and memedit
+  refuses a file holding such a delete until the write is done or planned
+  in the same run (persisted first) or, with no write in the decision, the
+  dest entry already exists; Not the same lesson and Defer authorize no op; a node Keep node writes the one
   line `**Affirmed**: <date>` to HIGHER_ORDER.md; a conflict Delete entry
   deletes with class `Delete entry`; a human-expiry (Keep, Re-date-as-sweep or
   Defer) names the entry's `file` and `heading` and, for Keep and
@@ -588,6 +596,7 @@ OP_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,79}\Z")
 # decisions.json is loaded.
 norm_opt = ds.norm_opt
 _AR = (("append_lines", "replace"),)
+_PROMO = (("insert", "replace"), ("delete",), ("delete",))
 _D28 = {
     "memory-proposal": {
         "Save": (("insert", "create"),), "Edit": (("insert", "create"),),
@@ -606,6 +615,10 @@ _D28 = {
     "conflict": {"Keep entry": _AR, "Update governance": _AR, "Delete entry": (("delete",),),
                  "Defer": _AR},
     "duplicate": {"Delete copy": (("delete",),), "Keep both": (), "Defer": ()},
+    # Promotion to user memory (memory-rules.md § Promotion path): the lesson is written to the
+    # user tier (an insert, or a replace that merges it into an existing entry), then each project
+    # copy is deleted. Remove copy is the same op set for a lesson the user tier already holds.
+    "promotion": {"Promote": _PROMO, "Remove copy": _PROMO, "Not the same lesson": (), "Defer": ()},
     "human-expiry": {"Keep": (("replace",),), "Re-date-as-sweep": (("replace",),),
                      "Defer": ()},
 }
@@ -1324,7 +1337,7 @@ def item_problems(dec, complete=False, policy=None):
             out.append("item %s: option %r contradicts the answer %r (another %s option)"
                        % (iid, ascii_safe(it["option"], 40), ascii_safe(it["answer"], 40), kind))
             continue
-        why = promotes_problem(it)
+        why = promotes_problem(it) or promotion_problem(it)
         if why:
             out.append("item %s: %s" % (iid, why))
             continue
@@ -1533,6 +1546,61 @@ def promotes_problem(it):
     return None
 
 
+PROMO_OPTIONS = ("promote", "remove copy")
+SHA_HEX_RE = re.compile(r"\A[0-9a-f]{64}\Z")
+PROMO_FIELDS = ("file", "heading", "dest_file", "dest_heading")
+
+
+def is_promotion_write(item):
+    """A promotion item answered Promote or Remove copy (the options that write)."""
+    return item.get("kind") == "promotion" and option_of(item) in PROMO_OPTIONS
+
+
+def promotion_problem(it):
+    """-> None, or why a promotion item answered Promote or Remove copy cannot name its writes: the
+    project copy (`file`, `heading`), an optional second copy (`file2` and `heading2`, together),
+    and the user-tier entry the lesson goes to (`dest_file`, `dest_heading`)."""
+    if not is_promotion_write(it):
+        return None
+    if not all(isinstance(it.get(f), str) and it[f].strip() for f in PROMO_FIELDS):
+        return "a promotion item needs file, heading, dest_file and dest_heading"
+    two = [isinstance(it.get(f), str) and bool(it[f].strip()) for f in ("file2", "heading2")]
+    if any(two) and not all(two):
+        return "a promotion item's second copy needs both file2 and heading2"
+    return None
+
+
+def promotion_targets(run, item):
+    """-> (dest, sources): the (native path, heading) the lesson is written to, and those of the
+    project copies the item deletes."""
+    dest = (repo_path(run, item["dest_file"]), item["dest_heading"].strip())
+    srcs = [(repo_path(run, item["file"]), item["heading"].strip())]
+    if isinstance(item.get("file2"), str) and item["file2"].strip():
+        srcs.append((repo_path(run, item["file2"]), item["heading2"].strip()))
+    return dest, srcs
+
+
+def promotion_op_refusal(run, item, op, path, heading):
+    """The file and heading rules of one op of a promotion decision (memedit's op, or a recorded op
+    re-checked by push --plan): the write goes to the item's user-tier dest entry, a delete to one
+    of its project copies. -> None or the reason."""
+    dest, srcs = promotion_targets(run, item)
+    if not user_tier(run, dest[0]):
+        return "a promotion writes the lesson to user memory or a topic file only"
+    if any(user_tier(run, p) for p, _h in srcs):
+        return "a promotion deletes project copies only, never a user-memory entry"
+    heading = (heading or "").strip()
+    if op in ("insert", "replace"):
+        if ds.nk(path) != ds.nk(dest[0]):
+            return "the item names another file (its dest_file)"
+        if op == "replace" and heading != dest[1]:
+            return "the item names another heading (its dest_heading)"
+        return None
+    if not any(ds.nk(path) == ds.nk(p) and heading == h for p, h in srcs):
+        return "the item names another file or heading (its file and heading, or file2 and heading2)"
+    return None
+
+
 def shape_refusal(item, o, body):
     """The shape of an op that rewrites the entry `body` (None for an insert or
     create), for the answers whose gate showed less than a whole entry. -> None
@@ -1577,9 +1645,12 @@ def authorize_op(run, item, o, body=None):
     if o["op"] == "delete":
         want = (PROMOTION_CLASSES if kind in GOVERNANCE_KINDS else
                 ("Delete entry",) if kind == "conflict" else
-                ("pruned",) if kind == "duplicate" else None)
+                ("pruned",) if kind == "duplicate" else
+                ("promotion-removal",) if kind == "promotion" else None)
         if want is not None and o["class"] not in want:
             return "a %s item's delete has class %s" % (kind, " or ".join(want))
+    if kind == "promotion":
+        return promotion_authorize(run, item, o)
     if kind == "node" and o["op"] == "append_lines" and not (
             isinstance(item.get("shown_text"), str)
             and AFFIRMED_RE.match(item["shown_text"].strip())):
@@ -1625,6 +1696,75 @@ def authorize_op(run, item, o, body=None):
     return None
 
 
+def promotion_authorize(run, item, o):
+    """authorize_op for a promotion item (its op type and delete class already checked): the file
+    and heading rules, a written entry that is the dest entry exactly as the gate showed it, and no
+    `human:` line the gate did not show. The order rule (the write lands before any delete) is
+    memedit's: promotion_order_refusals."""
+    heading = o.get("heading") if o["op"] != "insert" else text_heading(o.get("text"))
+    why = promotion_op_refusal(run, item, o["op"], o["file"], heading)
+    if why:
+        return why
+    if o["op"] in ("insert", "replace"):
+        shown = item.get("shown_text")
+        if not _same_text(o["text"], shown):
+            return "its text is not the text the gate showed"
+        if text_heading(o["text"]) != item["dest_heading"].strip():
+            return "the entry it writes is not the item's dest_heading"
+        for m in re.finditer(r"[^\n]*" + HUMAN_RE.pattern + r"[^\n]*", op_new_text(o)):
+            if m.group(0).strip() not in shown:
+                return "its text adds a human: actor the gate did not show"
+    return None
+
+
+def promotion_order_refusals(run, dec, ops, applied, plans):
+    """-> {file key: reason} for each planned file holding a promotion delete whose lesson is not
+    yet in the user tier: the decision's insert or replace is neither done (applied-ops.json) nor
+    planned in this run, and, when the decision has no such op at all (a Remove copy of a lesson
+    the user tier already holds), the dest entry is absent from its file. A stop between the write
+    and the delete can then leave a duplicate, never a lost lesson."""
+    if dec is None:
+        return {}
+    writes = {}
+    for rec in applied["ops"].values():
+        if isinstance(rec, dict) and rec.get("op") in ("insert", "replace"):
+            writes.setdefault(rec.get("decision_id"), set()).add(
+                "done" if rec.get("status") == "done" else "recorded")
+    for o in ops:
+        if o["op"] in ("insert", "replace") and o.get("decision_id") is not None:
+            writes.setdefault(o["decision_id"], set()).add(
+                "planned" if ds.nk(o["file"]) in plans else "refused")
+    out = {}
+    for k, plan in plans.items():
+        for step in plan:
+            o = step["op"]
+            item = decision_item(dec, o.get("decision_id")) if o.get("decision_id") else None
+            if o["op"] != "delete" or item is None or item.get("kind") != "promotion":
+                continue
+            got = writes.get(o["decision_id"], set())
+            if got & {"done", "planned"}:
+                continue
+            if not got:
+                dest, _s = promotion_targets(run, item)
+                try:
+                    held = os.path.isfile(dest[0]) and any(
+                        h == dest[1] for _sec, h, _b, _n in
+                        dm.memory_entries().entries(dm.read_text(dest[0])))
+                except OSError:
+                    held = False
+                if held:
+                    continue
+                out[k] = ("op %s: decision %s deletes a project copy, but %s holds no entry %r "
+                          "and the decision writes none: the lesson would be lost"
+                          % (o["id"], o["decision_id"], item["dest_file"], dest[1]))
+            else:
+                out[k] = ("op %s: decision %s deletes a project copy before its user-memory write "
+                          "has landed (that write was refused or is not done): nothing is deleted"
+                          % (o["id"], o["decision_id"]))
+            break
+    return out
+
+
 def recorded_op_refusal(run, item, rec):
     """push --plan's re-check of an applied-ops.json record under the D28
     table: op type, file and heading (the record keeps no text; memedit
@@ -1639,6 +1779,10 @@ def recorded_op_refusal(run, item, rec):
             return "a node op targets memory/HIGHER_ORDER.md only"
     if rec.get("op") == "delete" and node_del != (item["kind"] == "node"):
         return "a node delete needs a node item, and a node item a node delete"
+    if item["kind"] == "promotion":
+        if not isinstance(rec.get("file"), str) or promotion_problem(item):
+            return "the op's file is not the item's"
+        return promotion_op_refusal(run, item, rec["op"], rec["file"], rec.get("heading"))
     want = item.get("file")
     if not isinstance(want, str) or not isinstance(rec.get("file"), str) or \
             ds.nk(repo_path(run, want)) != ds.nk(rec["file"]):
@@ -2348,6 +2492,14 @@ def _memedit(run, args):
             plans[k] = plan_file(run, fops, applied, dec, dsha, over)
         except OpError as e:
             refused.append("%s: %s" % (fops[0]["file"], e))
+    for k, why in promotion_order_refusals(run, dec, ops, applied, plans).items():
+        refused.append("%s: %s" % (files[k][0]["file"], why))
+        del plans[k]
+    # A promotion's user-memory write is persisted before the files whose deletes it allows.
+    promo_del = {k for k, plan in plans.items() for st in plan
+                 if st["op"]["op"] == "delete" and dec is not None and st["op"].get("decision_id")
+                 and (decision_item(dec, st["op"]["decision_id"]) or {}).get("kind") == "promotion"}
+    plans = dict(sorted(plans.items(), key=lambda kv: kv[0] in promo_del))
     check_map(run, wm, applied, plans)
     journal_written = False
     done = skipped = 0
@@ -3508,6 +3660,26 @@ def compute_apply(run, obj, inp, dec):
     if kept or "singleton_ledger" in new:
         new["singleton_ledger"] = kept
         run.notes.append("singleton ledger: %d row(s), %d expired" % (len(kept), expired))
+    # A promotion answered "Not the same lesson" (memory-rules.md § State File Format,
+    # similar_declined): read from decisions.json itself, never from an agent-written input. The
+    # record is keyed by both entries' text, so it lapses when either entry is edited.
+    sim = [r for r in new.get("similar_declined") or [] if isinstance(r, dict)]
+    added = 0
+    for it in (dec or {}).get("items", []):
+        if it.get("kind") != "promotion" or option_of(it) != norm_opt("Not the same lesson"):
+            continue
+        a, b = it.get("pair_a"), it.get("pair_b")
+        if not (isinstance(a, str) and isinstance(b, str) and SHA_HEX_RE.match(a)
+                and SHA_HEX_RE.match(b) and a != b):
+            raise Precond("promotion item %s answered Not the same lesson needs pair_a and pair_b, "
+                          "two entry sha256s from sweep/similar.json" % it.get("id"))
+        if not any({r.get("a"), r.get("b")} == {a, b} for r in sim):
+            sim.append({"a": a, "b": b, "date": today})
+            added += 1
+    if sim or "similar_declined" in new:
+        new["similar_declined"] = sim
+        if added:
+            run.notes.append("similar_declined: %d record(s) added" % added)
     if cost:
         cost = dict(cost)
         fill_tokens(run, cost, orient)
