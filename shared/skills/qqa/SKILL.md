@@ -114,7 +114,7 @@ A surface driven through the user's desktop (a native GUI, a TUI in a real termi
 
 ## BLOCKED handling
 
-When verification cannot proceed: report BLOCKED verdict with (a) where execution stopped, (b) what would unblock it (missing service, env var, access, deployment), (c) partial results if any steps completed before the block.
+When verification cannot proceed: report BLOCKED verdict with (a) where execution stopped, (b) what would unblock it (missing service, env var, access, deployment) or, when nothing here can, the later real action that will verify it (for example, the first real install) — naming it still halts for the user's decision, (c) partial results if any steps completed before the block.
 
 **Bootstrap before BLOCKED**: before emitting BLOCKED, attempt environment bootstrap — start the server/app command and the external test sources documented in the project's `### Verification Setup` (`## Recipe persistence`), create a venv and install pinned deps, generate synthetic input if the surface accepts it — or escalate the *specific* missing prerequisite as a question ("need VPN access — proceed without QA?").
 

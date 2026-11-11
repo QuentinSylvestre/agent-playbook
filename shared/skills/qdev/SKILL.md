@@ -107,6 +107,8 @@ Spawn the sub-agent with this brief (all required):
 - **List the guards you mutated.** When you mutation-test your own checks, name in `tests.detail` each guard you mutated and whether its test failed. A summary such as "all mutants caught" is not coverage: the Step 5 reviewer mutates the guards your list leaves out.
 - When randomizing, generate valid, structured inputs that reach deep code paths, and assert properties of the output. A no-crash check is not a correctness check.
 - **Justify every changed test expectation.** When a failing test is made to pass by editing its expected value rather than the code, cite the spec or source that proves the old expectation wrong. Without one, leave the test unchanged and record it as a `divergences` entry (in-session: in the implementation notes); the orchestrator escalates it. Agents iterating until their own tests passed wrote more tests enforcing incorrect behaviour (danluu.com/agentic-testing, codex GPT-5.6, Rust Zstd eval, 160 runs per condition, 2026-09).
+- **Never reach green by attrition.** Do not add a retry, raise a timeout or skip a test just to make it pass. A raised timeout needs a cited measurement or spec. A flaky test is fixed at its cause; deleting it instead is a `divergences` entry naming the coverage lost. A legitimate skip names the missing capability, never only a platform ("Windows" is no reason; "no execute bit to set" is).
+- **Make negative and acceptance checks able to fail.** A "nothing happens" assertion needs a seeded control that would trigger it. A check for new or changed behaviour must fail on the code before the change, and an import or compile error does not count as that failure.
 
 **Sub-agent return transport format**: the sub-agent MUST return a single response containing two clearly-delimited surfaces in order:
 
@@ -207,7 +209,7 @@ A review persona that returns no output (an empty or missing final message) coun
 **Verdict handling** (unchanged from current):
 - **PASS**: No impact on auto-continue. Record in implementation notes.
 - **FAIL**: Hard-stop auto-continue. Findings enter Step 6 auto-fix loop as at least Medium severity (severity floor — anchors may escalate; see `/qreview`'s Verdict rubrics).
-- **BLOCKED**: Escalate to user. If user resolves the blocker, re-run /qqa. If user declines, continue with the phase recorded as BLOCKED (user declined) in implementation notes; SKIP means only that no runtime surface exists.
+- **BLOCKED**: Escalate to user. If user resolves the blocker, re-run /qqa. If user declines, continue with the phase recorded as BLOCKED (user declined) in implementation notes, with the closing check `/qqa` named; SKIP means only that no runtime surface exists.
 - **SKIP**: No impact. Record in implementation notes. (A SKIP on a `[QA]`-annotated phase indicates an annotation mismatch — record in implementation notes: "QA annotation mismatch: /qqa returned SKIP on [QA]-annotated phase — consider removing [QA] in future plan revisions." Treat as PASS for auto-continue.)
 - **Unrecognized**: Treat as BLOCKED and escalate.
 
@@ -264,7 +266,7 @@ This step is always performed by the orchestrator, never by the implementation s
 
    **Deferral cap (one hop maximum)**: An exit criterion may be deferred at most **once**. If Phase N+1's sub-agent again cannot satisfy a criterion deferred from Phase N, the orchestrator MUST surface this as a High-severity finding, halt auto-continue, and present two options to the user: (a) convert to a follow-up plan (accept the item as out-of-scope for the current plan), or (b) treat as a blocker and resolve interactively before continuing.
 
-   The orchestrator should first attempt reasonable auto-resolution (re-run flaky tests, apply unambiguous one-line fixes in-session) and only defer when resolution is genuinely too complex to do now or when the cross-phase home is a better fit.
+   The orchestrator should first attempt reasonable auto-resolution (fix a flaky test at its cause, apply unambiguous one-line fixes in-session) and only defer when resolution is genuinely too complex to do now or when the cross-phase home is a better fit.
 
 4. **Document divergences** -- for Standard/Major, copy each entry from the sub-agent's `divergences` list into the "Implementation Divergences from Plan" section. For Light/inline, write these yourself.
    **Mechanical harness-capture**: if this phase recorded a governance violation (self-caught or user-caught), a QA BLOCKED verdict, or a spec deviation in its implementation notes, write the corresponding `## Harness Improvement Opportunities` entry (per `shared/AGENTS.md § Harness Improvement Capture`) NOW, in this same project-file update — a verbal "I'll note this as a harness friction item" without the write is the failure mode this item exists to prevent.

@@ -26,7 +26,7 @@ Landing-zone reference for `/qextract`. Read by the orchestrator when assigning 
 ## Authoring reference (shared/, deployed)
 
 - `shared/AUTHORING.md` — the **canonical owner** of the playbook's own authoring conventions, deployed alongside `AGENTS.md`. Two sections, both of which `shared/AGENTS.md` carries only in summary-plus-pointer form:
-  - `§ SKILL.md Authoring` — full rules and rationale: quoted `argument-hint` values, repo-relative cross-file paths, curly-brace `{token}` markers in verbatim sub-agent briefs, a named first action for behavior-overriding skills, an explicit when-NOT-to-use note, a named fallback for closed-set choices, skills written as deviations from default behaviour rather than tutorials
+  - `§ SKILL.md Authoring` — full rules and rationale: quoted `argument-hint` values, repo-relative cross-file paths, curly-brace `{token}` markers in verbatim sub-agent briefs, a named first action for behavior-overriding skills, an explicit when-NOT-to-use note, a neighbour-disambiguating `description`, a named fallback for closed-set choices, skills written as deviations from default behaviour rather than tutorials
   - `§ Structure Requires a Consumer` — full rule and its relation to the Leanness review standard
 - Route an authoring-convention change here, not to the `AGENTS.md` summary. Landing it in the summary alone leaves the canonical text stale, and the summary is what a search for "SKILL.md authoring" hits first.
 

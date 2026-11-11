@@ -57,7 +57,7 @@ Collect from the current session and workspace:
 Write the document using the template in `## Output format` below.
 
 - **Previously** — completed work, key decisions with reasoning, constraints discovered. Reference project file, commits, and memory entries by path.
-- **Parked** — suspended threads with notes, file refs, open questions. Each item marked with staleness advisory when state may have changed.
+- **Parked** — suspended threads with notes, file refs, open questions. Each item marked with staleness advisory when state may have changed. An open question that waits on someone carries a re-check date, the day its answer is due or about a week out; a resuming session past that date re-asks or re-verifies it before relying on it.
 - **Current** — exact current objective. What's done, what remains. Suggested next steps (advisory) — name specific skill + entry point.
 
 ### Step 5 — Write output
@@ -88,7 +88,7 @@ The handoff document has this structure:
 ### Parked
 
 - <thread description> — ref: <path:line-range> — [potentially stale]
-- Open question: <question> — awaiting: <what/who>
+- Open question: <question> — awaiting: <what/who> — re-check by: <YYYY-MM-DD>
 
 ### Current
 

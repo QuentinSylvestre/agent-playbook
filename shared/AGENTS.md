@@ -53,7 +53,7 @@ These are cross-project defaults; per-project overrides live in the project's `#
 
 ## Doc & Test Guidelines
 
-**Canonical text.** These bullets are the default `/qplan` Step 2 proposes when a project lacks the section. `shared/skills/qplan/TEMPLATES.md § Doc & Test Guidelines` owns the schema — detection, bootstrap, waiver, subfolder scoping — and cites this text rather than restating it.
+**Canonical text.** These bullets are the default `/qplan` Step 2 proposes when a project lacks the section. `shared/skills/qplan/TEMPLATES.md § Doc & Test Guidelines` owns the schema and cites this text rather than restating it.
 
 - Update existing documentation files when implementing user-visible changes.
 - Do not create new documentation files unless the user requests them.
@@ -146,8 +146,8 @@ The following git commands are forbidden **except where a documented exception e
 
 ## Continuous Improvement
 
-- Proactively suggest adding recurring patterns as rules **or automation** to the project's AGENTS.md or CLAUDE.md. Repeated manual invocation of the same operation is the user hand-rolling a loop — catch it in the session where they feel the pain, not in a sweep weeks later.
-- **Your own capability-gap admission is a governance signal — the only trigger that keys on the agent rather than the user.** "I couldn't find a documented convention for X" or "there's no test command I can find" *is* the gap, self-identified, with the need freshly demonstrated. Do not work around it silently: surface it and propose the durable fix (a governance line, a `## Doc & Test Guidelines` entry, a memory entry — routed per `## Memory Management`). Every other trigger waits for the *user* to repeat themselves; this one fires the first time the absence bites.
+- Proactively suggest adding recurring patterns as rules **or automation** (strongest carrier first: a test, guard script or hook, else a code comment, else a line in the project's AGENTS.md or CLAUDE.md). Repeated manual invocation of the same operation is the user hand-rolling a loop — catch it in the session where they feel the pain, not in a sweep weeks later.
+- **Your own capability-gap admission is a governance signal — the only trigger that keys on the agent rather than the user.** "I couldn't find a documented convention for X" or "there's no test command I can find" *is* the gap, self-identified, with the need freshly demonstrated. Do not work around it silently: surface it and propose the durable fix (a test or script, a governance line, a `## Doc & Test Guidelines` entry, a memory entry — routed per `## Memory Management`). Every other trigger waits for the *user* to repeat themselves; this one fires the first time the absence bites.
 - When the user overrides a rule-driven default (plan tier, persona, route), note the (default, override) pair in the project file — recurring overrides mean the default is wrong.
 
 ## Memory Management
@@ -202,7 +202,7 @@ Full detail — promotion path, bootstrap and the staleness nudge: `shared/skill
 
 ## SKILL.md Authoring
 
-Conventions for writing a `SKILL.md`: quoted `argument-hint` values (never bare `[...]`), repo-relative cross-file paths, curly-brace `{token}` markers in verbatim sub-agent briefs, a named first action for behavior-overriding skills, an explicit when-NOT-to-use note, a named fallback for closed-set choices, and deviation-not-tutorial skill bodies. Full rules and rationale: `shared/AUTHORING.md § SKILL.md Authoring`.
+Conventions for writing a `SKILL.md`: quoted `argument-hint` values (never bare `[...]`), repo-relative cross-file paths, curly-brace `{token}` markers in verbatim sub-agent briefs, a named first action for behavior-overriding skills, an explicit when-NOT-to-use note, a neighbour-disambiguating `description`, a named fallback for closed-set choices, and deviation-not-tutorial skill bodies. Full rules and rationale: `shared/AUTHORING.md § SKILL.md Authoring`.
 
 ## Structure Requires a Consumer
 
@@ -240,7 +240,7 @@ Skills that produce or consume project files SHOULD include the **Harness Improv
 | Planning | `/qplan` | Tier selection (Trivial / Light / Standard / Major) at Step 2 | Plan sections appended to project file; committed |
 | Execution | `/qdev` | Per-phase review (Step 5); auto-continue gate (Step 8) | Implementation + review log entries in project file |
 | Review | `/qreview` | Persona selection; severity-based stop/continue | Findings table; used by `/qplan` Step 4 and `/qdev` Steps 5/9 |
-| Archival | `/qclose` | Cleanup scan (Step 2 Pass 1: project, Pass 2: harness governance, Pass 3: REVISIT markers, Pass 4: documentation-ripple) | Archived project file in `plans/done/` |
+| Archival | `/qclose` | Cleanup scan (Step 2, four passes) | Archived project file in `plans/done/` |
 
 Entry points: most work starts with `/qexplore`. `/qdev` can be invoked directly on an existing plan. `/qreview` is a shared library called by `/qplan` and `/qdev`, or invoked standalone.
 
