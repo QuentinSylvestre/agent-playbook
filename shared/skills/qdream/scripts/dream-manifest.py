@@ -307,11 +307,13 @@ providers/kiro/steering/memory-sources.md. Python 3.8+, stdlib only.
 """
 
 import argparse
+import collections
 import contextlib
 import datetime as dt
 import hashlib
 import io
 import json
+import math
 import os
 import re
 import secrets
@@ -1370,6 +1372,129 @@ def parse_entries(text):
     sections (memory-entries.py rules: fence-aware; ## Declined and the
     preamble are not entries)."""
     return [(h, b) for s, h, b, _n in memory_entries().entries(text) if "## " + s in TYPE_SECTIONS]
+
+
+# --------------------------------------------------------------------------
+# Repeated lessons across tiers (memory-rules.md § Promotion path, promotion to user memory)
+# --------------------------------------------------------------------------
+# A TF-IDF cosine over each entry's heading + Why + How to apply. Its consumers: dream-sweep.py
+# `similar` (the sweep's candidates) and dream-check.py `similar` (the write-time dedup check).
+# SIMILAR_THRESHOLD was measured on the store repo at 2026-11-11 (591 entries, 45 stores): the
+# lowest of the five known real repeats scored 0.36. The fixture checks the mechanics, never the
+# threshold: IDF over a small corpus gives other scores.
+SIMILAR_THRESHOLD = 0.35
+SIMILAR_STOP = frozenset((
+    "the a an of to in for and or is are be it on with not never before after when from by as at "
+    "that this its your you do does was were has have had but if then than so can will would should "
+    "may into out only any all each one two use used using how apply why source verified user "
+    "agent").split())
+_SIM_WORD_RE = re.compile(r"[a-z][a-z0-9-]{2,}")
+_SIM_FIELD_RE = re.compile(r"^\W*\*\*(?:Why|How to apply)\*\*:")
+# The bars that keep a project entry out of a pair (memory-rules.md § Promotion path): a pending
+# governance conflict, an unresolved negative outcome, a stated exception to a higher tier, and a
+# pattern entry whose claim names a project path or symbol.
+_SIM_CONFLICT_RE = re.compile(r"\*\*Governance-conflict\*\*:[^\n]*\b(?:rule-update-pending|deferred)\b")
+_SIM_OUTCOME_RE = re.compile(r"\*\*Outcome\*\*:\s*((?:not-)?recurred)\b")
+_SIM_EXCEPTION_RE = re.compile(r"(?i)\ban exception to\b|\bexceptions? to the\b")
+_SIM_SYMBOL_RE = re.compile(r"`[^`\n]*(?:[/\\]|\(\)|\.[A-Za-z]{1,5}\b|[A-Za-z0-9]_[A-Za-z0-9])[^`\n]*`")
+
+
+def entry_sha(heading, body):
+    """The text key of an entry: sha256 of its heading line and body, line endings as LF, trailing
+    blank lines dropped. A "Not the same lesson" record holds two of these; an edit changes it."""
+    lines = ["### " + heading.strip()] + [ln.rstrip() for ln in body]
+    while lines and not lines[-1]:
+        lines.pop()
+    return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
+
+
+def similar_bar(section, heading, body):
+    """-> None, or why a project entry is never offered for promotion or removal."""
+    text = "\n".join(body)
+    if _SIM_CONFLICT_RE.search(text):
+        return "governance-conflict"
+    outcomes = _SIM_OUTCOME_RE.findall(text)
+    if outcomes and outcomes[-1] == "recurred":
+        return "negative-outcome"
+    if _SIM_EXCEPTION_RE.search(heading + "\n" + text):
+        return "exception"
+    if section == "Pattern":
+        claim = heading + "\n" + "\n".join(ln for ln in body if _SIM_FIELD_RE.match(ln))
+        if _SIM_SYMBOL_RE.search(claim):
+            return "project-symbol"
+    return None
+
+
+def similar_docs(path, tier, store):
+    """-> the entries of one memory file as similarity documents: tier `project` or `user`, store
+    the memory file's identity (two entries of one store are never a pair). Improvement signals and
+    entries outside the type sections are not documents."""
+    out = []
+    for section, heading, body, _n in memory_entries().entries(read_text(path)):
+        if "## " + section not in TYPE_SECTIONS or heading.startswith("[improvement_signal]"):
+            continue
+        claim = [ln for ln in body if _SIM_FIELD_RE.match(ln)]
+        out.append({"tier": tier, "store": store, "file": str(path), "section": section,
+                    "heading": heading, "sha": entry_sha(heading, body),
+                    "bar": similar_bar(section, heading, body) if tier == "project" else None,
+                    "words": [w for w in _SIM_WORD_RE.findall((heading + " " + " ".join(claim)).lower())
+                              if w not in SIMILAR_STOP]})
+    return out
+
+
+def _sim_vectors(docs):
+    df = collections.Counter()
+    for d in docs:
+        df.update(set(d["words"]))
+    n = len(docs) or 1
+    vs = []
+    for d in docs:
+        tf = collections.Counter(d["words"])
+        v = {w: c * math.log(n / df[w]) for w, c in tf.items()}
+        norm = math.sqrt(sum(x * x for x in v.values())) or 1.0
+        vs.append({w: x / norm for w, x in v.items()})
+    return vs
+
+
+def _sim_cos(a, b):
+    if len(a) > len(b):
+        a, b = b, a
+    return sum(x * b.get(w, 0.0) for w, x in a.items())
+
+
+def _sim_side(d):
+    return {k: d[k] for k in ("tier", "store", "file", "section", "heading", "sha")}
+
+
+def similar_pairs(docs, threshold=SIMILAR_THRESHOLD, declined=()):
+    """-> (offered, excluded): pairs scoring at least `threshold`, each {score, kind, a, b}, highest
+    first. A pair is project vs project (two stores) or project vs user tier; user vs user and pairs
+    inside one store are never scored. `excluded` holds the pairs a bar keeps out, each with its
+    `why`: a project side's bar, or `not-same` when {a.sha, b.sha} is in `declined` (an iterable of
+    sha pairs, order free). Every exclusion is applied before a caller cuts the list."""
+    vs = _sim_vectors(docs)
+    no = {frozenset(p) for p in declined}
+    offered, excluded = [], []
+    for i in range(len(docs)):
+        for j in range(i + 1, len(docs)):
+            a, b = docs[i], docs[j]
+            if a["store"] == b["store"] or (a["tier"] == "user" and b["tier"] == "user"):
+                continue
+            score = _sim_cos(vs[i], vs[j])
+            if score < threshold:
+                continue
+            if a["tier"] == "user":
+                a, b = b, a
+            pair = {"score": round(score, 4),
+                    "kind": "project-user" if b["tier"] == "user" else "project-project",
+                    "a": _sim_side(a), "b": _sim_side(b)}
+            why = a["bar"] or b["bar"] or ("not-same" if frozenset((a["sha"], b["sha"])) in no else None)
+            if why:
+                excluded.append(dict(pair, why=why))
+            else:
+                offered.append(pair)
+    key = lambda p: (-p["score"], p["a"]["file"], p["a"]["heading"], p["b"]["file"], p["b"]["heading"])
+    return sorted(offered, key=key), sorted(excluded, key=key)
 
 
 def declined_strays(memory_file):

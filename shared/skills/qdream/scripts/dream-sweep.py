@@ -47,6 +47,15 @@ Subcommands:
       agent (when it has a memory file) and N `sessions only` agents, sessions
       packed greedily in manifest order, a session over the budget alone in
       its chunk; the plan-archive task goes to chunk 1 (`plans_task`).
+  similar [--state <memory/.dream-state.json>]
+      The candidate repeated lessons (memory-rules.md § Promotion path,
+      promotion to user memory): every entry of the manifest's memory files
+      (each project's memory_file, user memory and its topic files; not
+      improvement-signals.md) scored by dream-manifest.py similar_pairs.
+      Writes sweep/similar.json {threshold, offer_cap, shown, remaining,
+      offered, excluded}: `shown` is the first offer_cap (5) offered pairs,
+      highest score first, after every exclusion (a project side's bar, or a
+      `similar_declined` record of --state); `remaining` counts the rest.
   brief --kind task4|verifier|drafter|phase [--labels <L,...>] [--phase <name>]
         [--harvest <handoff file>] [--items drafts.json]
         [--resume-from <step id>|start] [--decision <handoff file>
@@ -608,7 +617,8 @@ OUTPUT_CLASSES = {
                    "sweep/ops-generated.json", "sweep/orient-sha.json",
                    "sweep/guard-hashes.json", "sweep/gate-check.json",
                    "sweep/gate-decisions.json", "sweep/write-queue.json", "sweep/planned-map.json",
-                   "sweep/shadow/", "sweep/singletons.json", "handoff/gate.md", "handoff/orient.json",
+                   "sweep/shadow/", "sweep/singletons.json", "sweep/similar.json",
+                   "handoff/gate.md", "handoff/orient.json",
                    "handoff/decisions.json", "handoff/gather.json", "handoff/ops/"),
 }
 # The handoff files a script writes (plan 261027 SC-5): gate.md, and the
@@ -4272,6 +4282,47 @@ def cmd_singletons(args, ctx):
     return EXIT_OK
 
 
+SIMILAR_OFFER_CAP = 5
+SIGNALS_FILE = "improvement-signals.md"
+
+
+def similar_records(state_path):
+    """The "Not the same lesson" records of the state file (memory-rules.md § State File Format,
+    `similar_declined`): -> [(sha, sha), ...]; none when the file or the key is absent."""
+    if not state_path:
+        return []
+    p = Path(state_path)
+    obj = load_json(p) if p.is_file() else None
+    rows = (obj or {}).get("similar_declined") if isinstance(obj, dict) else None
+    return [(r["a"], r["b"]) for r in rows or [] if isinstance(r, dict)
+            and isinstance(r.get("a"), str) and isinstance(r.get("b"), str)]
+
+
+def cmd_similar(args, ctx):
+    """memory-rules.md § Promotion path: the candidate repeats across the manifest's memory files
+    (every project's, user memory and its topic files, improvement signals excluded), scored by
+    dream-manifest.py similar_pairs. Writes sweep/similar.json: every pair at the threshold, the
+    excluded ones with their reason, and `shown`, the first SIMILAR_OFFER_CAP offered pairs."""
+    work, man = open_work(ctx)
+    docs = []
+    for key, proj in sorted(man["projects"].items()):
+        f = proj.get("memory_file")
+        if isinstance(f, str) and os.path.isfile(f):
+            docs += dm.similar_docs(f, "project", nk(key))
+    for f in user_memory_detail(work, man).get("files") or []:
+        if isinstance(f, str) and os.path.isfile(f) and Path(f).name.lower() != SIGNALS_FILE:
+            docs += dm.similar_docs(f, "user", USER_MEMORY)
+    offered, excluded = dm.similar_pairs(docs, declined=similar_records(args.state))
+    res = {"threshold": dm.SIMILAR_THRESHOLD, "offer_cap": SIMILAR_OFFER_CAP,
+           "shown": offered[:SIMILAR_OFFER_CAP], "remaining": max(0, len(offered) - SIMILAR_OFFER_CAP),
+           "offered": offered, "excluded": excluded}
+    how = put(work, "sweep/similar.json", dumps(res))
+    print("similar: %d entr(ies) scored, %d pair(s) offered (%d shown, %d remaining), %d excluded"
+          % (len(docs), len(offered), len(res["shown"]), res["remaining"], len(excluded)))
+    print("sweep/similar.json %s" % how)
+    return EXIT_OK
+
+
 def cmd_feeder(args, ctx):
     work, man = open_work(ctx)
     disp = load_sweep(work, DISPATCH, "run `dispatch` first")
@@ -5995,6 +6046,8 @@ def parse_args(argv):
     p.add_argument("--decision-sha")
     p = sp.add_parser("singletons")
     p.add_argument("--state", required=True)
+    p = sp.add_parser("similar")
+    p.add_argument("--state")
     p = sp.add_parser("gate")
     p.add_argument("--snapshot-sha", required=True)
     p.add_argument("--decisions-sha")
@@ -6037,7 +6090,7 @@ def selftest_checks(args):
         raise Usage("a subcommand is required")
 
 
-COMMANDS = {"singletons": cmd_singletons, "dirty": cmd_dirty, "dispatch": cmd_dispatch, "brief": cmd_brief,
+COMMANDS = {"singletons": cmd_singletons, "similar": cmd_similar, "dirty": cmd_dirty, "dispatch": cmd_dispatch, "brief": cmd_brief,
             "extract": cmd_extract, "countverify": cmd_countverify, "coverage": cmd_coverage,
             "aggregate": cmd_aggregate, "feeder": cmd_feeder, "blast": cmd_blast,
             "drift": cmd_drift, "guard": cmd_guard, "handoff": cmd_handoff, "wait": cmd_wait,

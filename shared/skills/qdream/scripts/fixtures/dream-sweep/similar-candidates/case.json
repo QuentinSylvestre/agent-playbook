@@ -1,0 +1,75 @@
+{
+  "description": "similar scores repeats across the manifest's memory files: project vs project in two stores and project vs user tier are offered; user vs user, improvement signals and pairs inside one store are never scored; a stated exception, a pending governance conflict and a pattern entry naming a project path are excluded before the cut; `shown` holds the first 5 and `remaining` the rest; a similar_declined record of --state excludes its pair as not-same.",
+  "now": "2026-10-12T12:00:00Z",
+  "write": {
+    "proj/alpha/memory/MEMORY.md": "# Project Memory — alpha\n\n## Feedback\n\n### Route read-only research helpers to the economy model tier\n\n**Why**: The owner chose the economy model tier for read-only research helpers twice.\n**How to apply**: Dispatch read-only research helpers on the economy model tier; keep reviewers on the frontier tier.\n**Source**: fixture | **Verified**: 2026-10-01 (sweep)\n\n### This repo takes direct pushes to trunk — an exception to the no-push-to-trunk rule\n\n**Why**: The owner confirmed trunk pushes are fine for this repo only.\n**How to apply**: Push to trunk here when asked; every other work repo keeps feature branches, never trunk pushes.\n**Source**: fixture | **Verified**: 2026-10-01 (sweep)\n\n### Cap the review loop at a single round per stage in this repo\n\n**Why**: The owner capped the review loop at a single round per stage.\n**How to apply**: Offer a single review round per stage here.\n**Source**: fixture | **Verified**: 2026-10-01 (sweep)\n**Governance-conflict**: contradicts shared/skills/qdev/SKILL.md § Step 6 — adjudicated 2026-10-22: rule-update-pending\n\n### Glacier archive restores take twelve hours before the bucket answers\n\n**Why**: A restore of the glacier archive answered only after twelve hours.\n**How to apply**: Plan glacier archive restores twelve hours ahead.\n**Source**: fixture | **Verified**: 2026-10-01 (sweep)\n\n### Kayak rental invoices need the harbour stamp before payment\n\n**Why**: Kayak rental invoices without the harbour stamp were rejected.\n**How to apply**: Check kayak rental invoices for the harbour stamp before payment.\n**Source**: fixture | **Verified**: 2026-10-01 (sweep)\n\n## Decision\n\n## Pattern\n\n### Lint the widget catalogue with `tools/catalogue_lint.py` before a release\n\n**Why**: Unlinted widget catalogue entries broke the release build.\n**How to apply**: Run `tools/catalogue_lint.py` on the widget catalogue before each release.\n**Source**: fixture | **Verified**: 2026-10-01 (sweep)\n\n## Declined\n",
+    "proj/beta/memory/MEMORY.md": "# Project Memory — beta\n\n## Feedback\n\n### Read-only research helpers run on the economy model tier\n\n**Why**: The owner asked for the economy model tier on read-only research helpers.\n**How to apply**: Give read-only research helpers the economy model tier; reviewers stay on the frontier tier.\n**Source**: fixture | **Verified**: 2026-10-01 (sweep)\n\n### Tram timetable exports drop the night service rows\n\n**Why**: The tram timetable export silently dropped every night service row.\n**How to apply**: After a tram timetable export, count the night service rows against the source.\n**Source**: fixture | **Verified**: 2026-10-01 (sweep)\n\n### Orchard sensor batteries fail below minus ten degrees\n\n**Why**: Orchard sensor batteries stopped reporting below minus ten degrees.\n**How to apply**: Swap orchard sensor batteries for cold-rated cells before winter.\n**Source**: fixture | **Verified**: 2026-10-01 (sweep)\n\n### Violin rosin dust fouls the pickup contacts\n\n**Why**: Violin rosin dust fouled the pickup contacts within a month.\n**How to apply**: Wipe violin rosin dust from the pickup contacts weekly.\n**Source**: fixture | **Verified**: 2026-10-01 (sweep)\n\n### Lighthouse lamp filaments crack after a cold restart\n\n**Why**: Lighthouse lamp filaments cracked after each cold restart.\n**How to apply**: Warm lighthouse lamp filaments before a cold restart.\n**Source**: fixture | **Verified**: 2026-10-01 (sweep)\n\n### Cold restarts crack lighthouse lamp filaments\n\n**Why**: Each cold restart cracked the lighthouse lamp filaments.\n**How to apply**: Before a cold restart, warm the lighthouse lamp filaments.\n**Source**: fixture | **Verified**: 2026-10-01 (sweep)\n\n## Decision\n\n## Pattern\n\n### [improvement_signal] Route read-only research helpers to the economy model tier\n\n**Why**: The owner chose the economy model tier for read-only research helpers twice.\n**How to apply**: Dispatch read-only research helpers on the economy model tier; keep reviewers on the frontier tier.\n**Source**: fixture | **Verified**: 2026-10-01 (sweep)\n\n## Declined\n",
+    "repo/memory/MEMORY.md": "# Memory\n\n## Feedback\n\n### Feature branches only in work repos; never push to trunk\n\n**Why**: A trunk push in a work repo was reverted by the owner.\n**How to apply**: Push work repos on feature branches, never to trunk.\n**Source**: fixture | **Verified**: 2026-10-01 (sweep)\n\n### Review loop: a single round per stage\n\n**Why**: The owner capped the review loop at a single round per stage.\n**How to apply**: Run a single review round per stage.\n**Source**: fixture | **Verified**: 2026-10-01 (sweep)\n\n### Lint the widget catalogue before a release\n\n**Why**: Unlinted widget catalogue entries broke the release build.\n**How to apply**: Lint the widget catalogue before each release.\n**Source**: fixture | **Verified**: 2026-10-01 (sweep)\n\n## Decision\n\n## Pattern\n\n## Declined\n",
+    "repo/memory/topics/tools.md": "# Topic memory — tools\n\n## Feedback\n\n### Tram timetable exports lose the night service rows\n\n**Why**: A tram timetable export dropped the night service rows without an error.\n**How to apply**: Count the night service rows of a tram timetable export against the source.\n**Source**: fixture | **Verified**: 2026-10-01 (sweep)\n\n### Orchard sensor batteries die below minus ten degrees\n\n**Why**: Orchard sensor batteries stopped below minus ten degrees.\n**How to apply**: Fit cold-rated cells in orchard sensors before winter.\n**Source**: fixture | **Verified**: 2026-10-01 (sweep)\n\n### Violin rosin dust on pickup contacts\n\n**Why**: Violin rosin dust fouled pickup contacts within a month.\n**How to apply**: Wipe violin rosin dust off pickup contacts weekly.\n**Source**: fixture | **Verified**: 2026-10-01 (sweep)\n\n### Glacier archive restores answer after twelve hours\n\n**Why**: Glacier archive restores answered after twelve hours.\n**How to apply**: Request glacier archive restores twelve hours ahead.\n**Source**: fixture | **Verified**: 2026-10-01 (sweep)\n\n### Kayak rental invoices require the harbour stamp\n\n**Why**: Kayak rental invoices lacking the harbour stamp were rejected.\n**How to apply**: Look for the harbour stamp on kayak rental invoices before paying.\n**Source**: fixture | **Verified**: 2026-10-01 (sweep)\n\n### Glacier archive restore lead time is twelve hours\n\n**Why**: Restoring the glacier archive took twelve hours.\n**How to apply**: Ask for a glacier archive restore twelve hours early.\n**Source**: fixture | **Verified**: 2026-10-01 (sweep)\n\n## Decision\n\n## Pattern\n\n## Declined\n",
+    "repo/memory/topics/improvement-signals.md": "# Topic memory — improvement signals\n\n## Feedback\n\n### Route read-only research helpers to the economy model tier\n\n**Why**: The owner chose the economy model tier for read-only research helpers twice.\n**How to apply**: Dispatch read-only research helpers on the economy model tier; keep reviewers on the frontier tier.\n**Source**: fixture | **Verified**: 2026-10-01 (sweep)\n\n## Decision\n\n## Pattern\n\n## Declined\n"
+  },
+  "git": [
+    "repo"
+  ],
+  "steps": [
+    {
+      "argv": [
+        "similar"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "similar: ",
+        "pair(s) offered (5 shown, 2 remaining), 3 excluded"
+      ],
+      "files": {
+        "sweep/similar.json": {
+          "offer_cap": 5,
+          "remaining": 2,
+          "shown": [
+            {},
+            {},
+            {},
+            {},
+            {}
+          ]
+        }
+      },
+      "text_contains": {
+        "sweep/similar.json": [
+          "\"kind\": \"project-project\"",
+          "\"why\": \"exception\"",
+          "\"why\": \"governance-conflict\"",
+          "\"why\": \"project-symbol\""
+        ]
+      },
+      "text_not_contains": {
+        "sweep/similar.json": [
+          "[improvement_signal]",
+          "Topic memory"
+        ]
+      }
+    },
+    {
+      "write": {
+        "repo/memory/.dream-state.json": "{\"similar_declined\": [{\"a\": \"7656d8bbee7dd9c67db8208e48cfd0ce40940c64114d9e0eae4a008abc354923\", \"b\": \"d7e1b7be5559b8531af1bd7c2bc14bc711059daca7f90c975fcd40c17fdb002b\", \"date\": \"2026-10-12\"}]}\n"
+      }
+    },
+    {
+      "argv": [
+        "similar",
+        "--state",
+        "memory/.dream-state.json"
+      ],
+      "cwd": "repo",
+      "exit": 0,
+      "stdout_contains": [
+        "(5 shown, 1 remaining), 4 excluded"
+      ],
+      "text_contains": {
+        "sweep/similar.json": [
+          "\"why\": \"not-same\""
+        ]
+      }
+    }
+  ]
+}

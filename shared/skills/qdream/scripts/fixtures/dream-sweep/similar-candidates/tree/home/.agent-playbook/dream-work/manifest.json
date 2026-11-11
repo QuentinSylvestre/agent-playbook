@@ -1,0 +1,80 @@
+{
+  "snapshot_at": "2026-10-12T12:00:00Z",
+  "sweep_due": false,
+  "due_sessions": 0,
+  "new_project_baseline": {
+    "rule": "last_run",
+    "since": "2026-10-01T00:00:00Z"
+  },
+  "errors": [],
+  "empty_sessions": 0,
+  "unattributed": "unattributed.json",
+  "watermarks_to_clear": [],
+  "user_memory": {
+    "detail": "user_memory.json",
+    "counts": {
+      "files": 0,
+      "entries": 0,
+      "suspects": 0
+    },
+    "quiet_sweeps": 0,
+    "memory_pass": null,
+    "memory_flags": [],
+    "file_flags": {},
+    "file_suspects": {}
+  },
+  "projects": {
+    "{ROOT}/proj/alpha": {
+      "status": "known",
+      "discovered_by": [
+        "state"
+      ],
+      "subdirectory_of": null,
+      "baseline_rule": "state",
+      "older_sessions_not_read": 0,
+      "empty_sessions": 0,
+      "counts": {
+        "sessions": 0,
+        "entries": 1,
+        "suspects": 0,
+        "new_plans": 0,
+        "errors": 0
+      },
+      "sessions": [],
+      "errors": [],
+      "due": false,
+      "fork_collapsed": [],
+      "memory_file": "{ROOT}/proj/alpha/memory/MEMORY.md",
+      "detail": "projects/alpha.json",
+      "quiet_sweeps": 0,
+      "memory_pass": null,
+      "memory_flags": []
+    },
+    "{ROOT}/proj/beta": {
+      "status": "known",
+      "discovered_by": [
+        "state"
+      ],
+      "subdirectory_of": null,
+      "baseline_rule": "state",
+      "older_sessions_not_read": 0,
+      "empty_sessions": 0,
+      "counts": {
+        "sessions": 0,
+        "entries": 1,
+        "suspects": 0,
+        "new_plans": 0,
+        "errors": 0
+      },
+      "sessions": [],
+      "errors": [],
+      "due": false,
+      "fork_collapsed": [],
+      "memory_file": "{ROOT}/proj/beta/memory/MEMORY.md",
+      "detail": "projects/beta.json",
+      "quiet_sweeps": 0,
+      "memory_pass": null,
+      "memory_flags": []
+    }
+  }
+}
