@@ -111,6 +111,7 @@ SYN-HIGHERORDER	SYN-HIGHERORDER	shared/skills/qdream/sweep-synthesize.md	shared/
 SYN-OUTCOME	SYN-OUTCOME	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/sweep-decide-apply.md
 SYN-PATTERN	SYN-PATTERN	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/SKILL.md
 SYN-SKILLS	SYN-SKILLS	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/SKILL.md
+SYN-REPEATS	SYN-REPEATS	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/memory-rules.md	shared/skills/qdream/sweep-decide-apply.md
 ORI-DISPATCH	ORI-DISPATCH	shared/skills/qdream/sweep-orient.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/sweep-gather.md	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/sweep-decide-apply.md	shared/skills/qdream/transition-fixtures.md	providers/kiro/skills/qdream/sweep-gather.OVERLAY.md	providers/kiro/skills/qdream/sweep-orient.OVERLAY.md	shared/skills/qdream/scripts/dream-manifest.py
 improvement-signals topic file	memory/topics/improvement-signals.md	shared/skills/qdream/SKILL.md	shared/skills/qdream/memory-rules.md	shared/skills/qdream/sweep-orient.md	shared/skills/qdream/sweep-synthesize.md	shared/skills/qdream/sweep-decide-apply.md	shared/skills/qdream/sweep-recovery.md	providers/kiro/skills/qdream/sweep-synthesize.OVERLAY.md	shared/skills/qextract/references/playbook-map.md	shared/AGENTS.md
 Prune-set exclusions	Prune-set exclusions	shared/skills/qdream/memory-rules.md	shared/skills/qdream/sweep-synthesize.md	providers/kiro/skills/qdream/OVERLAY.md

@@ -116,7 +116,7 @@ A full sweep loads each sweep file (beside this SKILL.md) when its phase starts,
 | `sweep-recovery.md` | ORI-RECOVER | Full sweep, only when `memory/.dream-journal.jsonl` is non-empty and no paused sweep is resumed; it runs at step 3 of `sweep-handoff.md § Orient order` |
 | `sweep-orient.md` | ORI-STATE, ORI-DISCOVER, ORI-ROUTE, ORI-READMEM, ORI-DISPATCH | Phase 1 — Orient |
 | `sweep-gather.md` | GAT-SESSIONS, GAT-ARCHETYPES, GAT-PLANS, GAT-CLASSIFY, GAT-DRIFT, GAT-SIGNALS, GAT-NATIVE | Phase 2 — Gather |
-| `sweep-synthesize.md` | SYN-GATE, SYN-OUTCOME, SYN-WRITE, SYN-STALE, SYN-RECONCILE, SYN-PATTERN, SYN-ARCHPROMO, SYN-PROMOTE, SYN-SKILLS, SYN-INSIGHTS, SYN-HIGHERORDER | Phase 3 — Synthesize |
+| `sweep-synthesize.md` | SYN-GATE, SYN-OUTCOME, SYN-WRITE, SYN-STALE, SYN-RECONCILE, SYN-PATTERN, SYN-ARCHPROMO, SYN-PROMOTE, SYN-REPEATS, SYN-SKILLS, SYN-INSIGHTS, SYN-HIGHERORDER | Phase 3 — Synthesize |
 | `sweep-decide-apply.md` | DEC-PROPOSALS, DEC-RETIRE, DEC-GATE, APP-ADJUDICATE, APP-STATE, APP-COMMIT, APP-CLEAN, APP-METRICS | Synthesize (DEC-PROPOSALS, DEC-RETIRE); the orchestrator (Phase 4a, the gate, the Report); Apply (Phase 5) |
 
 **Improvement signals** (user scope) live in the config repo's `memory/topics/improvement-signals.md`, not `memory/MEMORY.md`: read at `§ ORI-READMEM`, written at `§ SYN-PROMOTE`, removed only at `§ APP-ADJUDICATE`.
