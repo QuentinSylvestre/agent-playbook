@@ -1395,16 +1395,15 @@ _SIM_FIELD_RE = re.compile(r"^\W*\*\*(?:Why|How to apply)\*\*:")
 # pattern entry whose claim names a project path or symbol.
 _SIM_CONFLICT_RE = re.compile(r"\*\*Governance-conflict\*\*:[^\n]*\b(?:rule-update-pending|deferred)\b")
 _SIM_OUTCOME_RE = re.compile(r"\*\*Outcome\*\*:\s*((?:not-)?recurred)\b")
-_SIM_EXCEPTION_RE = re.compile(r"(?i)\ban exception to\b|\bexceptions? to the\b")
+_SIM_EXCEPTION_RE = re.compile(r"(?i)\b(?:is|as|an) exception to\b")
 _SIM_SYMBOL_RE = re.compile(r"`[^`\n]*(?:[/\\]|\(\)|\.[A-Za-z]{1,5}\b|[A-Za-z0-9]_[A-Za-z0-9])[^`\n]*`")
 
 
 def entry_sha(heading, body):
-    """The text key of an entry: sha256 of its heading line and body, line endings as LF, trailing
-    blank lines dropped. A "Not the same lesson" record holds two of these; an edit changes it."""
-    lines = ["### " + heading.strip()] + [ln.rstrip() for ln in body]
-    while lines and not lines[-1]:
-        lines.pop()
+    """The text key of an entry: sha256 of its heading and its Why and How to apply lines (the
+    claim the detector scores), stripped, LF-joined. A "Not the same lesson" record holds two of
+    these: an edit of the claim lapses it, a Usage bump, a re-date or an Outcome stamp does not."""
+    lines = ["### " + heading.strip()] + [ln.strip() for ln in body if _SIM_FIELD_RE.match(ln)]
     return hashlib.sha256("\n".join(lines).encode("utf-8")).hexdigest()
 
 

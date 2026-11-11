@@ -47,15 +47,20 @@ Subcommands:
       agent (when it has a memory file) and N `sessions only` agents, sessions
       packed greedily in manifest order, a session over the budget alone in
       its chunk; the plan-archive task goes to chunk 1 (`plans_task`).
-  similar [--state <memory/.dream-state.json>]
+  similar --state <memory/.dream-state.json>
       The candidate repeated lessons (memory-rules.md § Promotion path,
       promotion to user memory): every entry of the manifest's memory files
       (each project's memory_file, user memory and its topic files; not
       improvement-signals.md) scored by dream-manifest.py similar_pairs.
       Writes sweep/similar.json {threshold, offer_cap, shown, remaining,
-      offered, excluded}: `shown` is the first offer_cap (5) offered pairs,
-      highest score first, after every exclusion (a project side's bar, or a
-      `similar_declined` record of --state); `remaining` counts the rest.
+      offered, excluded, overlap_skipped, stale_declined}: `shown` is the first offer_cap (5)
+      offered pairs, highest score first, after every exclusion (a project
+      side's bar, or a `similar_declined` record of --state), skipping a pair
+      that shares an entry with one already shown (counted in
+      overlap_skipped); `remaining` counts the
+      offered pairs not shown; `stale_declined` lists the records naming an
+      entry that no longer exists, which state apply drops. An absent state
+      file holds no records; an unreadable one is exit 3.
   brief --kind task4|verifier|drafter|phase [--labels <L,...>] [--phase <name>]
         [--harvest <handoff file>] [--items drafts.json]
         [--resume-from <step id>|start] [--decision <handoff file>
@@ -4291,14 +4296,35 @@ SIGNALS_FILE = "improvement-signals.md"
 
 def similar_records(state_path):
     """The "Not the same lesson" records of the state file (memory-rules.md § State File Format,
-    `similar_declined`): -> [(sha, sha), ...]; none when the file or the key is absent."""
-    if not state_path:
-        return []
+    `similar_declined`): -> [(sha, sha), ...]; none when the file is absent (a first sweep) or
+    holds no such key. An unreadable state file is exit 3: its records would silently lapse."""
     p = Path(state_path)
-    obj = load_json(p) if p.is_file() else None
-    rows = (obj or {}).get("similar_declined") if isinstance(obj, dict) else None
+    if not p.is_file():
+        return []
+    obj = load_json(p)
+    if not isinstance(obj, dict):
+        raise Precond("%s is not a readable JSON object: its similar_declined records cannot be "
+                      "applied" % state_path)
+    rows = obj.get("similar_declined")
     return [(r["a"], r["b"]) for r in rows or [] if isinstance(r, dict)
             and isinstance(r.get("a"), str) and isinstance(r.get("b"), str)]
+
+
+def shown_pairs(offered, cap):
+    """The first `cap` offered pairs in score order, skipping a pair that shares an entry with one
+    already shown (two answers on one entry would delete it twice); a skipped pair stays offered and
+    can be shown next sweep."""
+    shown, used, skipped = [], set(), 0
+    for p in offered:
+        if len(shown) >= cap:
+            break
+        keys = {p["a"]["sha"], p["b"]["sha"]}
+        if keys & used:
+            skipped += 1
+            continue
+        shown.append(p)
+        used |= keys
+    return shown, skipped
 
 
 def cmd_similar(args, ctx):
@@ -4315,13 +4341,20 @@ def cmd_similar(args, ctx):
     for f in user_memory_detail(work, man).get("files") or []:
         if isinstance(f, str) and os.path.isfile(f) and Path(f).name.lower() != SIGNALS_FILE:
             docs += dm.similar_docs(f, "user", USER_MEMORY)
-    offered, excluded = dm.similar_pairs(docs, declined=similar_records(args.state))
+    records = similar_records(args.state)
+    offered, excluded = dm.similar_pairs(docs, declined=records)
+    shown, overlap = shown_pairs(offered, SIMILAR_OFFER_CAP)
+    # A record whose entry no longer exists (edited or removed) can never match again: state apply
+    # drops the records listed here.
+    live = {d["sha"] for d in docs}
+    stale = [{"a": a, "b": b} for a, b in records if a not in live or b not in live]
     res = {"threshold": dm.SIMILAR_THRESHOLD, "offer_cap": SIMILAR_OFFER_CAP,
-           "shown": offered[:SIMILAR_OFFER_CAP], "remaining": max(0, len(offered) - SIMILAR_OFFER_CAP),
-           "offered": offered, "excluded": excluded}
+           "shown": shown, "remaining": len(offered) - len(shown), "overlap_skipped": overlap,
+           "offered": offered, "excluded": excluded, "stale_declined": stale}
     how = put(work, "sweep/similar.json", dumps(res))
-    print("similar: %d entr(ies) scored, %d pair(s) offered (%d shown, %d remaining), %d excluded"
-          % (len(docs), len(offered), len(res["shown"]), res["remaining"], len(excluded)))
+    print("similar: %d entr(ies) scored, %d pair(s) offered (%d shown, %d remaining), %d excluded; "
+          "%d similar_declined record(s) read, %d stale"
+          % (len(docs), len(offered), len(shown), res["remaining"], len(excluded), len(records), len(stale)))
     print("sweep/similar.json %s" % how)
     return EXIT_OK
 
@@ -6064,7 +6097,7 @@ def parse_args(argv):
     p = sp.add_parser("singletons")
     p.add_argument("--state", required=True)
     p = sp.add_parser("similar")
-    p.add_argument("--state")
+    p.add_argument("--state", required=True)
     p = sp.add_parser("gate")
     p.add_argument("--snapshot-sha", required=True)
     p.add_argument("--decisions-sha")

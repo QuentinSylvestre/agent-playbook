@@ -39,10 +39,15 @@ Subcommands:
       memory and its topic files (improvement-signals.md excluded) and every
       store's memory/MEMORY.md (--stores, default the store repo the
       resolver names), never against --target, the file it would be
-      written to. Prints each entry at or above dream-manifest.py's
-      SIMILAR_THRESHOLD and one verdict line: it restates the user tier
-      (update that entry), it repeats another project (propose user scope),
-      or no repeat. Read-only; exit 0 whatever it finds.
+      written to. The draft takes the project bars, so a draft stating an
+      exception to a higher-tier entry is never read as a restatement. Prints
+      the corpus size, each entry at or above dream-manifest.py's
+      SIMILAR_THRESHOLD and one verdict line: it states an exception (save it
+      with the override noted), it restates the user tier (update that
+      entry), it repeats another project (propose user scope; for a user-tier
+      target, the sweep offers to remove the copy), related entries only, or
+      no repeat. Read-only; exit 0 whatever it finds; exit 1 when the user
+      memory directory or the store repo is missing.
   --selftest
       Runs the fixture cases under fixtures/dream-check/budget/.
 
@@ -463,25 +468,32 @@ def similar_corpus(repo, stores, target):
 
 def cmd_similar(args, ctx):
     repo = Path(args.repo) if args.repo else default_repo(ctx)
-    stores = args.stores or dm.resolver().store_repo_root()
+    stores = Path(args.stores) if args.stores else Path(dm.resolver().store_repo_root())
     if not os.path.isfile(args.entry_file):
         raise Failure("cannot read %s" % args.entry_file)
+    for what, d in (("user memory", Path(repo) / "memory"), ("store repo", stores)):
+        if not d.is_dir():
+            raise Failure("%s %s is not a directory: the check would compare against nothing" % (what, d))
     tdir = os.path.realpath(str(Path(repo) / "memory"))
-    tier = "user" if os.path.realpath(str(Path(args.target).parent)) in (tdir, os.path.join(tdir, "topics")) \
-        else "project"
-    cand = [dict(d, tier=tier, store="candidate", file="(new entry)", bar=None)
-            for d in dm.similar_docs(args.entry_file, tier, "candidate")]
+    tier = "user" if os.path.realpath(str(Path(args.target).parent)) in (tdir, os.path.join(tdir, "topics"))         else "project"
+    # The draft is scored as a project document whatever its target, so it pairs with every user-tier
+    # file but its target, and its own bars (a stated exception) apply.
+    cand = [dict(d, store="candidate", file="(new entry)")
+            for d in dm.similar_docs(args.entry_file, "project", "candidate")]
     if len(cand) != 1:
         raise Failure("%s holds %d entries under a type section; write the proposed entry as one `### ` "
                       "entry under its `## Feedback`, `## Decision` or `## Pattern` heading"
                       % (args.entry_file, len(cand)))
-    docs = similar_corpus(repo, stores, args.target) + cand
-    offered, excluded = dm.similar_pairs(docs)
+    corpus = similar_corpus(repo, stores, args.target)
+    print("similar: scanned %d user-tier and %d project entries" % (
+        sum(d["tier"] == "user" for d in corpus), sum(d["tier"] == "project" for d in corpus)))
+    offered, excluded = dm.similar_pairs(corpus + cand)
     mine = [p for p in offered + excluded if "(new entry)" in (p["a"]["file"], p["b"]["file"])]
     mine.sort(key=lambda p: -p["score"])
     if not mine:
         print("similar: no repeat at or above %.2f; write it at the narrowest true scope" % dm.SIMILAR_THRESHOLD)
         return EXIT_OK
+
     def other(p):
         return p["b"] if p["a"]["file"] == "(new entry)" else p["a"]
 
@@ -489,13 +501,22 @@ def cmd_similar(args, ctx):
         o = other(p)
         print("%.2f %s %s § %s%s" % (p["score"], o["tier"], o["file"], o["heading"],
                                           "  (excluded: %s)" % p["why"] if p.get("why") else ""))
-    if any(other(p)["tier"] == "user" for p in mine):
+    user_hit = any(other(p)["tier"] == "user" for p in mine)
+    proj_hit = any(other(p)["tier"] == "project" and not p.get("why") for p in mine)
+    if cand[0]["bar"] == "exception":
+        print("similar: states an exception to a higher-tier entry: save it at its own scope with the "
+              "override noted in Why (step 4, memory-tier branch); never fold it into that entry")
+    elif user_hit:
         print("similar: restates the user tier: update that entry instead of saving a copy")
-    elif tier == "project" and any(not p.get("why") for p in mine):
+    elif proj_hit and tier == "user":
+        print("similar: another project holds a copy: save it; the next /qdream sweep offers to remove "
+              "that copy")
+    elif proj_hit:
         print("similar: repeats another project: propose user scope (promotion to user memory); "
               "the user decides, and the next /qdream sweep offers to remove the other copy")
     else:
-        print("similar: related entries only (excluded by a bar); write it at the narrowest true scope")
+        print("similar: related entries only, each excluded by a bar (listed above); write it at the "
+              "narrowest true scope")
     return EXIT_OK
 
 
@@ -806,6 +827,24 @@ def _case_similar():
                                    "--repo", str(tmp / "repo"), "--stores", str(tmp / "stores")], dm.Ctx())
             if code != EXIT_OK or want not in out:
                 fails.append("%s: exit %s, expected %r in %r %r" % (name, code, want, out[-300:], err[-200:]))
+        f = put("draft-exception.md", "## Feedback\n\n" + ent(
+            "Tram timetable exports keep night service rows here, an exception to the export rule",
+            "A tram timetable export here kept night service rows.",
+            "Skip the night service row count after a tram timetable export here."))
+        code, out, err = _run(["similar", "--entry-file", str(f), "--target", str(target),
+                               "--repo", str(tmp / "repo"), "--stores", str(tmp / "stores")], dm.Ctx())
+        if code != EXIT_OK or "states an exception" not in out or "restates" in out:
+            fails.append("exception draft: exit %s, %r %r" % (code, out[-300:], err[-200:]))
+        f = put("draft-user-target.md", "## Feedback\n\n" + ent(*drafts["user"][:3]))
+        code, out, err = _run(["similar", "--entry-file", str(f), "--target",
+                               str(tmp / "repo" / "memory" / "topics" / "trams.md"),
+                               "--repo", str(tmp / "repo"), "--stores", str(tmp / "stores")], dm.Ctx())
+        if code != EXIT_OK or "restates the user tier" not in out:
+            fails.append("user-tier target: exit %s, %r %r" % (code, out[-300:], err[-200:]))
+        code, _o, err = _run(["similar", "--entry-file", str(f), "--target", str(target),
+                              "--repo", str(tmp / "repo"), "--stores", str(tmp / "no-such-stores")], dm.Ctx())
+        if code != EXIT_FAIL or "is not a directory" not in err:
+            fails.append("missing store repo: exit %s, %r" % (code, err[-200:]))
         bare = put("draft-bare.md", ent("No section", "w", "h"))
         code, _o, err = _run(["similar", "--entry-file", str(bare), "--target", str(target),
                               "--repo", str(tmp / "repo"), "--stores", str(tmp / "stores")], dm.Ctx())

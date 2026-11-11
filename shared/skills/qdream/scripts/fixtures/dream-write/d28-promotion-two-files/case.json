@@ -1,5 +1,5 @@
 {
-  "description": "D28 promotion (promotion to user memory): Promote authorizes one user-tier write and a promotion-removal delete of each project copy it names (file, file2); a delete of a user-tier entry, another class or under Not the same lesson is refused; memedit refuses a promotion delete whose user-memory write is neither done nor planned (lost lesson) or was refused, and persists the write first: a crash after it leaves both project copies, and the re-run deletes them. Remove copy with no write deletes the copy when the dest entry already exists.",
+  "description": "D28 promotion (promotion to user memory): Promote authorizes one write to memory/MEMORY.md or a topic file (never HIGHER_ORDER.md) of the dest entry as the gate showed it and a promotion-removal delete of each project copy (file, file2); a user-tier delete, another class, another heading or a delete under Not the same lesson is refused; memedit and queue refuse a promotion delete whose write is neither done nor planned in the same run, or, with no write, whose dest entry differs from shown_text; the write lands first, so a crash after it leaves both project copies and the re-run deletes them; push --plan re-checks recorded promotion ops; a decisions.json item without both pair shas, with equal shas, or with file2 and no heading2 refuses the whole file.",
   "now": "2026-10-12T12:00:00Z",
   "store_repo": "stores",
   "setup": [
@@ -42,12 +42,16 @@
     },
     {
       "write": {
-        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": [\n    {\n      \"id\": \"pm\",\n      \"kind\": \"promotion\",\n      \"answer\": \"Promote\",\n      \"option\": \"Promote\",\n      \"file\": \"{ROOT}/stores/alpha-000000/memory/MEMORY.md\",\n      \"heading\": \"Alpha only\",\n      \"file2\": \"{ROOT}/stores/beta-000000/memory/MEMORY.md\",\n      \"heading2\": \"Beta entry\",\n      \"dest_file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"dest_heading\": \"Promoted lesson\",\n      \"shown_text\": \"### Promoted lesson\\n\\n**Why**: seen in alpha and beta.\\n**How to apply**: do it.\\n**Source**: alpha s2; beta s4 | **Verified**: 2026-10-12 (human:alice, promotion from 2 projects)\\n\"\n    },\n    {\n      \"id\": \"rc\",\n      \"kind\": \"promotion\",\n      \"answer\": \"Remove copy\",\n      \"option\": \"Remove copy\",\n      \"file\": \"{ROOT}/stores/beta-000000/memory/MEMORY.md\",\n      \"heading\": \"Beta second\",\n      \"dest_file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"dest_heading\": \"Keep commits small\",\n      \"shown_text\": \"### Keep commits small\\n\\n**Why**: small diffs review faster.\\n**How to apply**: split by concern.\\n**Source**: plan-a § Notes | **Verified**: 2026-09-01\\n\"\n    },\n    {\n      \"id\": \"pu\",\n      \"kind\": \"promotion\",\n      \"answer\": \"Promote\",\n      \"option\": \"Promote\",\n      \"file\": \"{ROOT}/repo/memory/topics/ci.md\",\n      \"heading\": \"Pin the runner image\",\n      \"dest_file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"dest_heading\": \"Promoted lesson\",\n      \"shown_text\": \"### Promoted lesson\\n\\n**Why**: seen in alpha and beta.\\n**How to apply**: do it.\\n**Source**: alpha s2; beta s4 | **Verified**: 2026-10-12 (human:alice, promotion from 2 projects)\\n\"\n    },\n    {\n      \"id\": \"ns\",\n      \"kind\": \"promotion\",\n      \"answer\": \"Not the same lesson\",\n      \"option\": \"Not the same lesson\",\n      \"file\": \"{ROOT}/stores/alpha-000000/memory/MEMORY.md\",\n      \"heading\": \"Alpha only\",\n      \"dest_file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"dest_heading\": \"Promoted lesson\"\n    }\n  ]\n}\n",
+        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": [\n    {\n      \"id\": \"pm\",\n      \"kind\": \"promotion\",\n      \"answer\": \"Promote\",\n      \"option\": \"Promote\",\n      \"pair_a\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n      \"pair_b\": \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\n      \"file\": \"{ROOT}/stores/alpha-000000/memory/MEMORY.md\",\n      \"heading\": \"Alpha only\",\n      \"file2\": \"{ROOT}/stores/beta-000000/memory/MEMORY.md\",\n      \"heading2\": \"Beta entry\",\n      \"dest_file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"dest_heading\": \"Promoted lesson\",\n      \"shown_text\": \"### Promoted lesson\\n\\n**Why**: seen in alpha and beta.\\n**How to apply**: do it.\\n**Source**: alpha s2; beta s4 | **Verified**: 2026-10-12 (human:alice, promotion from 2 projects)\\n\"\n    },\n    {\n      \"id\": \"rc\",\n      \"kind\": \"promotion\",\n      \"answer\": \"Remove copy\",\n      \"option\": \"Remove copy\",\n      \"pair_a\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n      \"pair_b\": \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\n      \"file\": \"{ROOT}/stores/beta-000000/memory/MEMORY.md\",\n      \"heading\": \"Beta second\",\n      \"dest_file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"dest_heading\": \"Keep commits small\",\n      \"shown_text\": \"### Keep commits small\\n\\n**Why**: small diffs review faster.\\n**How to apply**: split by concern.\\n**Source**: plan-a § Notes | **Verified**: 2026-09-01\\n\"\n    },\n    {\n      \"id\": \"rm\",\n      \"kind\": \"promotion\",\n      \"answer\": \"Remove copy\",\n      \"option\": \"Remove copy\",\n      \"pair_a\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n      \"pair_b\": \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\n      \"file\": \"{ROOT}/stores/beta-000000/memory/MEMORY.md\",\n      \"heading\": \"Beta second\",\n      \"dest_file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"dest_heading\": \"Keep commits small\",\n      \"shown_text\": \"### Keep commits small\\n\\n**Why**: small diffs review faster.\\n**How to apply**: split by concern; one fact from beta.\\n**Source**: plan-a § Notes | **Verified**: 2026-09-01\\n\"\n    },\n    {\n      \"id\": \"pu\",\n      \"kind\": \"promotion\",\n      \"answer\": \"Promote\",\n      \"option\": \"Promote\",\n      \"pair_a\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n      \"pair_b\": \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\n      \"file\": \"{ROOT}/repo/memory/topics/ci.md\",\n      \"heading\": \"Pin the runner image\",\n      \"dest_file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"dest_heading\": \"Promoted lesson\",\n      \"shown_text\": \"### Promoted lesson\\n\\n**Why**: seen in alpha and beta.\\n**How to apply**: do it.\\n**Source**: alpha s2; beta s4 | **Verified**: 2026-10-12 (human:alice, promotion from 2 projects)\\n\"\n    },\n    {\n      \"id\": \"ph\",\n      \"kind\": \"promotion\",\n      \"answer\": \"Promote\",\n      \"option\": \"Promote\",\n      \"pair_a\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n      \"pair_b\": \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\n      \"file\": \"{ROOT}/stores/alpha-000000/memory/MEMORY.md\",\n      \"heading\": \"Alpha only\",\n      \"dest_file\": \"{ROOT}/repo/memory/HIGHER_ORDER.md\",\n      \"dest_heading\": \"Promoted lesson\",\n      \"shown_text\": \"### Promoted lesson\\n\\n**Why**: seen in alpha and beta.\\n**How to apply**: do it.\\n**Source**: alpha s2; beta s4 | **Verified**: 2026-10-12 (human:alice, promotion from 2 projects)\\n\"\n    },\n    {\n      \"id\": \"ns\",\n      \"kind\": \"promotion\",\n      \"answer\": \"Not the same lesson\",\n      \"option\": \"Not the same lesson\",\n      \"pair_a\": \"cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc\",\n      \"pair_b\": \"dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\"\n    },\n    {\n      \"id\": \"pd\",\n      \"kind\": \"promotion\",\n      \"answer\": \"Promote\",\n      \"option\": \"Promote\",\n      \"pair_a\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n      \"pair_b\": \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\n      \"file\": \"{ROOT}/stores/alpha-000000/memory/MEMORY.md\",\n      \"heading\": \"Alpha only\",\n      \"dest_file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"dest_heading\": \"Promoted lesson\",\n      \"shown_text\": \"### Other heading\\n\\n**Why**: seen in alpha and beta.\\n**How to apply**: do it.\\n**Source**: alpha s2; beta s4 | **Verified**: 2026-10-12 (human:alice, promotion from 2 projects)\\n\"\n    }\n  ]\n}\n",
         "home/.agent-playbook/dream-work/handoff/ops/pm-class.json": "{\n  \"ops\": [\n    {\n      \"id\": \"c1\",\n      \"op\": \"delete\",\n      \"file\": \"{ROOT}/stores/alpha-000000/memory/MEMORY.md\",\n      \"heading\": \"Alpha only\",\n      \"class\": \"pruned\",\n      \"decision_id\": \"pm\"\n    }\n  ]\n}\n",
         "home/.agent-playbook/dream-work/handoff/ops/pm-user.json": "{\n  \"ops\": [\n    {\n      \"id\": \"u1\",\n      \"op\": \"delete\",\n      \"file\": \"{ROOT}/repo/memory/topics/ci.md\",\n      \"heading\": \"Pin the runner image\",\n      \"class\": \"promotion-removal\",\n      \"decision_id\": \"pu\"\n    }\n  ]\n}\n",
         "home/.agent-playbook/dream-work/handoff/ops/pm-notsame.json": "{\n  \"ops\": [\n    {\n      \"id\": \"n1\",\n      \"op\": \"delete\",\n      \"file\": \"{ROOT}/stores/alpha-000000/memory/MEMORY.md\",\n      \"heading\": \"Alpha only\",\n      \"class\": \"promotion-removal\",\n      \"decision_id\": \"ns\"\n    }\n  ]\n}\n",
         "home/.agent-playbook/dream-work/handoff/ops/pm-lost.json": "{\n  \"ops\": [\n    {\n      \"id\": \"l1\",\n      \"op\": \"delete\",\n      \"file\": \"{ROOT}/stores/alpha-000000/memory/MEMORY.md\",\n      \"heading\": \"Alpha only\",\n      \"class\": \"promotion-removal\",\n      \"decision_id\": \"pm\"\n    }\n  ]\n}\n",
         "home/.agent-playbook/dream-work/handoff/ops/pm-badwrite.json": "{\n  \"ops\": [\n    {\n      \"id\": \"b1\",\n      \"op\": \"delete\",\n      \"file\": \"{ROOT}/stores/alpha-000000/memory/MEMORY.md\",\n      \"heading\": \"Alpha only\",\n      \"class\": \"promotion-removal\",\n      \"decision_id\": \"pm\"\n    },\n    {\n      \"id\": \"b2\",\n      \"op\": \"insert\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"section\": \"## Feedback\",\n      \"text\": \"### Promoted lesson\\n\\n**Why**: seen in alpha and beta.\\n**How to apply**: do something else.\\n**Source**: alpha s2; beta s4 | **Verified**: 2026-10-12 (human:alice, promotion from 2 projects)\\n\",\n      \"decision_id\": \"pm\"\n    }\n  ]\n}\n",
+        "home/.agent-playbook/dream-work/handoff/ops/pm-badhead.json": "{\n  \"ops\": [\n    {\n      \"id\": \"h1\",\n      \"op\": \"insert\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"section\": \"## Feedback\",\n      \"text\": \"### Other heading\\n\\n**Why**: seen in alpha and beta.\\n**How to apply**: do it.\\n**Source**: alpha s2; beta s4 | **Verified**: 2026-10-12 (human:alice, promotion from 2 projects)\\n\",\n      \"decision_id\": \"pd\"\n    }\n  ]\n}\n",
+        "home/.agent-playbook/dream-work/handoff/ops/pm-badreplace.json": "{\n  \"ops\": [\n    {\n      \"id\": \"r9\",\n      \"op\": \"replace\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Use stdlib only\",\n      \"text\": \"### Promoted lesson\\n\\n**Why**: seen in alpha and beta.\\n**How to apply**: do it.\\n**Source**: alpha s2; beta s4 | **Verified**: 2026-10-12 (human:alice, promotion from 2 projects)\\n\",\n      \"decision_id\": \"pm\"\n    }\n  ]\n}\n",
+        "home/.agent-playbook/dream-work/handoff/ops/pm-ho.json": "{\n  \"ops\": [\n    {\n      \"id\": \"o1\",\n      \"op\": \"insert\",\n      \"file\": \"{ROOT}/repo/memory/HIGHER_ORDER.md\",\n      \"section\": \"## Feedback\",\n      \"text\": \"### Promoted lesson\\n\\n**Why**: seen in alpha and beta.\\n**How to apply**: do it.\\n**Source**: alpha s2; beta s4 | **Verified**: 2026-10-12 (human:alice, promotion from 2 projects)\\n\",\n      \"decision_id\": \"ph\"\n    }\n  ]\n}\n",
+        "home/.agent-playbook/dream-work/handoff/ops/rm-merge-lost.json": "{\n  \"ops\": [\n    {\n      \"id\": \"m1\",\n      \"op\": \"delete\",\n      \"file\": \"{ROOT}/stores/beta-000000/memory/MEMORY.md\",\n      \"heading\": \"Beta second\",\n      \"class\": \"promotion-removal\",\n      \"decision_id\": \"rm\"\n    }\n  ]\n}\n",
         "home/.agent-playbook/dream-work/handoff/ops/pm-ok.json": "{\n  \"ops\": [\n    {\n      \"id\": \"p1\",\n      \"op\": \"delete\",\n      \"file\": \"{ROOT}/stores/alpha-000000/memory/MEMORY.md\",\n      \"heading\": \"Alpha only\",\n      \"class\": \"promotion-removal\",\n      \"decision_id\": \"pm\"\n    },\n    {\n      \"id\": \"p2\",\n      \"op\": \"delete\",\n      \"file\": \"{ROOT}/stores/beta-000000/memory/MEMORY.md\",\n      \"heading\": \"Beta entry\",\n      \"class\": \"promotion-removal\",\n      \"decision_id\": \"pm\"\n    },\n    {\n      \"id\": \"p3\",\n      \"op\": \"insert\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"section\": \"## Feedback\",\n      \"text\": \"### Promoted lesson\\n\\n**Why**: seen in alpha and beta.\\n**How to apply**: do it.\\n**Source**: alpha s2; beta s4 | **Verified**: 2026-10-12 (human:alice, promotion from 2 projects)\\n\",\n      \"decision_id\": \"pm\"\n    }\n  ]\n}\n",
         "home/.agent-playbook/dream-work/handoff/ops/rc-ok.json": "{\n  \"ops\": [\n    {\n      \"id\": \"r1\",\n      \"op\": \"delete\",\n      \"file\": \"{ROOT}/stores/beta-000000/memory/MEMORY.md\",\n      \"heading\": \"Beta second\",\n      \"class\": \"promotion-removal\",\n      \"decision_id\": \"rc\"\n    }\n  ]\n}\n"
       }
@@ -123,6 +127,7 @@
       "writes": [],
       "exit": 3,
       "stdout_contains": [
+        "holds no entry 'Promoted lesson'",
         "the lesson would be lost"
       ]
     },
@@ -143,6 +148,97 @@
       "stdout_contains": [
         "its text is not the text the gate showed",
         "before its user-memory write has landed"
+      ]
+    },
+    {
+      "argv": [
+        "memedit",
+        "--ops",
+        "handoff/ops/pm-badhead.json",
+        "--decisions",
+        "handoff/decisions.json",
+        "--decisions-sha",
+        "{SHA256:handoff/decisions.json}",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "writes": [],
+      "exit": 3,
+      "stdout_contains": [
+        "not the item's dest_heading"
+      ]
+    },
+    {
+      "argv": [
+        "memedit",
+        "--ops",
+        "handoff/ops/pm-badreplace.json",
+        "--decisions",
+        "handoff/decisions.json",
+        "--decisions-sha",
+        "{SHA256:handoff/decisions.json}",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "writes": [],
+      "exit": 3,
+      "stdout_contains": [
+        "the item names another heading (its dest_heading)"
+      ]
+    },
+    {
+      "argv": [
+        "memedit",
+        "--ops",
+        "handoff/ops/pm-ho.json",
+        "--decisions",
+        "handoff/decisions.json",
+        "--decisions-sha",
+        "{SHA256:handoff/decisions.json}",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "writes": [],
+      "exit": 3,
+      "stdout_contains": [
+        "never HIGHER_ORDER.md"
+      ]
+    },
+    {
+      "argv": [
+        "memedit",
+        "--ops",
+        "handoff/ops/rm-merge-lost.json",
+        "--decisions",
+        "handoff/decisions.json",
+        "--decisions-sha",
+        "{SHA256:handoff/decisions.json}",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "writes": [],
+      "exit": 3,
+      "stdout_contains": [
+        "other than the text the gate showed"
+      ]
+    },
+    {
+      "argv": [
+        "queue",
+        "--ops",
+        "handoff/ops/pm-lost.json",
+        "--decisions",
+        "handoff/decisions.json",
+        "--decisions-sha",
+        "{SHA256:handoff/decisions.json}",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "writes": [],
+      "exit": 3,
+      "stdout_contains": [
+        "the lesson would be lost",
+        "nothing queued"
       ]
     },
     {
@@ -227,6 +323,132 @@
       "writes": [
         "stores/beta-000000/memory/MEMORY.md",
         "repo/memory/.dream-journal.jsonl"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/sweep/applied-ops.json": "{\n  \"version\": 1,\n  \"ops\": {\n    \"x1\": {\n      \"pre_sha\": \"p\",\n      \"post_sha\": \"q\",\n      \"status\": \"done\",\n      \"decision_id\": \"pm\",\n      \"decisions_sha\": \"{SHA256:handoff/decisions.json}\",\n      \"op\": \"delete\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Keep commits small\",\n      \"class\": \"promotion-removal\"\n    }\n  }\n}\n",
+        "home/.agent-playbook/dream-work/sweep/commits.json": "{\n  \"version\": 1,\n  \"repos\": {\n    \"{ROOT}/repo\": {\n      \"commits\": []\n    }\n  }\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "push",
+        "--plan",
+        "--decisions-sha",
+        "{SHA256:handoff/decisions.json}",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "stdout_contains": [
+        "NOT pushable",
+        "the item names another file or heading"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/sweep/applied-ops.json": "{\n  \"version\": 1,\n  \"ops\": {\n    \"x1\": {\n      \"pre_sha\": \"p\",\n      \"post_sha\": \"q\",\n      \"status\": \"done\",\n      \"decision_id\": \"pm\",\n      \"decisions_sha\": \"{SHA256:handoff/decisions.json}\",\n      \"op\": \"insert\",\n      \"file\": \"{ROOT}/repo/memory/HIGHER_ORDER.md\",\n      \"heading\": null\n    }\n  }\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "push",
+        "--plan",
+        "--decisions-sha",
+        "{SHA256:handoff/decisions.json}",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "stdout_contains": [
+        "NOT pushable",
+        "the item names another file (its dest_file)"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/sweep/applied-ops.json": "{\n  \"version\": 1,\n  \"ops\": {\n    \"x1\": {\n      \"pre_sha\": \"p\",\n      \"post_sha\": \"q\",\n      \"status\": \"done\",\n      \"decision_id\": \"pm\",\n      \"decisions_sha\": \"{SHA256:handoff/decisions.json}\",\n      \"op\": \"delete\",\n      \"file\": \"{ROOT}/stores/alpha-000000/memory/MEMORY.md\",\n      \"heading\": \"Alpha only\",\n      \"class\": \"promotion-removal\"\n    }\n  }\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "push",
+        "--plan",
+        "--decisions-sha",
+        "{SHA256:handoff/decisions.json}",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "stdout_not_contains": [
+        "does not authorize it"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": [\n    {\n      \"id\": \"pm\",\n      \"kind\": \"promotion\",\n      \"answer\": \"Promote\",\n      \"option\": \"Promote\",\n      \"pair_a\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n      \"pair_b\": \"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\",\n      \"file\": \"{ROOT}/stores/alpha-000000/memory/MEMORY.md\",\n      \"heading\": \"Alpha only\",\n      \"file2\": \"{ROOT}/stores/beta-000000/memory/MEMORY.md\",\n      \"dest_file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"dest_heading\": \"Promoted lesson\",\n      \"shown_text\": \"### Promoted lesson\\n\\n**Why**: seen in alpha and beta.\\n**How to apply**: do it.\\n**Source**: alpha s2; beta s4 | **Verified**: 2026-10-12 (human:alice, promotion from 2 projects)\\n\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "memedit",
+        "--ops",
+        "handoff/ops/pm-class.json",
+        "--decisions",
+        "handoff/decisions.json",
+        "--decisions-sha",
+        "{SHA256:handoff/decisions.json}",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "writes": [],
+      "exit": 3,
+      "stdout_contains": [
+        "needs both file2 and heading2"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": [\n    {\n      \"id\": \"pm\",\n      \"kind\": \"promotion\",\n      \"answer\": \"Promote\",\n      \"option\": \"Promote\",\n      \"pair_a\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n      \"file\": \"{ROOT}/stores/alpha-000000/memory/MEMORY.md\",\n      \"heading\": \"Alpha only\",\n      \"file2\": \"{ROOT}/stores/beta-000000/memory/MEMORY.md\",\n      \"heading2\": \"Beta entry\",\n      \"dest_file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"dest_heading\": \"Promoted lesson\",\n      \"shown_text\": \"### Promoted lesson\\n\\n**Why**: seen in alpha and beta.\\n**How to apply**: do it.\\n**Source**: alpha s2; beta s4 | **Verified**: 2026-10-12 (human:alice, promotion from 2 projects)\\n\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "memedit",
+        "--ops",
+        "handoff/ops/pm-class.json",
+        "--decisions",
+        "handoff/decisions.json",
+        "--decisions-sha",
+        "{SHA256:handoff/decisions.json}",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "writes": [],
+      "exit": 3,
+      "stdout_contains": [
+        "needs pair_a and pair_b"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decisions.json": "{\n  \"items\": [\n    {\n      \"id\": \"pm\",\n      \"kind\": \"promotion\",\n      \"answer\": \"Promote\",\n      \"option\": \"Promote\",\n      \"pair_a\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n      \"pair_b\": \"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\",\n      \"file\": \"{ROOT}/stores/alpha-000000/memory/MEMORY.md\",\n      \"heading\": \"Alpha only\",\n      \"file2\": \"{ROOT}/stores/beta-000000/memory/MEMORY.md\",\n      \"heading2\": \"Beta entry\",\n      \"dest_file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"dest_heading\": \"Promoted lesson\",\n      \"shown_text\": \"### Promoted lesson\\n\\n**Why**: seen in alpha and beta.\\n**How to apply**: do it.\\n**Source**: alpha s2; beta s4 | **Verified**: 2026-10-12 (human:alice, promotion from 2 projects)\\n\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "memedit",
+        "--ops",
+        "handoff/ops/pm-class.json",
+        "--decisions",
+        "handoff/decisions.json",
+        "--decisions-sha",
+        "{SHA256:handoff/decisions.json}",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "writes": [],
+      "exit": 3,
+      "stdout_contains": [
+        "two distinct entry sha256s"
       ]
     }
   ]
