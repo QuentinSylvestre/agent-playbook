@@ -21,6 +21,10 @@ Do not rationalize skipping a skill's mandatory step by claiming "the outcome is
 Before ending a turn, check your last paragraph. If it contains a plan, an analysis, a question, a list of next steps, or a promise about undone work ("I'll…", "let me know when…"), do that work now with tool calls. Stopping with undone work described but not executed is the rationalization — context length, session duration, and "I can do this next turn" are not valid reasons to stop. End only when the task is complete or blocked on input only the user can provide. (Reinforces `shared/AGENTS.md § Style & Output` — lead with the outcome.)
 
 
+### Reasoning-exhaustion discipline
+
+Never derive a change, a layout or a diagnosis inside reasoning for longer than a short plan. After the plan, take one concrete tool step before reasoning further: run a command, read or write a file, or write the plan and partial results to a file. A turn that spends the whole output budget on reasoning ends with no tool call and no message, so nothing is done. If you notice yourself working out pixel-level or line-level details in your head, stop, write the first version, run it, and fix what the output reports. (Complements the Turn-end rule: that rule covers a turn that ends with undone work described; this one covers a turn that ends with no output at all.)
+
 ### Test-run-as-verification rationalization
 
 During `/qqa` verification, do not substitute test suite execution for runtime observation. Running tests proves you can run CI — not that the change works at its runtime surface. "Tests pass" is not a `/qqa` verdict; driving the application through its real interface is. Do not run tests as a warm-up, regression sweep, or substitute for browser/CLI/API interaction during verification. (Reinforces `shared/skills/qqa/SKILL.md § Process` — drive the surface.)

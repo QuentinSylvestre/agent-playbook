@@ -207,7 +207,7 @@ For each `DRIFTED` line:
 2. **Derive the repo-relative POSIX path**: strip the repo root from the `expected=` path and normalize backslashes to slashes (required for `git show`).
 3. **Early-exit check**: compare the local file against the repo source with `git diff --no-index --quiet` before querying history. If identical (exit 0), it's not actually drifted — skip it.
 4. **Query git history**: run `git -C <repo> log --format=%H --max-count=100 -- <repo-relative-source-path>`. Zero commits (e.g. newly added, never committed) → classify "local-specific" and note it has no history yet.
-5. **Compare against history**: for each commit, write the historical version to a temp file (`git -C <repo> show <sha>:<repo-relative-path> > <temp-file>`), compare with `git diff --no-index --quiet -- <local-path> <temp-file>`, and delete the temp file after each comparison. Use temp files on every platform — `git diff --no-index` can behave unexpectedly with process substitution.
+5. **Compare against history**: for each commit, write the historical version to a temp file byte for byte (`git -C <repo> show <sha>:<repo-relative-path> > <temp-file>`), compare with `git diff --no-index --quiet -- <local-path> <temp-file>`, and delete the temp file after each comparison. Use temp files on every platform — `git diff --no-index` can behave unexpectedly with process substitution. Run the `show` redirection in a shell whose `>` writes raw bytes: Git Bash, or `cmd /c "git -C <repo> show <sha>:<repo-relative-path> > <temp-file>"` from PowerShell. Never use `>` in Windows PowerShell 5.1: it re-encodes the output as UTF-16LE, so every comparison misses and every `DRIFTED` file is wrongly classed local-specific.
 6. **Classify**:
    - **Match found** (exit 0): **"behind"** — the local copy matches an older repo version. Add to the auto-repair list, no prompt needed.
    - **No match after all commits** (or the 100-commit limit): **"local-specific"** — the file has edits not present in any checked version. Conservative: a >100-commit history can misclassify, but the prompt below prevents data loss.
@@ -244,6 +244,8 @@ Summarize:
 - Store repo: pulled, skipped (missing) or stopped (conflict, index lock); paths committed, left uncommitted, pushed
 - Deployment status (all intact / repaired / issues remaining)
 - Claude settings: the state of the memory hook, the status line and the sounds
+
+**Actionable WARNs are questions, not report lines.** A `WARN` that names a repair the user can choose (an orphaned store, an in-workspace `memory/` or `plans/` to move, a Kiro workspace without its `__store_memory__.md` link, a store-repo `origin` that differs from the expected URL) is not listed in the summary above. Ask one question per such `WARN`: name the subject and the repair, then offer "Fix now / Leave?". On "Fix now", run the repair the reporting rule names (for an orphaned store, ask which store to delete and delete nothing unconfirmed). On "Leave", change nothing. A `WARN` with no user repair (the Claude settings `INFO` lines, a `SKIP`) stays a report line. A `FAIL` keeps its own next action.
 
 ## Rules
 

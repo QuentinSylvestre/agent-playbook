@@ -80,6 +80,8 @@ DISCOVERY items (inform planning sections):
 
 **Source-severity cross-check**: When Intent inherits a **severity** or **confidence** label from a cited source artifact (a `/qexplore` finding, a `/qtest` or test-drive report, an issue, a prior plan), do NOT propagate the label verbatim. Re-read the cited source and verify the claim it actually supports before writing it into Intent — an upstream "Medium / plausible / unverified" finding must not silently become a "verified High" in the plan. If the source's evidence is weaker than the label implies, downgrade the wording and record the uncertainty explicitly (e.g., "unverified — to be confirmed in Phase N"). Mis-inherited severity inflates scope and mis-prioritizes phases.
 
+**Sequel-chain check**: When the new plan refines, fixes or extends a feature that earlier plans shipped, find those earlier plans in the project's `plans/` and `plans/done/` folders (grep the feature's name, paths and skill names). Order them by the `Date` header in each project file, never by archive filename: the filename prefix can invert the true order. In the new plan's Intent section, list the chain oldest first, one line per plan with its filename and Date. Add one sentence naming what the earlier plans missed (the scoping miss), quoting the earlier plan's own acceptance finding or review rating when it has one. Plans with no earlier plan of the same feature skip this check. A chain you cannot confirm from the plans' own text is recorded as unconfirmed; do not infer it from filename proximity alone.
+
 ### Step 3: Write the plan
 
 **Trivial tier**: Write the plan inline in the conversation (no file):

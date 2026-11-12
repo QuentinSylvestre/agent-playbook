@@ -173,6 +173,12 @@ Signal catalog of recurring agent-failure patterns. Each entry: `### name` (unde
 
 **Session signals**: A long reasoning block that contains the full text of the intended artifact; few or no write or edit tool uses for the length of the turn; the user asks where the output is or why nothing happened; the agent then writes the file from the reasoning text in one step. Observed in 2 sessions (70e80f04, fa3d3684; candidate V12-022).
 
+### out_of_scope_failure_rereported_not_recorded
+
+**Description**: A failure that already existed before the task and lies outside it (for example a failing test) is reported as out of scope and left alone, in each new session, instead of being recorded once in a durable place (a memory entry, a roadmap line or an issue line). Every later session therefore finds it again from scratch. Distinct from `silent_instruction_drop` (the user asked for something and it was lost; here the agent does report the failure, and the loss is that the report is never persisted) and from `governance_rule_ignored` (the rule to report out-of-scope bugs is obeyed; the gap is that it is obeyed afresh each time and leaves no record).
+
+**Session signals**: The same out-of-scope failure is named in two or more sessions with no record of it in memory, a roadmap or an issue list; the agent's report offers to look into it later ("I didn't look into it. Tell me if you want me to.") and nothing is written down; the failing check is described as pre-existing or as failing without the agent's change. Observed in 3 sessions (07ce0dc8, 3c4ab162, 5c1c4961), evidence V08-010: the test `TestTerminalTurnWatch::test_held_sessions_hidden_workspaces_and_disabled_providers_are_left_out` reported as still failing, with the quote "The `TestTerminalTurnWatch` test that fails without my change is still failing. I didn't look into it. Tell me if you want me to." Evidence grade: plausible.
+
 ## Output Routing
 
 Archetype names MUST NOT contain colons. Use underscore_separated_lowercase for names.
