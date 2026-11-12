@@ -9,12 +9,13 @@ start makes each Python check COULD-NOT-RUN (exit 2), never a pass. A check stil
 TIMEOUT. It writes only its work folder.
 
 Usage:
-  run-checks.py [<repo>] [--work DIR] [--only NAME]... [--jobs N] [--list]
+  run-checks.py [<repo>] [--work DIR] [--only NAME]... [--jobs N] [--max-parallel N] [--list]
 
   <repo>       The config repo (default: the repo this script lives in).
   --work DIR   Where each check's output is kept (default: a new folder in the system temp directory).
   --only NAME  Run only the named check (repeatable); `--only verify-deployment` is Step 5's re-verify.
   --jobs N     Worker processes for the dream-write and dream-sweep selftests (default 8).
+  --max-parallel N  At most N checks at once after the launcher test (default 0: all at once).
   --list       Print the check names and exit.
   --ci         CI's exit rule: PARTIAL (a platform-specific case or parity assertion skipped on this OS)
                counts as passing; FAIL, COULD-NOT-RUN and TIMEOUT still fail. The verdicts printed are
@@ -305,6 +306,7 @@ def main(argv=None):
     ap.add_argument("--work")
     ap.add_argument("--only", action="append", default=[])
     ap.add_argument("--jobs", type=int, default=8)
+    ap.add_argument("--max-parallel", type=int, default=0)
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--ci", action="store_true")
     args = ap.parse_args(argv)
@@ -343,7 +345,9 @@ def main(argv=None):
                      "dream-manifest-selftest": 3}
     rest.sort(key=lambda c: longest_first.get(c[0], 9))
     if rest:
-        with concurrent.futures.ThreadPoolExecutor(max_workers=len(rest)) as pool:
+        # Longest first, so test-parity always holds one of the slots from the start.
+        slots = len(rest) if args.max_parallel <= 0 else min(len(rest), args.max_parallel)
+        with concurrent.futures.ThreadPoolExecutor(max_workers=slots) as pool:
             futs = {pool.submit(run_one, repo, work, name, argv): (name, kind) for name, argv, kind, _ in rest}
             for fut in concurrent.futures.as_completed(futs):
                 name, kind = futs[fut]
