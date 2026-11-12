@@ -409,6 +409,14 @@ class Diagrams:
             if kind == "d2":
                 for why in qd.d2_refusals(text):
                     fail(f"diagram {name}.d2 refused: {why}")
+                # Credential-shaped text is a refusal too: it must stop the build whether or not d2 is installed.
+                hits = qd.scan_content_file(f"diagram {name}.d2", text)
+                if hits:
+                    for hit in hits:
+                        print(qd.hit_line(hit), file=sys.stderr)
+                    fail(f"diagram {name}.d2 refused: credential-shaped text found; nothing written. In a D2 source an id "
+                         "such as token_store: Label reads like an assignment: rename the id (for example auth_cache) "
+                         "and keep the wording in the label")
         if any(self.sources[n][0] == "d2" for n in self.used):
             self.d2_exe = qd.find_d2()
             if not self.d2_exe:
