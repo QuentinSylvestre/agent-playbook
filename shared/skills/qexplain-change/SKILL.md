@@ -1,5 +1,5 @@
 ---
-name: qexplain
+name: qexplain-change
 description: Write a self-contained HTML brief of a code change for a human reviewer. A brief (intent, context, changes, verified, open items) is always there; walkthrough, maps (D2 or Mermaid diagrams with guided tours), a file inventory and an interactive diff review are optional parts. Use to understand or review a diff, branch, PR or commit range of any size, then optionally quiz the reader in chat. Not for judging the change (use /qreview). Manual invocation only.
 argument-hint: "<PR number, branch, commit range, path, or several label=repo::range pairs> [--all-maps]"
 disable-model-invocation: true
@@ -55,7 +55,7 @@ $ARGUMENTS
 **Measure first, and read nothing yet.** `<python>` is the interpreter of `<config-repo>/.venv-agent-playbook` with `-I` (`<config-repo>` and the interpreter path: `shared/AGENTS.md § Config Repo Locations`), the playbook's one interpreter. If it is missing or fails to start, stop and tell the user "venv missing: run setup.ps1 or setup.sh"; never use a Python from `PATH`.
 
 ```
-<python> <config-repo>/shared/skills/qexplain/scripts/measure-change.py --repo <dir> --diff-args "<git diff arguments>" [--exclude <glob>]...
+<python> <config-repo>/shared/skills/qexplain-change/scripts/measure-change.py --repo <dir> --diff-args "<git diff arguments>" [--exclude <glob>]...
 ```
 
 For several repos, replace `--repo` and `--diff-args` with one `--target "<label>=<repo>::<git diff arguments>"` per repo. For a fetched PR diff, use `--diff-file <unified diff>`. The script prints paths, counts and setting names, never file content. Act on its lines in this order, and re-measure after any change to the excludes:
@@ -131,7 +131,7 @@ You write content files in a temporary directory outside the repository. The tem
 Build with the `<python>` from Step 1:
 
 ```
-<python> <config-repo>/shared/skills/qexplain/scripts/build-explanation.py --out <path> --title "<title>" \
+<python> <config-repo>/shared/skills/qexplain-change/scripts/build-explanation.py --out <path> --title "<title>" \
   --repo <dir> --diff-args "<the git diff arguments that resolve the target>" \
   --parts brief,walkthrough,maps,summary,diff --brief <dir>/brief.html --walkthrough <dir>/walkthrough.html \
   --maps <dir>/maps.json --diagrams <dir>/diagrams --rationales <dir>/rationales.json --roles <dir>/roles.json \
@@ -204,9 +204,9 @@ Tour ids for D2 are D2 object ids: `site.mistap` for a node, `(site.bl -> gw.htt
 
 ### Change summary and Diff review
 
-The build generates both from `rationales.json`, `roles.json` and the diff; you write nothing else. The summary is a file inventory grouped by subsystem, each row linking to the file's card in Diff review. Diff review keeps its sidebar, split-pane diff, rationale per file, reviewed tracking and notes (stored under `qexplain-diff-<slug>`, `<slug>` being the file name stem lowercased with underscores turned to hyphens, so renaming the file starts a fresh review), Copy notes, left-out list, keyboard navigation and base and head pills.
+The build generates both from `rationales.json`, `roles.json` and the diff; you write nothing else. The summary is a file inventory grouped by subsystem, each row linking to the file's card in Diff review. Diff review keeps its sidebar, split-pane diff, rationale per file, reviewed tracking and notes (stored under `qexplain-change-diff-<slug>`, `<slug>` being the file name stem lowercased with underscores turned to hyphens, so renaming the file starts a fresh review), Copy notes, left-out list, keyboard navigation and base and head pills.
 
-The page also keeps the theme (`qexplain-theme`) and the sketch or classic style (`qexplain-sketch`) across visits.
+The page also keeps the theme (`qexplain-change-theme`) and the sketch or classic style (`qexplain-change-sketch`) across visits.
 
 ### Format rules
 
@@ -222,7 +222,7 @@ The page also keeps the theme (`qexplain-theme`) and the sketch or classic style
 The build runs the validator; you can re-run it alone:
 
 ```
-<python> <config-repo>/shared/skills/qexplain/scripts/validate-explanation.py <path-to-html>
+<python> <config-repo>/shared/skills/qexplain-change/scripts/validate-explanation.py <path-to-html>
 ```
 
 Twelve checks, each looking only at the parts present: `document-shape`, `title-present`, `remote-assets-pinned`, `no-module-scripts`, `no-runtime-fetch`, `code-whitespace`, `anchors-resolve` (also fails on duplicate ids), `no-active-links` (no `javascript:` URL, no remote image-like resource), `tabs-wired`, `parts-wired`, `brief-sections`, `no-emoji`. **A FAIL is a blocker.** Repair the content and rebuild. Do not report the artifact as ready on a failing run, and do not call a failed check a caveat.
@@ -230,7 +230,7 @@ Twelve checks, each looking only at the parts present: `document-shape`, `title-
 **Then check it in a browser.** The validator cannot see whether a diagram drew or a tour step lights anything:
 
 ```
-node <config-repo>/shared/skills/qexplain/scripts/visual-check.js <path-to-html> --out <screenshot dir>
+node <config-repo>/shared/skills/qexplain-change/scripts/visual-check.js <path-to-html> --out <screenshot dir>
 ```
 
 It checks only the parts present: provenance, Mermaid, D2 variants, every tour step, sub-tabs, the sketch and Show changes switches, theme redraw, the summary link, every diff-review control, phone width. **Look at the screenshots.** A `BAD` line or a visible defect is a blocker. Without Node and Playwright, run the checklist in the script's header by hand through a browser tool. Only when no browser can run at all, report the artifact as **statically validated but not visually confirmed** and name the checks skipped. Building needs Python 3; without it, stop and tell the user rather than writing the page by hand.

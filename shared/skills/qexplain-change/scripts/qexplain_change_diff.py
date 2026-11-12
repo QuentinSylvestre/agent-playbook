@@ -65,7 +65,7 @@ ALWAYS = [
     ("signed token", re.compile(r"\beyJ[A-Za-z0-9_-]{10,2048}\.eyJ[A-Za-z0-9_-]{10,2048}\.[A-Za-z0-9_-]{5,2048}")),
     ("bearer token", re.compile(r"\bbearer\s{1,4}[A-Za-z0-9._~+/-]{20,512}", re.I)),
 ]
-MASK = "<hidden-by-qexplain>"  # placeholder-shaped, so a masked line is not flagged again
+MASK = "<hidden-by-qexplain-change>"  # placeholder-shaped, so a masked line is not flagged again
 PLACEHOLDER_WORDS = {"changeme", "change_me", "password", "placeholder", "example", "redacted", "none", "null", "undefined"}
 PLACEHOLDER_FORMS = re.compile(r"\$\{[^}]*\}|\$\([^)]*\)|\$[A-Za-z_]\w*|%[A-Za-z_]\w*%|<[^<>]*>|\{\{.*\}\}|[A-Z][A-Z0-9_]*|[A-Za-z_]\w*(?:\.[A-Za-z_]\w*)+|[A-Za-z_][\w.]*\(.*\)")
 MADE_UP = re.compile(r"test|fake|dummy|mock|sample|wrong|invalid|foo|bar|baz|example", re.I)

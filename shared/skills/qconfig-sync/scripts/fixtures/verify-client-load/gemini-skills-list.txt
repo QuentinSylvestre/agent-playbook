@@ -38,9 +38,9 @@ qdream [Enabled]
   Description: <description>
   Location:    <home>\.gemini\skills\qdream\SKILL.md
 
-qexplain [Enabled]
+qexplain-change [Enabled]
   Description: <description>
-  Location:    <home>\.gemini\skills\qexplain\SKILL.md
+  Location:    <home>\.gemini\skills\qexplain-change\SKILL.md
 
 qexplore [Enabled]
   Description: <description>

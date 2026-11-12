@@ -8,7 +8,7 @@ This file is the single source of truth for memory entry format, type taxonomy, 
 
 Every workspace keeps its memory and its project files in the **store repo**, a private git repository at `~/.agent-playbook/stores` (`AGENT_PLAYBOOK_STORES` overrides the location), never inside the workspace. One store directory serves one workspace identity. The store resolver, `shared/skills/qdream/scripts/store-resolver.py`, is the single implementation of identity, naming, lookup and creation: no skill, script or agent re-implements any of them.
 
-`/qexplore`, `/qplan`, `/qdev`, `/qclose`, `/qhandoff`, `/qtest`, `/qexplain`, `/qdream`, `/qmemory-eval` and `/qwire-governance` cite this section and resolve their paths through it. `/qtest` resolves the **project-files** class, then appends `tests/`; it has no artifact class of its own. `/qwire-governance` resolves **no artifact class**: it asks the resolver for the store *directory* and writes a Kiro steering file naming it. `/qconfig-sync` and the delegate skills cite only `§ Store scratch folder`. This list is hand-maintained prose, not machine-checked: `verify-citations` counts citations to this section but cannot tell whether the names above match them, so **update this sentence in the same commit that makes a skill a citer**.
+`/qexplore`, `/qplan`, `/qdev`, `/qclose`, `/qhandoff`, `/qtest`, `/qexplain-change`, `/qdream`, `/qmemory-eval` and `/qwire-governance` cite this section and resolve their paths through it. `/qtest` resolves the **project-files** class, then appends `tests/`; it has no artifact class of its own. `/qwire-governance` resolves **no artifact class**: it asks the resolver for the store *directory* and writes a Kiro steering file naming it. `/qconfig-sync` and the delegate skills cite only `§ Store scratch folder`. This list is hand-maintained prose, not machine-checked: `verify-citations` counts citations to this section but cannot tell whether the names above match them, so **update this sentence in the same commit that makes a skill a citer**.
 
 ### Store layout
 
@@ -20,7 +20,7 @@ Every workspace keeps its memory and its project files in the **store repo**, a 
     plans/             # active project files
     plans/done/        # archived project files
     plans/tests/       # test plans
-    explanations/      # optional: written by /qexplain
+    explanations/      # optional: written by /qexplain-change
     artifacts/         # optional: files the user asked to keep
     scratch/           # reserved, git-ignored: temporary playbook working files
 ```

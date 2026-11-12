@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Build a /qexplain artifact from the shared template and the agent's content files.
+"""Build a /qexplain-change artifact from the shared template and the agent's content files.
 
 The agent writes the parts that need judgement (brief, walkthrough, maps, diagram sources,
 per-file rationales and roles). This script does the mechanical rest: captures the diff as
@@ -7,7 +7,7 @@ UTF-8, renders D2 diagrams, works out the provenance from git, builds the change
 inlines every piece of data safely, wires the tabs, drops the parts that were not selected,
 then runs the validator on the result.
 
-Standard library only; nothing to install. <python> is the interpreter of <config-repo>/.venv-agent-playbook, run with -I (shared/AGENTS.md, Config Repo Locations).
+Standard library only; nothing to install. <python> is the interpreter the SKILL.md names, run with -I.
 
 Usage:
     <python> build-explanation.py --out <path.html> --title <text> \
@@ -84,7 +84,7 @@ import tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)  # -I leaves the script's folder off the path
-import qexplain_diff as qd  # noqa: E402
+import qexplain_change_diff as qd  # noqa: E402
 
 TEMPLATE = os.path.join(HERE, "..", "assets", "template.html")
 VALIDATOR = os.path.join(HERE, "validate-explanation.py")

@@ -252,7 +252,7 @@ Entry points: most work starts with `/qexplore`. `/qdev` can be invoked directly
 
 ### Standalone skills
 
-Every other skill is standalone; its description says when to use it. `/qexplain` and `/qwait-what` run only when the user types them, never on the model's own initiative.
+Every other skill is standalone; its description says when to use it. `/qexplain-change` and `/qwait-what` run only when the user types them, never on the model's own initiative.
 
 ## Harness Improvement Capture
 

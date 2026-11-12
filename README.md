@@ -129,7 +129,7 @@ When the installed version differs from the ledger's, the line says so and the c
 | Verification | `/qqa` (verify a specific claim, PASS/FAIL/BLOCKED/SKIP), `/qtest` (test planning and runs), `/qbrowser-test` (drive a browser with Playwright) |
 | Memory | `/qdream` (the consolidation sweep), `/qmemory-eval` (memory health metrics), `/qextract` (mine an article or repo for playbook improvements) |
 | Delegation | `/qclaude-delegate`, `/qkiro-delegate` (hand a well-specified task to another agent and verify it), `/qauto-research` (autonomous experiment loop) |
-| Output | `/qexplain` (HTML review brief of a diff: brief, optional walkthrough, D2 maps with tours, file summary, diff review), `/qvisualize` (interactive charts and diagrams), `/qdocument-interaction` (Word, PDF, PowerPoint, Excel), `/qicon-design` |
+| Output | `/qexplain-change` (HTML review brief of a diff: brief, optional walkthrough, D2 maps with tours, file summary, diff review), `/qvisualize` (interactive charts and diagrams), `/qdocument-interaction` (Word, PDF, PowerPoint, Excel), `/qicon-design` |
 | Maintenance | `/qconfig-sync` (pull, verify the deployment, push), `/qmigrate-workspace` (move a workspace folder, Windows), `/qutilities-disk-cleanup` |
 
 Kiro also gets `/qwire-governance`, `/qrecover-file`, `/qfewer-permission-prompts` and `/qslidedeck` (self-contained HTML slide decks with scripted layout checks).

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate a /qexplain explanation artifact.
+"""Validate a /qexplain-change explanation artifact.
 
 Checks the generated HTML against the guarantees the skill promises: external
 libraries are version-pinned and from a known CDN, nothing depends on an API
@@ -8,7 +8,7 @@ resolves, every part, map tab and sub-tab has a panel (and the reverse), the
 Brief has its fixed headings in order and says what was verified, and no emoji.
 The page may hold any set of parts, so every check looks only at what is present.
 
-Standard library only; nothing to install. <python> is the interpreter of <config-repo>/.venv-agent-playbook, run with -I (shared/AGENTS.md, Config Repo Locations).
+Standard library only; nothing to install. <python> is the interpreter the SKILL.md names, run with -I.
 
 Usage:
     <python> validate-explanation.py <path-to-html>

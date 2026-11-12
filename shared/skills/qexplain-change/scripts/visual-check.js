@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /*
- * Visual check for a /qexplain artifact built from assets/template.html.
+ * Visual check for a /qexplain-change artifact built from assets/template.html.
  *
  * The static validator cannot see whether a D2 or Mermaid diagram drew, a tour step lit
  * anything, or the diff review behaves. This script opens the artifact in a real browser,
@@ -26,12 +26,12 @@
  *   3. Sub-tabs (walkthrough, maps) switch panels. `#maps/<view>` and `#diff` hashes open
  *      the right part on load.
  *   4. D2 pages: the sketch toggle swaps the visible variant and persists under
- *      qexplain-sketch. The Show changes switch on the system view changes a highlighted
+ *      qexplain-change-sketch. The Show changes switch on the system view changes a highlighted
  *      shape's fill.
  *   5. The theme toggle re-themes the page, persists, and redraws Mermaid diagrams with
  *      the new theme.
  *   6. Diff review: sidebar lists every file; Mark reviewed collapses the card and
- *      counts; state survives a reload under qexplain-diff-<slug>; j and m work; a
+ *      counts; state survives a reload under qexplain-change-diff-<slug>; j and m work; a
  *      type filter narrows the list; added rows are coloured; clicking a cell wraps
  *      and unwraps it; tree view shows directories; the sidebar resizes, persists,
  *      and resets on double-click; both hash pills copy; Copy notes exports a note with
@@ -49,12 +49,12 @@ if (!file || !fs.existsSync(file)) { console.error('usage: node visual-check.js 
 let chromium;
 try { ({ chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright')); }
 catch (e) { console.error('ERROR\tplaywright is not installed or not resolvable (set PLAYWRIGHT_MODULE)'); process.exit(2); }
-const out = opt('--out') || fs.mkdtempSync(path.join(os.tmpdir(), 'qexplain-shots-'));
+const out = opt('--out') || fs.mkdtempSync(path.join(os.tmpdir(), 'qexplain-change-shots-'));
 fs.mkdirSync(out, { recursive: true });
 const libs = opt('--libs');
 const url = require('url').pathToFileURL(path.resolve(file)).href;
 const stem = path.basename(file).replace(/\.html?$/i, '');
-const storeKey = 'qexplain-diff-' + stem.toLowerCase().replace(/_/g, '-');
+const storeKey = 'qexplain-change-diff-' + stem.toLowerCase().replace(/_/g, '-');
 
 let bad = 0;
 const log = (ok, msg) => { if (!ok) bad++; console.log((ok ? 'OK\t' : 'BAD\t') + msg); };
@@ -165,14 +165,14 @@ async function routeLibs(target) {
 
   // 4. D2 sketch toggle and Show changes
   if (info.hasD2) {
-    await page.evaluate(() => localStorage.removeItem('qexplain-sketch'));
+    await page.evaluate(() => localStorage.removeItem('qexplain-change-sketch'));
     await page.evaluate(() => { applySketch(false); });
     const shownVariant = () => page.evaluate(() => { const v = Array.from(document.querySelectorAll('.dgv')).find(x => x.offsetParent !== null); return v ? (v.classList.contains('v-sketch') ? 'sketch' : 'classic') : 'none'; });
     await page.evaluate(() => switchPart('brief')); await wait(300);
     const before = await shownVariant();
     await page.click('#sketch-toggle'); await wait(200);
     const after = await shownVariant();
-    const kept = await page.evaluate(() => localStorage.getItem('qexplain-sketch'));
+    const kept = await page.evaluate(() => localStorage.getItem('qexplain-change-sketch'));
     log(before === 'sketch' && after === 'classic' && kept === 'classic', `sketch toggle swaps the variant (${before} to ${after}) and persists (${kept})`);
     await page.click('#sketch-toggle'); await wait(200);
     const box = await page.$('#view-system .chg input');
@@ -193,7 +193,7 @@ async function routeLibs(target) {
   const bg0 = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
   await page.click('#theme-toggle'); await wait(2000);
   const bg1 = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  const stored = await page.evaluate(() => localStorage.getItem('qexplain-theme'));
+  const stored = await page.evaluate(() => localStorage.getItem('qexplain-change-theme'));
   log(bg0 !== bg1 && !!stored, `theme toggle re-themes and persists (${stored})`);
   const stale = await page.$$eval('.mmd', ns => ns.filter(n => n.offsetParent !== null && n.dataset.theme !== document.documentElement.dataset.theme.replace('light', 'default')).length);
   log(stale === 0, 'visible Mermaid diagrams were redrawn for the new theme');

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Measure a change for /qexplain before anything is read or written.
+"""Measure a change for /qexplain-change before anything is read or written.
 
 Prints each file shown, the files left out and the setting names their change touches,
 any credential-shaped match (path and line only, never the value), the size tier, the
 plans named by commit scopes, the production subsystems, a HEAVY warning when the one page
 will be long, and whether D2 is installed (D2 line). It prints no file content.
 
-Standard library only; nothing to install. <python> is the interpreter of <config-repo>/.venv-agent-playbook, run with -I (shared/AGENTS.md, Config Repo Locations).
+Standard library only; nothing to install. <python> is the interpreter the SKILL.md names, run with -I.
 
 Usage:
     <python> measure-change.py [--repo <dir>] --diff-args "<git diff arguments>" [--exclude <glob>]...
@@ -28,7 +28,7 @@ import sys
 import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # -I leaves the script's folder off the path
-import qexplain_diff as qd  # noqa: E402
+import qexplain_change_diff as qd  # noqa: E402
 
 HEAVY_READING_LINES = 2500
 
