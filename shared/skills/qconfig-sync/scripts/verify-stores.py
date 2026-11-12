@@ -699,7 +699,11 @@ def unwired_check(R, valid, kiro_cwds, rep):
     idents = {_norm(d): i for d, i in valid}
     home = _norm(os.path.expanduser("~"))
     seen = set()
+    checked = set()  # one entry per session, so folders repeat; each result depends on the folder alone
     for c in kiro_cwds:
+        if _norm(c) in checked:
+            continue
+        checked.add(_norm(c))
         if not os.path.isdir(c):
             continue
         res = R.find(c)
