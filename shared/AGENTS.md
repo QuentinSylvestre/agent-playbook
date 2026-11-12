@@ -39,7 +39,7 @@ Provider-specific config (settings.json, config.toml) lives outside this repo, i
 
 - For runtime work on browser-accessible content (local files, localhost servers, web UIs), pick by intent: **have a specific claim/change to confirm? → `/qqa`** (structured verification, PASS/FAIL/BLOCKED/SKIP). **Want lifecycle testing? → `/qtest`** (plan mode for research-driven test planning, run mode for structured execution with findings report). **Need to drive a browser? → `/qbrowser-test`** — the execution leaf that `/qqa` and `/qtest` route to; also directly invokable for ad-hoc browser tasks (screenshots, form fills, exploration).
 - When a task's exit criteria are primarily verification items (visual, behavioral, layout), runtime verification IS the core work — not an optional supplement to code-level inspection.
-- During `/qdev` execution, `/qqa` runs automatically: per-phase on `[QA]`-annotated phases (Step 5b, light verification) and exhaustively at Step 9b (full probe mandate, all surfaces). Manual `/qqa` invocation remains available for ad-hoc verification outside the `/qdev` lifecycle.
+- During `/qdev`, `/qqa` runs automatically: on `[QA]`-annotated phases (Step 5b) and exhaustively at Step 9b. Outside `/qdev`, verify an ad-hoc fix to browser-visible behaviour yourself with `/qqa` in the user's app, restart included, before reporting it done.
 
 ## Documentation Organization
 
