@@ -77,8 +77,9 @@ Deploys agent-playbook into the AI providers you choose. Safe to re-run.
 
 Environment: AGENT_PLAYBOOK_STORES (store repo path), AGENT_PLAYBOOK_CONFIG (pointer
 file path), AGENT_PLAYBOOK_SKIP_KIRO_CLI=1 (do not change kiro-cli's global settings).
-AGENT_PLAYBOOK_TEST_VENV_DIR is for test-parity.sh only (the venv folder to use instead
-of the repo's .venv-agent-playbook).
+AGENT_PLAYBOOK_TEST_VENV_DIR and AGENT_PLAYBOOK_TEST_GEMINI_HELPER are for test-parity.sh
+only (the venv folder to use instead of the repo's .venv-agent-playbook, and a script to run
+instead of providers/gemini/context-filename.py).
 "@
     exit 0
 }
@@ -731,7 +732,9 @@ function Invoke-GeminiContext {
     $code = 1
     try { [Console]::OutputEncoding = $Utf8NoBom } catch { }
     try {
-        $out = @(& $python -I (Join-Path $ScriptDir 'providers\gemini\context-filename.py') @helperArgs 2>$null)
+        # AGENT_PLAYBOOK_TEST_GEMINI_HELPER: test-parity.sh's seam for a helper that crashes
+        $helper = if ($env:AGENT_PLAYBOOK_TEST_GEMINI_HELPER) { $env:AGENT_PLAYBOOK_TEST_GEMINI_HELPER } else { Join-Path $ScriptDir 'providers\gemini\context-filename.py' }
+        $out = @(& $python -I $helper @helperArgs 2>$null)
         $code = $LASTEXITCODE
     } catch {
         $out = @()

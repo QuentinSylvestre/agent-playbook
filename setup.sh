@@ -78,8 +78,9 @@ Deploys agent-playbook into the AI providers you choose. Safe to re-run.
 
 Environment: AGENT_PLAYBOOK_STORES (store repo path), AGENT_PLAYBOOK_CONFIG (pointer
 file path), AGENT_PLAYBOOK_SKIP_KIRO_CLI=1 (do not change kiro-cli's global settings).
-AGENT_PLAYBOOK_TEST_VENV_DIR is for test-parity.sh only (the venv folder to use instead
-of the repo's .venv-agent-playbook).
+AGENT_PLAYBOOK_TEST_VENV_DIR and AGENT_PLAYBOOK_TEST_GEMINI_HELPER are for test-parity.sh
+only (the venv folder to use instead of the repo's .venv-agent-playbook, and a script to run
+instead of providers/gemini/context-filename.py).
 EOF
 }
 
@@ -836,13 +837,15 @@ drop_side_link() {
 # prints its one line, or "unreadable <why>" when it cannot run. An exit other than the helper's own
 # 0 and 3 is a crash: its output is never read as a reason.
 gemini_context() {
-    local py args out rc=0
+    local py args out rc=0 helper
+    # AGENT_PLAYBOOK_TEST_GEMINI_HELPER: test-parity.sh's seam for a helper that crashes
+    helper="${AGENT_PLAYBOOK_TEST_GEMINI_HELPER:-$SCRIPT_DIR/providers/gemini/context-filename.py}"
     py="$(venv_python)"
     if [ ! -x "$py" ]; then echo "unreadable there is no playbook venv to edit it with"; return 0; fi
     args=("$1" --settings "$(native_path "$GEMINI_SETTINGS")" --name "$GEMINI_SIDE_NAME")
     [ "$DRY_RUN" -eq 1 ] && args+=(--dry-run)
     # the prior value travels in the environment, as in setup.ps1 (see the helper's docstring)
-    out="$(CONTEXT_FILENAME_PRIOR="${2:-}" "$py" -I "$SCRIPT_DIR/providers/gemini/context-filename.py" "${args[@]}" 2>/dev/null)" || rc=$?
+    out="$(CONTEXT_FILENAME_PRIOR="${2:-}" "$py" -I "$helper" "${args[@]}" 2>/dev/null)" || rc=$?
     case "$rc" in
         0|3) printf '%s\n' "$out" | head -n 1 | tr -d '\r' ;;
         *) echo "unreadable the helper failed (exit $rc)" ;;

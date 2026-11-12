@@ -1692,6 +1692,9 @@ if [ -z "$PS_BIN" ] || [ ! -f "$SETUP_PS1_SCRIPT" ] || [ "$(uname -o 2>/dev/null
 fi
 local twins="sh"
 [ "$twin" -eq 1 ] && twins="sh ps"
+#   i: (Gemini CLI only) a helper that prints a success line and then exits 1
+#      (AGENT_PLAYBOOK_TEST_GEMINI_HELPER names a stub): setup does not trust its output, keeps your
+#      GEMINI.md, makes the side link, writes no setting row and prints the NOTE with the exit code.
 for fx in $fixtures; do
     for t in $twins; do cx_plant "$TMPDIR_PARITY/cx-$t-$fx" "$fx"; done
 done
@@ -1756,6 +1759,7 @@ if [ "$twin" -eq 1 ]; then
             || cx_fail ps "fixture $fx: the setup.sh and setup.ps1 settings.json bytes differ"
     done
 fi
+cx_fixture_i
 # the transition: your own files go away before run 2
 for t in $twins; do rm -f "$TMPDIR_PARITY/cx-$t-c/.gemini/GEMINI.md" "$TMPDIR_PARITY/cx-$t-c/.claude/CLAUDE.md"; done
 # a dry run first: the cleanup is only printed
@@ -2067,6 +2071,32 @@ cx_check_uninstall() {   # cx_check_uninstall <sandbox> <fixture> <sh|ps>
         b|g) cx_absent "$sb/.claude/CLAUDE.md" || cx_fail "$t" "fixture $fx: uninstall removes the CLAUDE.md link"
            cx_absent "$sb/.gemini/settings.json" \
                || cx_fail "$t" "fixture $fx: uninstall deletes the settings.json setup created (b: from the journal row)" ;;
+# cx_fixture_i: a helper that crashes after printing a success line (Gemini CLI only).
+cx_fixture_i() {
+    local t sb stub="$TMPDIR_PARITY/cx-crash-helper.py"
+    printf 'import sys\nprint("added prior=-")\nsys.exit(1)\n' > "$stub"
+    for t in $twins; do
+        sb="$TMPDIR_PARITY/cx-$t-i"
+        mkdir -p "$sb/.gemini" "$sb/.agent-playbook"
+        printf 'my gemini\n' > "$sb/.gemini/GEMINI.md"
+    done
+    AGENT_PLAYBOOK_TEST_GEMINI_HELPER="$(parity_native_path "$stub")"
+    export AGENT_PLAYBOOK_TEST_GEMINI_HELPER
+    cx_run i 1 "--providers gemini" "-Providers gemini"
+    cx_wait
+    unset AGENT_PLAYBOOK_TEST_GEMINI_HELPER
+    cx_rc i 1 0
+    for t in $twins; do
+        sb="$TMPDIR_PARITY/cx-$t-i"
+        [ "$(cat "$sb/.gemini/GEMINI.md")" = "my gemini" ] && [ ! -L "$sb/.gemini/GEMINI.md" ] \
+            && cx_link_to "$sb/.gemini/AGENT-PLAYBOOK.md" shared/AGENTS.md \
+            && cx_absent "$sb/.gemini/settings.json" \
+            && ! grep -qs $'^setting\t' "$sb/.agent-playbook/deploy-lock.tsv" "$sb/.agent-playbook/deploy-lock.journal.tsv" \
+            && grep -qF 'cannot be edited (the helper failed (exit 1)); add "AGENT-PLAYBOOK.md" to context.fileName' "$TMPDIR_PARITY/cx-$t-i-1.log" \
+            || cx_fail "$t" "fixture i: a helper that exits 1 is not trusted: GEMINI.md kept, side link made, no setting row, the NOTE names the exit code"
+    done
+}
+
         c) cx_absent "$sb/.claude/CLAUDE.md" && cx_absent "$sb/.gemini/GEMINI.md" \
                || cx_fail "$t" "fixture c: uninstall removes the CLAUDE.md and GEMINI.md links"
            [ "$(cat "$sb/.gemini/settings.json")" = "$CX_C_PRIOR" ] \
