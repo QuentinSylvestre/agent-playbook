@@ -2149,9 +2149,11 @@ mkdir -p "$PARITY_JOBS_DIR"
 
 # parity_step <name> <function> <flag vars...>
 parity_step() {
-    local name="$1" fn="$2"; shift 2
+    local name="$1" fn="$2" start="$SECONDS"; shift 2
     "$fn" > "$PARITY_JOBS_DIR/$name.out" 2> "$PARITY_JOBS_DIR/$name.err"
     declare -p "$@" > "$PARITY_JOBS_DIR/$name.status"
+    # start and end, in seconds since this script began: what to profile next
+    echo "$start $SECONDS" > "$PARITY_JOBS_DIR/$name.secs"
 }
 
 # parity_setup_ps1_deploy: SETUP-PARITY's setup.ps1 deploy into its own
@@ -2215,6 +2217,14 @@ for name in setup_verify merge render setup_parity ownership coexist; do
         PARITY_FAIL=1
     fi
 done
+# Section timings (seconds since start; sections run in four parallel jobs, see above)
+for name in setup_verify setup_parity ownership merge render coexist; do
+    if [ -f "$PARITY_JOBS_DIR/$name.secs" ]; then
+        read -r t0 t1 < "$PARITY_JOBS_DIR/$name.secs"
+        echo "TIMING: $name ran from ${t0} s to ${t1} s ($((t1 - t0)) s)"
+    fi
+done
+echo "TIMING: total ${SECONDS} s"
 
 # --- Verdict --------------------------------------------------------------
 
