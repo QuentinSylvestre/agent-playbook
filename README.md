@@ -46,18 +46,25 @@ Interactive setup:
 Setup records every file it writes in `~/.agent-playbook/deploy-lock.tsv` (except the Kiro seed
 files, which it writes only when absent), so a re-run changes only what changed.
 
-Your own global instruction file stays where it is, and the playbook loads beside it:
+Your own global instruction file stays where it is, and the playbook loads beside it. A file of
+yours is a regular file, or a link to a file outside this repo (from your dotfiles, say):
 
 - Claude Code: a `~/.claude/CLAUDE.md` of yours is kept, and the playbook is linked as
   `~/.claude/rules/agent-playbook.md`. Claude Code loads every file in that folder.
-- Gemini CLI: a `~/.gemini/GEMINI.md` of yours is kept. The playbook is linked as
-  `~/.gemini/AGENT-PLAYBOOK.md`, and that name is added to `context.fileName` in
-  `~/.gemini/settings.json`. This relies on a reading of Gemini CLI 0.28.2's source, not a runtime
-  check. A `settings.json` setup cannot parse is left alone, and your file is backed up instead.
+- Gemini CLI: a `~/.gemini/GEMINI.md` of yours is always kept, never backed up or replaced. The
+  playbook is linked as `~/.gemini/AGENT-PLAYBOOK.md`, and that name is added to
+  `context.fileName` in `~/.gemini/settings.json`, in every mode (`--yes` and a run with no
+  terminal included). A `settings.json` that is a link is written through the link. This relies on
+  a reading of Gemini CLI 0.28.2's source, not a runtime check. Setup leaves a `settings.json` it
+  cannot edit as it is, such as one with comments, which Gemini CLI accepts. It then prints a
+  `NOTE` with the line to add by hand, and `/qconfig-sync` reports that line `MISSING` until you do.
 - Codex cannot load a second global file, so a `~/.codex/AGENTS.md` of yours is backed up and
   replaced, and setup says so.
 
-Uninstall removes only the links and the setting entry setup added. For Claude Code, setup also links
+Once your file is gone, the next run links the instruction file and removes the side link and the
+`context.fileName` entry it added, so the playbook never loads twice. Uninstall removes only the
+links and the setting entry setup added, the `settings.json` setup created when it is then empty,
+and `~/.claude/rules/` when nothing else is left in it. For Claude Code, setup also links
 `~/.claude/rules/playbook-user-memory.md` and `~/.claude/rules/playbook-higher-order.md` to your user
 memory, so every session starts with both tiers in full (`providers/claude/README.md`).
 

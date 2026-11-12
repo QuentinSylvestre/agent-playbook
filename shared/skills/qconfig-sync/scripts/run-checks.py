@@ -157,6 +157,7 @@ def build_checks(repo, jobs):
     python("scan-selftest", "selftest", "providers/kiro/skills/qwire-governance/scripts/scan.py", "--selftest")
     python("qmigrate-store-rewrite-selftest", "selftest", "shared/skills/qmigrate-workspace/scripts/test_store_rewrite.py")
     python("memory-load-hook-selftest", "selftest", "providers/claude/memory-load-hook.py", "--selftest")
+    python("context-filename-selftest", "selftest", "providers/gemini/context-filename.py", "--selftest")
     python("claude-settings", "guard", "providers/claude/settings-entries.py", "check")
     python("claude-settings-selftest", "selftest", "providers/claude/settings-entries.py", "--selftest")
     python("render-selftest", "selftest", "shared/skills/qvisualize/scripts/render.py", "--selftest")

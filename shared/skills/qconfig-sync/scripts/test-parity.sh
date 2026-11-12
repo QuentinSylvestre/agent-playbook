@@ -1654,17 +1654,36 @@ parity_sec_coexist() {
 # sandbox per fixture, deployed for Claude Code, Codex and Gemini CLI only (no Kiro, so it is quick):
 #   a: your own ~/.claude/CLAUDE.md, ~/.codex/AGENTS.md, and ~/.gemini/GEMINI.md with a
 #      settings.json that names it as a string beside another key;
-#   b: your own ~/.gemini/GEMINI.md and no settings.json (and nothing at ~/.claude/CLAUDE.md).
+#   b: your own ~/.gemini/GEMINI.md and no settings.json (and nothing at ~/.claude/CLAUDE.md); before
+#      the uninstall, the lock's context.fileName row is moved to the lock journal, as a run that
+#      stopped after the settings edit leaves it;
+#   c: your own CLAUDE.md and GEMINI.md, both removed after run 1: run 2 links them and removes the
+#      co-existence links and the context.fileName entry (the transition); its prior context.fileName
+#      is a non-ASCII name, so the twins' byte-equal locks pin how each reads the helper's UTF-8; a
+#      dry run before run 2 prints DRY lines only;
+#   d: a settings.json with a comment (JSONC, which Gemini CLI accepts and the helper cannot keep):
+#      your GEMINI.md stays, the side link is made, settings.json is untouched, a NOTE gives the line
+#      to add, and verify-deployment.py reports the settings line MISSING (no double load);
+#   e: a context.fileName list that already holds AGENT-PLAYBOOK.md: no setting row, nothing written;
+#   f: settings.json is a link to a file of yours elsewhere: written through the link, the link kept;
+#      CLAUDE.md is a link of yours to a file outside the repo (dotfiles): kept, the rules link beside;
+#   g: a first run with no venv (AGENT_PLAYBOOK_TEST_VENV_DIR names a folder that does not exist yet,
+#      outside the sandbox): setup makes the venv, then edits settings.json in that same run; a dry
+#      run before it says the venv comes first and writes nothing;
+#   h: (Gemini CLI only) a run that stops after the settings edit (setup.sh: ~/.gemini/skills is a
+#      file; setup.ps1: the deploy lock path is a folder) leaves the setting row in the lock journal;
+#      the next run, once the cause is gone, records it in the lock.
 # setup.sh deploys each (COEXIST, always runs) and, where PowerShell and Git Bash are both present,
 # setup.ps1 deploys a twin of each (TWIN-COEXIST). Checked per sandbox: the outcomes below and the
-# Claude memory rules links, verify-deployment.py clean, a second run writes nothing (mtime and
-# inode, as NO-REWRITE), the two twins' deploy locks byte-equal, and an uninstall that gives every
-# file of yours back and removes only what setup added. Never --yes (it would repoint the repo's
-# memory link into the sandbox).
+# Claude memory rules links, verify-deployment.py, a second run writes nothing (mtime and inode, as
+# NO-REWRITE; c excepted), the two twins' deploy locks and settings.json byte-equal, and an
+# uninstall that gives every file of yours back and removes only what setup added. Never --yes (it
+# would repoint the repo's memory link into the sandbox).
 COEXIST_OK=1
 TWIN_COEXIST_OK=1
 TWIN_COEXIST_SKIPPED=0
-local twin=1 fx t sb pids=()
+local twin=1 fx t sb
+local fixtures="a b c d e f g"
 if [ -z "$PS_BIN" ] || [ ! -f "$SETUP_PS1_SCRIPT" ] || [ "$(uname -o 2>/dev/null)" != "Msys" ]; then
     twin=0
     TWIN_COEXIST_SKIPPED=1
@@ -1672,63 +1691,102 @@ if [ -z "$PS_BIN" ] || [ ! -f "$SETUP_PS1_SCRIPT" ] || [ "$(uname -o 2>/dev/null
 fi
 local twins="sh"
 [ "$twin" -eq 1 ] && twins="sh ps"
-for fx in a b; do
+for fx in $fixtures; do
     for t in $twins; do cx_plant "$TMPDIR_PARITY/cx-$t-$fx" "$fx"; done
 done
 # step <log suffix> <setup.sh args> -- <setup.ps1 args>: every sandbox, setup.sh in the background
-cx_all() {
-    local suffix="$1" sh_args="$2" ps_args="$3" fx2 p=()
-    for fx2 in a b; do
+# cx_run <fixture> <log suffix> <setup.sh args> <setup.ps1 args>: that fixture's twins, in the
+# background (each sandbox is its own home); cx_wait waits for them.
+CX_PIDS=()
+cx_run() {
+    local fx2="$1" suffix="$2" sh_args="$3" ps_args="$4" vsh="" vps=""
+    if [ "$fx2" = g ]; then
+        vsh="$TMPDIR_PARITY/cx-sh-g.venv"
+        [ "$twin" -eq 0 ] || vps="$(cygpath -w "$TMPDIR_PARITY/cx-ps-g.venv")"
+    fi
+    # shellcheck disable=SC2086
+    AGENT_PLAYBOOK_TEST_VENV_DIR="$vsh" own_run_sh "$TMPDIR_PARITY/cx-sh-$fx2" "cx-sh-$fx2-$suffix" $sh_args &
+    CX_PIDS+=("$!")
+    if [ "$twin" -eq 1 ]; then
         # shellcheck disable=SC2086
-        own_run_sh "$TMPDIR_PARITY/cx-sh-$fx2" "cx-sh-$fx2-$suffix" $sh_args &
-        p+=("$!")
-        # shellcheck disable=SC2086
-        [ "$twin" -eq 1 ] && own_run_ps "$TMPDIR_PARITY/cx-ps-$fx2" "cx-ps-$fx2-$suffix" $ps_args
-    done
-    for fx2 in "${p[@]}"; do wait "$fx2" || true; done
-    for fx2 in a b; do
-        own_rc "cx-sh-$fx2-$suffix" 0 || cx_fail sh "fixture $fx2: run $suffix exits 0 (got $(cat "$TMPDIR_PARITY/cx-sh-$fx2-$suffix.rc"))"
-        [ "$twin" -eq 0 ] || own_rc "cx-ps-$fx2-$suffix" 0 \
-            || cx_fail ps "fixture $fx2: run $suffix exits 0 (got $(cat "$TMPDIR_PARITY/cx-ps-$fx2-$suffix.rc"))"
-    done
+        AGENT_PLAYBOOK_TEST_VENV_DIR="$vps" own_run_ps "$TMPDIR_PARITY/cx-ps-$fx2" "cx-ps-$fx2-$suffix" $ps_args &
+        CX_PIDS+=("$!")
+    fi
 }
+cx_wait() {
+    local pid
+    for pid in "${CX_PIDS[@]}"; do wait "$pid" || true; done
+    CX_PIDS=()
+}
+# cx_rc <fixture> <log suffix> <0|nonzero>: both twins' exit codes
+cx_rc() {
+    own_rc "cx-sh-$1-$2" "$3" || cx_fail sh "fixture $1: run $2 exits $3 (got $(cat "$TMPDIR_PARITY/cx-sh-$1-$2.rc"))"
+    [ "$twin" -eq 0 ] || own_rc "cx-ps-$1-$2" "$3" \
+        || cx_fail ps "fixture $1: run $2 exits $3 (got $(cat "$TMPDIR_PARITY/cx-ps-$1-$2.rc"))"
+}
+cx_all() {
+    local suffix="$1" sh_args="$2" ps_args="$3" fx2
+    for fx2 in $fixtures; do cx_run "$fx2" "$suffix" "$sh_args" "$ps_args"; done
+    cx_wait
+    for fx2 in $fixtures; do cx_rc "$fx2" "$suffix" 0; done
+}
+# a dry run on fixture g before its first run: no venv yet, so setup says the venv comes first
+for t in $twins; do cx_snapshot "$TMPDIR_PARITY/cx-$t-g" > "$TMPDIR_PARITY/cx-$t-g.snap0"; done
+cx_run g dry "--dry-run --providers claude,codex,gemini" "-DryRun -Providers claude,codex,gemini"
+cx_wait
+cx_rc g dry 0
+for t in $twins; do cx_check_dry_g "$t"; done
+cx_fixture_h
 cx_all 1 "--providers claude,codex,gemini" "-Providers claude,codex,gemini"
-for fx in a b; do
+for fx in $fixtures; do
     for t in $twins; do
         sb="$TMPDIR_PARITY/cx-$t-$fx"
         cx_check_deploy "$sb" "$fx" "$t" "$TMPDIR_PARITY/cx-$t-$fx-1.log"
-        cx_verify "$sb" "$t"
+        cx_verify "$sb" "$t" "$fx"
         cx_snapshot "$sb" > "$sb.snap1"
     done
 done
 if [ "$twin" -eq 1 ]; then
-    for fx in a b; do
-        cmp -s "$TMPDIR_PARITY/cx-sh-$fx/.agent-playbook/deploy-lock.tsv" "$TMPDIR_PARITY/cx-ps-$fx/.agent-playbook/deploy-lock.tsv" \
+    for fx in $fixtures; do
+        cx_same "$TMPDIR_PARITY/cx-sh-$fx/.agent-playbook/deploy-lock.tsv" "$TMPDIR_PARITY/cx-ps-$fx/.agent-playbook/deploy-lock.tsv" \
             || { cx_fail ps "fixture $fx: the setup.sh and setup.ps1 deploy locks differ"
                  diff "$TMPDIR_PARITY/cx-sh-$fx/.agent-playbook/deploy-lock.tsv" "$TMPDIR_PARITY/cx-ps-$fx/.agent-playbook/deploy-lock.tsv" | head -n 10 >&2 || true; }
+        cx_same "$(cx_settings_file "$TMPDIR_PARITY/cx-sh-$fx" "$fx")" "$(cx_settings_file "$TMPDIR_PARITY/cx-ps-$fx" "$fx")" \
+            || cx_fail ps "fixture $fx: the setup.sh and setup.ps1 settings.json bytes differ"
     done
 fi
+# the transition: your own files go away before run 2
+for t in $twins; do rm -f "$TMPDIR_PARITY/cx-$t-c/.gemini/GEMINI.md" "$TMPDIR_PARITY/cx-$t-c/.claude/CLAUDE.md"; done
+# a dry run first: the cleanup is only printed
+for t in $twins; do cx_snapshot "$TMPDIR_PARITY/cx-$t-c" > "$TMPDIR_PARITY/cx-$t-c.snap-dry"; done
+cx_run c dry "--dry-run --providers claude,codex,gemini" "-DryRun -Providers claude,codex,gemini"
+cx_wait
+cx_rc c dry 0
+for t in $twins; do cx_check_dry_c "$t"; done
 cx_all 2 "--providers claude,codex,gemini" "-Providers claude,codex,gemini"
-for fx in a b; do
+for fx in $fixtures; do
     for t in $twins; do
         sb="$TMPDIR_PARITY/cx-$t-$fx"
+        if [ "$fx" = c ]; then cx_check_transition "$sb" "$t"; continue; fi
         cx_snapshot "$sb" > "$sb.snap2"
         cmp -s "$sb.snap1" "$sb.snap2" || { cx_fail "$t" "fixture $fx: a second run with co-existence active wrote something"
                                             diff "$sb.snap1" "$sb.snap2" | head -n 10 >&2 || true; }
     done
 done
+# fixture b: a run that stopped after editing settings.json, before writing its lock
+for t in $twins; do cx_interrupt "$TMPDIR_PARITY/cx-$t-b" "$t"; done
 cx_all 3 "--uninstall --providers claude,codex,gemini" "-Uninstall -Providers claude,codex,gemini"
-for fx in a b; do
+for fx in $fixtures; do
     for t in $twins; do cx_check_uninstall "$TMPDIR_PARITY/cx-$t-$fx" "$fx" "$t"; done
 done
 if [ "$COEXIST_OK" -eq 1 ]; then
-    echo "COEXIST OK: setup.sh keeps your CLAUDE.md and GEMINI.md beside the playbook, backs up Codex's, links the memory rules, re-runs without writing and uninstalls to your files"
+    echo "COEXIST OK: setup.sh keeps your CLAUDE.md and GEMINI.md beside the playbook (JSONC, listed, linked settings and a first run with no venv included), backs up Codex's, links the memory rules, re-runs without writing, cleans up once your file is gone, and uninstalls to your files"
 else
     echo "  --- setup.sh logs (tail) ---" >&2
     tail -n 12 "$TMPDIR_PARITY/cx-sh-a-1.log" "$TMPDIR_PARITY/cx-sh-a-3.log" >&2 || true
 fi
 if [ "$twin" -eq 1 ] && [ "$TWIN_COEXIST_OK" -eq 1 ]; then
-    echo "TWIN-COEXIST OK: setup.ps1 meets the same co-existence checks, with a byte-equal deploy lock"
+    echo "TWIN-COEXIST OK: setup.ps1 meets the same co-existence checks, with byte-equal deploy locks and settings.json"
 elif [ "$twin" -eq 1 ]; then
     echo "  --- setup.ps1 logs (tail) ---" >&2
     tail -n 12 "$TMPDIR_PARITY/cx-ps-a-1.log" "$TMPDIR_PARITY/cx-ps-a-3.log" >&2 || true
@@ -1741,16 +1799,51 @@ cx_fail() {
     if [ "$1" = sh ]; then COEXIST_OK=0; else TWIN_COEXIST_OK=0; fi
 }
 
-cx_plant() {   # cx_plant <sandbox> <a|b>
+# cx_same <a> <b>: the same bytes, or both absent.
+cx_same() {
+    if [ ! -e "$1" ] && [ ! -e "$2" ]; then return 0; fi
+    cmp -s "$1" "$2"
+}
+
+# The non-ASCII context.fileName fixture c starts from, and the list setup makes of it.
+CX_C_PRIOR='{"context": {"fileName": "Ünï-名前.md"}}'
+CX_C_ADDED='{"context": {"fileName": ["Ünï-名前.md", "AGENT-PLAYBOOK.md"]}}'
+
+CX_JSONC='{
+  // my own Gemini settings
+  "theme": "dark"
+}'
+
+cx_plant() {   # cx_plant <sandbox> <fixture>
     local sb="$1"
     mkdir -p "$sb/.gemini"
     printf 'my gemini\n' > "$sb/.gemini/GEMINI.md"
-    if [ "$2" = a ]; then
-        mkdir -p "$sb/.claude" "$sb/.codex"
-        printf 'my claude\n' > "$sb/.claude/CLAUDE.md"
-        printf 'my codex\n' > "$sb/.codex/AGENTS.md"
-        printf '{\n    "context": {"fileName": "GEMINI.md"},\n    "keep": 1\n}\n' > "$sb/.gemini/settings.json"
-    fi
+    case "$2" in
+        a) mkdir -p "$sb/.claude" "$sb/.codex"
+           printf 'my claude\n' > "$sb/.claude/CLAUDE.md"
+           printf 'my codex\n' > "$sb/.codex/AGENTS.md"
+           printf '{\n    "context": {"fileName": "GEMINI.md"},\n    "keep": 1\n}\n' > "$sb/.gemini/settings.json" ;;
+        b) if [ ! -e "$REPO_ROOT/memory/MEMORY.md" ]; then
+               # no user memory (CI): a memory rules link an earlier run made, dangling now
+               mkdir -p "$sb/.claude/rules"
+               ln -s "$REPO_ROOT/memory/MEMORY.md" "$sb/.claude/rules/playbook-user-memory.md" 2>/dev/null || true
+           fi ;;
+        c) mkdir -p "$sb/.claude"
+           printf 'my claude\n' > "$sb/.claude/CLAUDE.md"
+           printf '%s\n' "$CX_C_PRIOR" > "$sb/.gemini/settings.json" ;;
+        d) printf '%s\n' "$CX_JSONC" > "$sb/.gemini/settings.json" ;;
+        e) printf '{"context": {"fileName": ["GEMINI.md", "AGENT-PLAYBOOK.md"]}}\n' > "$sb/.gemini/settings.json" ;;
+        f) mkdir -p "$sb/dotfiles" "$sb/.claude"
+           printf 'my dotfiles claude\n' > "$sb/dotfiles/claude.md"
+           MSYS=winsymlinks:nativestrict ln -s "$sb/dotfiles/claude.md" "$sb/.claude/CLAUDE.md"
+           printf '{"keep": 1}\n' > "$sb/dotfiles/gemini-settings.json"
+           MSYS=winsymlinks:nativestrict ln -s "$sb/dotfiles/gemini-settings.json" "$sb/.gemini/settings.json" ;;
+    esac
+}
+
+# cx_settings_file <sandbox> <fixture>: the file that holds the settings (f: the link's target).
+cx_settings_file() {
+    if [ "$2" = f ]; then printf '%s' "$1/dotfiles/gemini-settings.json"; else printf '%s' "$1/.gemini/settings.json"; fi
 }
 
 # cx_link_to <link> <repo-relative target>: a link whose text ends with that target (either slash).
@@ -1762,9 +1855,10 @@ cx_link_to() {
 cx_absent() { [ ! -e "$1" ] && [ ! -L "$1" ]; }
 
 # cx_snapshot <sandbox>: nr_snapshot without PowerShell's own startup cache, which pwsh rewrites under a
-# sandbox USERPROFILE on every start (AppData/Local/Microsoft/PowerShell); setup.ps1 never writes it.
+# sandbox USERPROFILE on every start (AppData/Local/Microsoft/PowerShell, and the folders above it,
+# which its first start makes); setup.ps1 never writes there.
 cx_snapshot() {
-    nr_snapshot "$1" | grep -v '^AppData/Local/Microsoft/PowerShell/' || true
+    nr_snapshot "$1" | grep -Ev $'^AppData(/Local(/Microsoft(/PowerShell(/.*)?)?)?)?\t' || true
 }
 
 # cx_json <file> <python expression over d>: the file parses as JSON and the expression holds.
@@ -1774,8 +1868,9 @@ d = json.load(open(sys.argv[1], encoding="utf-8"))
 sys.exit(0 if eval(sys.argv[2]) else 1)' "$(parity_native_path "$1")" "$2" 2>/dev/null
 }
 
-cx_check_deploy() {   # cx_check_deploy <sandbox> <a|b> <sh|ps> <log>
-    local sb="$1" fx="$2" t="$3" log="$4" lock="$1/.agent-playbook/deploy-lock.tsv" n
+cx_check_deploy() {   # cx_check_deploy <sandbox> <fixture> <sh|ps> <log>
+    local sb="$1" fx="$2" t="$3" log="$4" lock="$1/.agent-playbook/deploy-lock.tsv" n want=1
+    local names='d["context"]["fileName"] == ["GEMINI.md", "AGENT-PLAYBOOK.md"]'
     if [ -e "$REPO_ROOT/memory/MEMORY.md" ] && [ -e "$REPO_ROOT/memory/HIGHER_ORDER.md" ]; then
         cx_link_to "$sb/.claude/rules/playbook-user-memory.md" memory/MEMORY.md \
             && cx_link_to "$sb/.claude/rules/playbook-higher-order.md" memory/HIGHER_ORDER.md \
@@ -1783,61 +1878,188 @@ cx_check_deploy() {   # cx_check_deploy <sandbox> <a|b> <sh|ps> <log>
     else
         cx_absent "$sb/.claude/rules/playbook-user-memory.md" && grep -q 'playbook-user-memory.md is not linked yet' "$log" \
             || cx_fail "$t" "fixture $fx: with no user memory, no dangling memory rules link is made, and setup says so"
+        if [ "$fx" = b ] && [ "$t" = sh ]; then
+            grep -q 'playbook-user-memory.md (dangling: there is no' "$log" \
+                || cx_fail "$t" "fixture b: a dangling memory rules link an earlier run made is removed, and setup says so"
+        fi
     fi
+    # in every fixture your GEMINI.md stays and the side link is made; the settings edit varies
     own_is "$sb/.gemini/GEMINI.md" "my gemini" && cx_link_to "$sb/.gemini/AGENT-PLAYBOOK.md" shared/AGENTS.md \
-        && cx_json "$sb/.gemini/settings.json" 'd["context"]["fileName"] == ["GEMINI.md", "AGENT-PLAYBOOK.md"]' \
-        || cx_fail "$t" "fixture $fx: your GEMINI.md stays, AGENT-PLAYBOOK.md links beside it and joins context.fileName"
-    if [ "$fx" = a ]; then
-        own_is "$sb/.claude/CLAUDE.md" "my claude" && cx_link_to "$sb/.claude/rules/agent-playbook.md" shared/AGENTS.md \
-            && grep -q 'CLAUDE.md is your own file' "$log" \
-            || cx_fail "$t" "your CLAUDE.md stays and ~/.claude/rules/agent-playbook.md links beside it, said once"
-        cx_link_to "$sb/.codex/AGENTS.md" shared/AGENTS.md && own_is "$sb/.codex/AGENTS.md.bak" "my codex" \
-            && grep -q 'Codex has no way to load a second global instructions file' "$log" \
-            || cx_fail "$t" "Codex has no co-existence: your AGENTS.md goes to .bak, the link is made, and setup says so"
-        cx_json "$sb/.gemini/settings.json" 'd["keep"] == 1 and len(d) == 2' \
-            || cx_fail "$t" "the settings.json edit keeps every other key"
-        grep -q $'^setting\tgemini/context.fileName\t"GEMINI.md"$' "$lock" && grep -q $'^backup\t~/.codex/AGENTS.md\t' "$lock" \
-            || cx_fail "$t" "the lock records the prior context.fileName and the Codex backup"
-    else
-        cx_link_to "$sb/.claude/CLAUDE.md" shared/AGENTS.md && cx_absent "$sb/.claude/rules/agent-playbook.md" \
-            || cx_fail "$t" "an empty CLAUDE.md path is linked as before, with no rules link beside it"
-        grep -q $'^setting\tgemini/context.fileName\t-$' "$lock" \
-            || cx_fail "$t" "with no settings.json, the lock records - as the prior context.fileName"
-    fi
+        && cx_absent "$sb/.gemini/GEMINI.md.bak" \
+        || cx_fail "$t" "fixture $fx: your GEMINI.md stays (no .bak) and AGENT-PLAYBOOK.md links beside it"
+    cx_absent "$sb/.agent-playbook/deploy-lock.journal.tsv" || cx_fail "$t" "fixture $fx: the lock write removes the journal"
+    case "$fx" in
+        a) cx_json "$sb/.gemini/settings.json" "$names" || cx_fail "$t" "fixture a: AGENT-PLAYBOOK.md joins context.fileName"
+           own_is "$sb/.claude/CLAUDE.md" "my claude" && cx_link_to "$sb/.claude/rules/agent-playbook.md" shared/AGENTS.md \
+               && grep -q 'CLAUDE.md is your own file' "$log" \
+               || cx_fail "$t" "your CLAUDE.md stays and ~/.claude/rules/agent-playbook.md links beside it, said once"
+           cx_link_to "$sb/.codex/AGENTS.md" shared/AGENTS.md && own_is "$sb/.codex/AGENTS.md.bak" "my codex" \
+               && grep -q 'Codex has no way to load a second global instructions file' "$log" \
+               || cx_fail "$t" "Codex has no co-existence: your AGENTS.md goes to .bak, the link is made, and setup says so"
+           cx_json "$sb/.gemini/settings.json" 'd["keep"] == 1 and len(d) == 2' \
+               || cx_fail "$t" "the settings.json edit keeps every other key"
+           grep -q $'^setting\tgemini/context.fileName\t"GEMINI.md"$' "$lock" && grep -q $'^backup\t~/.codex/AGENTS.md\t' "$lock" \
+               || cx_fail "$t" "the lock records the prior context.fileName and the Codex backup" ;;
+        b|g) cx_json "$sb/.gemini/settings.json" "$names" || cx_fail "$t" "fixture $fx: AGENT-PLAYBOOK.md joins context.fileName"
+           cx_link_to "$sb/.claude/CLAUDE.md" shared/AGENTS.md && cx_absent "$sb/.claude/rules/agent-playbook.md" \
+               || cx_fail "$t" "fixture $fx: an empty CLAUDE.md path is linked as before, with no rules link beside it"
+           grep -q $'^setting\tgemini/context.fileName\t+$' "$lock" \
+               || cx_fail "$t" "fixture $fx: with no settings.json, the lock records + (setup created it)"
+           if [ "$fx" = g ]; then
+               grep -q 'CREATED: ' "$log" && [ -d "$TMPDIR_PARITY/cx-$t-g.venv" ] \
+                   || cx_fail "$t" "fixture g: the first run with no venv creates it (in the test folder)"
+           fi ;;
+        c) [ "$(cat "$sb/.gemini/settings.json")" = "$CX_C_ADDED" ] \
+               || cx_fail "$t" "fixture c: AGENT-PLAYBOOK.md joins a non-ASCII context.fileName (got $(cat "$sb/.gemini/settings.json"))"
+           grep -qF "$(printf 'setting\tgemini/context.fileName\t"Ünï-名前.md"')" "$lock" \
+               || cx_fail "$t" "fixture c: the lock records the non-ASCII prior as UTF-8 JSON"
+           cx_link_to "$sb/.claude/rules/agent-playbook.md" shared/AGENTS.md \
+               || cx_fail "$t" "fixture c: the Claude rules link is made beside your CLAUDE.md" ;;
+        d) [ "$(cat "$sb/.gemini/settings.json")" = "$CX_JSONC" ] \
+               || cx_fail "$t" "fixture d: a settings.json with comments is left as it was"
+           grep -qF "add \"AGENT-PLAYBOOK.md\" to context.fileName in ~/.gemini/settings.json by hand" "$log" \
+               || cx_fail "$t" "fixture d: a NOTE gives the exact line to add by hand"
+           want=0 ;;
+        e) [ "$(cat "$sb/.gemini/settings.json")" = '{"context": {"fileName": ["GEMINI.md", "AGENT-PLAYBOOK.md"]}}' ] \
+               || cx_fail "$t" "fixture e: a list that already holds the name is not written"
+           want=0 ;;
+        f) [ -L "$sb/.gemini/settings.json" ] && cx_json "$sb/dotfiles/gemini-settings.json" "$names" \
+               && cx_json "$sb/dotfiles/gemini-settings.json" 'd["keep"] == 1' \
+               || cx_fail "$t" "fixture f: a linked settings.json is written through the link, and the link stays"
+           cx_link_to "$sb/.claude/CLAUDE.md" dotfiles/claude.md && [ "$(cat "$sb/.claude/CLAUDE.md")" = "my dotfiles claude" ] \
+               && cx_absent "$sb/.claude/CLAUDE.md.bak" && cx_link_to "$sb/.claude/rules/agent-playbook.md" shared/AGENTS.md \
+               || cx_fail "$t" "fixture f: your CLAUDE.md linked from your dotfiles stays (no .bak), the rules link beside it"
+           grep -q $'^setting\tgemini/context.fileName\t-$' "$lock" \
+               || cx_fail "$t" "fixture f: the lock records - (the file held no value)" ;;
+    esac
     n="$(grep -c $'^setting\t' "$lock" 2>/dev/null || true)"
-    [ "$n" = 1 ] || cx_fail "$t" "fixture $fx: exactly one setting row in the lock (got ${n:-0})"
+    [ "${n:-0}" = "$want" ] || cx_fail "$t" "fixture $fx: $want setting row(s) in the lock (got ${n:-0})"
 }
 
-cx_verify() {   # cx_verify <sandbox> <sh|ps>: verify-deployment.py clean, co-existence lines included
-    local sb="$1"
-    if HOME="$sb" XDG_CONFIG_HOME="$sb/.config" USERPROFILE="$(parity_native_path "$sb")" \
-        APPDATA="$(parity_native_path "$sb/AppData/Roaming")" "$VERIFY_PY" -I "$VERIFY_SCRIPT" > "$sb.verify" 2>&1 \
-        && grep -q $'^OK\t.*GEMINI.md\tuser-file-kept' "$sb.verify"; then
+cx_verify() {   # cx_verify <sandbox> <sh|ps> <fixture>: verify-deployment.py on the co-existence sandbox
+    local sb="$1" rc=0
+    HOME="$sb" XDG_CONFIG_HOME="$sb/.config" USERPROFILE="$(parity_native_path "$sb")" \
+        APPDATA="$(parity_native_path "$sb/AppData/Roaming")" "$VERIFY_PY" -I "$VERIFY_SCRIPT" > "$sb.verify" 2>&1 || rc=$?
+    if [ "$3" = d ]; then
+        # JSONC: setup could not add the name, so verify asks for it; the playbook does not load twice
+        [ "$rc" -eq 1 ] && grep -q $'^MISSING\t.*settings.json\tcontext.fileName-lacks=AGENT-PLAYBOOK.md' "$sb.verify" \
+            && grep -q $'^NOT_SYMLINK\t.*GEMINI.md\tuser-file-kept-without-the-playbook' "$sb.verify" \
+            && ! grep -q $'^DRIFTED\t' "$sb.verify" \
+            || { cx_fail "$2" "fixture d: verify-deployment.py reports the settings line MISSING, and no double load"
+                 grep -E $'^(MISSING|WRONG_TARGET|NOT_SYMLINK|DRIFTED)\t' "$sb.verify" | head -n 5 >&2 || true; }
+        return 0
+    fi
+    if [ "$3" = c2 ] && [ "$rc" -eq 0 ]; then return 0; fi
+    if [ "$3" != c2 ] && [ "$rc" -eq 0 ] && grep -q $'^OK\t.*GEMINI.md\tuser-file-kept' "$sb.verify"; then
         return 0
     fi
     cx_fail "$2" "verify-deployment.py is clean on the co-existence sandbox $(basename "$sb")"
     grep -E $'^(MISSING|WRONG_TARGET|NOT_SYMLINK|DRIFTED)\t' "$sb.verify" | head -n 5 >&2 || true
 }
 
-cx_check_uninstall() {   # cx_check_uninstall <sandbox> <a|b> <sh|ps>
+# cx_check_transition <sandbox> <sh|ps>: fixture c after run 2, your files gone: the instruction files
+# are the links, the co-existence links and the context.fileName entry are gone, the lock row too.
+cx_check_transition() {
+    local sb="$1" t="$2" lock="$1/.agent-playbook/deploy-lock.tsv"
+    own_rc "cx-$t-c-2" 0 || return 0
+    cx_link_to "$sb/.gemini/GEMINI.md" shared/AGENTS.md && cx_absent "$sb/.gemini/AGENT-PLAYBOOK.md" \
+        || cx_fail "$t" "fixture c: with your GEMINI.md gone, GEMINI.md is linked and the side link removed"
+    cx_link_to "$sb/.claude/CLAUDE.md" shared/AGENTS.md && cx_absent "$sb/.claude/rules/agent-playbook.md" \
+        || cx_fail "$t" "fixture c: with your CLAUDE.md gone, CLAUDE.md is linked and the rules link removed"
+    [ "$(cat "$sb/.gemini/settings.json")" = "$CX_C_PRIOR" ] \
+        || cx_fail "$t" "fixture c: the context.fileName entry setup added is taken out again (got $(cat "$sb/.gemini/settings.json"))"
+    ! grep -q 'gemini/context.fileName' "$lock" || cx_fail "$t" "fixture c: the lock drops the context.fileName row"
+    cx_verify "$sb" "$t" c2
+}
+
+# cx_interrupt <sandbox> <sh|ps>: the lock as a run leaves it that stopped after the settings edit:
+# the setting row in the journal only.
+cx_interrupt() {
+    local lock="$1/.agent-playbook/deploy-lock.tsv"
+    grep $'^setting\tgemini/context.fileName\t' "$lock" > "$1/.agent-playbook/deploy-lock.journal.tsv" \
+        || cx_fail "$2" "fixture b: the lock holds the context.fileName row before the interruption"
+    grep -v $'^setting\tgemini/context.fileName\t' "$lock" > "$lock.tmp" || true
+    mv -f "$lock.tmp" "$lock"
+}
+
+# cx_check_dry_g <sh|ps>: the dry run on fixture g wrote nothing (no venv either) and said the venv
+# comes first.
+cx_check_dry_g() {
+    local t="$1" sb="$TMPDIR_PARITY/cx-$1-g" log="$TMPDIR_PARITY/cx-$1-g-dry.log"
+    cx_snapshot "$sb" > "$sb.snap-dry0"
+    cmp -s "$sb.snap0" "$sb.snap-dry0" && cx_absent "$TMPDIR_PARITY/cx-$t-g.venv" \
+        && grep -q 'DRY: the venv is created first; then AGENT-PLAYBOOK.md is added to context.fileName' "$log" \
+        || cx_fail "$t" "fixture g: a dry run with no venv writes nothing and says the venv is created first"
+}
+
+# cx_check_dry_c <sh|ps>: the dry run of the transition prints the cleanup and changes nothing.
+cx_check_dry_c() {
+    local t="$1" sb="$TMPDIR_PARITY/cx-$1-c" log="$TMPDIR_PARITY/cx-$1-c-dry.log"
+    cx_snapshot "$sb" > "$sb.snap-dry1"
+    cmp -s "$sb.snap-dry" "$sb.snap-dry1" && grep -q 'DRY: remove AGENT-PLAYBOOK.md from context.fileName' "$log" \
+        && ! grep -q '^  REMOVED: ' "$log" \
+        || cx_fail "$t" "fixture c: a dry run prints DRY for the context.fileName cleanup and writes nothing"
+}
+
+# cx_fixture_h: a run that stops after the settings edit, then the run after it (Gemini CLI only).
+cx_fixture_h() {
+    local t sb j
+    for t in $twins; do
+        sb="$TMPDIR_PARITY/cx-$t-h"
+        mkdir -p "$sb/.gemini" "$sb/.agent-playbook"
+        printf 'my gemini\n' > "$sb/.gemini/GEMINI.md"
+        if [ "$t" = sh ]; then printf 'not a folder\n' > "$sb/.gemini/skills"; else mkdir -p "$sb/.agent-playbook/deploy-lock.tsv"; fi
+    done
+    cx_run h 1 "--providers gemini" "-Providers gemini"
+    cx_wait
+    cx_rc h 1 nonzero
+    for t in $twins; do
+        sb="$TMPDIR_PARITY/cx-$t-h"; j="$sb/.agent-playbook/deploy-lock.journal.tsv"
+        grep -q $'^setting\tgemini/context.fileName\t+$' "$j" 2>/dev/null \
+            && cx_json "$sb/.gemini/settings.json" 'd["context"]["fileName"] == ["GEMINI.md", "AGENT-PLAYBOOK.md"]' \
+            || cx_fail "$t" "fixture h: a run that stops after the settings edit leaves the setting row in the lock journal"
+        if [ "$t" = sh ]; then rm -f "$sb/.gemini/skills"; else rmdir "$sb/.agent-playbook/deploy-lock.tsv"; fi
+    done
+    cx_run h 2 "--providers gemini" "-Providers gemini"
+    cx_wait
+    cx_rc h 2 0
+    for t in $twins; do
+        sb="$TMPDIR_PARITY/cx-$t-h"
+        grep -q $'^setting\tgemini/context.fileName\t+$' "$sb/.agent-playbook/deploy-lock.tsv" 2>/dev/null \
+            && cx_absent "$sb/.agent-playbook/deploy-lock.journal.tsv" \
+            || cx_fail "$t" "fixture h: the next run records the journalled setting row in the lock"
+    done
+}
+
+cx_check_uninstall() {   # cx_check_uninstall <sandbox> <fixture> <sh|ps>
     local sb="$1" fx="$2" t="$3" lock="$1/.agent-playbook/deploy-lock.tsv"
-    own_is "$sb/.gemini/GEMINI.md" "my gemini" && cx_absent "$sb/.gemini/AGENT-PLAYBOOK.md" \
+    cx_absent "$sb/.gemini/AGENT-PLAYBOOK.md" \
         && cx_absent "$sb/.claude/rules/playbook-user-memory.md" && cx_absent "$sb/.claude/rules/playbook-higher-order.md" \
-        || cx_fail "$t" "fixture $fx: uninstall keeps your GEMINI.md and removes the side and memory rules links"
-    { [ ! -f "$lock" ] || ! grep -q 'gemini/context.fileName' "$lock"; } \
-        || cx_fail "$t" "fixture $fx: uninstall drops the context.fileName row from the lock"
-    if [ "$fx" = a ]; then
-        own_is "$sb/.claude/CLAUDE.md" "my claude" && cx_absent "$sb/.claude/rules/agent-playbook.md" \
-            || cx_fail "$t" "uninstall never touches your CLAUDE.md and removes the rules link"
-        own_is "$sb/.codex/AGENTS.md" "my codex" && cx_absent "$sb/.codex/AGENTS.md.bak" \
-            || cx_fail "$t" "uninstall restores your Codex AGENTS.md from its .bak"
-        cx_json "$sb/.gemini/settings.json" 'd == {"context": {"fileName": "GEMINI.md"}, "keep": 1}' \
-            || cx_fail "$t" "uninstall takes the playbook's name out of context.fileName and restores the string"
-    else
-        cx_absent "$sb/.claude/CLAUDE.md" || cx_fail "$t" "fixture b: uninstall removes the CLAUDE.md link"
-        cx_json "$sb/.gemini/settings.json" 'd == {}' \
-            || cx_fail "$t" "fixture b: uninstall removes the context.fileName setup created, and the context object"
-    fi
+        && cx_absent "$sb/.claude/rules" \
+        || cx_fail "$t" "fixture $fx: uninstall removes the side and memory rules links, and the rules folder left empty"
+    [ "$fx" = c ] || own_is "$sb/.gemini/GEMINI.md" "my gemini" || cx_fail "$t" "fixture $fx: uninstall keeps your GEMINI.md"
+    { [ ! -f "$lock" ] || ! grep -q 'gemini/context.fileName' "$lock"; } && cx_absent "$sb/.agent-playbook/deploy-lock.journal.tsv" \
+        || cx_fail "$t" "fixture $fx: uninstall drops the context.fileName row from the lock and the journal"
+    case "$fx" in
+        a) own_is "$sb/.claude/CLAUDE.md" "my claude" || cx_fail "$t" "uninstall never touches your CLAUDE.md"
+           own_is "$sb/.codex/AGENTS.md" "my codex" && cx_absent "$sb/.codex/AGENTS.md.bak" \
+               || cx_fail "$t" "uninstall restores your Codex AGENTS.md from its .bak"
+           cx_json "$sb/.gemini/settings.json" 'd == {"context": {"fileName": "GEMINI.md"}, "keep": 1}' \
+               || cx_fail "$t" "uninstall takes the playbook's name out of context.fileName and restores the string" ;;
+        b|g) cx_absent "$sb/.claude/CLAUDE.md" || cx_fail "$t" "fixture $fx: uninstall removes the CLAUDE.md link"
+           cx_absent "$sb/.gemini/settings.json" \
+               || cx_fail "$t" "fixture $fx: uninstall deletes the settings.json setup created (b: from the journal row)" ;;
+        c) cx_absent "$sb/.claude/CLAUDE.md" && cx_absent "$sb/.gemini/GEMINI.md" \
+               || cx_fail "$t" "fixture c: uninstall removes the CLAUDE.md and GEMINI.md links"
+           [ "$(cat "$sb/.gemini/settings.json")" = "$CX_C_PRIOR" ] \
+               || cx_fail "$t" "fixture c: uninstall leaves settings.json as it was" ;;
+        d) [ "$(cat "$sb/.gemini/settings.json")" = "$CX_JSONC" ] || cx_fail "$t" "fixture d: uninstall leaves settings.json as it was" ;;
+        e) [ "$(cat "$sb/.gemini/settings.json")" = '{"context": {"fileName": ["GEMINI.md", "AGENT-PLAYBOOK.md"]}}' ] \
+               || cx_fail "$t" "fixture e: uninstall leaves a name setup did not add" ;;
+        f) [ -L "$sb/.gemini/settings.json" ] && [ "$(cat "$sb/dotfiles/gemini-settings.json")" = '{"keep": 1}' ] \
+               || cx_fail "$t" "fixture f: uninstall restores the linked file and keeps the link"
+           cx_link_to "$sb/.claude/CLAUDE.md" dotfiles/claude.md || cx_fail "$t" "fixture f: uninstall keeps your linked CLAUDE.md" ;;
+    esac
 }
 
 # --- Parallel sections -----------------------------------------------------

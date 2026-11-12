@@ -12,7 +12,9 @@
 #                  provider, a file of yours is backed up and replaced, and the store
 #                  repo, engine branch and memory link are only reported, never created.
 # In every mode, your own ~\.claude\CLAUDE.md or ~\.gemini\GEMINI.md stays where it is and
-# the playbook loads beside it (see "Co-existence" below); Codex has no such mechanism.
+# the playbook loads beside it (see "Co-existence" below); Codex has no such mechanism. For
+# Gemini CLI that adds one name to context.fileName in ~\.gemini\settings.json, in every mode
+# (-Yes and no console included), as an agent-run install needs it too.
 #
 # Kiro overlay merge: for a shared skill dir, kiro discipline deltas live under
 # providers\kiro\skills\<name>\ and are APPENDED to the deployed copy at setup time:
@@ -60,6 +62,9 @@ Deploys agent-playbook into the AI providers you choose. Safe to re-run.
                     when none exists, create the engine branch, back up and replace
                     a file of yours that is in the way). Your own ~\.claude\CLAUDE.md
                     or ~\.gemini\GEMINI.md is never replaced: the playbook loads beside it.
+                    For Gemini CLI, setup then adds "AGENT-PLAYBOOK.md" to context.fileName
+                    in ~\.gemini\settings.json, with or without -Yes; when it cannot edit
+                    that file (comments in it, say), it prints the line to add by hand.
   -StoresUrl URL    clone the store repo from URL when it is missing.
   -NoStores         do not set up a store repo (memory is disabled until you do).
   -Uninstall        remove what setup deployed for the chosen providers: links into
@@ -72,6 +77,8 @@ Deploys agent-playbook into the AI providers you choose. Safe to re-run.
 
 Environment: AGENT_PLAYBOOK_STORES (store repo path), AGENT_PLAYBOOK_CONFIG (pointer
 file path), AGENT_PLAYBOOK_SKIP_KIRO_CLI=1 (do not change kiro-cli's global settings).
+AGENT_PLAYBOOK_TEST_VENV_DIR is for test-parity.sh only (the venv folder to use instead
+of the repo's .venv-agent-playbook).
 "@
     exit 0
 }
@@ -296,17 +303,19 @@ function Read-DeployLock {
             Write-Host "  NOTE: $LockFile is not a deploy lock this setup can read; treating this as a first run (it is kept as $LockFile.bak)"
         }
     }
-    # backup rows of a run that stopped before writing its lock: newer than the lock's own rows
+    # backup and context.fileName rows of a run that stopped before writing its lock: newer than the
+    # lock's own rows
     if (Test-Path -LiteralPath $LockJournal -PathType Leaf) {
         $jrows = @(); $jok = $true
         foreach ($line in (Read-LockLines $LockJournal)) {
             $c = $line.Split("`t")
-            if ($c[0] -cne 'backup' -or -not (Test-LockRow $c)) { $jok = $false; break }
+            $jkind = ($c[0] -ceq 'backup') -or ($c[0] -ceq 'setting' -and $c.Count -eq 3 -and $c[1] -ceq $LockGeminiKey)
+            if (-not $jkind -or -not (Test-LockRow $c)) { $jok = $false; break }
             $jrows += , $c
         }
         if ($jok) {
             $rows = @($jrows) + @($rows)
-            Write-Host "  NOTE: merged the backups an interrupted run recorded in $LockJournal"
+            Write-Host "  NOTE: merged the rows an interrupted run recorded in $LockJournal"
         } else {
             Write-Host "  NOTE: $LockJournal is not a journal this setup can read; ignored"
         }
@@ -638,27 +647,40 @@ function Link-Skills {
 }
 
 # --- Co-existence with your own instruction file ------------------------------
-# A regular file of yours at a client's global instruction path stays where it is, and the playbook
-# loads beside it. The rules and each client's mechanism are documented once, in setup.sh's
-# "Co-existence" section: Claude Code reads every ~\.claude\rules\*.md (measured, Claude Code 2.1.322,
-# 2026-11-12); Gemini CLI reads every name in context.fileName from ~\.gemini\ (source-read, not
-# runtime-verified: Gemini CLI 0.28.2 config.js:312, memoryDiscovery.js:93-100); Codex has none, so
-# your file gets the single .bak.
+# A file of yours at a client's global instruction path stays where it is, and the playbook loads
+# beside it. The rules and each client's mechanism are documented once, in setup.sh's "Co-existence"
+# section (what counts as a file of yours included: a regular file, or a link outside this repo to a
+# file; never a file the lock names or a byte copy of shared\AGENTS.md): Claude Code reads every
+# ~\.claude\rules\*.md (measured, Claude Code 2.1.322, 2026-11-12); Gemini CLI reads every name in
+# context.fileName from ~\.gemini\ (source-read, not runtime-verified: Gemini CLI 0.28.2
+# config.js:312, memoryDiscovery.js:93-100), and your GEMINI.md is never backed up or replaced, even
+# when settings.json cannot be edited; Codex has none, so your file gets the single .bak.
 $ClaudeSideLink = Join-Path $env:USERPROFILE ".claude\rules\agent-playbook.md"
 $GeminiSideName = "AGENT-PLAYBOOK.md"
 $GeminiSideLink = Join-Path $env:USERPROFILE ".gemini\$GeminiSideName"
 $GeminiSettings = Join-Path $env:USERPROFILE ".gemini\settings.json"
-$PlaybookPython = Join-Path $ScriptDir '.venv-agent-playbook\Scripts\python.exe'
-if (-not (Test-Path -LiteralPath $PlaybookPython)) { $PlaybookPython = Join-Path $ScriptDir '.venv-agent-playbook/bin/python' }
+# The venv folder. AGENT_PLAYBOOK_TEST_VENV_DIR is test-parity.sh's seam for a first run with no venv
+# (a fresh folder outside the repo); nothing else sets it.
+$VenvDir = if ($env:AGENT_PLAYBOOK_TEST_VENV_DIR) { $env:AGENT_PLAYBOOK_TEST_VENV_DIR } else { Join-Path $ScriptDir '.venv-agent-playbook' }
 
-# Test-UserInstructionFile: Dest is a regular file of your own: not a link, not a file the deploy lock
-# names, and not a byte copy of Source (a copy left where a link could not be made).
+# Get-PlaybookPython: the venv's interpreter, looked up at each call (the venv step may just have made it).
+function Get-PlaybookPython {
+    $py = Join-Path $VenvDir 'Scripts\python.exe'
+    if (-not (Test-Path -LiteralPath $py)) { $py = Join-Path $VenvDir 'bin/python' }
+    return $py
+}
+
+# Test-UserInstructionFile: Dest is a file of your own (setup.sh user_instruction_file).
 function Test-UserInstructionFile {
     param([string]$Dest, [string]$Source)
-    if (-not (Test-RegularFile $Dest)) { return $false }
+    if (Test-Reparse $Dest) {
+        if (Test-EngineLink $Dest) { return $false }
+        if (-not (Test-Path -LiteralPath $Dest -PathType Leaf)) { return $false }
+    } elseif (-not (Test-RegularFile $Dest)) { return $false }
     $key = ConvertTo-LockKey $Dest
     foreach ($c in $LockOld) { if ($c[1] -ceq $key -and $c[0] -ne 'backup' -and $c[0] -ne 'setting') { return $false } }
-    return ((Get-FileSha $Dest) -ne (Get-FileSha $Source))
+    # unreadable: yours (setup.sh's cmp and verify-deployment.py treat it the same way)
+    try { return ((Get-FileSha $Dest) -ne (Get-FileSha $Source)) } catch { return $true }
 }
 
 # Remove-SideLink: remove a co-existence link into this repo (the instruction file is the link now).
@@ -672,25 +694,41 @@ function Remove-SideLink {
 
 # Invoke-GeminiContext: providers\gemini\context-filename.py on ~\.gemini\settings.json; its one line,
 # or "unreadable <why>" when it cannot run. The prior value travels in the environment (the helper's
-# docstring says why).
+# docstring says why); its output is read as UTF-8 (the helper writes UTF-8 whatever the code page). An exit other than the helper's own 0 and 3 is a
+# crash: its output is never read as a reason.
 function Invoke-GeminiContext {
     param([string]$Action, [string]$Prior = '')
-    if (-not (Test-Path -LiteralPath $PlaybookPython)) { return 'unreadable there is no playbook venv to edit it with' }
+    $python = Get-PlaybookPython
+    if (-not (Test-Path -LiteralPath $python)) { return 'unreadable there is no playbook venv to edit it with' }
     $helperArgs = @($Action, '--settings', $GeminiSettings, '--name', $GeminiSideName)
     if ($DryRun) { $helperArgs += '--dry-run' }
     $prevEap = $ErrorActionPreference
+    $prevEnc = [Console]::OutputEncoding
     $ErrorActionPreference = 'Continue'
     $env:CONTEXT_FILENAME_PRIOR = $Prior
+    $code = 1
+    try { [Console]::OutputEncoding = $Utf8NoBom } catch { }
     try {
-        $out = @(& $PlaybookPython -I (Join-Path $ScriptDir 'providers\gemini\context-filename.py') @helperArgs 2>&1)
+        $out = @(& $python -I (Join-Path $ScriptDir 'providers\gemini\context-filename.py') @helperArgs 2>$null)
+        $code = $LASTEXITCODE
     } catch {
-        $out = @("unreadable $($_.Exception.Message)")
+        $out = @()
     } finally {
         $ErrorActionPreference = $prevEap
+        try { [Console]::OutputEncoding = $prevEnc } catch { }
         Remove-Item Env:\CONTEXT_FILENAME_PRIOR -ErrorAction SilentlyContinue
     }
+    if ($code -ne 0 -and $code -ne 3) { return "unreadable the helper failed (exit $code)" }
     if ($out.Count -eq 0) { return 'unreadable the helper printed nothing' }
     return ([string]$out[0]).TrimEnd("`r")
+}
+
+# Add-GeminiJournal: the setting row, in the lock journal the moment settings.json is edited.
+function Add-GeminiJournal {
+    param([string]$Prior)
+    if ($DryRun) { return }
+    New-DirIfMissing (Split-Path -Parent $LockJournal)
+    [IO.File]::AppendAllText($LockJournal, "setting`t$LockGeminiKey`t$Prior`n", $Utf8NoBom)
 }
 
 # Remove-GeminiContextEntry: take the name setup added out of context.fileName again; the lock row stays
@@ -699,7 +737,11 @@ function Remove-GeminiContextEntry {
     param([string]$Prior)
     $res = Invoke-GeminiContext 'remove' $Prior
     if ($res -eq 'removed') {
-        Write-Host "  REMOVED: $GeminiSideName from context.fileName in $GeminiSettings"
+        if ($DryRun) { Write-Host "    DRY: remove $GeminiSideName from context.fileName in $GeminiSettings" }
+        else {
+            Write-Host "  REMOVED: $GeminiSideName from context.fileName in $GeminiSettings"
+            if (-not (Test-Path -LiteralPath $GeminiSettings)) { Write-Host "  REMOVED: $GeminiSettings (setup created it)" }
+        }
     } elseif ($res -ne 'absent') {
         Write-Host "  NOTE: $GeminiSettings cannot be edited ($($res -replace '^unreadable ', '')); remove $GeminiSideName from its context.fileName by hand"
         Add-LockRow 'setting' $LockGeminiKey $Prior
@@ -712,36 +754,43 @@ function Deploy-ClaudeInstructions {
         Write-Host "  KEPT: $Dest is your own file; the playbook loads beside it from $ClaudeSideLink (Claude Code reads every ~/.claude/rules/*.md)"
         New-DirIfMissing (Split-Path -Parent $ClaudeSideLink)
         Link-File -Target $Source -Link $ClaudeSideLink
-    } else {
-        Link-File -Target $Source -Link $Dest
-        Remove-SideLink $ClaudeSideLink
+        return
     }
+    Link-File -Target $Source -Link $Dest
+    if ($DryRun -or (Test-EngineLink $Dest)) { Remove-SideLink $ClaudeSideLink }
 }
 
 function Deploy-GeminiInstructions {
     param([string]$Source, [string]$Dest)
     $old = Get-LockValue 'setting' $LockGeminiKey
     if (Test-UserInstructionFile $Dest $Source) {
-        $res = Invoke-GeminiContext 'add'
-        if ($res -eq 'present') {
-            if ($old) { Add-LockRow 'setting' $LockGeminiKey $old }
-        } elseif ($res.StartsWith('added ')) {
-            Add-LockRow 'setting' $LockGeminiKey $res.Substring(6)
-            if ($DryRun) { Write-Host "    DRY: add $GeminiSideName to context.fileName of $GeminiSettings" }
-            else { Write-Host "  SET: $GeminiSideName in context.fileName of $GeminiSettings" }
+        if ($DryRun -and -not (Test-Path -LiteralPath (Get-PlaybookPython))) {
+            Write-Host "    DRY: the venv is created first; then $GeminiSideName is added to context.fileName of $GeminiSettings"
         } else {
-            Write-Host "  NOTE: $GeminiSettings cannot be edited ($($res -replace '^unreadable ', '')), so your $Dest cannot stay beside the playbook's: it is backed up and replaced"
-            if ($old) { Add-LockRow 'setting' $LockGeminiKey $old }
-            Link-File -Target $Source -Link $Dest
-            return
+            $res = Invoke-GeminiContext 'add'
+            if ($res -eq 'present') {
+                if ($old) { Add-LockRow 'setting' $LockGeminiKey $old }
+            } elseif ($res.StartsWith('added ')) {
+                Add-LockRow 'setting' $LockGeminiKey $res.Substring(6)
+                Add-GeminiJournal $res.Substring(6)
+                if ($DryRun) { Write-Host "    DRY: add $GeminiSideName to context.fileName of $GeminiSettings" }
+                else { Write-Host "  SET: $GeminiSideName in context.fileName of $GeminiSettings" }
+            } else {
+                Write-Host "  NOTE: $GeminiSettings cannot be edited ($($res -replace '^unreadable ', '')); add `"$GeminiSideName`" to context.fileName in ~/.gemini/settings.json by hand, or Gemini CLI does not load the playbook"
+                if ($old) { Add-LockRow 'setting' $LockGeminiKey $old }
+            }
         }
         Write-Host "  KEPT: $Dest is your own file; the playbook loads beside it from $GeminiSideLink (listed in context.fileName)"
         Link-File -Target $Source -Link $GeminiSideLink
         return
     }
     Link-File -Target $Source -Link $Dest
-    Remove-SideLink $GeminiSideLink
-    if ($old) { Remove-GeminiContextEntry $old }
+    if ($DryRun -or (Test-EngineLink $Dest)) {
+        Remove-SideLink $GeminiSideLink
+        if ($old) { Remove-GeminiContextEntry $old }
+    } elseif ($old) {
+        Add-LockRow 'setting' $LockGeminiKey $old
+    }
 }
 
 function Deploy-CodexInstructions {
@@ -765,12 +814,17 @@ function Deploy-InstructionFile {
 }
 
 # Test-MemorySourceMissing: a row whose source lies in the gitignored memory\ (user memory, behind the
-# repo's memory link to the store repo) and is not there yet. No dangling link is made: setup says so,
-# and a later run links it once the store repo holds user memory.
+# repo's memory link to the store repo) and is not there yet. No dangling link is made, and one an
+# earlier run made is removed: setup says so, and a later run links it once the store repo holds
+# user memory.
 function Test-MemorySourceMissing {
     param([string]$ManifestSource, [string]$Source, [string]$Dest)
     if (-not $ManifestSource.StartsWith('memory/')) { return $false }
     if (Test-Path -LiteralPath $Source) { return $false }
+    if (Test-EngineLink $Dest) {
+        Write-Host "  REMOVE: $Dest (dangling: there is no $Source)"
+        Invoke-Act "remove $Dest" { Remove-Item -LiteralPath $Dest -Force }
+    }
     Write-Host "  NOTE: $Dest is not linked yet: there is no $Source (no user memory in the store repo yet)"
     return $true
 }
@@ -1462,7 +1516,14 @@ if ($Uninstall) {
     Write-Host "=== Uninstall: $($Chosen -join ', ') ==="
     if (Test-Wants 'claude') {
         Uninstall-Mode 'claude'; Remove-EngineLink $ClaudeSideLink; Remove-SkillLinks (Join-Path $env:USERPROFILE ".claude\skills")
-        $uninstallPython = Join-Path $ScriptDir '.venv-agent-playbook\Scripts\python.exe'
+        # the rules folder, once the playbook's links are gone and nothing else is in it
+        $rulesDir = Split-Path -Parent $ClaudeSideLink
+        if ((Test-Path -LiteralPath $rulesDir -PathType Container) -and -not (Test-Reparse $rulesDir) -and
+            -not (Get-ChildItem -LiteralPath $rulesDir -Force | Select-Object -First 1)) {
+            Invoke-Act "rmdir $rulesDir" { Remove-Item -LiteralPath $rulesDir -Force }
+            Write-Host "  REMOVED: $rulesDir (empty)"
+        }
+        $uninstallPython = Get-PlaybookPython
         if (Test-Path -LiteralPath $uninstallPython) {
             Invoke-Act "remove the playbook's entries from ~\.claude\settings.json" {
                 $removed = $false
@@ -1517,7 +1578,6 @@ if ($Uninstall) {
 # playbook. Re-running is idempotent: a working venv is left alone; a broken one
 # (for example the base Python was uninstalled) is rebuilt. setup.sh has the twin step.
 
-$VenvDir = Join-Path $ScriptDir '.venv-agent-playbook'
 $VenvPython = Join-Path $VenvDir 'Scripts\python.exe'
 
 # Runs `<exe> <preArgs> -c ...` and returns @{Exe; Version} when it is a working

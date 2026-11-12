@@ -26,7 +26,9 @@ export MSYS="${MSYS:-winsymlinks:nativestrict}"
 #                  yours is backed up and replaced, and the store repo, engine branch
 #                  and memory link are only reported, never created.
 # In every mode, your own ~/.claude/CLAUDE.md or ~/.gemini/GEMINI.md stays where it is and
-# the playbook loads beside it (see "Co-existence" below); Codex has no such mechanism.
+# the playbook loads beside it (see "Co-existence" below); Codex has no such mechanism. For
+# Gemini CLI that adds one name to context.fileName in ~/.gemini/settings.json, in every mode
+# (--yes and no terminal included), as an agent-run install needs it too.
 #
 # Kiro overlay merge: for a shared skill dir, kiro discipline deltas live under
 # providers/kiro/skills/<name>/ and are APPENDED to the deployed copy at setup time:
@@ -61,6 +63,9 @@ Deploys agent-playbook into the AI providers you choose. Safe to re-run.
                      when none exists, create the engine branch, back up and replace
                      a file of yours that is in the way). Your own ~/.claude/CLAUDE.md
                      or ~/.gemini/GEMINI.md is never replaced: the playbook loads beside it.
+                     For Gemini CLI, setup then adds "AGENT-PLAYBOOK.md" to context.fileName
+                     in ~/.gemini/settings.json, with or without --yes; when it cannot edit
+                     that file (comments in it, say), it prints the line to add by hand.
   --stores-url URL   clone the store repo from URL when it is missing.
   --no-stores        do not set up a store repo (memory is disabled until you do).
   --uninstall        remove what setup deployed for the chosen providers: links into
@@ -73,6 +78,8 @@ Deploys agent-playbook into the AI providers you choose. Safe to re-run.
 
 Environment: AGENT_PLAYBOOK_STORES (store repo path), AGENT_PLAYBOOK_CONFIG (pointer
 file path), AGENT_PLAYBOOK_SKIP_KIRO_CLI=1 (do not change kiro-cli's global settings).
+AGENT_PLAYBOOK_TEST_VENV_DIR is for test-parity.sh only (the venv folder to use instead
+of the repo's .venv-agent-playbook).
 EOF
 }
 
@@ -201,14 +208,15 @@ same_target() {
 #   path   : the destination, home written as ~/, forward slashes; setting: kiro-cli/chat.defaultAgent
 #            or gemini/context.fileName
 #   value  : sha256, lowercase hex, of the bytes setup wrote; backup: of the .bak (- for a folder
-#            or a link); setting: the value setup replaced, as compact JSON (- if none)
+#            or a link); setting: the value setup replaced, as compact JSON (- if none; for
+#            context.fileName, + when there was no settings.json and setup created it)
 # The lock is untrusted input: a missing file, another first line or one malformed row means no
 # lock at all (the first-run case), and only ~/ paths with no .. segment, no backslash and no colon
 # are accepted (setup never writes another key). An unreadable lock is moved to deploy-lock.tsv.bak
 # before the new one is written.
-# Journal: each backup row is also appended to deploy-lock.journal.tsv the moment the .bak exists, so
-# a run that stops half-way loses no backup; the next run (or uninstall) merges it, and the lock
-# write deletes it.
+# Journal: each backup row is also appended to deploy-lock.journal.tsv the moment the .bak exists,
+# and the context.fileName setting row the moment settings.json is edited, so a run that stops
+# half-way loses neither; the next run (or uninstall) merges it, and the lock write deletes it.
 #
 # Ownership rule (own_rule, the one decision for every file setup writes; seed files are the one
 # exception: written only when absent, never locked, never replaced):
@@ -308,12 +316,14 @@ lock_load() {
             echo "  NOTE: $LOCK_FILE is not a deploy lock this setup can read; treating this as a first run (it is kept as $LOCK_FILE.bak)"
         fi
     fi
-    # backup rows of a run that stopped before writing its lock: newer than the lock's own rows
+    # backup and context.fileName rows of a run that stopped before writing its lock: newer than the
+    # lock's own rows
     if [ -f "$LOCK_JOURNAL" ]; then
-        if awk -F'\t' -v skey="$LOCK_SETTING_KEY" -v gkey="$LOCK_GEMINI_KEY" '$1 != "backup" { exit 1 }'"$LOCK_ROWS_AWK" "$LOCK_JOURNAL"; then
+        if awk -F'\t' -v skey="$LOCK_SETTING_KEY" -v gkey="$LOCK_GEMINI_KEY" '
+            $1 != "backup" && !($1 == "setting" && $2 == gkey) { exit 1 }'"$LOCK_ROWS_AWK" "$LOCK_JOURNAL"; then
             cat "$LOCK_JOURNAL" "$LOCK_WORK/old" > "$LOCK_WORK/old.j"
             mv "$LOCK_WORK/old.j" "$LOCK_WORK/old"
-            echo "  NOTE: merged the backups an interrupted run recorded in $LOCK_JOURNAL"
+            echo "  NOTE: merged the rows an interrupted run recorded in $LOCK_JOURNAL"
         else
             echo "  NOTE: $LOCK_JOURNAL is not a journal this setup can read; ignored"
         fi
@@ -754,28 +764,37 @@ link_skills() {
 }
 
 # --- Co-existence with your own instruction file ------------------------------
-# A regular file of yours at a client's global instruction path stays where it is, and the playbook
-# loads beside it through the client's own side-by-side mechanism:
+# A file of yours at a client's global instruction path stays where it is, and the playbook loads
+# beside it through the client's own side-by-side mechanism:
 #   Claude Code: ~/.claude/rules/agent-playbook.md links to shared/AGENTS.md (Claude Code 2.1.322 loads
 #                every ~/.claude/rules/*.md whole, links included; measured 2026-11-12).
 #   Gemini CLI : ~/.gemini/AGENT-PLAYBOOK.md links to shared/AGENTS.md, and its name joins
 #                context.fileName in ~/.gemini/settings.json. Source-read, not runtime-verified: Gemini
 #                CLI 0.28.2 config.js:312 and memoryDiscovery.js:93-100 (read 2026-11-12).
-#                providers/gemini/context-filename.py makes the edit; the deploy lock records it as a
-#                setting row. A settings.json that does not parse, or no venv, falls back to the .bak
-#                below, with a note.
+#                providers/gemini/context-filename.py makes the edit, in every mode; the deploy lock
+#                records it as a setting row (journalled at once). Your GEMINI.md is never backed up or
+#                replaced: when the helper cannot edit settings.json (comments in it, which Gemini CLI
+#                accepts; no venv; a dangling link; a failed write), the side link is still made, no
+#                setting row is written, and a NOTE gives the line to add by hand.
 #   Codex      : no side-by-side mechanism; your file gets the single .bak, then the link, and setup
 #                says so.
-# An empty path or a link is linked as before, and a co-existence link into this repo is removed then,
-# so the playbook never loads twice. Existing installs need no migration.
+# A file of yours: a regular file, or a link that points outside this repo to a file (your dotfiles),
+# that the deploy lock does not name and whose bytes differ from shared/AGENTS.md (a byte copy is a
+# copy left where a link could not be made). An older copy of shared/AGENTS.md has other bytes, so it
+# counts as yours and is kept: setup cannot tell it from a file you wrote. verify-deployment.py's
+# is_user_file is the same rule.
+# An empty path or a link into this repo is linked as before; once the instruction file is that link,
+# the co-existence link and the context.fileName entry setup added are removed, so the playbook never
+# loads twice. Existing installs need no migration.
 CLAUDE_SIDE_LINK="$HOME/.claude/rules/agent-playbook.md"
 GEMINI_SIDE_NAME="AGENT-PLAYBOOK.md"
 GEMINI_SIDE_LINK="$HOME/.gemini/$GEMINI_SIDE_NAME"
+GEMINI_SETTINGS="$HOME/.gemini/settings.json"
 
-# user_instruction_file <dest> <source>: dest is a regular file of your own: not a link, not a file the
-# deploy lock names, and not a byte copy of the source (a copy left where a link could not be made).
+# user_instruction_file <dest> <source>: dest is a file of your own (the rule above).
 user_instruction_file() {
-    [ -f "$1" ] && [ ! -L "$1" ] || return 1
+    [ -f "$1" ] || return 1
+    if [ -L "$1" ] && is_engine_link "$1"; then return 1; fi
     [ -z "$(awk -F'\t' -v k="$(lock_key "$1")" '$2 == k && $1 != "backup" && $1 != "setting"' "$LOCK_WORK/old")" ] || return 1
     ! cmp -s "$1" "$2"
 }
@@ -789,16 +808,27 @@ drop_side_link() {
 }
 
 # gemini_context <add|remove> [prior]: providers/gemini/context-filename.py on ~/.gemini/settings.json;
-# prints its one line, or "unreadable <why>" when it cannot run.
+# prints its one line, or "unreadable <why>" when it cannot run. An exit other than the helper's own
+# 0 and 3 is a crash: its output is never read as a reason.
 gemini_context() {
-    local py args
+    local py args out rc=0
     py="$(venv_python)"
     if [ ! -x "$py" ]; then echo "unreadable there is no playbook venv to edit it with"; return 0; fi
-    args=("$1" --settings "$(native_path "$HOME/.gemini/settings.json")" --name "$GEMINI_SIDE_NAME")
+    args=("$1" --settings "$(native_path "$GEMINI_SETTINGS")" --name "$GEMINI_SIDE_NAME")
     [ "$DRY_RUN" -eq 1 ] && args+=(--dry-run)
     # the prior value travels in the environment, as in setup.ps1 (see the helper's docstring)
-    { CONTEXT_FILENAME_PRIOR="${2:-}" "$py" -I "$SCRIPT_DIR/providers/gemini/context-filename.py" "${args[@]}" 2>&1 || true; } \
-        | head -n 1 | tr -d '\r'
+    out="$(CONTEXT_FILENAME_PRIOR="${2:-}" "$py" -I "$SCRIPT_DIR/providers/gemini/context-filename.py" "${args[@]}" 2>/dev/null)" || rc=$?
+    case "$rc" in
+        0|3) printf '%s\n' "$out" | head -n 1 | tr -d '\r' ;;
+        *) echo "unreadable the helper failed (exit $rc)" ;;
+    esac
+}
+
+# gemini_journal <prior>: the setting row, in the lock journal the moment settings.json is edited.
+gemini_journal() {
+    [ "$DRY_RUN" -eq 1 ] && return 0
+    mkdir -p "$(dirname "$LOCK_JOURNAL")"
+    printf 'setting\t%s\t%s\n' "$LOCK_GEMINI_KEY" "$1" >> "$LOCK_JOURNAL"
 }
 
 # gemini_unset <prior>: take the name setup added out of context.fileName again; the lock row stays
@@ -807,9 +837,14 @@ gemini_unset() {
     local res
     res="$(gemini_context remove "$1")"
     case "$res" in
-        removed) echo "  REMOVED: $GEMINI_SIDE_NAME from context.fileName in $HOME/.gemini/settings.json" ;;
+        removed)
+            if [ "$DRY_RUN" -eq 1 ]; then echo "    DRY: remove $GEMINI_SIDE_NAME from context.fileName in $GEMINI_SETTINGS"
+            else
+                echo "  REMOVED: $GEMINI_SIDE_NAME from context.fileName in $GEMINI_SETTINGS"
+                [ -e "$GEMINI_SETTINGS" ] || echo "  REMOVED: $GEMINI_SETTINGS (setup created it)"
+            fi ;;
         absent) ;;
-        *) echo "  NOTE: $HOME/.gemini/settings.json cannot be edited (${res#unreadable }); remove $GEMINI_SIDE_NAME from its context.fileName by hand"
+        *) echo "  NOTE: $GEMINI_SETTINGS cannot be edited (${res#unreadable }); remove $GEMINI_SIDE_NAME from its context.fileName by hand"
            lock_add setting "$LOCK_GEMINI_KEY" "$1" ;;
     esac
 }
@@ -820,34 +855,41 @@ claude_instructions() {
         echo "  KEPT: $dest is your own file; the playbook loads beside it from $CLAUDE_SIDE_LINK (Claude Code reads every ~/.claude/rules/*.md)"
         act mkdir -p "$(dirname "$CLAUDE_SIDE_LINK")"
         link_file "$source" "$CLAUDE_SIDE_LINK"
-    else
-        link_file "$source" "$dest"
-        drop_side_link "$CLAUDE_SIDE_LINK"
+        return 0
     fi
+    link_file "$source" "$dest"
+    if [ "$DRY_RUN" -eq 1 ] || is_engine_link "$dest"; then drop_side_link "$CLAUDE_SIDE_LINK"; fi
 }
 
 gemini_instructions() {
     local source="$1" dest="$2" old res
     old="$(lock_get setting "$LOCK_GEMINI_KEY")"
     if user_instruction_file "$dest" "$source"; then
-        res="$(gemini_context add)"
-        case "$res" in
-            present) [ -z "$old" ] || lock_add setting "$LOCK_GEMINI_KEY" "$old" ;;
-            "added "*) lock_add setting "$LOCK_GEMINI_KEY" "${res#added }"
-                       if [ "$DRY_RUN" -eq 1 ]; then echo "    DRY: add $GEMINI_SIDE_NAME to context.fileName of $HOME/.gemini/settings.json"
-                       else echo "  SET: $GEMINI_SIDE_NAME in context.fileName of $HOME/.gemini/settings.json"; fi ;;
-            *) echo "  NOTE: $HOME/.gemini/settings.json cannot be edited (${res#unreadable }), so your $dest cannot stay beside the playbook's: it is backed up and replaced"
-               [ -z "$old" ] || lock_add setting "$LOCK_GEMINI_KEY" "$old"
-               link_file "$source" "$dest"
-               return 0 ;;
-        esac
+        if [ "$DRY_RUN" -eq 1 ] && [ ! -x "$(venv_python)" ]; then
+            echo "    DRY: the venv is created first; then $GEMINI_SIDE_NAME is added to context.fileName of $GEMINI_SETTINGS"
+        else
+            res="$(gemini_context add)"
+            case "$res" in
+                present) [ -z "$old" ] || lock_add setting "$LOCK_GEMINI_KEY" "$old" ;;
+                "added "*) lock_add setting "$LOCK_GEMINI_KEY" "${res#added }"
+                           gemini_journal "${res#added }"
+                           if [ "$DRY_RUN" -eq 1 ]; then echo "    DRY: add $GEMINI_SIDE_NAME to context.fileName of $GEMINI_SETTINGS"
+                           else echo "  SET: $GEMINI_SIDE_NAME in context.fileName of $GEMINI_SETTINGS"; fi ;;
+                *) echo "  NOTE: $GEMINI_SETTINGS cannot be edited (${res#unreadable }); add \"$GEMINI_SIDE_NAME\" to context.fileName in ~/.gemini/settings.json by hand, or Gemini CLI does not load the playbook"
+                   [ -z "$old" ] || lock_add setting "$LOCK_GEMINI_KEY" "$old" ;;
+            esac
+        fi
         echo "  KEPT: $dest is your own file; the playbook loads beside it from $GEMINI_SIDE_LINK (listed in context.fileName)"
         link_file "$source" "$GEMINI_SIDE_LINK"
         return 0
     fi
     link_file "$source" "$dest"
-    drop_side_link "$GEMINI_SIDE_LINK"
-    [ -z "$old" ] || gemini_unset "$old"
+    if [ "$DRY_RUN" -eq 1 ] || is_engine_link "$dest"; then
+        drop_side_link "$GEMINI_SIDE_LINK"
+        [ -z "$old" ] || gemini_unset "$old"
+    elif [ -n "$old" ]; then
+        lock_add setting "$LOCK_GEMINI_KEY" "$old"
+    fi
 }
 
 codex_instructions() {
@@ -872,10 +914,15 @@ deploy_instruction_file() {
 
 # memory_source_missing <manifest source> <source> <dest>: a row whose source lies in the gitignored
 # memory/ (user memory, behind the repo's memory link to the store repo) and is not there yet. No
-# dangling link is made: setup says so, and a later run links it once the store repo holds user memory.
+# dangling link is made, and one an earlier run made is removed: setup says so, and a later run links
+# it once the store repo holds user memory.
 memory_source_missing() {
     case "$1" in memory/*) ;; *) return 1 ;; esac
     [ -e "$2" ] && return 1
+    if is_engine_link "$3"; then
+        echo "  REMOVE: $3 (dangling: there is no $2)"
+        act rm "$3"
+    fi
     echo "  NOTE: $3 is not linked yet: there is no $2 (no user memory in the store repo yet)"
     return 0
 }
@@ -1012,13 +1059,18 @@ check_prereqs() {
 # Twin of setup.ps1's venv step: <repo>/.venv-agent-playbook, stdlib only, created
 # --without-pip from the system Python 3.8+, rebuilt when it no longer runs.
 
+# VENV_DIR: AGENT_PLAYBOOK_TEST_VENV_DIR is test-parity.sh's seam for a first run with no venv (a
+# fresh folder outside the repo); nothing else sets it.
+VENV_DIR="${AGENT_PLAYBOOK_TEST_VENV_DIR:-$SCRIPT_DIR/.venv-agent-playbook}"
+
+# venv_python: the venv's interpreter, looked up at each call (the venv step may just have made it).
 venv_python() {
-    local vdir="$SCRIPT_DIR/.venv-agent-playbook"
+    local vdir="$VENV_DIR"
     if [ -x "$vdir/Scripts/python.exe" ]; then printf '%s' "$vdir/Scripts/python.exe"; else printf '%s' "$vdir/bin/python"; fi
 }
 
 venv_step() {
-    local vdir="$SCRIPT_DIR/.venv-agent-playbook" vpy
+    local vdir="$VENV_DIR" vpy
     vpy="$(venv_python)"
     if [ -x "$vpy" ] && "$vpy" -c 'import sys' 2>/dev/null; then
         echo "  OK: $vdir"
@@ -1779,6 +1831,10 @@ uninstall() {
     echo "=== Uninstall: ${PROVIDERS// /, } ==="
     if wants claude; then
         uninstall_mode claude; unlink_engine "$CLAUDE_SIDE_LINK"; unlink_skills "$HOME/.claude/skills"
+        # the rules folder, once the playbook's links are gone and nothing else is in it
+        if [ -d "$HOME/.claude/rules" ] && [ ! -L "$HOME/.claude/rules" ] && [ -z "$(ls -A "$HOME/.claude/rules")" ]; then
+            act rmdir "$HOME/.claude/rules"; echo "  REMOVED: $HOME/.claude/rules (empty)"
+        fi
         if [ -x "$(venv_python)" ]; then
             act "$(venv_python)" -I "$SCRIPT_DIR/providers/claude/settings-entries.py" remove --home "$(native_path "$HOME")" \
                 || echo "  NOTE: the venv did not run, so remove the playbook's entries from ~/.claude/settings.json by hand"

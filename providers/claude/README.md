@@ -28,11 +28,14 @@ with `inclusion: always`, written by `/qwire-governance`. Codex and Cursor read
 
 ## Your own ~/.claude/CLAUDE.md
 
-Setup links `~/.claude/CLAUDE.md` to `shared/AGENTS.md`. When a regular file of
-yours already sits there, setup leaves it in place and links
+Setup links `~/.claude/CLAUDE.md` to `shared/AGENTS.md`. When a file of yours
+already sits there (a regular file, or a link to a file outside this repo, such
+as one from your dotfiles), setup leaves it in place and links
 `~/.claude/rules/agent-playbook.md` to `shared/AGENTS.md` instead, so both load.
 Once `~/.claude/CLAUDE.md` is the playbook's link again, setup removes that rules
-link, so the playbook never loads twice. Uninstall removes the rules link and
+link, so the playbook never loads twice; `/qconfig-sync` reports a rules link
+left beside the playbook's `CLAUDE.md` link as `DRIFTED`. Uninstall removes the
+rules link, and the `~/.claude/rules/` folder when nothing else is in it, and
 never touches your file. The same `~/.claude/rules/` folder carries the memory
 links described under § SessionStart memory hook.
 
@@ -197,7 +200,8 @@ full through two links setup makes (`inventory.tsv`):
 `~/.claude/rules/playbook-higher-order.md` to `memory/HIGHER_ORDER.md`. Claude
 Code loads every `~/.claude/rules/*.md` file whole at session start, links
 included (measured on Claude Code 2.1.322, 2026-11-12, with a 74 KB file). While
-the store repo holds no user memory yet, setup makes no link and says so.
+the store repo holds no user memory yet, setup makes no link and says so, and it
+removes a link it made earlier that has nothing to point to any more.
 
 At each start, resume, `/clear` and compaction the hook injects:
 
@@ -210,10 +214,12 @@ At each start, resume, `/clear` and compaction the hook injects:
 - the project memory tier in full when it fits, otherwise its heading index.
   The project tier gets the rest of the cap.
 
-That is rules mode, which applies when both links resolve to the files the hook
-reads. Otherwise (setup not re-run, a link that resolves elsewhere) the hook falls
-back to index mode: it injects heading indexes of the user and higher-order
-files, with the marks inline, and the header says to still read those files. A
+The decision is made per tier, because setup links each tier on its own. A
+tier is delivered when its link resolves to the file the hook reads. A tier
+that is not delivered (setup not re-run, a link that resolves elsewhere, no file
+yet) falls back to its heading index, with the marks inline, and the header's
+second line says, tier by tier, which are delivered and which still need a read.
+With both tiers delivered that is rules mode; with neither, index mode. A
 heading index is not delivery (`shared/AGENTS.md § Memory Management`,
 Read-time behavior).
 

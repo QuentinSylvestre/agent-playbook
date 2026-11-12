@@ -28,11 +28,14 @@ Inventory sources:
     playbook-higher-order.md) link to <repo>/memory/MEMORY.md and HIGHER_ORDER.md,
     behind the repo's gitignored memory link. While that source is absent (no
     user memory in the store repo yet) setup makes no link, and the row is
-    SKIP no-source=<path>.
+    SKIP no-source=<path>; a link into the repo left there (dangling) is
+    MISSING target=<link text> dangling-no-source=<path>, which setup removes.
 
-Co-existence (lockstep with setup's "Co-existence" section): a regular file of the
-user's own at ~/.claude/CLAUDE.md or ~/.gemini/GEMINI.md is accepted in place of the
-link when the playbook loads beside it. For Claude Code that is the link
+Co-existence (lockstep with setup's "Co-existence" section): a file of the user's own
+at ~/.claude/CLAUDE.md or ~/.gemini/GEMINI.md is accepted in place of the link when the
+playbook loads beside it. A file of the user's own is setup's rule (is_user_file): a
+regular file, or a link outside the repo to a file, that the deploy lock does not name
+and that is not a byte copy of the source. For Claude Code that is the link
 ~/.claude/rules/agent-playbook.md to shared/AGENTS.md; for Gemini CLI the link
 ~/.gemini/AGENT-PLAYBOOK.md plus that name in `context.fileName` of
 ~/.gemini/settings.json. Each part gets its own line (the settings line is
@@ -40,7 +43,13 @@ OK|MISSING <settings.json> context.fileName...), and the instruction file is
 OK <path> user-file-kept playbook-via=<side link> when every part is there, else
 NOT_SYMLINK <path> user-file-kept-without-the-playbook. A byte copy of the source is
 not the user's own file (setup replaces it), so it stays NOT_SYMLINK. Codex has
-no such mechanism: its row is checked as a plain link.
+no such mechanism: its row is checked as a plain link. When the instruction file is
+the link into the repo, a co-existence link left beside it is
+DRIFTED <side link> leftover-side-link=<instruction file>, with a double-load detail
+when the client loads it too (Claude Code always; Gemini CLI when context.fileName
+lists its name): setup removes it. A settings.json that is not plain JSON (Gemini CLI
+accepts comments; setup then leaves it alone) is MISSING ... context.fileName-lacks=,
+the line to add by hand.
 
 A folder of the user's own at a skill's name (lockstep with setup's KEPT rule) is
 OK <path> user-folder-kept playbook-skill-not-deployed, which does not fail the run: setup
@@ -1006,22 +1015,74 @@ class Verifier(object):
             if mode == "gemini" and self.win and kind not in (KIND_SYMLINK_FILE, KIND_SYMLINK_DIR):
                 continue   # the .ps1 checks only the two symlink kinds here; the .sh checks every row
             if raw_source.startswith("memory/") and not os.path.exists(source):
-                self.emit("SKIP", dest, "no-source=" + source)
+                if self.engine_link(dest):
+                    # setup removes a link it made once the source is gone; one still there is dangling
+                    self.emit("MISSING", dest, "target=" + self._link_text(dest), "dangling-no-source=" + source)
+                else:
+                    self.emit("SKIP", dest, "no-source=" + source)
                 continue
             side = SIDE_LINKS.get(raw_dest)
+            gemini = raw_dest == GEMINI_INSTRUCTIONS
             if side and self.is_user_file(dest, source):
-                self.check_coexist(dest, source, self.join(self.home, side), raw_dest == GEMINI_INSTRUCTIONS)
+                self.check_coexist(dest, source, self.join(self.home, side), gemini)
                 continue
             self.check_symlink(dest, source)
+            if side:
+                self.check_double_load(dest, self.join(self.home, side), gemini)
+
+    def _is_link(self, path):
+        return os.path.islink(path) or bool(self.win and _ps_link_type(path))
+
+    def _link_text(self, path):
+        try:
+            return (_win_readlink(path) if self.win else os.readlink(path)) or ""
+        except OSError:
+            return ""
+
+    def engine_link(self, path):
+        """A symlink (or junction) whose target text names a path inside the repo, dangling or not. The
+        text is compared, never its resolution: the repo's own memory link points out of the repo, so a
+        link to memory/MEMORY.md would resolve outside it."""
+        if not self._is_link(path):
+            return False
+        raw = self._link_text(path)
+        if not raw:
+            return False
+        t = os.path.normpath(_link_dest(path, raw)).replace("\\", "/").rstrip("/")
+        root = os.path.normpath(self.repo).replace("\\", "/").rstrip("/")
+        if self.win:
+            t, root = t.lower(), root.lower()
+            if t.startswith("//?/"):
+                t = t[4:]
+        return t == root or t.startswith(root + "/")
 
     def is_user_file(self, path, source):
-        """A regular file (no link) that is not a byte copy of its source: the user's own instruction file."""
-        if os.path.islink(path) or (self.win and _ps_link_type(path)) or not os.path.isfile(path):
+        """The user's own instruction file, setup's rule (setup.sh user_instruction_file, setup.ps1
+        Test-UserInstructionFile): a regular file, or a link outside the repo to a file; not a file the
+        deploy lock names; not a byte copy of its source."""
+        if self._is_link(path) and self.engine_link(path):
+            return False
+        if not os.path.isfile(path):
+            return False
+        key = self.lock_key(path)
+        if key is not None and key in self.locked_keys():
             return False
         try:
             return not os.path.isfile(source) or not _files_equal(path, source)
         except OSError:
             return True
+
+    def check_double_load(self, dest, side, gemini):
+        """The instruction file is the link into the repo: a co-existence link beside it is a leftover
+        setup removes (and, when the client loads it too, a second copy of the playbook)."""
+        if not self.engine_link(dest) or not self.engine_link(side):
+            return
+        extras = ["leftover-side-link=" + dest]
+        if not gemini:
+            extras.append("double-load")
+        elif GEMINI_SIDE_NAME in (self._gemini_names() or []):
+            extras += ["double-load", "context.fileName-lists=" + GEMINI_SIDE_NAME]
+        self.emit("DRIFTED", side, *extras)
 
     def check_coexist(self, dest, source, side, gemini):
         ok_before = self.counts["OK"]
@@ -1034,8 +1095,8 @@ class Verifier(object):
         else:
             self.emit("NOT_SYMLINK", dest, "user-file-kept-without-the-playbook")
 
-    def check_gemini_setting(self):
-        """-> True when context.fileName of ~/.gemini/settings.json lists the playbook's file name."""
+    def _gemini_names(self):
+        """-> context.fileName of ~/.gemini/settings.json as a list, or None (absent or not plain JSON)."""
         path = self.join(self.home, ".gemini/settings.json")
         try:
             with open(path, "rb") as fh:
@@ -1048,7 +1109,13 @@ class Verifier(object):
         except (OSError, ValueError):
             names = None
         names = [names] if isinstance(names, str) else names
-        if isinstance(names, list) and GEMINI_SIDE_NAME in names:
+        return names if isinstance(names, list) else None
+
+    def check_gemini_setting(self):
+        """-> True when context.fileName of ~/.gemini/settings.json lists the playbook's file name."""
+        path = self.join(self.home, ".gemini/settings.json")
+        names = self._gemini_names()
+        if names is not None and GEMINI_SIDE_NAME in names:
             self.emit("OK", path, "context.fileName")
             return True
         self.emit("MISSING", path, "context.fileName-lacks=" + GEMINI_SIDE_NAME)
@@ -1631,6 +1698,21 @@ def _st_cases(tmp, links, skip_reason):
         mklink(os.path.join(repo, "memory", "MEMORY.md"), os.path.join(home, ".claude", "rules", "playbook-user-memory.md"))
         rc, out, _ = _st_run(repo, env)
         check(rc == 0 and has(out, "OK", ".claude/rules/playbook-user-memory.md"), "a memory rules link -> OK")
+        # ... and the source gone again (no user memory): the link setup made is dangling -> MISSING, not SKIP.
+        os.remove(os.path.join(repo, "memory", "MEMORY.md"))
+        rc, out, _ = _st_run(repo, env)
+        check(rc == 1 and has(out, "MISSING", ".claude/rules/playbook-user-memory.md", "target=")
+              and not has(out, "SKIP", ".claude/rules/playbook-user-memory.md"),
+              "a dangling memory rules link -> MISSING, not SKIP no-source= (rc=%d)" % rc)
+        # The real layout: the repo's memory is a link to the store repo's user/memory, outside the repo.
+        repo, home, env = fresh()
+        store_mem = os.path.join(os.path.dirname(repo), "stores", "user", "memory")
+        os.makedirs(store_mem)
+        mklink(store_mem, os.path.join(repo, "memory"), True)
+        mklink(os.path.join(repo, "memory", "MEMORY.md"), os.path.join(home, ".claude", "rules", "playbook-user-memory.md"))
+        rc, out, _ = _st_run(repo, env)
+        check(rc == 1 and has(out, "MISSING", ".claude/rules/playbook-user-memory.md", "target="),
+              "a dangling memory rules link through the repo's linked memory folder -> MISSING (rc=%d)" % rc)
 
         # Co-existence, Claude Code: a file of the user's own at CLAUDE.md plus the rules link verifies OK;
         # without the rules link it fails.
@@ -1647,6 +1729,28 @@ def _st_cases(tmp, links, skip_reason):
         check(rc == 0 and has(out, "OK", ".claude/CLAUDE.md", "user-file-kept")
               and has(out, "OK", ".claude/rules/agent-playbook.md"),
               "a user CLAUDE.md beside the rules link -> OK user-file-kept (rc=%d)" % rc)
+        # A file the deploy lock names is setup's, never the user's own (setup's rule, shared).
+        _w(os.path.join(home, ".agent-playbook", "deploy-lock.tsv"),
+           LOCK_HEADER + "\ncopy-file\t~/.claude/CLAUDE.md\t" + "0" * 64 + "\n")
+        rc, out, _ = _st_run(repo, env)
+        check(rc == 1 and has(out, "NOT_SYMLINK", ".claude/CLAUDE.md")
+              and not has(out, "OK", ".claude/CLAUDE.md", "user-file-kept"),
+              "a CLAUDE.md the deploy lock names is not the user's own (rc=%d)" % rc)
+        os.remove(os.path.join(home, ".agent-playbook", "deploy-lock.tsv"))
+        # A link of the user's own outside the repo (dotfiles) is the user's file too.
+        os.remove(claude_md)
+        _w(os.path.join(home, "dotfiles", "claude.md"), b"my dotfiles instructions\n")
+        mklink(os.path.join(home, "dotfiles", "claude.md"), claude_md)
+        rc, out, _ = _st_run(repo, env)
+        check(rc == 0 and has(out, "OK", ".claude/CLAUDE.md", "user-file-kept"),
+              "a user CLAUDE.md linked from outside the repo -> OK user-file-kept (rc=%d)" % rc)
+        # Double load: CLAUDE.md is the playbook link and the rules link is still there -> DRIFTED.
+        os.remove(claude_md)
+        mklink(os.path.join(repo, "shared", "AGENTS.md"), claude_md)
+        rc, out, _ = _st_run(repo, env)
+        check(rc == 1 and has(out, "OK", ".claude/CLAUDE.md")
+              and has(out, "DRIFTED", ".claude/rules/agent-playbook.md", "leftover-side-link="),
+              "CLAUDE.md is the link and the rules link remains -> DRIFTED double load (rc=%d)" % rc)
 
         # Co-existence, Gemini CLI: the side link and the context.fileName entry are both required.
         repo, home, env = fresh()
@@ -1665,8 +1769,24 @@ def _st_cases(tmp, links, skip_reason):
         check(rc == 0 and has(out, "OK", ".gemini/GEMINI.md", "user-file-kept")
               and has(out, "OK", ".gemini/settings.json", "context.fileName"),
               "a user GEMINI.md beside the side link and the settings entry -> OK (rc=%d)" % rc)
-        # A byte copy of the source is not the user's own file: it stays NOT_SYMLINK, side link or not.
+        # A settings.json with comments (Gemini CLI accepts JSONC): setup cannot edit it -> MISSING settings.
+        _w(os.path.join(gem, "settings.json"),
+           b'{\n  // mine\n  "context": {"fileName": ["GEMINI.md", "AGENT-PLAYBOOK.md"]}\n}\n')
+        rc, out, _ = _st_run(repo, env)
+        check(rc == 1 and has(out, "MISSING", ".gemini/settings.json", "context.fileName-lacks=")
+              and has(out, "NOT_SYMLINK", ".gemini/GEMINI.md", "user-file-kept-without"),
+              "a JSONC settings.json -> MISSING settings and NOT_SYMLINK (rc=%d)" % rc)
+        # Double load: GEMINI.md is the playbook link while the side link and the entry remain -> DRIFTED.
+        _w(os.path.join(gem, "settings.json"), b'{"context": {"fileName": ["GEMINI.md", "AGENT-PLAYBOOK.md"]}}\n')
         os.remove(os.path.join(gem, "GEMINI.md"))
+        mklink(os.path.join(repo, "shared", "AGENTS.md"), os.path.join(gem, "GEMINI.md"))
+        rc, out, _ = _st_run(repo, env)
+        check(rc == 1 and has(out, "OK", ".gemini/GEMINI.md")
+              and has(out, "DRIFTED", ".gemini/AGENT-PLAYBOOK.md", "leftover-side-link=")
+              and any(l.startswith("DRIFTED") and "context.fileName-lists=" in l for l in out),
+              "GEMINI.md is the link, the side link and the entry remain -> DRIFTED double load (rc=%d)" % rc)
+        os.remove(os.path.join(gem, "GEMINI.md"))
+        # A byte copy of the source is not the user's own file: it stays NOT_SYMLINK, side link or not.
         _w(os.path.join(gem, "GEMINI.md"), b"agents\n")
         rc, out, _ = _st_run(repo, env)
         check(rc == 1 and has(out, "NOT_SYMLINK", ".gemini/GEMINI.md")
@@ -1849,6 +1969,9 @@ def selftest():
             ("a user's own instruction file is never accepted", Verifier, "is_user_file",
              lambda self, path, source: False),
             ("co-existence ignores the Gemini settings entry", Verifier, "check_gemini_setting", lambda self: True),
+            ("a co-existence link beside the instruction-file link is never reported", Verifier, "check_double_load",
+             lambda self, dest, side, gemini: None),
+            ("a dangling memory rules link reads as no source", Verifier, "engine_link", lambda self, path: False),
             ("a memory row with no source is checked anyway", Verifier, "check_link_row",
              lambda self, mode: [self.check_symlink(d, src) for _k, d, src in self._mode_rows(mode)]),
         ]
