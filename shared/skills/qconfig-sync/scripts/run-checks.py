@@ -31,7 +31,7 @@ Output: one line per check, in a fixed order --
   <name>  <exit>  <seconds>  <flagged>  <verdict>
 <flagged> counts output lines (stdout and stderr) carrying a status token the skill says to surface:
 FAIL, FAILED, SKIP, SKIPPED, DRIFT, DRIFTED, MISSING, MISSING_PATH, MISSING_ANCHOR, OVER, WARN, WARNING,
-ORPHAN, WRONG_TARGET, NOT_SYMLINK, AMBIGUOUS_SKILL (upper case, as whole words), except a line that starts
+INACTIVE, ORPHAN, WRONG_TARGET, NOT_SYMLINK, AMBIGUOUS_SKILL (upper case, as whole words), except a line that starts
 with its own pass status (OK, ok, PASS), such as an OK line naming a step ID. A non-zero count on a
 passing check is still to be read: SKIP, WARN and ORPHAN lines never change an exit code.
 <verdict> is PASS (exit 0), FAIL (exit 1, or any other non-zero exit), COULD-NOT-RUN (exit 2: the check
@@ -58,7 +58,7 @@ HERE = Path(os.path.realpath(__file__)).parent
 DEFAULT_REPO = HERE.parents[3]  # scripts -> qconfig-sync -> skills -> shared -> repo
 WINDOWS = os.name == "nt"
 TIMEOUT_S = 900
-FLAG_RE = re.compile(r"\b(FAIL(ED)?|SKIP(PED)?|DRIFT(ED)?|MISSING(_PATH|_ANCHOR)?|OVER|WARN(ING)?|ORPHAN"
+FLAG_RE = re.compile(r"\b(FAIL(ED)?|SKIP(PED)?|DRIFT(ED)?|MISSING(_PATH|_ANCHOR)?|OVER|WARN(ING)?|INACTIVE|ORPHAN"
                      r"|WRONG_TARGET|NOT_SYMLINK|AMBIGUOUS_SKILL)\b")
 # A line whose own status is a pass is never flagged, whatever it names: verify-citations prints
 # "OK<TAB>GAT-DRIFT<TAB>..." for the stable step ID GAT-DRIFT.
@@ -128,6 +128,7 @@ def build_checks(repo, jobs):
     python("verify-mass", "guard", qs + "verify-mass.py", str(repo))
     python("verify-links", "guard", qs + "verify-links.py")
     python("verify-skills", "guard", qs + "verify-skills.py", str(repo))
+    python("verify-client-load", "guard", qs + "verify-client-load.py", str(repo))
     python("leak-scan", "guard", qs + "leak-scan.py", str(repo))
     python("leak-scan-selftest", "selftest", qs + "leak-scan.py", "--selftest")
     python("verify-stores", "guard", qs + "verify-stores.py", str(repo))
@@ -147,6 +148,7 @@ def build_checks(repo, jobs):
     python("verify-mass-selftest", "selftest", qs + "verify-mass.py", "--selftest")
     python("verify-links-selftest", "selftest", qs + "verify-links.py", "--selftest")
     python("verify-skills-selftest", "selftest", qs + "verify-skills.py", "--selftest")
+    python("verify-client-load-selftest", "selftest", qs + "verify-client-load.py", "--selftest")
     python("verify-dream-journal-selftest", "selftest", qd + "verify-dream-journal.py", "--selftest")
     python("verify-dream-state-selftest", "selftest", qd + "verify-dream-state.py", "--selftest")
     python("verify-deployment-selftest", "selftest", qs + "verify-deployment.py", "--selftest")

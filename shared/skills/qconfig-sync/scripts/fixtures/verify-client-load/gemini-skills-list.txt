@@ -1,0 +1,111 @@
+Error authenticating: FatalAuthenticationError: Interactive consent could not be obtained.
+Error during discovery for MCP server '<server>': MCP error -32000: Connection closedHook registry initialized with 0 hook entries
+Discovered Agent Skills:
+
+qauto-research [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qauto-research\SKILL.md
+
+qbrowser-test [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qbrowser-test\SKILL.md
+
+qclaude-delegate [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qclaude-delegate\SKILL.md
+
+qclose [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qclose\SKILL.md
+
+qconfig-sync [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qconfig-sync\SKILL.md
+
+qcouncil [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qcouncil\SKILL.md
+
+qdev [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qdev\SKILL.md
+
+qdocument-interaction [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qdocument-interaction\SKILL.md
+
+qdream [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qdream\SKILL.md
+
+qexplain [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qexplain\SKILL.md
+
+qexplore [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qexplore\SKILL.md
+
+qexplore-other [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qexplore-other\SKILL.md
+
+qextract [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qextract\SKILL.md
+
+qhandoff [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qhandoff\SKILL.md
+
+qicon-design [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qicon-design\SKILL.md
+
+qkiro-delegate [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qkiro-delegate\SKILL.md
+
+qmemory-eval [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qmemory-eval\SKILL.md
+
+qmigrate-workspace [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qmigrate-workspace\SKILL.md
+
+qplan [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qplan\SKILL.md
+
+qprototype [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qprototype\SKILL.md
+
+qqa [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qqa\SKILL.md
+
+qreview [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qreview\SKILL.md
+
+qtest [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qtest\SKILL.md
+
+qutilities-disk-cleanup [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qutilities-disk-cleanup\SKILL.md
+
+qvalidate [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qvalidate\SKILL.md
+
+qvisualize [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qvisualize\SKILL.md
+
+qwait-what [Enabled]
+  Description: <description>
+  Location:    <home>\.gemini\skills\qwait-what\SKILL.md

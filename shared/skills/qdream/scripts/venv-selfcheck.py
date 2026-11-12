@@ -139,7 +139,7 @@ STUB_END = "# --- end venv guard stub ---"
 # differs from those above only in the one line that names where venv-selfcheck.py sits.
 OUTSIDE_STUB_SCRIPTS = tuple(("qconfig-sync", "scripts", n) for n in (
     "verify-stores.py", "verify-memory.py", "verify-citations.py", "verify-mass.py", "verify-links.py",
-    "verify-deployment.py", "verify-skills.py")) + (("qvalidate", "scripts", "qvalidate.py"), ("qclose", "scripts", "close-plan.py"),
+    "verify-deployment.py", "verify-skills.py", "verify-client-load.py")) + (("qvalidate", "scripts", "qvalidate.py"), ("qclose", "scripts", "close-plan.py"),
     ("..", "..", "providers", "kiro", "skills", "qwire-governance", "scripts", "scan.py"),
     ("..", "..", "providers", "claude", "settings-entries.py"))
 PATH_LINE = "path = os.path.join("
