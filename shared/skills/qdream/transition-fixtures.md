@@ -212,7 +212,7 @@ Entry M is returned by Task-4 in BOTH subsumed_entries (with a subsuming_quote c
 VERDICT: subsumed-beats-stale
 MUST NOT: surface-not-delete
 
-(The reader must derive: the precedence rule — subsumed beats stale; an entry in both channels is dispositioned as subsumed, routed to the user-gated Phase 4b Remove/Keep/Defer, never autonomously deleted via the stale path)
+(The reader must derive: the precedence rule — subsumed beats stale; an entry in both channels is dispositioned as subsumed, routed by § SYN-RECONCILE (removed on a `confirmed` verdict except a `human:` entry, otherwise the Phase 4b Remove/Keep/Defer), never deleted via the stale path)
 
 ### FIX-RECOVER-both-present [ORI-RECOVER]
 

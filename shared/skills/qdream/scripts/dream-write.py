@@ -248,14 +248,13 @@ heading match) and `decision_id`):
   inside a type section, exactly one match). ## Declined is preserved byte
   for byte except by declined_add; BOM and line endings are preserved.
   User-gated ops carry `decision_id` and need --decisions/--decisions-sha:
-  declined_add, every delete of class USER_GATED_CLASSES, `pruned` in the
-  config repo's memory/MEMORY.md, a HIGHER_ORDER.md node delete, any op but
-  usage_bump on an entry whose Verified names a `human:` actor, and any op
-  whose new text adds a `human:` Verified actor. An op without decision_id
-  (autonomous) is refused in each of those cases, with two exceptions for an
-  entry whose Verified names a `human:` actor: the `pruned` delete of a
-  project memory file's entry (the Size check, outside <config repo>/memory/)
-  and a `replace` that only sets or changes the entry's `Outcome:` field (a
+  declined_add, every delete of class USER_GATED_CLASSES (a `subsumption
+  removal` of an entry the verifier confirmed for that heading is autonomous),
+  a HIGHER_ORDER.md node delete, any op but usage_bump on an entry whose
+  Verified names a `human:` actor, and any op whose new text adds a `human:`
+  Verified actor. An op without decision_id (autonomous) is refused in each of
+  those cases, with one exception for an entry whose Verified names a `human:`
+  actor: a `replace` that only sets or changes the entry's `Outcome:` field (a
   field is `**Outcome**: recurred|not-recurred <YYYY-MM-DD>` and nothing more,
   alone on its line or after a `|` on its own metadata line, as in
   `**Usage**: 3 | **Outcome**: ...`; never on the Source/Verified line, which
@@ -2119,6 +2118,64 @@ def apply_op(doc, op):
     return e
 
 
+def entry_view(text):
+    """The type-section entries of a memory file as memory-entries.py reads them (the parser
+    independent of walk()): [(section, heading, body lines)], trailing blank lines dropped."""
+    view = []
+    for sec, heading, body, _n in dm.memory_entries().entries(text):
+        if "## " + sec not in dm.TYPE_SECTIONS:
+            continue
+        lines = list(body)
+        while lines and not lines[-1].strip():
+            lines.pop()
+        view.append(("## " + sec, heading, tuple(lines)))
+    return view
+
+
+def parse_back(pre, post, op, target):
+    """-> None when `post`, the entry view of the edited text, is `pre` changed exactly as `op`
+    says (the entry count moves by the op's delta, the touched entry sits under its intended
+    heading and section, every other entry is unchanged), else the reason it is not."""
+    kind = op["op"]
+    delta = {"delete": -1, "insert": 1}.get(kind, 0)
+    if len(post) - len(pre) != delta:
+        return "the entry count went from %d to %d, expected %+d" % (len(pre), len(post), delta)
+    if kind == "declined_add":
+        return None if post == pre else "an entry changed"
+    if kind == "insert":
+        want = entry_view(norm_section(op["section"]) + "\n\n" + op["text"])
+        hits = [i for i, x in enumerate(post) if want and x[:2] == want[0][:2]]
+        if len(hits) != 1:
+            return "the new entry is not present once under its heading and section"
+        i = hits[0]
+        if post[:i] + post[i + 1:] != pre:
+            return "an entry other than the new one changed"
+        return None if post[i] == want[0] else "the new entry's text does not read back as given"
+    i = [k for k, x in enumerate(pre) if x[:2] == (target["section"], target["heading"])]
+    if len(i) != 1:
+        return "the target entry is not one entry of the file before the edit"
+    i = i[0]
+    if kind == "delete":
+        return None if post == pre[:i] + pre[i + 1:] else "an entry other than the deleted one changed"
+    if post[:i] != pre[:i] or post[i + 1:] != pre[i + 1:]:
+        return "an entry other than the target changed"
+    sec, heading, body = pre[i]
+    got = post[i]
+    if kind == "replace":
+        want = entry_view(sec + "\n\n" + op["text"])
+        if len(want) != 1 or got != want[0]:
+            return "the replaced entry does not read back as given, under the same section"
+    elif kind == "append_lines":
+        tail = list(body) + list(op["lines"])
+        while tail and not tail[-1].strip():
+            tail.pop()
+        if got != (sec, heading, tuple(tail)):
+            return "the appended lines do not read back at the end of the entry"
+    elif got[:2] != (sec, heading) or not 0 <= len(got[2]) - len(body) <= 1:
+        return "the usage bump changed more than the Usage line"
+    return None
+
+
 def op_texts(op):
     parts = [op.get("heading"), op.get("text"), op.get("row")]
     if isinstance(op.get("lines"), list):
@@ -2304,7 +2361,6 @@ def needs_decision(run, op, entry_body):
     if op["op"] == "declined_add":
         return True
     ho = _real(node_file(run))
-    prune = False
     if op["op"] == "delete":
         if op["class"] == "subsumption removal" and confirmed_subsumption(run, op.get("heading"), op["file"]):
             pass
@@ -2318,8 +2374,8 @@ def needs_decision(run, op, entry_body):
             return True
     stamp = (op["op"] == "replace" and entry_body is not None
              and outcome_stamp_only(entry_body, op["text"]))
-    # The two exemptions bypass only this refusal of a human-attested entry.
-    if not stamp and not prune:
+    # The Outcome stamp bypasses only this refusal of a human-attested entry.
+    if not stamp:
         if op["op"] != "usage_bump" and entry_body is not None and HUMAN_RE.search(entry_body):
             return True
     # New text that adds a human: actor needs a decision that showed it (S2),
@@ -2787,12 +2843,17 @@ def plan_file(run, fops, applied, dec, dsha, over):
                 elif getattr(run, "expect_bodies", {}).get(o["id"]) not in (None, bsha):
                     raise OpError("op %s: the entry changed after the op was queued" % o["id"])
             decision_gate(run, o, body, dec, over)
+            pre_view = entry_view(new.text())
             try:
                 apply_op(new, o)
             except OpError as e:
                 raise OpError("op %s: %s" % (o["id"], e))
             if o["op"] != "declined_add" and declined_blocks(new) != before_declined:
                 raise OpError("op %s would change ## Declined" % o["id"])
+            why = parse_back(pre_view, entry_view(new.text()), o, target)
+            if why:
+                raise OpError("op %s: the edited file does not read back as the op intended: %s"
+                              % (o["id"], why))
             if o["op"] == "delete" and o["class"] != NODE_CLASS:
                 fq = fq_target(run, path, target["heading"])
                 if fq is None:
@@ -5104,7 +5165,8 @@ REQUIRED_CASES = [
     "hash-dirty-at-orient-refused", "memedit-fence-swallows-declined-refused",
     "memedit-foreign-edit-between-runs", "memedit-journal-changed-refused",
     "memedit-journal-validation-rerun", "memedit-journal-validator-fail-rerun",
-    "memedit-needs-decision-pruned-node", "memedit-pending-neither-sha-refused",
+    "memedit-needs-decision-pruned-node", "memedit-parse-back-refused",
+    "memedit-pending-neither-sha-refused",
     "memedit-span-disagreement-refused", "push-plan-credential-textconv-marked",
     "push-plan-recorded-op-refused", "push-plan-sweep-commit-outside-window",
     "push-remote-name-refused", "push-repos-head-moved-refused",
