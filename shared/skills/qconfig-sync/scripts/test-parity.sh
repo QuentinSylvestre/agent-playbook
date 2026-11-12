@@ -1207,6 +1207,24 @@ wait "$sh_pid" || true
 own_check_nolock "$sh_sb" setup.sh own-sh-6
 [ "$twin" -eq 1 ] && own_check_nolock "$ps_sb" setup.ps1 own-ps-6
 
+# 7. a sandboxed HOME never writes the repo's memory link (it lives in the shared working copy). A
+# --yes dry run: the SKIPPED line names the link, and neither LINKED nor UPDATE names it.
+own_check_memlink() {   # own_check_memlink <setup.sh|setup.ps1> <log name>
+    local log="$TMPDIR_PARITY/$2.log" lp
+    lp="$(tr -d '\r' < "$log" | sed -n 's/^  SKIPPED: \(.*\) (HOME is sandboxed; the repo.s memory link is never written from a sandbox)$/\1/p' | head -n 1)"
+    if own_rc "$2" 0 && [ -n "$lp" ] && ! grep -qF -e "LINKED: $lp " -e "UPDATE: $lp " "$log"; then
+        echo "OWNERSHIP OK: $1 with a sandboxed HOME skips the repo's memory link"
+    else
+        own_fail "$1" "a sandboxed --yes run must print the memory link SKIPPED line and must not link or repoint it (link: ${lp:-none}, exit=$(cat "$TMPDIR_PARITY/$2.rc" 2>/dev/null))"
+    fi
+}
+own_run_sh "$sh_sb" own-sh-7 --dry-run --yes
+own_check_memlink setup.sh own-sh-7
+if [ "$twin" -eq 1 ]; then
+    own_run_ps "$ps_sb" own-ps-7 -DryRun -Yes
+    own_check_memlink setup.ps1 own-ps-7
+fi
+
 if [ "$OWNERSHIP_OK" -eq 1 ]; then
     echo "OWNERSHIP OK: setup.sh keeps, backs up, replaces, retires and uninstalls each planted collision by the deploy lock, fails loudly on a backup it cannot make, and sets and reverts chat.defaultAgent through a stub kiro-cli"
 else

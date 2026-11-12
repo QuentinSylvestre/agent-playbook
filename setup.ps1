@@ -1749,9 +1749,16 @@ if ($storeReady) { Initialize-UserMemory }
 
 $MemLink = Join-Path $ScriptDir "memory"
 $MemTarget = Join-Path $Stores "user\memory"
+# The repo's memory link lives in the shared working copy, so a sandboxed run (USERPROFILE is not the
+# profile folder Windows reports, as in a test probe) never writes it; nor does one whose real profile is unknown.
+$realHome = [Environment]::GetFolderPath('UserProfile')
+$homeSandboxed = (-not $realHome) -or ([IO.Path]::GetFullPath($env:USERPROFILE).TrimEnd([char]92, [char]47) -ne [IO.Path]::GetFullPath($realHome).TrimEnd([char]92, [char]47))
 $memItem = Get-Item -LiteralPath $MemLink -Force -ErrorAction SilentlyContinue
 $linkMemory = $true
-if ($memItem -and ($memItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+if ($homeSandboxed) {
+    Write-Host "  SKIPPED: $MemLink (HOME is sandboxed; the repo's memory link is never written from a sandbox)"
+    $linkMemory = $false
+} elseif ($memItem -and ($memItem.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
     if ([string]($memItem.Target | Select-Object -First 1) -eq $MemTarget) {
         Write-Host "  OK: $MemLink -> $MemTarget"; $linkMemory = $false
     } elseif (-not $Interactive -and -not $Yes) {

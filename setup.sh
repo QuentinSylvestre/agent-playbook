@@ -1175,10 +1175,40 @@ store_step() {
     seed_user_memory
 }
 
+# The home the OS reports for this user, whatever HOME says (empty when it cannot be told). Git Bash
+# asks Windows for the profile folder; elsewhere the passwd entry names it.
+real_home() {
+    local h=""
+    if [ "$IS_MSYS" -eq 1 ]; then
+        # CSIDL_PROFILE (40): the profile folder Windows records, whatever HOME and USERPROFILE say
+        h="$(cygpath -F 40 2>/dev/null | tr -d '\r')"
+    elif command -v getent >/dev/null 2>&1; then
+        h="$(getent passwd "$(id -un)" 2>/dev/null | cut -d: -f6)"
+    elif command -v dscl >/dev/null 2>&1; then
+        h="$(dscl . -read "/Users/$(id -un)" NFSHomeDirectory 2>/dev/null | awk '{print $2}')"
+    fi
+    printf '%s' "$h"
+}
+
+# True when HOME is not the user's real home (a test probe's temp dir), or the real home cannot be
+# told. The repo's memory link lives in the shared working copy, so a run that cannot prove it is the
+# real user's never writes it.
+home_is_sandboxed() {
+    local real; real="$(real_home)"
+    [ -n "$real" ] || return 0
+    local a b; a="$(long_path "$(native_path "$HOME")")"; b="$(long_path "$(native_path "$real")")"
+    [ "$(printf '%s' "${a%/}" | tr 'A-Z' 'a-z')" != "$(printf '%s' "${b%/}" | tr 'A-Z' 'a-z')" ]
+}
+
 memory_link_step() {
     local link="$SCRIPT_DIR/memory" target="$STORES/user/memory"
+    if home_is_sandboxed; then
+        echo "  SKIPPED: $link (HOME is sandboxed; the repo's memory link is never written from a sandbox)"
+        return
+    fi
     if [ -L "$link" ]; then
-        if [ "$(readlink "$link")" = "$target" ]; then
+        # compare one spelling per file: readlink gives /c/... where STORES may say C:/...
+        if [ "$(canon_path "$(readlink "$link")")" = "$(canon_path "$target")" ]; then
             echo "  OK: $link -> $target"
             return
         fi
