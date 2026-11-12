@@ -3,9 +3,9 @@
 
 plan 261016 Phase 5 (Phase 3 defined the rule). Every qdream script calls require() at the start of
 its main(), before it reads or writes anything. A process whose sys.prefix is not the playbook venv
-(`<config-repo>/.venv-agent-playbook`, built by setup.ps1) prints
+(`<config-repo>/.venv-agent-playbook`, built by setup.ps1 or setup.sh) prints
 
-    guard did not run: venv missing -- run setup.ps1
+    guard did not run: venv missing -- run setup.ps1 or setup.sh
 
 on stderr and exits 2, so a wrong interpreter is loud and never a silent PATH fallback. The venv is
 recognised by its fixed folder name and by being a venv (sys.prefix differs from sys.base_prefix), not by
@@ -37,7 +37,7 @@ import subprocess
 import sys
 
 VENV_NAME = ".venv-agent-playbook"
-MESSAGE = "guard did not run: venv missing — run setup.ps1"
+MESSAGE = "guard did not run: venv missing — run setup.ps1 or setup.sh"
 
 
 def _real(p):
@@ -139,7 +139,7 @@ STUB_END = "# --- end venv guard stub ---"
 # differs from those above only in the one line that names where venv-selfcheck.py sits.
 OUTSIDE_STUB_SCRIPTS = tuple(("qconfig-sync", "scripts", n) for n in (
     "verify-stores.py", "verify-memory.py", "verify-citations.py", "verify-mass.py", "verify-links.py",
-    "verify-deployment.py")) + (("qvalidate", "scripts", "qvalidate.py"), ("qclose", "scripts", "close-plan.py"),
+    "verify-deployment.py", "verify-skills.py")) + (("qvalidate", "scripts", "qvalidate.py"), ("qclose", "scripts", "close-plan.py"),
     ("..", "..", "providers", "kiro", "skills", "qwire-governance", "scripts", "scan.py"),
     ("..", "..", "providers", "claude", "settings-entries.py"))
 PATH_LINE = "path = os.path.join("

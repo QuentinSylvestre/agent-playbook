@@ -6,7 +6,7 @@ per-file rationales). This script does the mechanical rest: captures the diff as
 UTF-8, inlines every piece of data safely inside the page's script, wires the map
 tabs, then runs the validator on the result.
 
-Standard library only; nothing to install. <python> is <config-repo>/.venv-agent-playbook/Scripts/python.exe -I.
+Standard library only; nothing to install. <python> is the interpreter of <config-repo>/.venv-agent-playbook, run with -I (shared/AGENTS.md, Config Repo Locations).
 
 Usage:
     <python> build-explanation.py --out <path.html> --title <text> \

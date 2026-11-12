@@ -198,7 +198,7 @@ project with no `CLAUDE.md` and for a session opened in a subfolder. It writes
 nothing, and on any error it injects a one-line notice and exits 0. The script
 header has the full contract. Its fixtures under
 `providers/claude/fixtures/memory-load-hook/` run with
-`.venv-agent-playbook\Scripts\python.exe -I providers\claude\memory-load-hook.py --selftest`.
+the interpreter of `.venv-agent-playbook` (`shared/AGENTS.md § Config Repo Locations`) as `<python> -I providers/claude/memory-load-hook.py --selftest`.
 
 #### Interpreter and launcher
 

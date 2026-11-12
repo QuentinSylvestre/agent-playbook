@@ -5,7 +5,7 @@ Prints each file shown, the files left out and the setting names their change to
 any credential-shaped match (path and line only, never the value), the size tier, the
 plans named by commit scopes, and whether to propose a split. It prints no file content.
 
-Standard library only; nothing to install. <python> is <config-repo>/.venv-agent-playbook/Scripts/python.exe -I.
+Standard library only; nothing to install. <python> is the interpreter of <config-repo>/.venv-agent-playbook, run with -I (shared/AGENTS.md, Config Repo Locations).
 
 Usage:
     <python> measure-change.py [--repo <dir>] --diff-args "<git diff arguments>" [--exclude <glob>]...

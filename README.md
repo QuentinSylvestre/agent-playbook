@@ -101,7 +101,7 @@ More: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and the vocabulary in
 | Gemini CLI | `~/.gemini/GEMINI.md` | `~/.gemini/skills/` | |
 | Kiro (CLI and IDE) | steering in `~/.kiro/steering/` | `~/.kiro/skills/` (with Kiro overlays) | `kiro_default` agent, settings seeds ([providers/kiro/README.md](providers/kiro/README.md)) |
 
-Windows is the main platform and Linux is supported; both are tested in CI. macOS is not tested yet: `setup.sh` should work there, but expect rough edges. Kiro and Windows get the most day-to-day use.
+Windows is the main platform and Linux is supported. The scripts and their selftests run on both in CI, but a full `/qdream` sweep has been exercised on Windows only. macOS is untested: `setup.sh` should work there, but expect rough edges. Kiro and Windows get the most day-to-day use.
 
 ## Contributing
 

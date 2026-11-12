@@ -17,7 +17,7 @@ Hand a task to a Claude Code session, keep its transcript out of your context, a
 
 **When NOT to use**: a task smaller than writing its brief (a fresh session start costs about $0.17 estimated usage even for a one-sentence answer; a resumed turn adds much less, about $0.014 for one short turn; both measured on Claude Code 2.1.302, subscription, 2026-10-17); a task whose next step depends on the user's answer (the delegate cannot reach the user); a review or design call you would have to judge yourself; work needing a secret in the prompt.
 
-`<python>` below is `<config-repo>\.venv-agent-playbook\Scripts\python.exe -I` (`shared/AGENTS.md § Config Repo Locations`); `<scripts>` is this skill's `scripts/` folder as an absolute path; `<work>` is a fresh folder in the session scratchpad or the store scratch folder (`shared/skills/qdream/memory-rules.md § Store scratch folder`), one per delegation; `<folder>` is the session working directory, the same on every turn.
+`<python>` below is the interpreter of `<config-repo>/.venv-agent-playbook` with `-I` (`shared/AGENTS.md § Config Repo Locations`); `<scripts>` is this skill's `scripts/` folder as an absolute path; `<work>` is a fresh folder in the session scratchpad or the store scratch folder (`shared/skills/qdream/memory-rules.md § Store scratch folder`), one per delegation; `<folder>` is the session working directory, the same on every turn.
 
 ## Process
 

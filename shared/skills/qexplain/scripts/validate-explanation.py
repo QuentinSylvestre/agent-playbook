@@ -8,7 +8,7 @@ resolves, every part and map tab has a panel (and every part-panel has a
 matching control and vice versa), the Narrative part says what was verified,
 and no emoji.
 
-Standard library only; nothing to install. <python> is <config-repo>/.venv-agent-playbook/Scripts/python.exe -I.
+Standard library only; nothing to install. <python> is the interpreter of <config-repo>/.venv-agent-playbook, run with -I (shared/AGENTS.md, Config Repo Locations).
 
 Usage:
     <python> validate-explanation.py <path-to-html>

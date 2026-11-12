@@ -52,7 +52,7 @@ If the form is ambiguous, ask the user which they meant. If the resolved diff is
 
 ## Step 1: Resolve the target and read beyond the diff
 
-**Measure first, and read nothing yet.** `<python>` is `<config-repo>/.venv-agent-playbook/Scripts/python.exe -I` (`<config-repo>`: `shared/AGENTS.md § Config Repo Locations`), the playbook's one interpreter. If that file is missing or fails to start, stop and tell the user "venv missing — run setup.ps1"; never use a Python from `PATH`.
+**Measure first, and read nothing yet.** `<python>` is the interpreter of `<config-repo>/.venv-agent-playbook` with `-I` (`<config-repo>` and the interpreter path: `shared/AGENTS.md § Config Repo Locations`), the playbook's one interpreter. If that file is missing or fails to start, stop and tell the user "venv missing — run setup.ps1 or setup.sh"; never use a Python from `PATH`.
 
 ```
 <python> <config-repo>/shared/skills/qexplain/scripts/measure-change.py --repo <dir> --diff-args "<git diff arguments>" [--exclude <glob>]...
