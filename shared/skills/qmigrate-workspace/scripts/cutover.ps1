@@ -51,7 +51,7 @@ $ChangeLog = Join-Path $Work 'cutover-changes.log'
 function Step($n, $msg) { Write-Host "`n=== [$n] $msg" -ForegroundColor Cyan }
 function Need-Ok($what) { if ($LASTEXITCODE -ne 0) { throw "$what failed (exit $LASTEXITCODE). Stopped. Resume with -FromStep after fixing." } }
 function Note($s) { Add-Content $ChangeLog "$(Get-Date -Format o)`t$s"; "  $s" }
-# Boundary-correct, case-insensitive path tests. `-like "$Old*"` would also match ...\Personal and treats [ ] as wildcards.
+# Boundary-correct, case-insensitive path tests. `-like "$Old*"` would also match ...\Repos and treats [ ] as wildcards.
 $OldRx = '(?i)' + [regex]::Escape($Old) + '(?=$|[\\/"''\s])'
 function Test-UnderOld([string]$p) { $p = $p -replace '^\\\\\?\\',''; $p -match ('^' + $OldRx) }
 function Convert-ToNew([string]$s) { [regex]::Replace($s, $OldRx, { param($m) $New }) }

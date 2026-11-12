@@ -37,7 +37,7 @@ Scripts live in `<config-repo>/shared/skills/qmigrate-workspace/scripts/` (`<scr
 
 1. `& <scripts>\venvs.ps1 -Phase freeze -Old <OLD> -New <NEW>`, then the same with `-Phase rebuild` (writes into NEW only). Invoke with `&`, never `pwsh -File`, which passes an array argument as one string.
 2. Find project-local config that names OLD: `verify.py residue --old <OLD> --new <NEW>`. Each real config file goes to `apply.py --also <file>` in the dry run and to `cutover.ps1 -Also <file>,<file>` for the real run; leave caches, logs and archived plans.
-3. Dry-run: `apply.py --old <OLD> --new <NEW> [--config-repo <checkout live after the move>] [--also <file>]` must end `No blockers.` A folder beside OLD whose name starts with OLD's name and a space (`Perso Old`) is a blocker: its paths would match too.
+3. Dry-run: `apply.py --old <OLD> --new <NEW> [--config-repo <checkout live after the move>] [--also <file>]` must end `No blockers.` A folder beside OLD whose name starts with OLD's name and a space (`Repo Old`) is a blocker: its paths would match too.
 4. If the config repo itself moves: its location is the `root=` line of `~/.agent-playbook/config` (`shared/AGENTS.md § Config Repo Locations`), which `apply.py` rewrites with the other machine state. No governance text names it.
 
 ### Step 4: Cutover (the user runs it)

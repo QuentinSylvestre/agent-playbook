@@ -5,7 +5,7 @@ One OLD -> NEW mapping, matched in every form the agent stores were seen to use
 slashes, URL-encoded (`c%3A`, `%20`), either drive-letter case, any letter case
 in the rest of the path, and a `~/` home-relative form. The replacement keeps the
 separator, drive-letter case and encoding of each match. A match must end at a
-path boundary, so `...\\Perso` never matches `...\\Personal`.
+path boundary, so `...\\Repo` never matches `...\\Repos`.
 
 Nothing here parses JSON: depth-limited parsers silently truncate deeply nested
 session files, and a round trip can add a BOM or reorder keys.
@@ -16,9 +16,9 @@ import re
 SEP = rb"(?:\\{1,4}|/)"
 SPACE = rb"(?: |%20)"
 COLON = rb"(?::|%3[Aa])"
-# A match must not run on into a longer sibling name: `Perso` must not match `Personal`, `Perso-old`,
-# `Perso.bak`, `Perso(2)` or `Perso~1`. A space cannot be excluded (it also ends a path in prose), so a
-# sibling like `Perso Old` or `Perso (copy)` is caught by ambiguous_siblings() instead.
+# A match must not run on into a longer sibling name: `Repo` must not match `Repos`, `Repo-old`,
+# `Repo.bak`, `Repo(2)` or `Repo~1`. A space cannot be excluded (it also ends a path in prose), so a
+# sibling like `Repo Old` or `Repo (copy)` is caught by ambiguous_siblings() instead.
 BOUNDARY_CHARS = r"A-Za-z0-9_\-.(~"
 BOUNDARY = ("(?![" + BOUNDARY_CHARS + "])").encode()
 
@@ -90,7 +90,7 @@ class PathMap:
 
 def ambiguous_siblings(old):
     """Folders beside OLD whose name starts with OLD's name and that the regex would still match
-    (e.g. `Perso Old`). Their paths would be rewritten too, so apply.py refuses while any exist."""
+    (e.g. `Repo Old`). Their paths would be rewritten too, so apply.py refuses while any exist."""
     old = old.rstrip("\\/")
     parent, base = os.path.dirname(old), os.path.basename(old)
     pat = re.compile(re.escape(base) + "(?![" + BOUNDARY_CHARS + "])", re.I)

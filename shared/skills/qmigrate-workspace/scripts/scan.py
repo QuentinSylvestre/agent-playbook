@@ -142,7 +142,7 @@ if os.path.isdir(proj):
     log("[claude project folders named from OLD]")
     for d in sorted(os.listdir(proj)):
         o = pm.old_slug.lower()
-        if d.lower() == o or d.lower().startswith(o + "-"):  # boundary: '...-Perso' must not match '...-Personal'
+        if d.lower() == o or d.lower().startswith(o + "-"):  # boundary: '...-Repo' must not match '...-Repos'
             log("  " + d)
 if a.report:
     open(a.report, "w", encoding="utf-8").write("\n".join(out))
