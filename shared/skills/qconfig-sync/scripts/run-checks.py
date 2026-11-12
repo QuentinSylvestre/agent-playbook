@@ -5,7 +5,7 @@ Python only, no sh/ps1 twin (like verify-stores.py), so it is outside test-parit
 Python 3.8+. It may run under any interpreter: every Python check it starts runs under the playbook venv
 (<repo>/.venv-agent-playbook, with -I), never a `python` from PATH, and a venv that is missing or fails to
 start makes each Python check COULD-NOT-RUN (exit 2), never a pass. A check still running after 15 minutes
-is stopped with every process under it (its job object on Windows, its process group elsewhere) and reported
+(25 for test-parity, which takes about 17 minutes on the Windows development machine, 2026-11-12) is stopped with every process under it (its job object on Windows, its process group elsewhere) and reported
 TIMEOUT. It writes only its work folder.
 
 Usage:
@@ -58,6 +58,8 @@ HERE = Path(os.path.realpath(__file__)).parent
 DEFAULT_REPO = HERE.parents[3]  # scripts -> qconfig-sync -> skills -> shared -> repo
 WINDOWS = os.name == "nt"
 TIMEOUT_S = 900
+# test-parity.sh measured 1007 s alone on 2026-11-12: its own cap, above that with margin.
+TIMEOUT_BY_CHECK = {"test-parity": 1500}
 FLAG_RE = re.compile(r"\b(FAIL(ED)?|SKIP(PED)?|DRIFT(ED)?|MISSING(_PATH|_ANCHOR)?|OVER|WARN(ING)?|INACTIVE|ORPHAN"
                      r"|WRONG_TARGET|NOT_SYMLINK|AMBIGUOUS_SKILL)\b")
 # A line whose own status is a pass is never flagged, whatever it names: verify-citations prints
@@ -267,7 +269,7 @@ def run_one(repo, work, name, argv):
         else:
             job = win_job_for(proc) if WINDOWS else None
             try:
-                code = proc.wait(timeout=TIMEOUT_S)
+                code = proc.wait(timeout=TIMEOUT_BY_CHECK.get(name, TIMEOUT_S))
             except subprocess.TimeoutExpired:
                 kill_tree(proc, job)
                 code = "timeout"
