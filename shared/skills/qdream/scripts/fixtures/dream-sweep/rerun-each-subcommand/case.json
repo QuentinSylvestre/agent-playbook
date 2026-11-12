@@ -480,9 +480,9 @@
         "feeder.json",
         "drift-gather.json",
         "blast/shared-skills-demo-SKILL-md-Target-Section-ff779e3f.json",
-        "briefs/phase-gather-1.md",
-        "briefs/phase-gather-2.md",
-        "briefs/phase-gather-3.md",
+        "briefs/phase-gather-1.md", "briefs/phase-gather-1.progress.json",
+        "briefs/phase-gather-2.md", "briefs/phase-gather-2.progress.json",
+        "briefs/phase-gather-3.md", "briefs/phase-gather-3.progress.json",
         "briefs/D01.md",
         "briefs/D01.data.json"
       ]

@@ -94,7 +94,11 @@ Subcommands:
       for the phase agent's dream-write.py calls (`none` when absent); the
       three flags are a usage error for other kinds. --decision names a
       handoff/decision-<n>.json and needs --decision-sha, checked against
-      that file at render time (the sha256 the orchestrator recorded). --attempt N (task4,
+      that file at render time (the sha256 the orchestrator recorded). Every
+      decision `standing` recorded for the phase is named, with its sha256,
+      under Standing decisions; the
+      progress the agent starts from is copied to
+      sweep/briefs/phase-<name>-<attempt>.progress.json for `gain`. --attempt N (task4,
       verifier, drafter; default 1) re-renders for a Retry or a Resume: attempt
       N >= 2 writes <label>.a<N>.md, <label>.a<N>.data.json and
       verifier-index.a<N>.json beside attempt 1's files (Attempts below).
@@ -403,6 +407,31 @@ Subcommands:
       transcript for a moment, and the caller decides (a label still missing
       after its own dispatch's completion notification is a failed child).
       Reads only. Exit 3 unless every label is final.
+  gain --phase <name>
+      Compares handoff/progress-<name>.json with the progress the newest
+      phase-<name>-<n> brief started from (sweep/briefs/phase-<name>-<n>.
+      progress.json, written by brief). Prints the steps completed and the
+      child returns collected since, then `gained: yes` (exit 0) or
+      `gained: no` (exit 1). Only a step of the phase's own ids with its
+      steps/ file, and a label returned with its agent id, count. From the
+      10th launch of a phase it prints `gained: cap` (exit 1): the user is
+      asked. The orchestrator relaunches a `budget` stop without asking only
+      on exit 0. Reads only.
+  standing --decision handoff/decision-<n>.json --decision-sha <sha256>
+      Records a `standing: true` answer to a user-decision in
+      sweep/standing.json (orchestrator only); every later brief of that
+      phase names it, and refuses it once its bytes changed.
+  show <work-relative .json> [--key <k>] [--id <v>] [--where <k>=<v>]...
+       [--fields <k1,k2>] [--max-chars N] [--full]
+      A bounded view of one JSON file of the work folder, in place of reading
+      it whole: one compact JSON line per item of its list (`items`, `rows`,
+      `ops`, `verdicts` or `projects` first, else the only list of objects;
+      --key picks another, an object's entries become items with a `key`),
+      filtered by --id (matched against id, item_id, label, heading or key)
+      and by each --where (string equality), projected to --fields. Strings
+      over 300 characters are cut unless --full; output stops at --max-chars
+      (default 6000) with a count of the items not shown. An object with no
+      list prints its keys, types and sizes. Reads only.
   --selftest [--work <dir>] [--jobs N] [--case <name>]... [--list]
       Runs the cases under fixtures/dream-sweep/ in N worker processes
       (default 4; --jobs 1 runs them in this process), printing results in
@@ -590,6 +619,9 @@ if __name__ == "__main__":
 dm = _load_manifest_module()
 
 EXIT_OK, EXIT_USAGE, EXIT_PRECOND = 0, 2, 3
+# show: the output cap and the per-string cap of its bounded view.
+SHOW_MAX_CHARS = 6000
+SHOW_STRING_MAX = 300
 SUMMARY_MAX_LINES = 20
 PROMPT_LINES_MAX = 15
 
@@ -623,6 +655,7 @@ OUTPUT_CLASSES = {
                    "sweep/guard-hashes.json", "sweep/gate-check.json",
                    "sweep/gate-decisions.json", "sweep/write-queue.json", "sweep/planned-map.json",
                    "sweep/shadow/", "sweep/singletons.json", "sweep/similar.json",
+                   "sweep/prune-preview.json", "sweep/standing.json",
                    "handoff/gate.md", "handoff/orient.json",
                    "handoff/decisions.json", "handoff/gather.json", "handoff/ops/"),
 }
@@ -2607,6 +2640,11 @@ def _decision_option_problems(path, obj):
     if "option" in obj and not _is_str(obj["option"]):
         return ["option must be a string"]
     nd = load_json(path.parent / path.name.replace("decision-", "needs-decision-", 1))
+    if "standing" in obj:
+        if not isinstance(obj["standing"], bool):
+            return ["standing must be true or false"]
+        if obj["standing"] and (not isinstance(nd, dict) or nd.get("kind") != "user-decision"):
+            return ["standing: true is for the answer to a user-decision only"]
     if not isinstance(nd, dict) or nd.get("kind") not in NEEDS_DECISION_OPTIONS:
         return []
     got = norm_opt(obj.get("option", obj["answer"]))
@@ -2862,7 +2900,9 @@ def handoff_schema(name):
             "from the question text" % ", ".join(PHASES))
     if pat.startswith("decision-"):
         lines.append("  also: an optional string option; when the needs-decision has fixed options "
-                     "the option (else the answer) is one of them")
+                     "the option (else the answer) is one of them; an optional boolean standing "
+                     "(user-decision answers only): true makes every later phase brief of that "
+                     "phase name the file under Standing decisions")
     if pat == r"answers\.json":
         lines.append("  also: each item (one per gate item answered) has " + ", ".join(
             "%s: non-empty %s" % (k, _type_words(t)) for k, t in ANSWER_ITEM.items())
@@ -2892,7 +2932,15 @@ def handoff_schema(name):
                   "    dest_file, dest_heading: for a promotion, the user-tier file and entry the "
                   "lesson goes to; file2, heading2: its second project copy, if any; pair_a, "
                   "pair_b: the two entry shas of its sweep/similar.json pair",
-                  "    each of these is a non-empty string; file, dest_file and file2 are absolute"]
+                  "    each of these is a non-empty string; file, dest_file and file2 are absolute",
+                  "    shown_text_by_option: an object, option name -> the text that option writes, "
+                  "each verbatim in text; required in place of shown_text when two options of the "
+                  "kind write memory text (a conflict's Keep entry, Update governance and Defer)",
+                  "    evidence: {file: an absolute .md governance file, quote: at least %d "
+                  "characters and 3 words of it, verbatim in text}: for an item whose answer is not "
+                  "in doubt; gate checks the quote against the file, and gate --index groups the "
+                  "item bulk only when it is found and the entry on disk names no human: actor"
+                  % EVIDENCE_MIN_CHARS]
     if pat == r"drafts\.json":
         lines.append("  also: each item is checked beyond being an object: " + "; ".join(
             "%s: %s" % (k, _type_words(t)) for k, t in DRAFT_ITEM.items()))
@@ -3314,7 +3362,7 @@ def load_template(kind, skill_dir=None):
 # The tokens brief_phase fills, and strings the live Dream Phase Agent Brief
 # must hold (the orchestrator-only commands and files, the wait step).
 PHASE_TOKENS = ("phase", "attempt", "work", "skill_dir", "resume_from", "decision_path",
-                "snapshot_sha", "decisions_sha", "guard_digest")
+                "standing_decisions", "snapshot_sha", "decisions_sha", "guard_digest")
 PHASE_TEMPLATE_NEEDLES = (
     "Never run `dream-write.py push --plan`, `dream-write.py push --repos` or `dream-sweep.py "
     "guard --rebaseline`: only the orchestrator runs them, and the push only after the user "
@@ -3684,17 +3732,205 @@ def brief_phase(work, man, args, template, marker):
             "phase-%s-%d.md" % (args.phase, n)))):
         n += 1
     label = "phase-%s-%d" % (args.phase, n)
+    standing = standing_decisions(work, args.phase)
     values = {"phase": args.phase, "attempt": n, "work": native(work),
               "skill_dir": native(Path(args.skill_dir_value)),
               "resume_from": args.resume_from or "start",
               "decision_path": native(handoff_path(work, args.decision)) if args.decision
               else "none",
+              "standing_decisions": "; ".join("`%s` (sha256 %s)" % (native(sp), sh)
+                                              for sp, sh in standing) or "none",
               "snapshot_sha": args.snapshot_sha.strip().lower(),
               "decisions_sha": (args.decisions_sha or "none").strip().lower(),
               "guard_digest": args.guard_digest or "none"}
     rel_md = "sweep/briefs/%s.md" % label
+    # The progress the agent starts from, so `gain` can tell what it added.
+    prog = load_json(Path(work) / "handoff" / ("progress-%s.json" % args.phase))
+    put(work, "sweep/briefs/%s.progress.json" % label,
+        dumps({"progress": prog if isinstance(prog, dict) else None}))
     put(work, rel_md, fill(template, values, "phase"))
     return [prompt_line(marker, args.phase, native(Path(work) / rel_md))]
+
+
+STANDING = "sweep/standing.json"
+
+
+def standing_decisions(work, phase):
+    """-> [(path, sha256)] of the standing decisions the orchestrator recorded
+    (`standing`, in sweep/standing.json, which only that script writes) whose
+    needs-decision is this phase's. Each file must still hold the recorded
+    bytes (exit 3 otherwise): a decision file a phase agent wrote is never a
+    standing user answer, so none is discovered by its name."""
+    rec = load_json(Path(work) / STANDING)
+    found = []
+    for r in (rec or {}).get("decisions") or []:
+        f = Path(work) / "handoff" / r["name"]
+        with open(str(f), "rb") as fh:
+            got = sha256_bytes(fh.read())
+        if got != r["sha256"]:
+            raise Precond("refused: standing %s changed since `standing` recorded it" % r["name"])
+        if r["phase"] == phase:
+            found.append((f, got))
+    return found
+
+
+def cmd_standing(args, ctx):
+    """Records one decision file as a standing user answer for later phase briefs."""
+    work, _man = open_work(ctx)
+    dp = handoff_path(work, args.decision)
+    if not re.fullmatch(r"decision-[1-9][0-9]{0,3}\.json", dp.name) or not dp.is_file():
+        raise Usage("standing takes --decision handoff/decision-<n>.json")
+    with open(str(dp), "rb") as fh:
+        got = sha256_bytes(fh.read())
+    if got != (args.decision_sha or "").strip().lower():
+        raise Precond("refused: %s's sha256 %s is not the one recorded (%s)" % (dp.name, got, args.decision_sha))
+    _pat, probs = handoff_problems(dp.name, dp)
+    if probs:
+        raise Precond("refused: %s" % "; ".join(probs))
+    obj = load_json(dp)
+    nd = load_json(dp.parent / dp.name.replace("decision-", "needs-decision-", 1)) or {}
+    if obj.get("standing") is not True or nd.get("kind") != "user-decision":
+        raise Precond("refused: %s is not a standing answer to a user-decision" % dp.name)
+    rec = load_json(Path(work) / STANDING) or {}
+    rows = [r for r in rec.get("decisions") or [] if r.get("name") != dp.name]
+    rows.append({"name": dp.name, "sha256": got, "phase": nd.get("phase")})
+    put(work, STANDING, dumps({"decisions": rows}))
+    print("standing: %s recorded for the %s phase (%d standing decision(s))" % (dp.name, nd.get("phase"), len(rows)))
+    return EXIT_OK
+
+
+def cmd_gain(args, ctx):
+    """Whether the newest phase agent of a phase moved its progress forward."""
+    if args.phase not in PHASES:
+        raise Usage("gain needs --phase %s" % "|".join(PHASES))
+    work, _man = open_work(ctx)
+    n = 0
+    while os.path.lexists(str(Path(work) / "sweep" / "briefs" / (
+            "phase-%s-%d.md" % (args.phase, n + 1)))):
+        n += 1
+    if n == 0:
+        raise Precond("refused: no phase brief of %s has been rendered" % args.phase)
+    snap = load_json(Path(work) / "sweep" / "briefs" / ("phase-%s-%d.progress.json" % (args.phase, n)))
+    if not isinstance(snap, dict) or "progress" not in snap:
+        raise Precond("refused: phase-%s-%d has no start-progress record" % (args.phase, n))
+    name = "progress-%s.json" % args.phase
+    _pat, probs = handoff_problems(name, Path(work) / "handoff" / name)
+    if probs:
+        raise Precond("refused: %s" % "; ".join(probs))
+    cur = load_json(Path(work) / "handoff" / name)
+    before = snap["progress"] if isinstance(snap["progress"], dict) else {}
+    done_before = set(before.get("completed_steps") or [])
+    # A step counts only as one of the phase's own step ids with its steps/ file; a return only
+    # with the child's agent id recorded.
+    steps = [x for x in cur["completed_steps"] if x not in done_before
+             and re.fullmatch(GAIN_STEP_RE[args.phase], x)
+             and (Path(work) / "handoff" / "steps" / (x + ".json")).is_file()]
+    blab = before.get("labels") if isinstance(before.get("labels"), dict) else {}
+    labels = sorted(k for k, v in cur["labels"].items()
+                    if isinstance(v, dict) and v.get("status") == "returned" and _is_str(v.get("agent_id"))
+                    and (blab.get(k) or {}).get("status") != "returned")
+    s = Summary()
+    s.add("gain: phase-%s-%d completed %d step(s) and collected %d child return(s) since its launch"
+          % (args.phase, n, len(steps), len(labels)))
+    if steps:
+        s.add("steps: %s" % ", ".join(steps))
+    if labels:
+        s.add("returns: %s" % ", ".join(labels[:40]) + (" ..." if len(labels) > 40 else ""))
+    if (steps or labels) and n >= GAIN_RELAUNCH_CAP:
+        s.add("gained: cap (phase-%s has had %d launches; ask the user Resume / Abort)" % (args.phase, n))
+        s.emit()
+        return EXIT_FINDINGS
+    s.add("gained: %s" % ("yes" if steps or labels else "no"))
+    s.emit()
+    return EXIT_OK if steps or labels else EXIT_FINDINGS
+
+
+# gain: the step ids each phase completes, and the launches after which the user is asked.
+GAIN_STEP_RE = {"gather": r"GAT-[A-Z0-9-]+", "synthesize": r"(SYN|DEC)-[A-Z0-9-]+", "apply": r"APP-[A-Z0-9-]+"}
+GAIN_RELAUNCH_CAP = 10
+
+SHOW_LIST_KEYS = ("items", "rows", "ops", "verdicts", "projects")
+
+
+def _show_value(v, full):
+    if isinstance(v, str) and not full and len(v) > SHOW_STRING_MAX:
+        return v[:SHOW_STRING_MAX] + "...(+%d chars)" % (len(v) - SHOW_STRING_MAX)
+    if isinstance(v, list) and not full:
+        return [_show_value(x, full) for x in v]
+    if isinstance(v, dict) and not full:
+        return {k: _show_value(x, full) for k, x in v.items()}
+    return v
+
+
+def cmd_show(args, ctx):
+    """A bounded view of one JSON file of the work folder."""
+    work, _man = open_work(ctx)
+    rel = args.path.replace("\\", "/").lstrip("/")
+    target = Path(work) / rel
+    if not dm.is_inside(target, work) or not rel.endswith(".json"):
+        raise Usage("show takes a .json file inside the work folder, relative to it "
+                    "(handoff/... or sweep/...)")
+    obj = load_json(target)
+    if obj is None:
+        raise Precond("refused: %s is missing or is not JSON" % rel)
+    key = args.key
+    if key is None and isinstance(obj, dict):
+        lists = [k for k, v in obj.items() if isinstance(v, list) and v and
+                 all(isinstance(x, dict) for x in v)]
+        pref = [k for k in SHOW_LIST_KEYS if k in lists]
+        key = pref[0] if pref else (lists[0] if len(lists) == 1 else None)
+    if isinstance(obj, list):
+        rows, where = obj, "the top-level list"
+    elif key is not None:
+        if not isinstance(obj, dict) or key not in obj:
+            raise Usage("%s has no key %r" % (rel, key))
+        rows, where = obj[key], key
+        if isinstance(rows, dict):
+            rows = [dict({"key": k}, **v) if isinstance(v, dict) else {"key": k, "value": v}
+                    for k, v in rows.items()]
+        elif not isinstance(rows, list):
+            text = json.dumps(_show_value(rows, args.full), ensure_ascii=False)
+            print("show: %s: %s" % (rel, key))
+            print(text[:args.max_chars])
+            return EXIT_OK
+    else:
+        print("show: %s: an object with %d key(s); pick a list with --key" % (rel, len(obj)))
+        for k, v in obj.items():
+            size = ("%d item(s)" % len(v)) if isinstance(v, (list, dict)) else (
+                "%d chars" % len(v) if isinstance(v, str) else type(v).__name__)
+            print("  %s: %s %s" % (k, type(v).__name__, size))
+        return EXIT_OK
+    conds = []
+    for w in args.where:
+        if "=" not in w:
+            raise Usage("--where takes key=value")
+        conds.append(w.split("=", 1))
+    fields = [f for f in (args.fields or "").split(",") if f]
+
+    def ident(r):
+        return [str(r.get(k)) for k in ("id", "item_id", "label", "heading", "key") if k in r]
+
+    hit = []
+    for r in rows:
+        if not isinstance(r, dict):
+            r = {"value": r}
+        if args.id is not None and args.id not in ident(r):
+            continue
+        if any(str(r.get(k)) != v for k, v in conds):
+            continue
+        hit.append(r)
+    print("show: %s: %d of %d item(s) in %s" % (rel, len(hit), len(rows), where))
+    used = 0
+    for i, r in enumerate(hit):
+        view = {k: r[k] for k in fields if k in r} if fields else r
+        line = json.dumps(_show_value(view, args.full), ensure_ascii=False)
+        if used + len(line) > args.max_chars:
+            print("... %d more item(s) not shown; narrow with --id, --where or --fields"
+                  % (len(hit) - i))
+            break
+        print(line)
+        used += len(line) + 1
+    return EXIT_OK
 
 
 def cmd_brief(args, ctx):
@@ -5152,6 +5388,86 @@ def promotes_line(e):
     return "Also removes memory entry: %s \u00a7 %s" % (_jq(e["file"]), _jq(e["heading"]))
 
 
+EVIDENCE_MIN_CHARS = 20
+
+
+def evidence_file_problem(f):
+    """None when an evidence file can be a governance file: a .md file outside the work folder
+    and outside any memory folder; else why not."""
+    parts = [x.lower() for x in Path(f.replace("\\", "/")).parts]
+    if not f.lower().endswith(".md"):
+        return "is not a .md governance file"
+    if "dream-work" in parts or "memory" in parts:
+        return "is in the work folder or a memory folder, not a governance file"
+    return None
+
+
+def entry_block(path, heading):
+    """The text of the `### <heading>` entry in a memory file (to the next heading of level 3 or
+    less), or None when the file or the entry cannot be read."""
+    try:
+        lines = dm.read_text(path).replace("\r\n", "\n").split("\n")
+    except (OSError, ValueError):
+        return None
+    for i, ln in enumerate(lines):
+        if ln.strip() == "### " + heading:
+            j = i + 1
+            while j < len(lines) and not re.match(r"^#{1,3} ", lines[j]):
+                j += 1
+            return "\n".join(lines[i:j])
+    return None
+
+
+def evidence_found(e):
+    """True when a text item's `evidence` quote is, verbatim, in its governance file now; False
+    when it is not or cannot be read; None when the item carries no evidence."""
+    ev = e.get("evidence")
+    if not isinstance(ev, dict):
+        return None
+    f, q = ev.get("file"), ev.get("quote")
+    if not (_is_str(f) and os.path.isabs(f) and _is_str(q) and q.strip()) or evidence_file_problem(f) \
+            or len(q.strip()) < EVIDENCE_MIN_CHARS or len(q.split()) < 3:
+        return False
+    try:
+        text = dm.read_text(f).replace("\r\n", "\n")
+    except (OSError, ValueError):
+        return False
+    return q.replace("\r\n", "\n") in text
+
+
+def evidence_line(e):
+    """The line `gate` adds under a text item that carries `evidence`: whether the quoted
+    governance text is in the file now, checked by gate, never taken from the item."""
+    ev = e["evidence"]
+    return "Checked by gate: the quoted governance text %s in %s" % (
+        "is" if evidence_found(e) else "is NOT", _jq(ev.get("file") if _is_str(ev.get("file")) else "?"))
+
+
+# Kinds that touch an entry the user verified, a governance disagreement or a plausible
+# subsumption (2026-11-04 decision: gated). On the veto screen they are pre-answered only with
+# a quote gate verified; otherwise they are asked one at a time.
+EVIDENCE_KINDS = ("conflict", "human-expiry", "stale", "stale-salvage", "subsumed", "promotion", "node")
+
+
+def screen_group(e, kind, rec):
+    """`bulk` (pre-answered with its recommendation on the veto screen) or `ask` (asked one at a
+    time): an item is bulk only with one recommendation, no human-verified entry in its text and,
+    for an EVIDENCE_KINDS item, an evidence quote gate found in its governance file."""
+    if not rec:
+        return "ask"
+    if _is_str(e.get("text")) and "(human:" in e["text"]:
+        return "ask"
+    if kind in EVIDENCE_KINDS:
+        if evidence_found(e) is not True:
+            return "ask"
+        # the entry as it is on disk, not as the item quotes it
+        block = entry_block(e["file"], e["heading"]) if _is_str(e.get("file")) and _is_str(
+            e.get("heading")) else None
+        if block is None or "(human:" in block:
+            return "ask"
+    return "bulk"
+
+
 def acts_on_line(e):
     """The line `gate` adds to a text item's block: the fields its decision
     acts on (kind, file, heading, variant, project), generated from
@@ -5358,7 +5674,8 @@ def gate_render(work, policy, wm):
     by_id = {}
     for e in gi:
         if _is_str(e.get("text")):
-            by_id[e["id"]] = mark_all(e["text"].rstrip("\r\n")) + "\n" + acts_on_line(e)
+            by_id[e["id"]] = mark_all(e["text"].rstrip("\r\n")) + "\n" + acts_on_line(e) + (
+                "\n" + evidence_line(e) if isinstance(e.get("evidence"), dict) else "")
         else:
             _label, ret, data = drafts[e["id"]]
             by_id[e["id"]] = render_gate_item(policy, e["id"], e, ret, data, check)
@@ -5405,9 +5722,9 @@ def cmd_gate_index(args, ctx, work, man, policy):
             rec = recommended(e.get("options") or text_options(e.get("text")))
         head = one_line(head or "-")
         rows.append("\t".join(one_line(x) for x in (e["id"], kind, target, head[:100] + (
-            "..." if len(head) > 100 else ""), rec or "no recommendation")))
+            "..." if len(head) > 100 else ""), rec or "no recommendation", screen_group(e, kind, rec))))
     page = rows[start - 1:start - 1 + GATE_INDEX_PAGE]
-    print("gate --index: items %d-%d of %d (id, kind, target, heading, recommendation)"
+    print("gate --index: items %d-%d of %d (id, kind, target, heading, recommendation, group)"
           % (start, start - 1 + len(page), len(rows)))
     for r in page:
         print(r)
@@ -5654,6 +5971,63 @@ def text_item_problems(e, kinds):
     if _is_str(e.get("shown_text")) and _is_str(e.get("text")) \
             and e["shown_text"] not in e["text"]:
         out.append("%s: shown_text does not appear verbatim in its text" % iid)
+    out += shown_text_problems(e, kinds)
+    ev = e.get("evidence")
+    if ev is not None:
+        if not (isinstance(ev, dict) and _is_str(ev.get("file")) and os.path.isabs(ev["file"])
+                and _is_str(ev.get("quote")) and ev["quote"].strip()):
+            out.append("%s: evidence must be {file: an absolute path, quote: a non-empty text}" % iid)
+        elif _is_str(e.get("text")) and ev["quote"] not in e["text"]:
+            out.append("%s: the evidence quote does not appear verbatim in its text" % iid)
+        elif evidence_file_problem(ev["file"]):
+            out.append("%s: evidence file %s" % (iid, evidence_file_problem(ev["file"])))
+        elif len(ev["quote"].strip()) < EVIDENCE_MIN_CHARS or len(ev["quote"].split()) < 3:
+            out.append("%s: the evidence quote is shorter than %d characters or 3 words"
+                       % (iid, EVIDENCE_MIN_CHARS))
+    return out
+
+
+# Options whose text the user writes at the gate (no shown_text exists before the answer).
+USER_TEXT_OPTIONS = ("edit",)
+
+
+def shown_text_problems(e, kinds):
+    """Every option of the item's kind that writes memory text has its text at the gate:
+    `shown_text_by_option[<option>]` (an object keyed by the option as the kind's table names
+    it), else `shown_text`, each verbatim in the item's text. A conflict's Keep entry and Defer
+    write different record lines, so one shown_text cannot serve both; decisions copies the
+    chosen option's text into shown_text. Checked when the gate renders, not at decisions."""
+    iid, out = e.get("id"), []
+    by = e.get("shown_text_by_option")
+    if by is not None:
+        if not isinstance(by, dict) or not all(_is_str(k) and _is_str(v) and v.strip()
+                                                for k, v in by.items()):
+            return ["%s: shown_text_by_option must map option names to non-empty texts" % iid]
+        if _is_str(e.get("text")):
+            out += ["%s: shown_text_by_option[%r] does not appear verbatim in its text" % (iid, k[:40])
+                    for k, v in by.items() if v not in e["text"]]
+    kind = e.get("kind")
+    if not _is_str(kind) or kind not in kinds or not _is_str(e.get("text")):
+        return out
+    wm = _load_write_module()
+    by_norm = {wm.norm_opt(k): v for k, v in (by or {}).items()}
+    bad = [k for k in by_norm if k not in kinds[kind]]
+    out += ["%s: shown_text_by_option names %r, not an option of %s" % (iid, k[:40], kind) for k in bad]
+    var = wm.D28_VARIANTS.get((kind, e.get("variant")), {})
+    writing = []
+    for opt, slots in kinds[kind].items():
+        slots = var.get(opt, slots)
+        types = {t for sl in slots for t in sl}
+        if opt not in USER_TEXT_OPTIONS and types & {"insert", "replace", "append_lines", "create"}:
+            writing.append(opt)
+    # Two options that write memory text write different texts (a conflict's Keep entry and
+    # Defer records), so a single shown_text can serve only a kind with one such option.
+    single = len(writing) == 1 and _is_str(e.get("shown_text")) and e["shown_text"].strip()
+    for opt in writing:
+        if opt not in by_norm and not single:
+            out.append("%s: option %r writes memory text, but the item carries no %s for it" % (
+                iid, opt, "shown_text (or shown_text_by_option entry)" if len(writing) == 1
+                else "shown_text_by_option entry (its options write different texts)"))
     return out
 
 
@@ -5742,6 +6116,9 @@ def cmd_decisions(args, ctx):
         if it is None:
             d["kind"] = e["kind"]
             d.update({k: e[k] for k in TEXT_ITEM_KEYS if k in e and k != "kind"})
+            by = {wm.norm_opt(k): v for k, v in (e.get("shown_text_by_option") or {}).items()}
+            if wm.norm_opt(a["option"]) in by:
+                d["shown_text"] = by[wm.norm_opt(a["option"])]
         else:
             d.update({"kind": it["kind"], "target_file": it["target_file"],
                       "heading": it.get("heading")})
@@ -6117,6 +6494,19 @@ def parse_args(argv):
     p = sp.add_parser("handoff")
     p.add_argument("action", choices=["check", "schema"])
     p.add_argument("name")
+    p = sp.add_parser("gain")
+    p.add_argument("--phase", required=True)
+    p = sp.add_parser("standing")
+    p.add_argument("--decision", required=True)
+    p.add_argument("--decision-sha", required=True)
+    p = sp.add_parser("show")
+    p.add_argument("path")
+    p.add_argument("--key")
+    p.add_argument("--id")
+    p.add_argument("--where", action="append", default=[])
+    p.add_argument("--fields")
+    p.add_argument("--max-chars", type=int, default=SHOW_MAX_CHARS)
+    p.add_argument("--full", action="store_true")
     p = sp.add_parser("wait")
     p.add_argument("--labels", required=True)
     p.add_argument("--session")
@@ -6145,7 +6535,8 @@ COMMANDS = {"singletons": cmd_singletons, "similar": cmd_similar, "dirty": cmd_d
             "aggregate": cmd_aggregate, "feeder": cmd_feeder, "blast": cmd_blast,
             "drift": cmd_drift, "guard": cmd_guard, "handoff": cmd_handoff, "wait": cmd_wait,
             "gate": cmd_gate, "orient": cmd_orient, "decisions": cmd_decisions,
-            "gather": cmd_gather}
+            "gather": cmd_gather, "gain": cmd_gain, "show": cmd_show,
+            "standing": cmd_standing}
 
 
 def main(argv=None, ctx=None):

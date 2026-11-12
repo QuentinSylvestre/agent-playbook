@@ -1020,6 +1020,10 @@ def check_target(run, path, want=None):
         mapped = Path(ds.via_memory_link(path))
         if real is not None and mapped != probe:
             probe, where = mapped, real
+        elif real is not None and dm.is_inside(str(probe), str(real)):
+            # The same file spelled under the link's target, as a store-repo commit records it
+            # (commits.json, push --plan): check it there, still refusing any other link.
+            where = real
     link = ds._link_on_path(where, probe)
     if link is not None:
         raise Precond("refused: %s is reached through a link (%s)" % (path, link))
@@ -4863,6 +4867,11 @@ def prune_plan(run):
     topic file: ENTRY_PIN entries, signals and excluded entries not counted."""
     cands = {i.get("heading") for i in synth_items(run)
              if i.get("class") in ("subsumed_entries", "stale_entries")}
+    # An entry a gate item of this sweep acts on is the user's to decide (memory-rules.md, the sixth
+    # Prune-set exclusion): the prune never deletes it ahead of, or against, the answer.
+    gi = ds.load_json(run.work / "handoff" / "gate-items.json")
+    if isinstance(gi, dict) and isinstance(gi.get("items"), list):
+        cands |= {e["heading"] for e in gi["items"] if isinstance(e, dict) and isinstance(e.get("heading"), str)}
     fresh = queued_new_headings(run, load_rec(run, QUEUE, {"version": 1, "entries": []}))
     ops, lines = [], []
     user_md = run.repo / "memory" / "MEMORY.md"
@@ -4874,7 +4883,8 @@ def prune_plan(run):
             if over <= 0:
                 break
             over -= len(e["body"].split())
-            ops.append({"file": str(user_md), "heading": e["heading"]})
+            ops.append({"file": str(user_md), "heading": e["heading"],
+                        "why": "user tier %d words over its %d-word pin; %s" % (words - pin, pin, value_words(e))})
         if over > 0:
             lines.append("prune: user tier still %d words over its pin: no entry left to prune" % over)
     disp = ds.load_sweep(run.work, ds.DISPATCH, "run dream-sweep.py dispatch first")
@@ -4889,8 +4899,60 @@ def prune_plan(run):
         pool, _n = prune_candidates(run, mf, cands, fresh)
         excess = len(pool) - ENTRY_PIN
         for e in sorted(pool, key=entry_value)[:max(excess, 0)]:
-            ops.append({"file": mf, "heading": e["heading"]})
+            ops.append({"file": mf, "heading": e["heading"],
+                        "why": "file %d entries over its %d-entry pin; %s" % (excess, ENTRY_PIN, value_words(e))})
     return ops, lines
+
+
+def value_words(e):
+    """entry_value in words, for the gate's prune rows."""
+    rec, usage, verified, fb = entry_value(e)
+    return "%sUsage %d, Verified %s, %s" % ("Outcome recurred, " if rec == 0 else "", usage,
+                                            verified or "none", "feedback" if fb == 0 else (e.get("section") or "?"))
+
+
+PRUNE_PREVIEW = "sweep/prune-preview.json"
+
+
+def previewed_ops(ops, preview):
+    """(ops to run, ops held back): only an op the gate showed and the user did not veto runs."""
+    shown = {(ds.nk(r["file"]), r["heading"]) for r in preview.get("rows", []) if not r.get("vetoed")}
+    run_ops = [o for o in ops if (ds.nk(o["file"]), o["heading"]) in shown]
+    return run_ops, [o for o in ops if (ds.nk(o["file"]), o["heading"]) not in shown]
+
+
+def cmd_prune(args, ctx):
+    """The gate-time prune preview, and the user's vetoes of its rows."""
+    run = Run(ctx, args)
+    guard_check(run)
+    dest = run.work / PRUNE_PREVIEW
+    if args.preview == bool(args.veto):
+        raise Usage("prune takes --preview or --veto <P01,P02,...>")
+    if args.preview:
+        if dest.is_file():
+            raise Precond("refused: %s exists: the gate showed it; --veto marks its rows" % PRUNE_PREVIEW)
+        ops, lines = prune_plan(run)
+        rows = [{"id": "P%02d" % n, "file": o["file"], "heading": o["heading"], "why": o["why"], "vetoed": False}
+                for n, o in enumerate(ops, 1)]
+        ds.put(run.work, PRUNE_PREVIEW, ds.dumps({"rows": rows, "lines": lines}))
+        print("prune preview: %d entr(ies) the budget would prune, in %s; show every row at the gate "
+              "(dream-sweep.py show %s)" % (len(rows), PRUNE_PREVIEW, PRUNE_PREVIEW))
+        for ln in lines:
+            print(ln)
+        return EXIT_OK
+    prev = ds.load_json(dest)
+    if not isinstance(prev, dict) or not isinstance(prev.get("rows"), list):
+        raise Precond("refused: no prune preview: run prune --preview at the gate first")
+    want = [x.strip() for x in args.veto.split(",") if x.strip()]
+    ids = {r["id"] for r in prev["rows"]}
+    bad = [x for x in want if x not in ids]
+    if bad:
+        raise Precond("refused: no preview row %s" % ", ".join(bad))
+    rows = [dict(r, vetoed=bool(r.get("vetoed")) or r["id"] in want) for r in prev["rows"]]
+    ds.put(run.work, PRUNE_PREVIEW, ds.dumps({"rows": rows, "lines": prev.get("lines", [])}))
+    print("prune preview: %d row(s) vetoed: %s" % (sum(r["vetoed"] for r in rows),
+                                                    ", ".join(r["id"] for r in rows if r["vetoed"]) or "none"))
+    return EXIT_OK
 
 
 # A concurrent session changed or removed the entry: the only refusals apply-all drops and goes past.
@@ -4949,6 +5011,17 @@ def cmd_apply_all(args, ctx):
         ops, lines = prune_plan(run)
         for ln in lines:
             print(ln)
+        prev = ds.load_json(run.work / PRUNE_PREVIEW)
+        if not isinstance(prev, dict):
+            if ops:
+                print("prune: %d entr(ies) over budget not pruned: the gate showed no prune preview "
+                      "(dream-write.py prune --preview); the next sweep shows them" % len(ops))
+            ops = []
+        else:
+            ops, held = previewed_ops(ops, prev)
+            if held:
+                print("prune: %d entr(ies) over budget not pruned: not on the gate's preview, or vetoed; "
+                      "the next sweep shows them: %s" % (len(held), "; ".join(o["heading"] for o in held)[:600]))
         put = [{"id": "app-prune-%03d" % n, "op": "delete", "file": o["file"], "heading": o["heading"],
                 "class": "pruned"} for n, o in enumerate(ops, 1)]
         if put:
@@ -5055,9 +5128,12 @@ def parse_args(argv):
     p = sp.add_parser("apply-all")
     p.add_argument("--decisions", required=True)
     p.add_argument("--decisions-sha", required=True)
+    p = sp.add_parser("prune")
+    p.add_argument("--preview", action="store_true")
+    p.add_argument("--veto")
     # Every write-side subcommand: the Orient snapshot's sha (required, D27;
     # missing is exit 3) and, after a guard --rebaseline, the new digest.
-    for name in ("memedit", "hash", "state", "commit", "push", "ops", "queue", "apply-all"):
+    for name in ("memedit", "hash", "state", "commit", "push", "ops", "queue", "apply-all", "prune"):
         sp.choices[name].add_argument("--snapshot-sha")
         sp.choices[name].add_argument("--guard-digest")
     args = ap.parse_args(argv)
@@ -5071,7 +5147,7 @@ def parse_args(argv):
 
 COMMANDS = {"memedit": cmd_memedit, "hash": cmd_hash, "state": cmd_state,
             "commit": cmd_commit, "push": cmd_push, "ops": cmd_ops, "queue": cmd_queue,
-            "apply-all": cmd_apply_all}
+            "apply-all": cmd_apply_all, "prune": cmd_prune}
 
 
 def main(argv=None, ctx=None):
@@ -6014,6 +6090,15 @@ def _unit_prune_and_subsumption(root, home, ctx):
     got = [e["heading"] for e in sorted(pool, key=entry_value)]
     if got != ["recurs", "plain"]:
         fails.append("prune pool or order: %r" % got)
+    ops = [{"file": str(f), "heading": "recurs"}, {"file": str(f), "heading": "plain"},
+           {"file": str(f), "heading": "late"}]
+    prev = {"rows": [{"file": str(f), "heading": "recurs", "vetoed": False},
+                     {"file": str(f), "heading": "plain", "vetoed": True}]}
+    go, held = previewed_ops(ops, prev)
+    if [o["heading"] for o in go] != ["recurs"] or [o["heading"] for o in held] != ["plain", "late"]:
+        fails.append("previewed_ops: ran %r, held %r" % (go, held))
+    if "Usage 9" not in value_words(sorted(pool, key=entry_value)[0]):
+        fails.append("value_words: %r" % value_words(sorted(pool, key=entry_value)[0]))
     a, b = str(root / "a.md"), str(root / "b.md")
     (run.work / "sweep" / "dispatch.json").write_text(json.dumps({"agents": [
         {"project": "/a", "memory_file": a}, {"project": "/b", "memory_file": b}]}), encoding="utf-8")

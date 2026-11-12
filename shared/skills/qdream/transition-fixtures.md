@@ -566,12 +566,12 @@ MUST NOT: one-gate-item
 
 ### FIX-EXPIRY-human-precedence-workingmap [SYN-WRITE]
 
-A full sweep runs on 2026-08-04. Project P's `memory/MEMORY.md` is not git-tracked (a solely-owned file: a folder the store resolver creates no store for) and holds 31 entries. Entry J carries `**Verified**: 2026-02-11 (human:alice)`, `**Stale-after**: 2026-07-01` and `**Outcome**: recurred 2026-06-10`, and has `Usage: 0`. The other 30 entries pass verification, carry no `Outcome`, and have `Usage` 2 or more. The agent returned J in `verified` as `{"heading": "J", "expiry": "Stale-after"}`: its forced check passed. task4_status is checked and the count-verify passes. The Size check prunes the lowest-ranked entry. What happens to J's expiry at the Re-dating step?
+A full sweep runs on 2026-08-04. Project P's `memory/MEMORY.md` is not git-tracked (a solely-owned file: a folder the store resolver creates no store for) and holds 31 entries. Entry J carries `**Verified**: 2026-02-11 (human:alice)`, `**Stale-after**: 2026-07-01` and `**Outcome**: recurred 2026-06-10`, and has `Usage: 0`. The other 30 entries pass verification, carry no `Outcome`, and have `Usage` 2 or more. The agent returned J in `verified` as `{"heading": "J", "expiry": "Stale-after"}`: its forced check passed. task4_status is checked and the count-verify passes. The file is over its budget. What happens to J's expiry at the Re-dating step?
 
-VERDICT: gate-skipped
-MUST NOT: human-expiry-gated
+VERDICT: human-expiry-gated
+MUST NOT: gate-skipped
 
-(The reader must derive: the Size check runs at § SYN-WRITE, before the count-verify. The file is over the ~30 count, J ranks first in the derived-utility order on criterion (2), `Outcome: recurred`, and a `human:` actor is only a tiebreak at criterion (5), so the Size check prunes J and records it in the working map as removed, class `pruned`. A heading removed in § SYN-WRITE this sweep, whatever the class, never enters `human_expiries`, so there is no gate item and no re-date. The existing human-attestation carve-out does not exclude an entry from the Size-check prune.)
+(The reader must derive: § SYN-WRITE's Size check proposes no prune; the budget prune is previewed before the gate and run by `apply-all`. Its *Prune-set exclusions* (`memory-rules.md § Derived Utility & Pruning`) leave out every `human:`-attested entry and every entry a gate item acts on, so J is never pruned, whatever its `Outcome: recurred` rank. Nothing removed J at § SYN-WRITE, so its passing expiry-forced check enters `human_expiries` and becomes a `human-expiry` gate item (`Keep / Re-date-as-sweep / Defer`), never an autonomous re-date.)
 
 ### FIX-EXPIRY-human-precedence-duplicate [SYN-RECONCILE]
 

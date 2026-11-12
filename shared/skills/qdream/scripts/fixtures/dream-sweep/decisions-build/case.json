@@ -1,5 +1,5 @@
 {
-  "description": "plan 261027 SC-5: `decisions` builds handoff/decisions.json from answers.json and the gate inputs: gate.md bound to --gate-sha (the sha `gate` prints) and equal to a fresh render, every item in gate order, the Applied texts copied from the draft, a text item's decision fields from gate-items.json, and the governance item a conflict drafts recorded as a Skip with for_conflict when the conflict is not answered Update governance. Refused, nothing written: another gate sha or snapshot sha, a missing answer, an answer to an unpresented item, an answer to no gate item, an option that contradicts its answer (item_problems before the write), a bad answers.json, an input changed after the gate, a text item without a kind (refused by `gate` itself, review R1). `gate` refuses a shown_text not in its text. `gate --index` prints one line per item (id, kind, target, heading, recommendation), pages with --start, and is bound like gate.",
+  "description": "plan 261027 SC-5: `decisions` builds handoff/decisions.json from answers.json and the gate inputs: gate.md bound to --gate-sha (the sha `gate` prints) and equal to a fresh render, every item in gate order, the Applied texts copied from the draft, a text item's decision fields from gate-items.json, and the governance item a conflict drafts recorded as a Skip with for_conflict when the conflict is not answered Update governance. Refused, nothing written: another gate sha or snapshot sha, a missing answer, an answer to an unpresented item, an answer to no gate item, an option that contradicts its answer (item_problems before the write), a bad answers.json, an input changed after the gate, a text item without a kind (refused by `gate` itself, review R1). `gate` refuses a shown_text not in its text. `gate --index` prints one line per item (id, kind, target, heading, recommendation), pages with --start, and is bound like gate. A conflict answered Keep entry takes that option's text from shown_text_by_option; gate refuses a conflict item that carries no shown text for an option that writes memory text. A text item's evidence quote is checked against its governance file (gate prints `Checked by gate:` is / is NOT); gate --index groups it bulk only when the quote is found and the entry on disk names no human: actor; an evidence file in the work folder is refused.",
   "now": "2026-10-23T12:00:00Z",
   "write": {
     "repo/shared/skills/demo/SKILL.md": "# Demo\n\n## Steps\n\nStep one.\nStep two.\n\n## Other\n\nKeep.\n\n## Last\n\nEnd.\n",
@@ -67,7 +67,7 @@
     },
     {
       "write": {
-        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate for the decisions fixture.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: fixture) / Skip\"\n    },\n    {\n      \"id\": \"C1\",\n      \"kind\": \"conflict\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Old rule\",\n      \"text\": \"Gate item C1: entry Old rule contradicts shared/AGENTS.md\\nOptions: Keep entry / Update governance / Delete entry (recommended: dead rule) / Defer\"\n    },\n    {\n      \"id\": \"M1\",\n      \"kind\": \"memory-proposal\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"New lesson\",\n      \"shown_text\": \"### New lesson\\n\\n**Why**: other\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\n\",\n      \"text\": \"Gate item M1: save a memory entry\\nEntry:\\n### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\nOptions: Save (recommended: verified) / Skip\"\n    },\n    {\n      \"id\": \"g2\",\n      \"why\": \"w2\",\n      \"options\": \"Apply / Skip\"\n    }\n  ]\n}\n"
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate for the decisions fixture.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: fixture) / Skip\"\n    },\n    {\n      \"id\": \"C1\",\n      \"kind\": \"conflict\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Old rule\",\n      \"text\": \"Gate item C1: entry Old rule contradicts shared/AGENTS.md\\nOptions: Keep entry / Update governance / Delete entry (recommended: dead rule) / Defer\\nKeep entry writes: **Governance-conflict**: keep-entry 2026-10-23 (sweep)\\nUpdate governance writes: **Governance-conflict**: rule-update-pending 2026-10-23 (sweep)\\nDefer writes: **Governance-conflict**: deferred 2026-10-23 (sweep)\",\n      \"shown_text_by_option\": {\n        \"Keep entry\": \"**Governance-conflict**: keep-entry 2026-10-23 (sweep)\",\n        \"Update governance\": \"**Governance-conflict**: rule-update-pending 2026-10-23 (sweep)\",\n        \"Defer\": \"**Governance-conflict**: deferred 2026-10-23 (sweep)\"\n      }\n    },\n    {\n      \"id\": \"M1\",\n      \"kind\": \"memory-proposal\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"New lesson\",\n      \"shown_text\": \"### New lesson\\n\\n**Why**: other\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\n\",\n      \"text\": \"Gate item M1: save a memory entry\\nEntry:\\n### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\nOptions: Save (recommended: verified) / Skip\",\n      \"shown_text_by_option\": {\n        \"Save\": \"### New lesson\\n\\n**Why**: other\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\n\",\n        \"record with an explicit override note\": \"### New lesson\\n\\n**Why**: other\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\n\"\n      }\n    },\n    {\n      \"id\": \"g2\",\n      \"why\": \"w2\",\n      \"options\": \"Apply / Skip\"\n    }\n  ]\n}\n"
       }
     },
     {
@@ -86,7 +86,7 @@
     },
     {
       "write": {
-        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate for the decisions fixture.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: fixture) / Skip\"\n    },\n    {\n      \"id\": \"C1\",\n      \"kind\": \"conflict\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Old rule\",\n      \"text\": \"Gate item C1: entry Old rule contradicts shared/AGENTS.md\\nOptions: Keep entry / Update governance / Delete entry (recommended: dead rule) / Defer\"\n    },\n    {\n      \"id\": \"M1\",\n      \"kind\": \"memory-proposal\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"New lesson\",\n      \"shown_text\": \"### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\n\",\n      \"text\": \"Gate item M1: save a memory entry\\nEntry:\\n### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\nOptions: Save (recommended: verified) / Skip\"\n    },\n    {\n      \"id\": \"g2\",\n      \"why\": \"w2\",\n      \"options\": \"Apply / Skip\"\n    }\n  ]\n}\n"
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate for the decisions fixture.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: fixture) / Skip\"\n    },\n    {\n      \"id\": \"C1\",\n      \"kind\": \"conflict\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Old rule\",\n      \"text\": \"Gate item C1: entry Old rule contradicts shared/AGENTS.md\\nOptions: Keep entry / Update governance / Delete entry (recommended: dead rule) / Defer\\nKeep entry writes: **Governance-conflict**: keep-entry 2026-10-23 (sweep)\\nUpdate governance writes: **Governance-conflict**: rule-update-pending 2026-10-23 (sweep)\\nDefer writes: **Governance-conflict**: deferred 2026-10-23 (sweep)\",\n      \"shown_text_by_option\": {\n        \"Keep entry\": \"**Governance-conflict**: keep-entry 2026-10-23 (sweep)\",\n        \"Update governance\": \"**Governance-conflict**: rule-update-pending 2026-10-23 (sweep)\",\n        \"Defer\": \"**Governance-conflict**: deferred 2026-10-23 (sweep)\"\n      }\n    },\n    {\n      \"id\": \"M1\",\n      \"kind\": \"memory-proposal\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"New lesson\",\n      \"shown_text\": \"### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\n\",\n      \"text\": \"Gate item M1: save a memory entry\\nEntry:\\n### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\nOptions: Save (recommended: verified) / Skip\",\n      \"shown_text_by_option\": {\n        \"Save\": \"### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\n\",\n        \"record with an explicit override note\": \"### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\n\"\n      }\n    },\n    {\n      \"id\": \"g2\",\n      \"why\": \"w2\",\n      \"options\": \"Apply / Skip\"\n    }\n  ]\n}\n"
       }
     },
     {
@@ -111,10 +111,10 @@
       "unchanged": true,
       "stdout_contains": [
         "gate --index: items 1-4 of 4",
-        "g1\tgovernance\tshared/skills/demo/SKILL.md\t## Steps\tApply",
+        "g1\tgovernance\tshared/skills/demo/SKILL.md\t## Steps\tApply\tbulk",
         "C1\tconflict\t{ROOT}/repo/memory/MEMORY.md\tOld rule\tDelete entry",
         "M1\tmemory-proposal\t{ROOT}/repo/memory/MEMORY.md\tNew lesson\tSave",
-        "g2\tgovernance\tshared/skills/demo/SKILL.md\t## Other\tno recommendation"
+        "g2\tgovernance\tshared/skills/demo/SKILL.md\t## Other\tno recommendation\task"
       ],
       "stdout_not_contains": [
         "next: gate --index"
@@ -328,7 +328,7 @@
     {
       "write": {
         "home/.agent-playbook/dream-work/handoff/answers.json": "{\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"answer\": \"apply it\",\n      \"option\": \"Apply\",\n      \"turn\": \"turn 12\"\n    },\n    {\n      \"id\": \"C1\",\n      \"answer\": \"delete that one\",\n      \"option\": \"Delete entry\",\n      \"turn\": \"turn 12\"\n    },\n    {\n      \"id\": \"M1\",\n      \"answer\": \"yes save\",\n      \"option\": \"Save\",\n      \"turn\": \"turn 13\"\n    }\n  ],\n  \"track\": [\n    \"{ROOT}/repo/memory/MEMORY.md\"\n  ]\n}\n",
-        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Changed.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: fixture) / Skip\"\n    },\n    {\n      \"id\": \"C1\",\n      \"kind\": \"conflict\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Old rule\",\n      \"text\": \"Gate item C1: entry Old rule contradicts shared/AGENTS.md\\nOptions: Keep entry / Update governance / Delete entry (recommended: dead rule) / Defer\"\n    },\n    {\n      \"id\": \"M1\",\n      \"kind\": \"memory-proposal\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"New lesson\",\n      \"shown_text\": \"### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\n\",\n      \"text\": \"Gate item M1: save a memory entry\\nEntry:\\n### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\nOptions: Save (recommended: verified) / Skip\"\n    },\n    {\n      \"id\": \"g2\",\n      \"why\": \"w2\",\n      \"options\": \"Apply / Skip\"\n    }\n  ]\n}\n"
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Changed.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: fixture) / Skip\"\n    },\n    {\n      \"id\": \"C1\",\n      \"kind\": \"conflict\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Old rule\",\n      \"text\": \"Gate item C1: entry Old rule contradicts shared/AGENTS.md\\nOptions: Keep entry / Update governance / Delete entry (recommended: dead rule) / Defer\\nKeep entry writes: **Governance-conflict**: keep-entry 2026-10-23 (sweep)\\nUpdate governance writes: **Governance-conflict**: rule-update-pending 2026-10-23 (sweep)\\nDefer writes: **Governance-conflict**: deferred 2026-10-23 (sweep)\",\n      \"shown_text_by_option\": {\n        \"Keep entry\": \"**Governance-conflict**: keep-entry 2026-10-23 (sweep)\",\n        \"Update governance\": \"**Governance-conflict**: rule-update-pending 2026-10-23 (sweep)\",\n        \"Defer\": \"**Governance-conflict**: deferred 2026-10-23 (sweep)\"\n      }\n    },\n    {\n      \"id\": \"M1\",\n      \"kind\": \"memory-proposal\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"New lesson\",\n      \"shown_text\": \"### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\n\",\n      \"text\": \"Gate item M1: save a memory entry\\nEntry:\\n### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\nOptions: Save (recommended: verified) / Skip\",\n      \"shown_text_by_option\": {\n        \"Save\": \"### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\n\",\n        \"record with an explicit override note\": \"### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\n\"\n      }\n    },\n    {\n      \"id\": \"g2\",\n      \"why\": \"w2\",\n      \"options\": \"Apply / Skip\"\n    }\n  ]\n}\n"
       }
     },
     {
@@ -349,7 +349,7 @@
     },
     {
       "write": {
-        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate for the decisions fixture.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: fixture) / Skip\"\n    },\n    {\n      \"id\": \"C1\",\n      \"text\": \"Gate item C1: entry Old rule contradicts shared/AGENTS.md\\nOptions: Keep entry / Update governance / Delete entry (recommended: dead rule) / Defer\"\n    },\n    {\n      \"id\": \"M1\",\n      \"kind\": \"memory-proposal\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"New lesson\",\n      \"shown_text\": \"### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\n\",\n      \"text\": \"Gate item M1: save a memory entry\\nEntry:\\n### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\nOptions: Save (recommended: verified) / Skip\"\n    },\n    {\n      \"id\": \"g2\",\n      \"why\": \"w2\",\n      \"options\": \"Apply / Skip\"\n    }\n  ]\n}\n"
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate for the decisions fixture.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: fixture) / Skip\"\n    },\n    {\n      \"id\": \"C1\",\n      \"text\": \"Gate item C1: entry Old rule contradicts shared/AGENTS.md\\nOptions: Keep entry / Update governance / Delete entry (recommended: dead rule) / Defer\"\n    },\n    {\n      \"id\": \"M1\",\n      \"kind\": \"memory-proposal\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"New lesson\",\n      \"shown_text\": \"### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\n\",\n      \"text\": \"Gate item M1: save a memory entry\\nEntry:\\n### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\nOptions: Save (recommended: verified) / Skip\",\n      \"shown_text_by_option\": {\n        \"Save\": \"### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\n\",\n        \"record with an explicit override note\": \"### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\n\"\n      }\n    },\n    {\n      \"id\": \"g2\",\n      \"why\": \"w2\",\n      \"options\": \"Apply / Skip\"\n    }\n  ]\n}\n"
       }
     },
     {
@@ -381,7 +381,7 @@
     },
     {
       "write": {
-        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate for the decisions fixture.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: fixture) / Skip\"\n    },\n    {\n      \"id\": \"C1\",\n      \"kind\": \"conflict\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Old rule\",\n      \"text\": \"Gate item C1: entry Old rule contradicts shared/AGENTS.md\\nOptions: Keep entry / Update governance / Delete entry (recommended: dead rule) / Defer\"\n    },\n    {\n      \"id\": \"M1\",\n      \"kind\": \"memory-proposal\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"New lesson\",\n      \"shown_text\": \"### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\n\",\n      \"text\": \"Gate item M1: save a memory entry\\nEntry:\\n### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\nOptions: Save (recommended: verified) / Skip\"\n    },\n    {\n      \"id\": \"g2\",\n      \"why\": \"w2\",\n      \"options\": \"Apply / Skip\"\n    }\n  ]\n}\n"
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate for the decisions fixture.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: fixture) / Skip\"\n    },\n    {\n      \"id\": \"C1\",\n      \"kind\": \"conflict\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Old rule\",\n      \"text\": \"Gate item C1: entry Old rule contradicts shared/AGENTS.md\\nOptions: Keep entry / Update governance / Delete entry (recommended: dead rule) / Defer\\nKeep entry writes: **Governance-conflict**: keep-entry 2026-10-23 (sweep)\\nUpdate governance writes: **Governance-conflict**: rule-update-pending 2026-10-23 (sweep)\\nDefer writes: **Governance-conflict**: deferred 2026-10-23 (sweep)\",\n      \"shown_text_by_option\": {\n        \"Keep entry\": \"**Governance-conflict**: keep-entry 2026-10-23 (sweep)\",\n        \"Update governance\": \"**Governance-conflict**: rule-update-pending 2026-10-23 (sweep)\",\n        \"Defer\": \"**Governance-conflict**: deferred 2026-10-23 (sweep)\"\n      }\n    },\n    {\n      \"id\": \"M1\",\n      \"kind\": \"memory-proposal\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"New lesson\",\n      \"shown_text\": \"### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\n\",\n      \"text\": \"Gate item M1: save a memory entry\\nEntry:\\n### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\nOptions: Save (recommended: verified) / Skip\",\n      \"shown_text_by_option\": {\n        \"Save\": \"### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\n\",\n        \"record with an explicit override note\": \"### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\n\"\n      }\n    },\n    {\n      \"id\": \"g2\",\n      \"why\": \"w2\",\n      \"options\": \"Apply / Skip\"\n    }\n  ]\n}\n"
       }
     },
     {
@@ -487,6 +487,96 @@
       "exit": 0,
       "stdout_contains": [
         "1 Applied item(s) replayed"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/answers.json": "{\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"answer\": \"apply it\",\n      \"option\": \"Apply\",\n      \"turn\": \"turn 12\"\n    },\n    {\n      \"id\": \"C1\",\n      \"answer\": \"keep it\",\n      \"option\": \"Keep entry\",\n      \"turn\": \"turn 12\"\n    },\n    {\n      \"id\": \"M1\",\n      \"answer\": \"yes save\",\n      \"option\": \"Save\",\n      \"turn\": \"turn 13\"\n    }\n  ],\n  \"track\": [\n    \"{ROOT}/repo/memory/MEMORY.md\"\n  ]\n}\n"
+      },
+      "description_marker": "shown-text"
+    },
+    {
+      "argv": [
+        "decisions",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}",
+        "--gate-sha",
+        "{SHA256:handoff/gate.md}"
+      ],
+      "exit": 0,
+      "text_contains": {
+        "handoff/decisions.json": [
+          "\"shown_text\": \"**Governance-conflict**: keep-entry 2026-10-23 (sweep)\""
+        ]
+      }
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"preamble\": \"Gate for the decisions fixture.\",\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: fixture) / Skip\"\n    },\n    {\n      \"id\": \"C1\",\n      \"kind\": \"conflict\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"Old rule\",\n      \"text\": \"Gate item C1: entry Old rule contradicts shared/AGENTS.md\\nOptions: Keep entry / Update governance / Delete entry (recommended: dead rule) / Defer\\nKeep entry writes: **Governance-conflict**: keep-entry 2026-10-23 (sweep)\\nUpdate governance writes: **Governance-conflict**: rule-update-pending 2026-10-23 (sweep)\\nDefer writes: **Governance-conflict**: deferred 2026-10-23 (sweep)\"\n    },\n    {\n      \"id\": \"M1\",\n      \"kind\": \"memory-proposal\",\n      \"file\": \"{ROOT}/repo/memory/MEMORY.md\",\n      \"heading\": \"New lesson\",\n      \"shown_text\": \"### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\n\",\n      \"text\": \"Gate item M1: save a memory entry\\nEntry:\\n### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\nOptions: Save (recommended: verified) / Skip\",\n      \"shown_text_by_option\": {\n        \"Save\": \"### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\n\",\n        \"record with an explicit override note\": \"### New lesson\\n\\n**Why**: w\\n**How to apply**: h\\n**Source**: s | **Verified**: 2026-10-23 (sweep)\\n\"\n      }\n    },\n    {\n      \"id\": \"g2\",\n      \"why\": \"w2\",\n      \"options\": \"Apply / Skip\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "gate",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "C1: option 'keep entry' writes memory text, but the item carries no"
+      ]
+    },
+    {
+      "marker": "evidence",
+      "write": {
+        "repo/docs/RULES.md": "# Rules\n\nThe rule the entry asked for has landed in this file.\n",
+        "proj/ev/memory/MEMORY.md": "# M\n\n## Feedback\n\n### Plain entry\n\n**Why**: w\n**Source**: s | **Verified**: 2026-09-01 (sweep)\n\n### Human entry\n\n**Why**: w\n**Source**: s | **Verified**: 2026-09-01 (human:q)\n",
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: fixture) / Skip\"\n    },\n    {\n      \"id\": \"g2\",\n      \"why\": \"w2\",\n      \"options\": \"Apply / Skip\"\n    },\n    {\n      \"id\": \"E1\",\n      \"kind\": \"stale\",\n      \"file\": \"{ROOT}/proj/ev/memory/MEMORY.md\",\n      \"heading\": \"Plain entry\",\n      \"text\": \"Gate item E1: stale entry Plain entry\\nRule: \\\"The rule the entry asked for has landed in this file.\\\"\\nOptions: Delete (recommended: the rule landed) / Keep / Defer\",\n      \"evidence\": {\n        \"file\": \"{ROOT}/repo/docs/RULES.md\",\n        \"quote\": \"The rule the entry asked for has landed in this file.\"\n      }\n    },\n    {\n      \"id\": \"E2\",\n      \"kind\": \"stale\",\n      \"file\": \"{ROOT}/proj/ev/memory/MEMORY.md\",\n      \"heading\": \"Plain entry\",\n      \"text\": \"Gate item E2: stale entry Plain entry\\nRule: \\\"This sentence is not in the governance file at all.\\\"\\nOptions: Delete (recommended: the rule landed) / Keep / Defer\",\n      \"evidence\": {\n        \"file\": \"{ROOT}/repo/docs/RULES.md\",\n        \"quote\": \"This sentence is not in the governance file at all.\"\n      }\n    },\n    {\n      \"id\": \"E3\",\n      \"kind\": \"stale\",\n      \"file\": \"{ROOT}/proj/ev/memory/MEMORY.md\",\n      \"heading\": \"Human entry\",\n      \"text\": \"Gate item E3: stale entry Human entry\\nRule: \\\"The rule the entry asked for has landed in this file.\\\"\\nOptions: Delete (recommended: the rule landed) / Keep / Defer\",\n      \"evidence\": {\n        \"file\": \"{ROOT}/repo/docs/RULES.md\",\n        \"quote\": \"The rule the entry asked for has landed in this file.\"\n      }\n    },\n    {\n      \"id\": \"E4\",\n      \"kind\": \"stale\",\n      \"file\": \"{ROOT}/proj/ev/memory/MEMORY.md\",\n      \"heading\": \"Plain entry\",\n      \"text\": \"Gate item E4: stale entry Plain entry\\nRule: \\\"The rule the entry asked for has landed in this file.\\\"\\nOptions: Delete (recommended: the rule landed) / Keep / Defer\",\n      \"evidence\": {\n        \"file\": \"{ROOT}/home/.agent-playbook/dream-work/handoff/x.md\",\n        \"quote\": \"The rule the entry asked for has landed in this file.\"\n      }\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "gate",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "E4: evidence file is in the work folder or a memory folder"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"items\": [\n    {\n      \"id\": \"g1\",\n      \"why\": \"w1\",\n      \"options\": \"Apply (recommended: fixture) / Skip\"\n    },\n    {\n      \"id\": \"g2\",\n      \"why\": \"w2\",\n      \"options\": \"Apply / Skip\"\n    },\n    {\n      \"id\": \"E1\",\n      \"kind\": \"stale\",\n      \"file\": \"{ROOT}/proj/ev/memory/MEMORY.md\",\n      \"heading\": \"Plain entry\",\n      \"text\": \"Gate item E1: stale entry Plain entry\\nRule: \\\"The rule the entry asked for has landed in this file.\\\"\\nOptions: Delete (recommended: the rule landed) / Keep / Defer\",\n      \"evidence\": {\n        \"file\": \"{ROOT}/repo/docs/RULES.md\",\n        \"quote\": \"The rule the entry asked for has landed in this file.\"\n      }\n    },\n    {\n      \"id\": \"E2\",\n      \"kind\": \"stale\",\n      \"file\": \"{ROOT}/proj/ev/memory/MEMORY.md\",\n      \"heading\": \"Plain entry\",\n      \"text\": \"Gate item E2: stale entry Plain entry\\nRule: \\\"This sentence is not in the governance file at all.\\\"\\nOptions: Delete (recommended: the rule landed) / Keep / Defer\",\n      \"evidence\": {\n        \"file\": \"{ROOT}/repo/docs/RULES.md\",\n        \"quote\": \"This sentence is not in the governance file at all.\"\n      }\n    },\n    {\n      \"id\": \"E3\",\n      \"kind\": \"stale\",\n      \"file\": \"{ROOT}/proj/ev/memory/MEMORY.md\",\n      \"heading\": \"Human entry\",\n      \"text\": \"Gate item E3: stale entry Human entry\\nRule: \\\"The rule the entry asked for has landed in this file.\\\"\\nOptions: Delete (recommended: the rule landed) / Keep / Defer\",\n      \"evidence\": {\n        \"file\": \"{ROOT}/repo/docs/RULES.md\",\n        \"quote\": \"The rule the entry asked for has landed in this file.\"\n      }\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "gate",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "exit": 0,
+      "text_contains": {
+        "handoff/gate.md": [
+          "Checked by gate: the quoted governance text is in",
+          "Checked by gate: the quoted governance text is NOT in"
+        ]
+      }
+    },
+    {
+      "argv": [
+        "gate",
+        "--index",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "E1\tstale\t",
+        "Plain entry\tDelete\tbulk\n",
+        "Plain entry\tDelete\task\n",
+        "Human entry\tDelete\task"
       ]
     }
   ]

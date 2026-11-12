@@ -1,5 +1,5 @@
 {
-  "description": "User memory behind the config repo's sanctioned `memory` link lives in the store repo: the sweep's user-memory files and state are committed there, in one store-repo commit with the project store's file, under the default subject, and that commit carries the usage line; the config repo gets no commit.",
+  "description": "User memory behind the config repo's sanctioned `memory` link lives in the store repo: the sweep's user-memory files and state are committed there, in one store-repo commit with the project store's file, under the default subject, and that commit carries the usage line; the config repo gets no commit. push --plan then checks that store-repo commit by its store-repo paths (user/memory/...), which name the same files as the config repo's link, and raises no target refusal for them.",
   "now": "2026-10-12T12:00:00Z",
   "store_repo": "stores",
   "store_repo_real_git": true,
@@ -178,6 +178,28 @@
           "equals": "1"
         }
       ]
+    },
+    {
+      "argv": [
+        "push",
+        "--plan",
+        "--decisions",
+        "handoff/decisions.json",
+        "--decisions-sha",
+        "{SHA256:handoff/decisions.json}",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "push-plan sha256:"
+      ],
+      "root_not_contains": {
+        "home/.agent-playbook/dream-work/sweep/push-plan.json": [
+          "neither an allowed memory target",
+          "is not under"
+        ]
+      }
     }
   ]
 }
