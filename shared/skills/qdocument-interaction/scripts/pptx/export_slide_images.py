@@ -8,22 +8,41 @@ such as an architecture diagram, and --hide to leave out named shapes (a caption
 
 The deck is opened read-only and never saved; shapes are removed from the in-memory copy only.
 
+PowerPoint runs as a single instance per user: COM attaches to the user's running PowerPoint, and
+quitting that instance closes every presentation the user has open. So the script refuses to run
+while PowerPoint is already running (exit 4), unless --allow-running is given. With --allow-running
+it works inside the user's PowerPoint, closes only its own hidden copy and never quits. When the
+script started PowerPoint itself, it quits it at the end only if no other presentation is open.
+
 Usage:
     python export_slide_images.py <deck.pptx> <out_dir> [--slides 12,13,20-25] [--width 2667]
                                   [--full] [--keep-placeholders] [--hide NAME ...] [--pad 4]
+                                  [--allow-running]
 
 Writes <out_dir>/s<NN>.png per slide and prints JSON: [{"slide", "file", "size", "removed", "kept"}].
 Slides left with no shape after the removal are reported with "file": null.
 
-Exit codes: 0 = success, 1 = failure, 2 = PowerPoint or pywin32 not available
+Exit codes: 0 = success, 1 = failure, 2 = PowerPoint or pywin32 not available,
+            4 = PowerPoint is already running and --allow-running was not given (nothing was touched)
 """
 import argparse
 import json
 import os
+import subprocess
 import sys
 
 PLACEHOLDER, GROUP = 14, 6
 PICTURE_CONTENT = 13  # PlaceholderFormat.ContainedType of a picture placeholder: keep it
+
+
+def powerpoint_running():
+    """True when a POWERPNT.EXE process exists. Read from the process list, so PowerPoint is not touched."""
+    try:
+        out = subprocess.run(["tasklist", "/FI", "IMAGENAME eq POWERPNT.EXE", "/FO", "CSV", "/NH"],
+                             capture_output=True, text=True, timeout=30).stdout
+    except (OSError, subprocess.SubprocessError):
+        return True  # cannot tell: assume running, so the user's work is never at risk
+    return "powerpnt.exe" in out.lower()
 
 
 def parse_slides(spec, count):
@@ -109,6 +128,9 @@ def main():
     ap.add_argument("--keep-placeholders", action="store_true", help="keep text placeholders in the crop")
     ap.add_argument("--hide", action="append", default=[], help="shape name to leave out (repeatable)")
     ap.add_argument("--pad", type=int, default=4, help="crop margin in pixels")
+    ap.add_argument("--allow-running", action="store_true",
+                    help="work inside an already running PowerPoint (the user's): close only the copy this "
+                         "script opened and never quit. Use only with the user's agreement")
     args = ap.parse_args()
     if not os.path.isfile(args.pptx):
         print("file not found: %s" % args.pptx, file=sys.stderr)
@@ -119,6 +141,12 @@ def main():
     except ImportError as e:
         print("missing dependency: %s (needs pywin32 and Pillow, Windows with PowerPoint)" % e, file=sys.stderr)
         sys.exit(2)
+    was_running = powerpoint_running()
+    if was_running and not args.allow_running:
+        print("PowerPoint is already running, so it may hold the user's open presentations; nothing was "
+              "touched. Ask the user to close PowerPoint, or rerun with --allow-running if they agree.",
+              file=sys.stderr)
+        sys.exit(4)
     os.makedirs(args.out_dir, exist_ok=True)
     try:
         app = win32com.client.DispatchEx("PowerPoint.Application")
@@ -126,6 +154,7 @@ def main():
         print("PowerPoint not available: %s" % e, file=sys.stderr)
         sys.exit(2)
     results = []
+    failed = False
     try:
         pres = app.Presentations.Open(os.path.abspath(args.pptx), True, False, False)  # read-only, no window
         try:
@@ -136,9 +165,21 @@ def main():
             pres.Close()
     except Exception as e:
         print("export failed: %s" % e, file=sys.stderr)
-        sys.exit(1)
+        failed = True
     finally:
-        app.Quit()
+        # Quit only a PowerPoint this script started, and only when nothing else is open in it:
+        # the user may have opened a presentation, which joins this same instance, during the run.
+        if not was_running:
+            try:
+                if app.Presentations.Count == 0:
+                    app.Quit()
+                else:
+                    print("PowerPoint left running: %d presentation(s) were opened during the export"
+                          % app.Presentations.Count, file=sys.stderr)
+            except Exception:
+                pass
+    if failed:
+        sys.exit(1)
     print(json.dumps(results, indent=1))
 
 
