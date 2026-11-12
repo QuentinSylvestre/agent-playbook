@@ -43,7 +43,12 @@ Interactive setup:
 4. Offers to clone your store repo or create a new one (see below).
 5. Writes `~/.agent-playbook/config`.
 
-It never replaces a file of yours without asking: it backs the file up to `.bak` first.
+Setup records every file it writes in `~/.agent-playbook/deploy-lock.tsv`, so a re-run changes
+only what changed. A file of yours where the playbook puts a link is backed up to `<file>.bak` before it
+is replaced: an interactive run asks first, while `--yes` and a run with no terminal back up without
+asking. A file setup wrote and you then edited is backed up the same way, without asking. Setup keeps
+one `.bak` per path, so a later backup replaces an earlier one. A skill folder of yours with a
+playbook skill's name is never replaced.
 
 Non-interactive: `./setup.sh --yes --providers claude,codex`. Remove everything again with
 `./setup.sh --uninstall` (add `--purge` to drop the pointer file too). See `./setup.sh --help`.

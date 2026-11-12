@@ -17,10 +17,15 @@
 #   - SKILL.md overlay : OVERLAY.md          -> appended to the deployed SKILL.md
 #   - aux-file overlay  : <stem>.OVERLAY.md  -> appended to the deployed <stem>.md
 #     (e.g. memory-rules.OVERLAY.md -> memory-rules.md)
-# Any overlay forces a copy of the skill dir (a single file inside a symlinked dir
-# cannot be overwritten); aux merges run AFTER the dir copy. SKILL.OVERLAY.md is
-# reserved/forbidden (SKILL.md uses the bare OVERLAY.md) and an overlay whose target
-# file is absent is skipped with a warning. See Merge-Overlay / Apply-AuxOverlays below.
+# Any overlay makes the skill a generated copy (a single file inside a symlinked dir
+# cannot be overwritten). SKILL.OVERLAY.md is reserved/forbidden (SKILL.md uses the
+# bare OVERLAY.md) and an overlay whose target file is absent is skipped with a
+# warning. See Merge-Overlay / Get-AuxOverlayTargets / Deploy-GeneratedCopy below.
+#
+# Ownership: every regular file setup writes is recorded in the deploy lock
+# (~\.agent-playbook\deploy-lock.tsv, see "Deploy lock" below). A re-run writes only
+# what changed, removes what it wrote once the source is gone, and moves a file you
+# edited or own to <path>.bak (one backup per path) before it writes there.
 
 param(
     [string]$Providers = "",
@@ -53,9 +58,10 @@ Deploys agent-playbook into the AI providers you choose. Safe to re-run.
                     a file of yours that is in the way).
   -StoresUrl URL    clone the store repo from URL when it is missing.
   -NoStores         do not set up a store repo (memory is disabled until you do).
-  -Uninstall        remove what setup deployed (links into this repo, generated
-                    copies, restored .bak files, Claude Code settings entries)
-                    for the chosen providers.
+  -Uninstall        remove what setup deployed for the chosen providers: links into
+                    this repo, the files it wrote and you did not edit (by the deploy
+                    lock), the Claude Code settings entries; restore each .bak setup
+                    made, and kiro-cli's default agent when setup set it.
   -Purge            with -Uninstall: also remove ~\.agent-playbook\config and the
                     repo's memory link. The store repo itself is never touched.
   -Help             this text.
@@ -112,10 +118,263 @@ function Test-EngineLink {
 # Remove a directory link without following it (Remove-Item -Recurse can delete the target's files).
 function Remove-DirLink { param([string]$Path) Invoke-Act "rmdir $Path" { cmd /c rmdir "$Path" 2>$null } }
 
+# --- Deploy lock -----------------------------------------------------------
+# ~\.agent-playbook\deploy-lock.tsv names the regular files setup wrote, so a re-run can tell its
+# own unedited files from yours. The format, the kinds and the ownership rule are documented once,
+# in setup.sh's "Deploy lock" section; this twin writes the same bytes on the same machine (rows
+# sorted by ordinal order, LF, no BOM). The path is built from $env:USERPROFILE only: PowerShell's
+# own $HOME and ~ name the real profile even when USERPROFILE points at a sandbox.
+
+$LockHeader = "# agent-playbook deploy lock v1 (written by setup; kind<TAB>path<TAB>sha256)"
+$LockFile = Join-Path (Join-Path $env:USERPROFILE ".agent-playbook") "deploy-lock.tsv"
+$LockSettingKey = "kiro-cli/chat.defaultAgent"
+$LockFileKinds = @('copy-dir-recursive', 'merge-file', 'copy-file', 'template-file')
+$LockOld = New-Object 'System.Collections.Generic.List[string[]]'
+$LockOldValue = @{}
+$LockNew = New-Object 'System.Collections.Generic.List[string]'
+$Utf8NoBom = New-Object System.Text.UTF8Encoding $false
+
+function Get-FileSha {
+    param([string]$Path)
+    return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+
+function Get-BytesSha {
+    param([byte[]]$Bytes)
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { return [BitConverter]::ToString($sha.ComputeHash($Bytes)).Replace('-', '').ToLowerInvariant() } finally { $sha.Dispose() }
+}
+
+# Get-ShaMap: path -> lowercase sha256 for many files, keyed by the path exactly as given
+# (Get-FileHash reports a resolved long path, which would not match a short-name USERPROFILE).
+function Get-ShaMap {
+    param([string[]]$Paths)
+    $map = @{}
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try {
+        foreach ($p in $Paths) {
+            if (-not $p) { continue }
+            $fs = [IO.File]::OpenRead($p)
+            try { $map[$p] = [BitConverter]::ToString($sha.ComputeHash($fs)).Replace('-', '').ToLowerInvariant() } finally { $fs.Dispose() }
+        }
+    } finally { $sha.Dispose() }
+    return $map
+}
+
+function ConvertTo-LockKey {
+    param([string]$Path)
+    if ($Path.StartsWith($env:USERPROFILE + '\', [StringComparison]::OrdinalIgnoreCase)) {
+        return '~/' + $Path.Substring($env:USERPROFILE.Length + 1).Replace('\', '/')
+    }
+    return $Path.Replace('\', '/')
+}
+
+function ConvertFrom-LockKey {
+    param([string]$Key)
+    return Join-Path $env:USERPROFILE ($Key.Substring(2).Replace('/', '\'))
+}
+
+function Get-KeyProvider {
+    param([string]$Key)
+    if ($Key.StartsWith('~/.kiro/') -or $Key -eq $LockSettingKey) { return 'kiro' }
+    foreach ($p in 'claude', 'codex', 'gemini') { if ($Key.StartsWith("~/.$p/")) { return $p } }
+    return 'none'
+}
+
+# Get-PathAttributes: the entry's own attributes (a link is not followed), or $null when absent.
+function Get-PathAttributes {
+    param([string]$Path)
+    try { return [IO.File]::GetAttributes($Path) } catch { return $null }
+}
+
+function Test-Reparse {
+    param([string]$Path)
+    $a = Get-PathAttributes $Path
+    return [bool]($null -ne $a -and ($a -band [IO.FileAttributes]::ReparsePoint))
+}
+
+function Test-RegularFile {
+    param([string]$Path)
+    $a = Get-PathAttributes $Path
+    return [bool]($null -ne $a -and -not ($a -band ([IO.FileAttributes]::Directory -bor [IO.FileAttributes]::ReparsePoint)))
+}
+
+# Read-DeployLock: the previous lock's rows, or none. The lock is untrusted input: another first
+# line or one malformed row means no lock (the first-run case); only ~/ paths with no .. segment.
+function Read-DeployLock {
+    $LockOld.Clear(); $LockOldValue.Clear()
+    if (-not (Test-Path -LiteralPath $LockFile -PathType Leaf)) { return }
+    $text = $Utf8NoBom.GetString([IO.File]::ReadAllBytes($LockFile))
+    $lines = $text.Split("`n")
+    if ($text.EndsWith("`n")) { $lines = @($lines[0..($lines.Count - 2)]) }
+    $rows = @()
+    $ok = ($lines.Count -ge 1) -and ($lines[0] -ceq $LockHeader)
+    for ($i = 1; $ok -and $i -lt $lines.Count; $i++) {
+        $c = $lines[$i].Split("`t")
+        if ($c.Count -ne 3) { $ok = $false; break }
+        if ($c[0] -ceq 'setting') {
+            if ($c[1] -cne $LockSettingKey -or $c[2] -eq '') { $ok = $false }
+        } elseif (($LockFileKinds + 'backup') -cnotcontains $c[0]) {
+            $ok = $false
+        } elseif (-not $c[1].StartsWith('~/') -or ("/" + $c[1] + "/").Contains('/../')) {
+            $ok = $false
+        } elseif (-not ($c[0] -ceq 'backup' -and $c[2] -ceq '-') -and $c[2] -cnotmatch '^[0-9a-f]{64}$') {
+            $ok = $false
+        }
+        $rows += , $c
+    }
+    if (-not $ok) {
+        Write-Host "  NOTE: $LockFile is not a deploy lock this setup can read; treating this as a first run"
+        return
+    }
+    foreach ($c in $rows) {
+        $LockOld.Add($c)
+        $k = $c[0] + "`t" + $c[1]
+        if (-not $LockOldValue.ContainsKey($k)) { $LockOldValue[$k] = $c[2] }
+    }
+}
+
+function Add-LockRow {
+    param([string]$Kind, [string]$Key, [string]$Value)
+    $LockNew.Add("$Kind`t$Key`t$Value")
+}
+
+function Get-LockValue {
+    param([string]$Kind, [string]$Key)
+    $k = "$Kind`t$Key"
+    if ($LockOldValue.ContainsKey($k)) { return $LockOldValue[$k] }
+    return ''
+}
+
+# Complete-DeployLock: write the new lock when its bytes differ (temp file, then replace). New rows
+# win over carried rows for the same path and kind class. -DropEmpty (uninstall) deletes an empty lock.
+function Complete-DeployLock {
+    param([string[]]$Carry, [switch]$DropEmpty)
+    if ($DryRun) { return }
+    $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+    $rows = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($line in (@($LockNew) + @($Carry))) {
+        if (-not $line) { continue }
+        $c = $line.Split("`t")
+        $cls = if ($c[0] -eq 'backup' -or $c[0] -eq 'setting') { $c[0] } else { 'file' }
+        if ($seen.Add($cls + "`t" + $c[1])) { $rows.Add($line) }
+    }
+    $arr = $rows.ToArray()
+    [Array]::Sort($arr, [StringComparer]::Ordinal)
+    $exists = Test-Path -LiteralPath $LockFile -PathType Leaf
+    if ($arr.Count -eq 0) {
+        if ($DropEmpty -and $exists) { Remove-Item -LiteralPath $LockFile -Force; Write-Host "  REMOVED: $LockFile"; return }
+        if (-not $exists) { return }
+    }
+    $text = $LockHeader + "`n"
+    foreach ($r in $arr) { $text += $r + "`n" }
+    $bytes = $Utf8NoBom.GetBytes($text)
+    if ($exists -and ((Get-BytesSha $bytes) -eq (Get-FileSha $LockFile))) { Write-Host "  OK: $LockFile"; return }
+    New-DirIfMissing (Split-Path -Parent $LockFile)
+    $tmp = "$LockFile.tmp-$PID"
+    [IO.File]::WriteAllBytes($tmp, $bytes)
+    if ($exists) { [IO.File]::Replace($tmp, $LockFile, [NullString]::Value) } else { [IO.File]::Move($tmp, $LockFile) }
+    Write-Host "  WROTE: $LockFile"
+}
+
+# Get-LockCarryRows: the previous lock's rows this run keeps: rows of a provider not deployed now,
+# and backup rows whose .bak is still there.
+function Get-LockCarryRows {
+    $out = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($c in $LockOld) {
+        if ($c[0] -eq 'backup') {
+            if ($null -ne (Get-PathAttributes ((ConvertFrom-LockKey $c[1]) + '.bak'))) { $out.Add($c -join "`t") }
+        } elseif (-not (Test-Wants (Get-KeyProvider $c[1]))) {
+            $out.Add($c -join "`t")
+        }
+    }
+    return , $out.ToArray()
+}
+
+# Get-OwnAction: the ownership rule, the one decision for every file setup writes (setup.sh own_rule).
+function Get-OwnAction {
+    param([string]$Want, [string]$Cur, [string]$Locked)
+    if ($Cur -eq '-') { return 'write' }
+    if ($Cur -eq $Want) { return 'keep' }
+    if ($Locked -ne '-' -and $Cur -eq $Locked) { return 'replace' }
+    return 'backup'
+}
+
+# Test-NoLinkParent: no folder between Top (exclusive) and Path is a link.
+function Test-NoLinkParent {
+    param([string]$Path, [string]$Top)
+    $d = [IO.Path]::GetDirectoryName($Path)
+    while ($d -and $d.Length -gt $Top.Length -and $d -ne $Top) {
+        if (Test-Reparse $d) { return $false }
+        $d = [IO.Path]::GetDirectoryName($d)
+    }
+    return $true
+}
+
+# Remove-EmptyDirs: remove every empty folder under Dir, Dir included, deepest first, never
+# entering a link (setup.sh: find Dir -type d -empty -delete).
+function Remove-EmptyDirs {
+    param([string]$Dir)
+    if ($DryRun -or -not (Test-Path -LiteralPath $Dir -PathType Container) -or (Test-Reparse $Dir)) { return }
+    $dirs = New-Object 'System.Collections.Generic.List[string]'
+    $stack = New-Object 'System.Collections.Generic.Stack[string]'
+    $stack.Push($Dir)
+    while ($stack.Count) {
+        $d = $stack.Pop()
+        $dirs.Add($d)
+        foreach ($e in (New-Object IO.DirectoryInfo $d).GetDirectories()) {
+            if (-not ($e.Attributes -band [IO.FileAttributes]::ReparsePoint)) { $stack.Push([IO.Path]::Combine($d, $e.Name)) }
+        }
+    }
+    for ($i = $dirs.Count - 1; $i -ge 0; $i--) {
+        if (-not [IO.Directory]::EnumerateFileSystemEntries($dirs[$i]).GetEnumerator().MoveNext()) { [IO.Directory]::Delete($dirs[$i]) }
+    }
+}
+
+# Get-SkillDirOf: the ~\.kiro\skills\<name> folder a path lies in, or '' outside one.
+function Get-SkillDirOf {
+    param([string]$Path)
+    $root = Join-Path $env:USERPROFILE ".kiro\skills"
+    if (-not $Path.StartsWith($root + '\', [StringComparison]::OrdinalIgnoreCase)) { return '' }
+    $rest = $Path.Substring($root.Length + 1)
+    $i = $rest.IndexOf('\')
+    if ($i -lt 1) { return '' }
+    return Join-Path $root $rest.Substring(0, $i)
+}
+
+# Remove-PathNoFollow: delete a file, a folder or a link without following any link inside it.
+function Remove-PathNoFollow {
+    param([string]$Path)
+    $item = Get-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
+    if (-not $item) { return }
+    if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+        if ($item.PSIsContainer) { [IO.Directory]::Delete($Path) } else { [IO.File]::Delete($Path) }
+    } elseif ($item.PSIsContainer) {
+        [IO.Directory]::Delete($Path, $true)
+    } else {
+        [IO.File]::Delete($Path)
+    }
+}
+
+# Backup-Path: move a file, folder or link that is not setup's to <path>.bak, the single bounded
+# backup (an older .bak is removed first), and record the backup in the lock.
+function Backup-Path {
+    param([string]$Path)
+    $h = if (Test-RegularFile $Path) { Get-FileSha $Path } else { '-' }
+    Write-Host "  BACKUP: $Path -> ${Path}.bak"
+    Invoke-Act "move $Path ${Path}.bak" {
+        Remove-PathNoFollow "${Path}.bak"
+        $item = Get-Item -LiteralPath $Path -Force
+        if ($item.PSIsContainer) { [IO.Directory]::Move($Path, "${Path}.bak") } else { [IO.File]::Move($Path, "${Path}.bak") }
+    }
+    Add-LockRow 'backup' (ConvertTo-LockKey $Path) $h
+}
+
 # --- Linking ---------------------------------------------------------------
 
-# Clear-WayFor: a non-link file or folder of the user's sits where a link goes.
-# Returns $true when the path is free afterwards (backed up to .bak), $false to skip it.
+# Clear-WayFor: a file, folder or link of the user's (a link that does not point into this repo)
+# sits where a link goes. Returns $true when the path is free afterwards (backed up to .bak),
+# $false to skip it. Only an interactive run asks; -Yes and a run with no console back up and replace.
 function Clear-WayFor {
     param([string]$Path)
     if ($Interactive) {
@@ -125,9 +384,30 @@ function Clear-WayFor {
             return $false
         }
     }
-    Write-Host "  BACKUP: $Path -> ${Path}.bak"
-    Invoke-Act "move $Path ${Path}.bak" { Move-Item $Path "${Path}.bak" -Force }
+    Backup-Path $Path
     return $true
+}
+
+# Clear-LinkWay: before a link is made at Link. 'free' when the path is free (an outdated link into
+# this repo removed, anything else backed up), 'skip' to skip it, 'ok' when the right link is there.
+function Clear-LinkWay {
+    param([string]$Link, [string]$Target)
+    $item = Get-Item -LiteralPath $Link -Force -ErrorAction SilentlyContinue
+    if (-not $item) { return 'free' }
+    if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
+        $currentTarget = $item.Target
+        if ($currentTarget -eq $Target) {
+            Write-Host "  OK: $Link -> $Target"
+            return 'ok'
+        }
+        if (Test-EngineLink $Link) {
+            Write-Host "  UPDATE: $Link (was -> $currentTarget)"
+            if ($item.PSIsContainer) { Remove-DirLink $Link } else { Invoke-Act "remove $Link" { Remove-Item -LiteralPath $Link -Force } }
+            return 'free'
+        }
+    }
+    if (Clear-WayFor $Link) { return 'free' }
+    return 'skip'
 }
 
 function Link-File {
@@ -135,21 +415,7 @@ function Link-File {
         [string]$Target,  # source file in repo
         [string]$Link     # symlink to create
     )
-
-    if (Test-Path $Link) {
-        $item = Get-Item $Link -Force
-        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
-            $currentTarget = $item.Target
-            if ($currentTarget -eq $Target) {
-                Write-Host "  OK: $Link -> $Target"
-                return
-            }
-            Write-Host "  UPDATE: $Link (was -> $currentTarget)"
-            Invoke-Act "remove $Link" { Remove-Item $Link -Force }
-        } else {
-            if (-not (Clear-WayFor $Link)) { return }
-        }
-    }
+    if ((Clear-LinkWay $Link $Target) -ne 'free') { return }
 
     # PowerShell 5's New-Item -ItemType SymbolicLink may require admin for files.
     # Fall back to cmd mklink which works with Developer Mode enabled.
@@ -168,21 +434,7 @@ function Link-Dir {
         [string]$Target,
         [string]$Link
     )
-
-    if (Test-Path $Link) {
-        $item = Get-Item $Link -Force
-        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
-            $currentTarget = $item.Target
-            if ($currentTarget -eq $Target) {
-                Write-Host "  OK: $Link -> $Target"
-                return
-            }
-            Write-Host "  UPDATE: $Link (was -> $currentTarget)"
-            Remove-DirLink $Link
-        } else {
-            if (-not (Clear-WayFor $Link)) { return }
-        }
-    }
+    if ((Clear-LinkWay $Link $Target) -ne 'free') { return }
 
     # PowerShell 5's New-Item -ItemType SymbolicLink requires admin for directories.
     # Fall back to cmd mklink /D which works with Developer Mode enabled.
@@ -241,59 +493,203 @@ function Link-Skills {
     }
 }
 
-# --- Copy helpers ---
-# Copy-File: kiro-always manifest entries (copies by design, outside steering).
-# Copy-Dir: overlay-bearing Kiro skills, which must be generated copies because
-# the merge overwrites one file inside the skill directory. Everything else in
-# ~/.kiro/ is a symlink (Windows copy mode was retired 2026-09-20).
-
-function Copy-File {
+# --- Owned files ---
+# Write-OwnedFile: a copy-file or template-file row (kiro-always) under the ownership rule. A link
+# at Dest is removed when it points into this repo (the layout before copies), else backed up.
+function Write-OwnedFile {
     param(
-        [string]$Source,  # source file in repo
-        [string]$Dest     # destination to copy to
+        [string]$Kind,     # copy-file | template-file
+        [string]$Dest,
+        [byte[]]$Bytes     # what setup writes
     )
-
-    # Remove stale symlink if present (migration from symlink-based setup)
-    if ((Test-Path $Dest) -and ((Get-Item $Dest -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-        Write-Host "  REMOVE SYMLINK: $Dest"
-        Invoke-Act "remove $Dest" { Remove-Item $Dest -Force }
+    $key = ConvertTo-LockKey $Dest
+    $item = Get-Item -LiteralPath $Dest -Force -ErrorAction SilentlyContinue
+    if ($item -and ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        if (Test-EngineLink $Dest) {
+            Write-Host "  REMOVE SYMLINK: $Dest"
+            Invoke-Act "remove $Dest" { Remove-Item -LiteralPath $Dest -Force }
+        } else {
+            Backup-Path $Dest
+        }
+    } elseif ($item -and $item.PSIsContainer) {
+        Backup-Path $Dest
     }
-
-    # Skip copy if content is already identical
-    if ((Test-Path $Dest) -and
-        ([System.IO.File]::ReadAllText($Source) -eq [System.IO.File]::ReadAllText($Dest))) {
-        Write-Host "  OK: $Dest (matches source)"
-        return
+    $want = Get-BytesSha $Bytes
+    $cur = if (Test-RegularFile $Dest) { Get-FileSha $Dest } else { '-' }
+    $locked = Get-LockValue $Kind $key
+    if (-not $locked) { $locked = '-' }
+    switch (Get-OwnAction $want $cur $locked) {
+        'keep' { Write-Host "  OK: $Dest (matches source)" }
+        'backup' {
+            Backup-Path $Dest
+            Invoke-Act "write $Dest" { [IO.File]::WriteAllBytes($Dest, $Bytes) }
+            Write-Host "  WROTE: $Dest (yours kept as ${Dest}.bak)"
+        }
+        default {
+            Invoke-Act "write $Dest" { [IO.File]::WriteAllBytes($Dest, $Bytes) }
+            Write-Host "  WROTE: $Dest"
+        }
     }
-
-    Invoke-Act "copy $Source -> $Dest" { Copy-Item -Path $Source -Destination $Dest -Force }
-    Write-Host "  COPIED: $Source -> $Dest"
+    Add-LockRow $Kind $key $want
 }
 
-function Copy-Dir {
-    param(
-        [string]$Source,
-        [string]$Dest
-    )
-
-    # Remove stale symlink if present (migration from symlink-based setup).
-    # Use cmd rmdir for directory symlinks -- PowerShell's Remove-Item can
-    # throw NullReferenceException on directory junctions/symlinks.
-    if ((Test-Path $Dest) -and ((Get-Item $Dest -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-        Write-Host "  REMOVE SYMLINK: $Dest"
-        Remove-DirLink $Dest
+# Get-FilesNoFollow: the regular files under Root, recursively, never entering a link or a
+# __pycache__ folder (setup.sh: find -name __pycache__ -prune -o -type f). Paths are built from
+# Root as given: FullName would expand a short (8.3) name and stop matching the lock's keys.
+function Get-FilesNoFollow {
+    param([string]$Root)
+    $out = New-Object 'System.Collections.Generic.List[string]'
+    $stack = New-Object 'System.Collections.Generic.Stack[string]'
+    $stack.Push($Root)
+    while ($stack.Count) {
+        $d = $stack.Pop()
+        foreach ($e in (New-Object IO.DirectoryInfo $d).GetFileSystemInfos()) {
+            if ($e.Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
+            $full = [IO.Path]::Combine($d, $e.Name)
+            if ($e.Attributes -band [IO.FileAttributes]::Directory) {
+                if ($e.Name -ne '__pycache__') { $stack.Push($full) }
+            } else {
+                $out.Add($full)
+            }
+        }
     }
+    return , $out.ToArray()
+}
 
-    # Copies are always recoverable from the repo, so we delete-then-copy
-    # rather than backing up (backup dirs confused Kiro IDE previously).
-    Invoke-Act "copy $Source -> $Dest" {
-        if (Test-Path $Dest) { Remove-Item $Dest -Recurse -Force }
-        Copy-Item -Path $Source -Destination $Dest -Recurse -Force
-        # Python bytecode caches are build output, not deployables (verify-deployment skips them too).
-        Get-ChildItem -LiteralPath $Dest -Directory -Recurse -Force -Filter '__pycache__' -ErrorAction SilentlyContinue |
-            Remove-Item -Recurse -Force
+# Invoke-LockRetire: rows of the previous lock under Prefix that this run did not record (their
+# source is gone). Each file is removed when unchanged since setup wrote it, else backed up; then
+# the empty folders above it are removed, up to the Kiro skills folder.
+function Invoke-LockRetire {
+    param([string]$Prefix)
+    $recorded = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+    foreach ($line in $LockNew) {
+        $c = $line.Split("`t")
+        if ($c[0] -ne 'backup' -and $c[0] -ne 'setting') { [void]$recorded.Add($c[1]) }
     }
-    Write-Host "  COPIED: $Source -> $Dest"
+    $done = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+    $todo = New-Object 'System.Collections.Generic.List[object]'
+    foreach ($c in $LockOld) {
+        if ($c[0] -eq 'backup' -or $c[0] -eq 'setting' -or -not $c[1].StartsWith($Prefix, [StringComparison]::Ordinal)) { continue }
+        if ($recorded.Contains($c[1]) -or -not $done.Add($c[1])) { continue }
+        $p = ConvertFrom-LockKey $c[1]
+        if ((Test-RegularFile $p) -and (Test-NoLinkParent $p $env:USERPROFILE)) { $todo.Add(@($p, $c[2])) }
+    }
+    if (-not $todo.Count) { return }
+    $hashes = Get-ShaMap ($todo | ForEach-Object { $_[0] })
+    $touched = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    foreach ($t in $todo) {
+        $p = $t[0]
+        if ($hashes[$p] -eq $t[1]) {
+            Invoke-Act "remove $p" { [IO.File]::Delete($p) }
+            Write-Host "  REMOVED: $p (its source is gone)"
+        } else {
+            Write-Host "  NOTE: $p changed since setup wrote it and its source is gone"
+            Backup-Path $p
+        }
+        $sd = Get-SkillDirOf $p
+        if ($sd) { [void]$touched.Add($sd) }
+    }
+    foreach ($sd in $touched) { Remove-EmptyDirs $sd }
+}
+
+# Deploy-GeneratedCopy: an overlay-bearing skill as a generated copy (setup.sh
+# deploy_generated_copy). Every expected file's bytes are known first (the shared file, or the
+# merge); then only the files that differ are written, each under the ownership rule. Files of the
+# copy whose source is gone are left to Invoke-LockRetire. A folder at Dest with files, none of
+# them locked and none equal to what setup writes, is yours: it is KEPT. Returns $false when
+# nothing was deployed.
+function Deploy-GeneratedCopy {
+    param([string]$SourceDir, [string]$Dest, [string]$OverlayDir, [string]$Name)
+    $prefix = "~/.kiro/skills/$Name/"
+    # 1. the expected files: rel -> @{kind; src or bytes; hash}
+    $exp = [ordered]@{}
+    foreach ($f in (Get-FilesNoFollow $SourceDir)) {
+        $exp[$f.Substring($SourceDir.Length + 1).Replace('\', '/')] = @{ Kind = 'copy-dir-recursive'; Src = $f; Bytes = $null; Hash = '' }
+    }
+    $skillOverlay = Join-Path $OverlayDir "OVERLAY.md"
+    if (Test-Path -LiteralPath $skillOverlay) {
+        if (([IO.File]::ReadAllText($skillOverlay)).Trim().Length -eq 0) { Write-Host "  SKIPPED EMPTY OVERLAY: $Name" }
+        $b = $Utf8NoBom.GetBytes((Merge-Overlay -SharedFile (Join-Path $SourceDir "SKILL.md") -OverlayFile $skillOverlay))
+        $exp['SKILL.md'] = @{ Kind = 'merge-file'; Src = $null; Bytes = $b; Hash = (Get-BytesSha $b) }
+    }
+    foreach ($t in (Get-AuxOverlayTargets -OverlayDir $OverlayDir -SourceDir $SourceDir)) {
+        $b = $Utf8NoBom.GetBytes((Merge-Overlay -SharedFile (Join-Path $SourceDir $t.Target) -OverlayFile $t.Overlay))
+        $exp[$t.Target] = @{ Kind = 'merge-file'; Src = $null; Bytes = $b; Hash = (Get-BytesSha $b) }
+    }
+    $srcHashes = Get-ShaMap @($exp.Values | Where-Object { $_.Src } | ForEach-Object { $_.Src })
+    foreach ($e in $exp.Values) { if ($e.Src) { $e.Hash = $srcHashes[$e.Src] } }
+    # 2. what is there now
+    $cur = @{}
+    $item = Get-Item -LiteralPath $Dest -Force -ErrorAction SilentlyContinue
+    if ($item -and ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
+        if (Test-EngineLink $Dest) {
+            Write-Host "  REMOVE SYMLINK: $Dest (now a generated copy)"
+            Remove-DirLink $Dest
+        } elseif (-not (Clear-WayFor $Dest)) { return $false }
+    } elseif ($item -and -not $item.PSIsContainer) {
+        if (-not (Clear-WayFor $Dest)) { return $false }
+    } elseif ($item) {
+        $curHashes = Get-ShaMap (Get-FilesNoFollow $Dest)
+        foreach ($k in $curHashes.Keys) { $cur[$k.Substring($Dest.Length + 1).Replace('\', '/')] = $curHashes[$k] }
+    }
+    $locked = @{}
+    foreach ($c in $LockOld) {
+        if (($c[0] -eq 'copy-dir-recursive' -or $c[0] -eq 'merge-file') -and $c[1].StartsWith($prefix, [StringComparison]::Ordinal)) {
+            $locked[$c[1].Substring($prefix.Length)] = $c[2]
+        }
+    }
+    # 3. the decision per expected file
+    $plan = New-Object 'System.Collections.Generic.List[object]'
+    $match = 0
+    foreach ($rel in $exp.Keys) {
+        $e = $exp[$rel]
+        $c = if ($cur.ContainsKey($rel)) { $cur[$rel] } else { '-' }
+        $l = if ($locked.ContainsKey($rel)) { $locked[$rel] } else { '-' }
+        if ($c -eq $e.Hash) { $match++ }
+        $plan.Add(@((Get-OwnAction $e.Hash $c $l), $rel))
+    }
+    if ($cur.Count -gt 0 -and $locked.Count -eq 0 -and $match -eq 0) {
+        Write-Host "  KEPT: $Dest is your own folder; the playbook's $Name skill is not deployed there"
+        return $false
+    }
+    New-DirIfMissing $Dest
+    # 4. write only the differences
+    $nWrite = 0; $nBackup = 0; $nKeep = 0
+    foreach ($step in $plan) {
+        $action = $step[0]; $rel = $step[1]; $e = $exp[$rel]
+        $full = Join-Path $Dest ($rel.Replace('/', '\'))
+        if ($action -ne 'keep') {
+            if (-not (Test-NoLinkParent $full $Dest)) { Write-Host "  SKIPPED: $full (a folder above it is a link)"; continue }
+            if ($action -eq 'backup' -or ($action -eq 'write' -and $null -ne (Get-PathAttributes $full))) {
+                Backup-Path $full
+                $nBackup++
+            }
+            $parent = Split-Path -Parent $full
+            Invoke-Act "write $full" {
+                if (-not (Test-Path -LiteralPath $parent)) { [void][IO.Directory]::CreateDirectory($parent) }
+                if ($e.Src) { [IO.File]::Copy($e.Src, $full, $true) } else { [IO.File]::WriteAllBytes($full, $e.Bytes) }
+            }
+            $nWrite++
+        } else {
+            $nKeep++
+        }
+        Add-LockRow $e.Kind ($prefix + $rel) $e.Hash
+    }
+    if ($nWrite -eq 0) { Write-Host "  OK: $Dest (generated copy, $nKeep files)" }
+    else { Write-Host "  UPDATED: $Dest (generated copy: $nWrite written, $nBackup backed up, $nKeep unchanged)" }
+    return $true
+}
+
+# Free-RealSkillDir: a real folder at a Kiro skill name where a link goes (a generated copy left by
+# an older overlay, or a folder of yours). The files setup wrote there and left unchanged are
+# removed (Invoke-LockRetire); $true when the folder is then gone, $false when it holds anything else.
+function Free-RealSkillDir {
+    param([string]$Name)
+    $dest = Join-Path (Join-Path $env:USERPROFILE ".kiro\skills") $Name
+    Invoke-LockRetire "~/.kiro/skills/$Name/"
+    if ($DryRun) { return $false }
+    Remove-EmptyDirs $dest
+    return -not (Test-Path -LiteralPath $dest)
 }
 
 # --- Manifest reader -------------------------------------------------------
@@ -419,9 +815,9 @@ function Test-Wants { param([string]$Name) return ($Name -in $Chosen) }
 # trailing LF. Deliberately the same shape as Merge-Overlay so both generated-
 # file paths share one contract.
 #
-# Tokens expand to a JSON-escaped platform-native root (Windows: C:\\Users\\X;
-# POSIX: /home/x -- the escape is a no-op there). Templates use forward slashes
-# for everything AFTER the token, so Windows renders the mixed separator form
+# Tokens expand to the platform-native root with forward slashes (Windows:
+# C:/Users/X; POSIX: /home/x, unchanged). Templates use forward slashes for
+# everything AFTER the token too, so Windows renders the mixed separator form
 # Kiro already accepts and POSIX renders a clean native path.
 function Render-Template {
     param([string]$Source)
@@ -444,21 +840,7 @@ function Copy-Template {
         [string]$Dest     # destination to render to
     )
 
-    $rendered = Render-Template $Source
-
-    # Remove stale symlink if present (migration from symlink-based setup)
-    if ((Test-Path $Dest) -and ((Get-Item $Dest -Force).Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-        Write-Host "  REMOVE SYMLINK: $Dest"
-        Invoke-Act "remove $Dest" { Remove-Item $Dest -Force }
-    }
-
-    if ((Test-Path $Dest) -and ([IO.File]::ReadAllText($Dest) -eq $rendered)) {
-        Write-Host "  OK: $Dest (matches rendered source)"
-        return
-    }
-
-    Write-TextFile $Dest $rendered
-    Write-Host "  RENDERED: $Source -> $Dest"
+    Write-OwnedFile -Kind 'template-file' -Dest $Dest -Bytes $Utf8NoBom.GetBytes((Render-Template $Source))
 }
 
 # seed-file: render only when the destination is ABSENT. The app owns the live
@@ -482,20 +864,16 @@ function Copy-Seed {
 
 # --- Kiro overlay merge ----------------------------------------------------
 
-# Write merged content as UTF-8 WITHOUT a BOM, with no trailing newline added.
-# Windows PowerShell 5.1's Set-Content default encoding is NOT UTF-8 and corrupts
-# multibyte characters (e.g. em-dashes) in merged skill content; bash writes plain
-# UTF-8, so an explicit no-BOM UTF-8 write here keeps the two scripts byte-identical.
-function Write-MergedFile {
-    param([string]$Path, [string]$Content)
-    Write-TextFile $Path $Content
-}
+# Merged content is written as UTF-8 WITHOUT a BOM ($Utf8NoBom), with no trailing newline added.
+# Windows PowerShell 5.1's Set-Content default encoding is NOT UTF-8 and corrupts multibyte
+# characters (e.g. em-dashes) in merged skill content; bash writes plain UTF-8, so the explicit
+# no-BOM UTF-8 bytes keep the two scripts byte-identical.
 
 # Merge a shared file body with a kiro overlay body using the canonical shape:
 #   non-empty overlay -> shared (trailing newlines stripped) + "`n`n" + overlay (trailing
 #                        newlines stripped) + single trailing "`n"
 #   empty overlay     -> shared (trailing newlines stripped) + single trailing "`n"
-# Returns the merged string (written via Write-MergedFile, no extra newline). Mirrors
+# Returns the merged string (Deploy-GeneratedCopy writes its no-BOM UTF-8 bytes, no extra newline). Mirrors
 # setup.sh byte-for-byte (modulo platform line endings) so the two scripts stay in parity.
 function Merge-Overlay {
     param(
@@ -516,39 +894,34 @@ function Merge-Overlay {
     }
 }
 
-# Apply auxiliary-file overlays inside an already-copied skill dir.
-# For every providers\kiro\skills\<name>\<stem>.OVERLAY.md (except the reserved
-# SKILL.OVERLAY.md), append the overlay to the deployed markdown target <stem>.md.
-# Naming convention matches the consumers (e.g. memory-rules.OVERLAY.md -> memory-rules.md,
-# RESEARCH_CONFIG_TEMPLATE.OVERLAY.md -> RESEARCH_CONFIG_TEMPLATE.md). SKILL.md keeps the
-# bare OVERLAY.md convention (handled by the caller), so SKILL.OVERLAY.md is rejected to
-# prevent two paths to the same target. Target-missing overlays are skipped with a warning
-# (an overlay never creates a file on its own). The shared source file is merged, which is
-# what the copy holds, so a dry run (no copy made) shows the same plan.
-function Apply-AuxOverlays {
+# Get-AuxOverlayTargets: @{Target; Overlay} for every providers\kiro\skills\<name>\<stem>.OVERLAY.md
+# (except the reserved SKILL.OVERLAY.md), whose overlay is appended to the deployed markdown target
+# <stem>.md. Naming convention matches the consumers (e.g. memory-rules.OVERLAY.md -> memory-rules.md,
+# RESEARCH_CONFIG_TEMPLATE.OVERLAY.md -> RESEARCH_CONFIG_TEMPLATE.md). SKILL.md keeps the bare
+# OVERLAY.md convention (handled by the caller), so SKILL.OVERLAY.md is rejected to prevent two
+# paths to the same target. Target-missing overlays are skipped with a warning (an overlay never
+# creates a file on its own).
+function Get-AuxOverlayTargets {
     param(
         [string]$OverlayDir,  # providers\kiro\skills\<name>
-        [string]$Dest,        # ~/.kiro/skills/<name> (already copied)
         [string]$SourceDir    # shared\skills\<name>
     )
-    if (-not (Test-Path $OverlayDir)) { return }
-    Get-ChildItem $OverlayDir -File -Filter "*.OVERLAY.md" | ForEach-Object {
-        if ($_.Name -eq "OVERLAY.md") { return }  # SKILL.md overlay, handled separately
-        if ($_.Name -eq "SKILL.OVERLAY.md") {
-            Write-Warning "  SKIPPED RESERVED: $($_.FullName) (SKILL.md uses bare OVERLAY.md; SKILL.OVERLAY.md is forbidden)"
-            return
+    $out = @()
+    if (-not (Test-Path $OverlayDir)) { return , $out }
+    foreach ($ov in (Get-ChildItem $OverlayDir -File -Filter "*.OVERLAY.md")) {
+        if ($ov.Name -eq "OVERLAY.md") { continue }  # SKILL.md overlay, handled separately
+        if ($ov.Name -eq "SKILL.OVERLAY.md") {
+            Write-Warning "  SKIPPED RESERVED: $($ov.FullName) (SKILL.md uses bare OVERLAY.md; SKILL.OVERLAY.md is forbidden)"
+            continue
         }
-        $targetName = ($_.Name -replace '\.OVERLAY\.md$', '') + ".md"
-        $targetPath = Join-Path $Dest $targetName
-        $sourcePath = Join-Path $SourceDir $targetName
-        if (-not (Test-Path $sourcePath)) {
-            Write-Warning "  SKIPPED AUX OVERLAY: $($_.FullName) (no shared target '$targetName')"
-            return
+        $targetName = ($ov.Name -replace '\.OVERLAY\.md$', '') + ".md"
+        if (-not (Test-Path (Join-Path $SourceDir $targetName))) {
+            Write-Warning "  SKIPPED AUX OVERLAY: $($ov.FullName) (no shared target '$targetName')"
+            continue
         }
-        $merged = Merge-Overlay -SharedFile $sourcePath -OverlayFile $_.FullName
-        Write-MergedFile -Path $targetPath -Content $merged
-        Write-Host "  MERGED AUX: $targetName (shared + kiro overlay)"
+        $out += [PSCustomObject]@{ Target = $targetName; Overlay = $ov.FullName }
     }
+    return , $out
 }
 
 # Does a kiro overlay dir carry ANY overlay (SKILL.md's OVERLAY.md or any aux
@@ -566,6 +939,26 @@ function Test-HasAnyOverlay {
 
 # --- Uninstall -------------------------------------------------------------
 
+# Restore-Backup: put <path>.bak back when the deploy lock shows setup made that backup and, for a
+# file, that it is unchanged since; a .bak setup did not make is never touched.
+function Restore-Backup {
+    param([string]$Path)
+    $val = Get-LockValue 'backup' (ConvertTo-LockKey $Path)
+    if (-not $val) { return }
+    $bak = "$Path.bak"
+    if (-not (Get-Item -LiteralPath $bak -Force -ErrorAction SilentlyContinue)) { return }
+    if (Get-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue) { Write-Host "  KEPT: $bak ($Path is still there)"; return }
+    if ($val -ne '-' -and (-not (Test-RegularFile $bak) -or (Get-FileSha $bak) -ne $val)) {
+        Write-Host "  KEPT: $bak (changed since setup made it)"
+        return
+    }
+    Invoke-Act "restore $Path" {
+        $item = Get-Item -LiteralPath $bak -Force
+        if ($item.PSIsContainer) { [IO.Directory]::Move($bak, $Path) } else { [IO.File]::Move($bak, $Path) }
+    }
+    Write-Host "  RESTORED: $Path (from $bak)"
+}
+
 # Remove a link into this repo, then restore <path>.bak if setup made one.
 function Remove-EngineLink {
     param([string]$Path)
@@ -573,16 +966,29 @@ function Remove-EngineLink {
     $item = Get-Item -LiteralPath $Path -Force
     if ($item.PSIsContainer) { Remove-DirLink $Path } else { Invoke-Act "remove $Path" { Remove-Item -LiteralPath $Path -Force } }
     Write-Host "  REMOVED: $Path"
-    if (Test-Path -LiteralPath "$Path.bak") {
-        Invoke-Act "restore $Path" { Move-Item -LiteralPath "$Path.bak" $Path -Force }
-        Write-Host "  RESTORED: $Path (from $Path.bak)"
-    }
+    Restore-Backup $Path
 }
 
 function Remove-SkillLinks {
     param([string]$Dir)
     if (-not (Test-Path $Dir)) { return }
-    Get-ChildItem $Dir -Force -ErrorAction SilentlyContinue | ForEach-Object { Remove-EngineLink $_.FullName }
+    # Join-Path, not FullName: FullName expands a short (8.3) name, and Restore-Backup keys by the path given.
+    Get-ChildItem $Dir -Force -ErrorAction SilentlyContinue | ForEach-Object { Remove-EngineLink (Join-Path $Dir $_.Name) }
+}
+
+# Uninstall-OwnedFile: a copy-file or template-file row. Removed when it is the file setup wrote,
+# unchanged (by the lock; with no lock row, when it equals the source or the render); else kept.
+function Uninstall-OwnedFile {
+    param([string]$Kind, [string]$Dest, [string]$Source)
+    if (Test-RegularFile $Dest) {
+        $locked = Get-LockValue $Kind (ConvertTo-LockKey $Dest)
+        if ($locked) { $same = ((Get-FileSha $Dest) -eq $locked) }
+        elseif ($Kind -eq 'template-file') { $same = ([IO.File]::ReadAllText($Dest) -eq (Render-Template $Source)) }
+        else { $same = ([IO.File]::ReadAllText($Dest) -eq [IO.File]::ReadAllText($Source)) }
+        if ($same) { Invoke-Act "remove $Dest" { Remove-Item -LiteralPath $Dest -Force }; Write-Host "  REMOVED: $Dest" }
+        else { Write-Host "  KEPT: $Dest (changed since setup wrote it)" }
+    }
+    Restore-Backup $Dest
 }
 
 function Uninstall-Mode {
@@ -592,20 +998,75 @@ function Uninstall-Mode {
         $source = Expand-Source $entry.source
         switch ($entry.kind) {
             { $_ -in 'symlink-file', 'symlink-dir' } { Remove-EngineLink $dest }
-            'template-file' {
-                if ((Test-Path $dest) -and ([IO.File]::ReadAllText($dest) -eq (Render-Template $source))) {
-                    Invoke-Act "remove $dest" { Remove-Item $dest -Force }; Write-Host "  REMOVED: $dest"
-                } elseif (Test-Path $dest) { Write-Host "  KEPT: $dest (changed since setup rendered it)" }
-            }
-            'copy-file' {
-                if ((Test-Path $dest) -and ([IO.File]::ReadAllText($dest) -eq [IO.File]::ReadAllText($source))) {
-                    Invoke-Act "remove $dest" { Remove-Item $dest -Force }; Write-Host "  REMOVED: $dest"
-                } elseif (Test-Path $dest) { Write-Host "  KEPT: $dest (changed since setup copied it)" }
-            }
+            { $_ -in 'template-file', 'copy-file' } { Uninstall-OwnedFile $entry.kind $dest $source }
             'seed-file' { if (Test-Path $dest) { Write-Host "  KEPT: $dest (the app owns it; setup only seeded it)" } }
         }
     }
 }
+
+# Uninstall-GeneratedCopies: the files of the generated Kiro copies the lock names. Each is removed
+# when unchanged since setup wrote it, else kept; then the empty folders go and the backups setup
+# made there are restored.
+function Uninstall-GeneratedCopies {
+    $skillsRoot = Join-Path $env:USERPROFILE ".kiro\skills"
+    $todo = New-Object 'System.Collections.Generic.List[object]'; $names = @()
+    foreach ($c in $LockOld) {
+        if (($c[0] -ne 'copy-dir-recursive' -and $c[0] -ne 'merge-file') -or -not $c[1].StartsWith('~/.kiro/skills/', [StringComparison]::Ordinal)) { continue }
+        $n = $c[1].Split('/')[3]
+        if ($names -notcontains $n) { $names += $n }
+        $p = ConvertFrom-LockKey $c[1]
+        if ((Test-RegularFile $p) -and (Test-NoLinkParent $p $env:USERPROFILE)) { $todo.Add(@($p, $c[2])) }
+    }
+    $hashes = Get-ShaMap ($todo | ForEach-Object { $_[0] })
+    foreach ($t in $todo) {
+        if ($hashes[$t[0]] -eq $t[1]) {
+            Invoke-Act "remove $($t[0])" { [IO.File]::Delete($t[0]) }
+        } else {
+            Write-Host "  KEPT: $($t[0]) (changed since setup wrote it)"
+        }
+    }
+    foreach ($n in $names) { Remove-EmptyDirs (Join-Path $skillsRoot $n) }
+    foreach ($c in $LockOld) {
+        if ($c[0] -eq 'backup' -and $c[1].StartsWith('~/.kiro/skills/', [StringComparison]::Ordinal)) { Restore-Backup (ConvertFrom-LockKey $c[1]) }
+    }
+    foreach ($n in ($names | Sort-Object)) {
+        $d = Join-Path $skillsRoot $n
+        if ((Test-Path -LiteralPath $d -PathType Container) -and -not (Test-Reparse $d)) {
+            Write-Host "  KEPT: $d (holds files that are not setup's unchanged ones)"
+        } else {
+            Write-Host "  REMOVED: $d (generated copy)"
+        }
+    }
+}
+
+# Uninstall-KiroSetting: revert chat.defaultAgent only when the lock shows setup set it and it
+# still names kiro_default.
+function Uninstall-KiroSetting {
+    if (-not (Get-Command kiro-cli -ErrorAction SilentlyContinue)) { return }
+    if ($env:AGENT_PLAYBOOK_SKIP_KIRO_CLI -eq '1') { Write-Host "  SKIP: kiro-cli settings (AGENT_PLAYBOOK_SKIP_KIRO_CLI=1)"; return }
+    $val = Get-LockValue 'setting' $LockSettingKey
+    if (-not $val) { Write-Host "  NOTE: setup did not set kiro-cli's chat.defaultAgent, so it is left as is"; return }
+    $cur = Get-KiroDefaultAgent
+    if ($cur -ne '"kiro_default"') { Write-Host "  NOTE: kiro-cli's chat.defaultAgent changed since setup set it, so it is left as is"; return }
+    if ($val -eq '-') {
+        Invoke-Act "kiro-cli settings --global --delete chat.defaultAgent" { & kiro-cli settings --global --delete chat.defaultAgent }
+    } else {
+        $v = $val.Trim('"')
+        Invoke-Act "kiro-cli settings --global chat.defaultAgent $v" { & kiro-cli settings --global chat.defaultAgent $v }
+    }
+    Write-Host "  RESTORED: kiro-cli chat.defaultAgent (to $val)"
+}
+
+# Get-KiroDefaultAgent: kiro-cli's chat.defaultAgent as JSON with no whitespace ('' when unreadable).
+function Get-KiroDefaultAgent {
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try { return ((& kiro-cli settings -f json --global chat.defaultAgent 2>$null) -join '') -replace '\s', '' }
+    catch { return '' }
+    finally { $ErrorActionPreference = $prev }
+}
+
+Read-DeployLock
 
 if ($Uninstall) {
     Write-Host "=== Uninstall: $($Chosen -join ', ') ==="
@@ -630,21 +1091,13 @@ if ($Uninstall) {
     if (Test-Wants 'kiro') {
         Uninstall-Mode 'kiro-always'
         Uninstall-Mode 'kiro'
-        $kiroSkills = Join-Path $env:USERPROFILE ".kiro\skills"
-        foreach ($skill in (Get-SharedSkills)) {
-            $dest = Join-Path $kiroSkills $skill.Name
-            $item = Get-Item -LiteralPath $dest -Force -ErrorAction SilentlyContinue
-            if ((Test-HasAnyOverlay (Join-Path $ScriptDir "providers\kiro\skills\$($skill.Name)")) -and $item -and
-                -not ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-                Invoke-Act "remove $dest" { Remove-Item $dest -Recurse -Force }
-                Write-Host "  REMOVED: $dest (generated copy)"
-            }
-        }
-        Remove-SkillLinks $kiroSkills
-        if (Get-Command kiro-cli -ErrorAction SilentlyContinue) {
-            Write-Host "  NOTE: kiro-cli's chat.defaultAgent still names kiro_default; change it with: kiro-cli settings --global chat.defaultAgent <agent>"
-        }
+        Uninstall-GeneratedCopies
+        Remove-SkillLinks (Join-Path $env:USERPROFILE ".kiro\skills")
+        Uninstall-KiroSetting
     }
+    $keep = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($c in $LockOld) { if (-not (Test-Wants (Get-KeyProvider $c[1]))) { $keep.Add($c -join "`t") } }
+    Complete-DeployLock -Carry $keep.ToArray() -DropEmpty
     if ($Purge) {
         $memLink = Join-Path $ScriptDir "memory"
         $memItem = Get-Item -LiteralPath $memLink -Force -ErrorAction SilentlyContinue
@@ -959,24 +1412,38 @@ if (Test-Wants 'kiro') {
             switch ($entry.kind) {
                 'template-file' { Copy-Template -Source $source -Dest $dest }
                 'seed-file'     { Copy-Seed -Source $source -Dest $dest }
-                default         { Copy-File -Source $source -Dest $dest }
+                default         { Write-OwnedFile -Kind 'copy-file' -Dest $dest -Bytes ([IO.File]::ReadAllBytes($source)) }
             }
         }
     }
 
+    # chat.defaultAgent: set only when it is not kiro_default already, and recorded in the lock
+    # (kind setting, with the value it replaced) so that uninstall reverts only what setup set.
+    $oldSetting = Get-LockValue 'setting' $LockSettingKey
     if ($env:AGENT_PLAYBOOK_SKIP_KIRO_CLI -eq '1') {
         Write-Host "  SKIP: kiro-cli settings (AGENT_PLAYBOOK_SKIP_KIRO_CLI=1)"
+        if ($oldSetting) { Add-LockRow 'setting' $LockSettingKey $oldSetting }
     } elseif (Get-Command kiro-cli -ErrorAction SilentlyContinue) {
-        if ($DryRun) {
+        $prevAgent = Get-KiroDefaultAgent
+        if ($prevAgent -eq '"kiro_default"') {
+            Write-Host "  OK: chat.defaultAgent = kiro_default (global)"
+            if ($oldSetting) { Add-LockRow 'setting' $LockSettingKey $oldSetting }
+        } elseif ($DryRun) {
             Write-Host "    DRY: kiro-cli settings --global chat.defaultAgent kiro_default"
         } else {
-            try {
-                & kiro-cli settings --global chat.defaultAgent kiro_default
+            $setOk = $false
+            try { & kiro-cli settings --global chat.defaultAgent kiro_default; $setOk = ($LASTEXITCODE -eq 0) } catch { $setOk = $false }
+            if ($setOk) {
                 Write-Host "  SET: chat.defaultAgent = kiro_default (global)"
-            } catch {
-                Write-Warning "  WARN: Failed to set chat.defaultAgent: $_"
+                if ($prevAgent -eq '' -or $prevAgent -eq 'null') { $prevAgent = '-' }
+                Add-LockRow 'setting' $LockSettingKey $prevAgent
+            } else {
+                Write-Warning "  WARN: Failed to set chat.defaultAgent"
+                if ($oldSetting) { Add-LockRow 'setting' $LockSettingKey $oldSetting }
             }
         }
+    } elseif ($oldSetting) {
+        Add-LockRow 'setting' $LockSettingKey $oldSetting
     }
 
     # --- Kiro IDE ---
@@ -985,26 +1452,13 @@ if (Test-Wants 'kiro') {
     # does not follow symlinks on Windows", which was re-measured 2026-08-17 and
     # does not reproduce; copies were retired 2026-09-20. Overlay-bearing skills
     # stay generated copies on every platform: the merge overwrites one file inside
-    # the skill dir, which a symlinked dir forbids. A regular file the old copy mode
-    # left at a linked steering destination is a deploy artifact and is removed
-    # before linking, never backed up: it is recoverable from the repo.
+    # the skill dir, which a symlinked dir forbids. A regular file at a linked
+    # steering destination is backed up like any other (Link-File, Clear-WayFor).
     Write-Host "=== Kiro IDE ==="
     $KiroSteeringDir = Join-Path (Join-Path $env:USERPROFILE ".kiro") "steering"
     $KiroSkillsDir = Join-Path (Join-Path $env:USERPROFILE ".kiro") "skills"
     New-DirIfMissing $KiroSteeringDir
     New-DirIfMissing $KiroSkillsDir
-
-    # Remove a regular file or directory the old copy mode left at a destination
-    # that is now linked. Reparse points are left alone: Link-File / Link-Dir
-    # replace an outdated link and keep a correct one.
-    function Remove-DeployedCopy {
-        param([string]$Path)
-        if (-not (Test-Path $Path)) { return }
-        $item = Get-Item $Path -Force
-        if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) { return }
-        Invoke-Act "remove $Path" { if ($item.PSIsContainer) { Remove-Item $Path -Recurse -Force } else { Remove-Item $Path -Force } }
-        Write-Host "  REMOVED COPY: $Path (replaced by a link)"
-    }
 
     # Steering files from manifest (mode kiro). Steering is flat: every deployed
     # file sits directly in ~/.kiro/steering/.
@@ -1012,47 +1466,32 @@ if (Test-Wants 'kiro') {
         $dest = Expand-Dest $entry.dest
         $source = Expand-Source $entry.source
         New-DirIfMissing (Split-Path -Parent $dest)
-        Remove-DeployedCopy $dest
         Link-File -Target $source -Link $dest
     }
 
     # Build list of managed skill names for cleanup pass
     $ManagedSkills = @()
 
-    # Shared skills (with overlay-merge support). Any overlay forces a Copy-Dir (symlinked
-    # dirs can't have a single file overwritten); a plain skill is a Link-Dir. Aux merges
-    # run AFTER the dir copy so they overwrite the freshly-copied targets.
+    # Shared skills (with overlay-merge support). Any overlay makes a generated copy (a
+    # symlinked dir can't have a single file overwritten): Deploy-GeneratedCopy.
     Write-Host "  Shared skills:"
     $KiroOverlayRoot = Join-Path $ScriptDir "providers\kiro\skills"
-    Get-ChildItem (Join-Path $SharedDir "skills") -Directory | ForEach-Object {
-        $name = $_.Name
-        if (-not (Test-Path (Join-Path $_.FullName "SKILL.md"))) { return }
+    foreach ($skill in (Get-ChildItem (Join-Path $SharedDir "skills") -Directory)) {
+        $name = $skill.Name
+        if (-not (Test-Path (Join-Path $skill.FullName "SKILL.md"))) { continue }
         $overlayDir = Join-Path $KiroOverlayRoot $name
-        $skillOverlay = Join-Path $overlayDir "OVERLAY.md"
         $dest = Join-Path $KiroSkillsDir $name
         if (Test-HasAnyOverlay $overlayDir) {
-            Copy-Dir -Source $_.FullName -Dest $dest
-            if (Test-Path $skillOverlay) {
-                $merged = Merge-Overlay -SharedFile (Join-Path $_.FullName "SKILL.md") -OverlayFile $skillOverlay
-                if (([IO.File]::ReadAllText($skillOverlay)).Trim().Length -eq 0) {
-                    Write-Host "  SKIPPED EMPTY OVERLAY: $name"
-                }
-                Write-MergedFile -Path (Join-Path $dest "SKILL.md") -Content $merged
-                Write-Host "  MERGED: $name (shared + kiro overlay)"
-            }
-            # Aux overlays run after the dir copy so they overwrite the copied targets.
-            Apply-AuxOverlays -OverlayDir $overlayDir -Dest $dest -SourceDir $_.FullName
+            [void](Deploy-GeneratedCopy -SourceDir $skill.FullName -Dest $dest -OverlayDir $overlayDir -Name $name)
         } else {
+            # a real folder here: a generated copy left by an older overlay, or yours
             $existing = Get-Item -LiteralPath $dest -Force -ErrorAction SilentlyContinue
             if ($existing -and $existing.PSIsContainer -and
-                -not ($existing.Attributes -band [IO.FileAttributes]::ReparsePoint) -and
-                -not (Test-Path (Join-Path $dest "SKILL.md"))) {
+                -not ($existing.Attributes -band [IO.FileAttributes]::ReparsePoint) -and -not (Free-RealSkillDir $name)) {
                 Write-Host "  KEPT: $dest is your own folder; the playbook's $name skill is not linked there"
-                return
+                continue
             }
-            # a generated copy left by an older overlay, now a plain skill: regenerate as a link
-            Remove-DeployedCopy $dest
-            Link-Dir -Target $_.FullName -Link $dest
+            Link-Dir -Target $skill.FullName -Link $dest
         }
         $ManagedSkills += $name
     }
@@ -1066,8 +1505,15 @@ if (Test-Wants 'kiro') {
                 # Skip if this dir is a shared-skill overlay (SKILL.md and/or aux overlays)
                 # already merged above, rather than a standalone kiro-only skill.
                 if (Test-HasAnyOverlay (Join-Path $KiroOverlayRoot $_.Name)) { return }
-                Link-Dir -Target $_.FullName -Link (Join-Path $KiroSkillsDir $_.Name)
-                $ManagedSkills += $_.Name
+                $dest = Join-Path $KiroSkillsDir $_.Name
+                $existing = Get-Item -LiteralPath $dest -Force -ErrorAction SilentlyContinue
+                if ($existing -and $existing.PSIsContainer -and
+                    -not ($existing.Attributes -band [IO.FileAttributes]::ReparsePoint) -and -not (Free-RealSkillDir $_.Name)) {
+                    Write-Host "  KEPT: $dest is your own folder; the playbook's $($_.Name) skill is not linked there"
+                    return
+                }
+                Link-Dir -Target $_.FullName -Link $dest
+                $script:ManagedSkills += $_.Name
             }
         }
     }
@@ -1086,13 +1532,18 @@ if (Test-Wants 'kiro') {
         }
     }
 
+    # Files setup wrote whose source is gone (a deleted skill, a retired copy-file row): the deploy
+    # lock names them. Each is removed when unchanged since setup wrote it, else backed up.
+    Write-Host "  Cleaning files whose source is gone:"
+    Invoke-LockRetire "~/.kiro/"
+
     Write-Host ""
     Write-Host "=== Cleanup stale files ==="
     # Files: names a previous deployment wrote that the current manifest no longer
     # owns. NEVER list a path the manifest currently deploys (this runs after the
     # steering loop and would delete the fresh copy).
-    # Entries are dated; drop one once every machine has certainly re-run setup
-    # since (a few months), so the list does not grow forever.
+    # Frozen at these 7 entries: add no new ones. The deploy lock covers every later
+    # retirement (Invoke-LockRetire above). Entries are dated.
     $StaleFiles = @(
         (Join-Path $KiroAgentsDir "kiro_default.json"),                 # 2026-08-18
         (Join-Path $KiroSteeringDir "claude-code-local-data.md"),       # 2026-09-20, and the rest
@@ -1130,6 +1581,9 @@ if (Test-Wants 'kiro') {
         else { Write-Host "  OK: v3 agent and permissions deployed" }
     }
 }
+
+Write-Host "=== Deploy lock ==="
+Complete-DeployLock -Carry (Get-LockCarryRows)
 
 Write-Host ""
 Write-Host "Done (providers: $($Chosen -join ', ')). Run '/qconfig-sync' from any agent to verify."

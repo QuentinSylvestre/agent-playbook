@@ -4,14 +4,11 @@
 # - kind: symlink-file | symlink-dir | copy-file | copy-dir-recursive | merge-file
 #         | template-file | seed-file
 # - template-file: copied with {{USER_HOME}} / {{PLAYBOOK_ROOT}} substituted at deploy
-#   time. Tokens expand to the platform-native root; authors MUST use forward slashes
-#   for everything after the token (Windows tolerates the mixed form, POSIX needs it).
-#   setup.ps1 JSON-escapes the backslashes a Windows root carries; setup.sh does not,
-#   because a POSIX root has none -- see setup.sh render_template. Consumers are JSON
-#   files, or YAML values written in DOUBLE QUOTES (YAML double-quoted scalars use the
-#   same backslash escapes as JSON, so the rendered `C:\\Users\\X` reads back as
-#   `C:\Users\X`). A bare (unquoted) YAML scalar would keep the doubled backslashes:
-#   never template one.
+#   time. Tokens expand to the platform-native root written with forward slashes
+#   (C:/Users/X on Windows), so no consumer needs a backslash escape; authors MUST use
+#   forward slashes for everything after the token too (Windows tolerates the mixed
+#   form, POSIX needs it). Consumers are JSON, markdown, and YAML values written in
+#   double quotes.
 # - seed-file: a template-file that is written ONLY when the destination is absent,
 #   and verified for PRESENCE rather than content. For config the app itself rewrites
 #   at runtime (mcp.json) the repo copy is a restore seed, not a managed artifact --

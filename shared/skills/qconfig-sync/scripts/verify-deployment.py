@@ -79,7 +79,12 @@ ORPHAN, AMBIGUOUS_SKILL}.
   ORPHAN           a deployed file or skill directory whose source is gone.
                    Emitted by the destination-side walk; REPORT-ONLY, never
                    fails the run, because the deployed tree also holds files
-                   the manifest does not claim to own.
+                   the manifest does not claim to own. Its last field says whose
+                   it is, read from setup's deploy lock
+                   (~/.agent-playbook/deploy-lock.tsv): owned-by-setup (a file the
+                   lock names, a folder holding one, or a link into the repo) or
+                   foreign (anything else, a .bak setup made included). A missing
+                   or unreadable lock makes every file and folder foreign.
   AMBIGUOUS_SKILL  a providers/kiro/skills/<name>/ setup cannot deploy
                    coherently. Two shapes, different fixes -- read the detail
                    field: (a) SKILL.md AND an overlay, so setup deploys the
@@ -160,6 +165,45 @@ VALID_KINDS = (KIND_SYMLINK_FILE, KIND_SYMLINK_DIR, KIND_COPY_FILE, KIND_COPY_DI
                KIND_MERGE_FILE, KIND_TEMPLATE_FILE, KIND_SEED_FILE)
 FILE_KINDS = (KIND_COPY_FILE, KIND_SYMLINK_FILE, KIND_TEMPLATE_FILE, KIND_SEED_FILE, KIND_MERGE_FILE)
 DIR_KINDS = (KIND_COPY_DIR_RECURSIVE, KIND_SYMLINK_DIR)
+
+# The deploy lock setup writes (setup.sh "Deploy lock" section): read only for the ORPHAN owner field.
+LOCK_HEADER = "# agent-playbook deploy lock v1 (written by setup; kind<TAB>path<TAB>sha256)"
+LOCK_FILE_KINDS = ("copy-dir-recursive", "merge-file", "copy-file", "template-file")
+LOCK_SETTING_KEY = "kiro-cli/chat.defaultAgent"
+OWNED, FOREIGN = "owned-by-setup", "foreign"
+
+
+def read_lock_keys(path):
+    """-> the set of path keys of the lock's file rows, or an empty set for a missing or invalid lock.
+    Untrusted input, read exactly as setup reads it: one bad row means no lock."""
+    try:
+        with open(path, "rb") as fh:
+            text = fh.read().decode("utf-8")
+    except (OSError, UnicodeDecodeError):
+        return set()
+    lines = text.split("\n")
+    if text.endswith("\n"):
+        lines = lines[:-1]
+    if not lines or lines[0] != LOCK_HEADER:
+        return set()
+    keys = set()
+    for line in lines[1:]:
+        c = line.split("\t")
+        if len(c) != 3:
+            return set()
+        kind, key, val = c
+        if kind == "setting":
+            if key != LOCK_SETTING_KEY or not val:
+                return set()
+            continue
+        if kind not in LOCK_FILE_KINDS + ("backup",) or not key.startswith("~/") or "/../" in "/" + key + "/":
+            return set()
+        if not (kind == "backup" and val == "-") and not re.match(r"^[0-9a-f]{64}$", val):
+            return set()
+        if kind != "backup":
+            keys.add(key)
+    return keys
+
 
 STATUSES = ("OK", "MISSING", "WRONG_TARGET", "NOT_SYMLINK", "DRIFTED", "SKIP", "ORPHAN", "AMBIGUOUS_SKILL")
 FAILING = ("MISSING", "WRONG_TARGET", "NOT_SYMLINK", "DRIFTED", "AMBIGUOUS_SKILL")
@@ -475,6 +519,7 @@ class Verifier(object):
         self.kiro_overlay_root = self.kiro_provider_skills
         self.kiro_top = self.join(self.home, ".kiro")
         self.manifest = []
+        self._lock_keys = None
 
     # --- paths ---
     def join(self, base, child):
@@ -484,6 +529,33 @@ class Verifier(object):
 
     def exists(self, p):
         return os.path.exists(p)
+
+    # --- deploy lock ---
+    def lock_owner(self, full):
+        """owned-by-setup or foreign for an ORPHAN path (see the docstring's ORPHAN entry)."""
+        if os.path.islink(full) or (self.win and _ps_link_type(full)):
+            try:
+                t = _win_readlink(full) if self.win else os.path.realpath(full)
+            except OSError:
+                t = ""
+            t = (t or "").replace("\\", "/").rstrip("/")
+            root = self.repo.replace("\\", "/").rstrip("/")
+            if self.win:
+                t, root = t.lower(), root.lower()
+            return OWNED if t == root or t.startswith(root + "/") else FOREIGN
+        if self._lock_keys is None:
+            keys = read_lock_keys(self.join(self.home, ".agent-playbook/deploy-lock.tsv"))
+            self._lock_keys = set(k.lower() for k in keys) if self.win else keys
+        home = self.home.replace("\\", "/").rstrip("/")
+        p = full.replace("\\", "/")
+        if self.win:
+            home, p = home.lower(), p.lower()
+        if not p.startswith(home + "/"):
+            return FOREIGN
+        key = "~/" + p[len(home) + 1:]
+        if key in self._lock_keys or any(k.startswith(key + "/") for k in self._lock_keys):
+            return OWNED
+        return FOREIGN
 
     # --- output ---
     def emit(self, status, path, *extras):
@@ -948,7 +1020,7 @@ class Verifier(object):
                     candidate = _winjoin(src, rel)
                     if os.path.exists(candidate) or full.lower() in exp_files:
                         continue
-                    self.emit("ORPHAN", full, "expected-source=" + candidate)
+                    self.emit("ORPHAN", full, "expected-source=" + candidate, self.lock_owner(full))
             roots = {}
             for d in exp_dirs_list:
                 parent = os.path.dirname(d)
@@ -963,7 +1035,7 @@ class Verifier(object):
                 for name, full in sorted(entries, key=lambda e: e[1].lower()):
                     if name.startswith(".") or full.lower() in exp_dirs:
                         continue
-                    self.emit("ORPHAN", full, "no-source-skill")
+                    self.emit("ORPHAN", full, "no-source-skill", self.lock_owner(full))
             return
         exp_files = set(r[1] for r in rows if r[0] in FILE_KINDS)
         exp_dirs = set(r[1] for r in rows if r[0] in DIR_KINDS)
@@ -974,7 +1046,7 @@ class Verifier(object):
                 deployed = dest + "/" + rel
                 if os.path.exists(src + "/" + rel) or deployed in exp_files:
                     continue
-                self.emit("ORPHAN", deployed, "expected-source=%s/%s" % (src, rel))
+                self.emit("ORPHAN", deployed, "expected-source=%s/%s" % (src, rel), self.lock_owner(deployed))
         roots = set()
         for d in exp_dirs:
             parent = d.rsplit("/", 1)[0] if "/" in d else ""
@@ -994,7 +1066,7 @@ class Verifier(object):
             for name, full in sorted(entries, key=lambda e: _c_key(e[1])):
                 if name.startswith(".") or full in exp_dirs:
                     continue
-                self.emit("ORPHAN", full, "no-source-skill")
+                self.emit("ORPHAN", full, "no-source-skill", self.lock_owner(full))
 
     def ambiguous_check(self):
         """A providers/kiro/skills/<name>/ is a standalone skill (SKILL.md) or an overlay, never both,
@@ -1320,6 +1392,31 @@ def _st_cases(tmp, links, skip_reason):
     check(not any("__pycache__" in l or ".tool-managed" in l for l in out),
           "bytecode caches and dot entries are not orphans")
     check(sum(1 for l in out if l.startswith("ORPHAN\t")) == 2, "exactly two ORPHAN lines")
+    check(has(out, "ORPHAN", ".kiro/skills/ghost", "foreign") and has(out, "ORPHAN", "beta/stale.md", "foreign"),
+          "with no deploy lock, an ORPHAN is foreign")
+
+    # ORPHAN owner field from the deploy lock: a locked file and a folder holding one are setup's;
+    # a .bak setup made is the user's content, so foreign; an invalid lock is no lock.
+    repo, home, env = fresh()
+    _w(os.path.join(home, ".kiro", "skills", "beta", "stale.md"), b"left behind\n")
+    _w(os.path.join(home, ".kiro", "skills", "beta", "SKILL.md.bak"), b"yours\n")
+    _w(os.path.join(home, ".kiro", "skills", "gone", "SKILL.md"), b"old\n")
+    os.makedirs(os.path.join(home, ".kiro", "skills", "mine"))
+    sha = "0" * 64
+    lock_rows = ["copy-dir-recursive\t~/.kiro/skills/beta/stale.md\t" + sha,
+                 "backup\t~/.kiro/skills/beta/SKILL.md\t" + sha,
+                 "copy-dir-recursive\t~/.kiro/skills/gone/SKILL.md\t" + sha]
+    lock_path = os.path.join(home, ".agent-playbook", "deploy-lock.tsv")
+    _w(lock_path, LOCK_HEADER + "\n" + "\n".join(lock_rows) + "\n")
+    rc, out, _ = _st_run(repo, env)
+    check(rc == 0, "ORPHAN with a lock never fails the run (rc=%d)" % rc)
+    check(has(out, "ORPHAN", "beta/stale.md", "owned-by-setup"), "a locked file -> ORPHAN owned-by-setup")
+    check(has(out, "ORPHAN", "beta/SKILL.md.bak", "foreign"), "a .bak setup made -> ORPHAN foreign")
+    check(has(out, "ORPHAN", ".kiro/skills/gone", "owned-by-setup"), "a folder holding a locked file -> owned-by-setup")
+    check(has(out, "ORPHAN", ".kiro/skills/mine", "foreign"), "a folder the lock does not name -> foreign")
+    _w(lock_path, LOCK_HEADER + "\n" + "\n".join(lock_rows) + "\nnot a row\n")
+    rc, out, _ = _st_run(repo, env)
+    check(has(out, "ORPHAN", "beta/stale.md", "foreign"), "a lock with a malformed row is no lock -> foreign")
 
     if links:
         # Coexistence: a skill of the user's own beside the playbook's per-skill links is never reported.
@@ -1479,6 +1576,7 @@ def selftest():
             ("merge recompute returns the bare shared file", g, "_merged_bytes",
              lambda shared, overlay, windows: _read_bytes(shared)),
             ("orphan walk disabled", Verifier, "orphan_walk", lambda self: None),
+            ("the ORPHAN owner field ignores the deploy lock", Verifier, "lock_owner", lambda self, full: FOREIGN),
             ("a listing failure reads as an empty directory", g, "_entries", swallow),
             ("a dangling provider top folder reads as not installed", Verifier, "provider_installed",
              old_provider_installed),

@@ -18,14 +18,15 @@
 #      two deployed TREES are compared (see its own block). No other script
 #      pair remains: every guard is a single Python script with its own
 #      --selftest.
-#      THREE assertions carry a *_SKIPPED variable and are therefore tallied:
-#      the setup pair plus merge-equivalence and render-equivalence. The
-#      inventory assertion and SETUP-VERIFY (§ below) are NOT among them --
-#      neither has a *_SKIPPED variable and neither can be skipped, since both
-#      are bash-only and always run -- so do not count either when updating
-#      the hardcoded denominator in the verdict block. Adding an assertion
-#      means editing the tally, the verdict conditional, and that number
-#      together.
+#      FOUR assertions carry a *_SKIPPED variable and are therefore tallied:
+#      the setup pair (SETUP-PARITY), its deploy-lock and ownership leg
+#      (TWIN-OWNERSHIP), merge-equivalence and render-equivalence. The
+#      inventory assertion, SETUP-VERIFY, NO-REWRITE and OWNERSHIP (§ below)
+#      are NOT among them -- none has a *_SKIPPED variable and none can be
+#      skipped, since all are bash-only and always run -- so do not count them
+#      when updating the hardcoded denominator in the verdict block. Adding an
+#      assertion means editing the tally, the verdict conditional, and that
+#      number together.
 #
 #   2. Cross-shell merge-equivalence: for a sample overlay skill, asserts the
 #      PowerShell `Merge-Overlay` output equals the bash `merge_overlay` output
@@ -451,6 +452,51 @@ else
     echo "  --- setup.sh log (tail) ---" >&2
     tail -n 40 "$SETUP_VERIFY_LOG" >&2 || true
 fi
+
+# --- NO-REWRITE: a second setup.sh run on an unchanged tree writes nothing --
+#
+# SC-1 of plan 261111_DEPLOYMENT_OWNERSHIP_AND_CLIENT_LOAD_VERIFICATION: the
+# deploy lock and the per-file comparison make a re-run a no-op. Every entry
+# under the sandbox HOME (files, links, folders) keeps its type, mtime and inode
+# across run 2, the deploy lock included. Always runs.
+NO_REWRITE_OK=1
+nr_snapshot "$SETUP_VERIFY_SANDBOX" > "$TMPDIR_PARITY/no-rewrite-1.tsv"
+if HOME="$SETUP_VERIFY_SANDBOX" XDG_CONFIG_HOME="$SETUP_VERIFY_SANDBOX/.config" \
+    APPDATA="$SETUP_VERIFY_SANDBOX/AppData/Roaming" \
+    AGENT_PLAYBOOK_SKIP_KIRO_CLI=1 bash "$SETUP_SCRIPT" < /dev/null > "$TMPDIR_PARITY/no-rewrite.log" 2>&1; then
+    nr_exit=0
+else
+    nr_exit=$?
+fi
+nr_snapshot "$SETUP_VERIFY_SANDBOX" > "$TMPDIR_PARITY/no-rewrite-2.tsv"
+if [ "$nr_exit" -eq 0 ] && [ -s "$TMPDIR_PARITY/no-rewrite-1.tsv" ] \
+    && cmp -s "$TMPDIR_PARITY/no-rewrite-1.tsv" "$TMPDIR_PARITY/no-rewrite-2.tsv" \
+    && [ -f "$SETUP_VERIFY_SANDBOX/.agent-playbook/deploy-lock.tsv" ]; then
+    echo "NO-REWRITE OK: a second setup.sh run wrote nothing ($(wc -l < "$TMPDIR_PARITY/no-rewrite-1.tsv") entries kept their mtime and inode)"
+else
+    NO_REWRITE_OK=0
+    echo "NO-REWRITE FAIL: the second setup.sh run changed the sandbox (exit=$nr_exit)" >&2
+    diff "$TMPDIR_PARITY/no-rewrite-1.tsv" "$TMPDIR_PARITY/no-rewrite-2.tsv" | head -n 20 >&2 || true
+fi
+}
+
+# nr_snapshot <dir>: "<relpath>\t<type>\t<mtime ns>\t<inode>" for every entry under dir, sorted.
+NR_SNAPSHOT_PY='
+import os, sys
+root = sys.argv[1]
+out = []
+for d, dirs, files in os.walk(root):
+    for n in dirs + files:
+        p = os.path.join(d, n)
+        st = os.lstat(p)
+        kind = "link" if os.path.islink(p) else ("dir" if os.path.isdir(p) else "file")
+        out.append("%s\t%s\t%d\t%d" % (os.path.relpath(p, root).replace(os.sep, "/"), kind, st.st_mtime_ns, st.st_ino))
+sys.stdout.write("".join(l + "\n" for l in sorted(out)))
+'
+nr_snapshot() {
+    local native="$1"
+    command -v cygpath >/dev/null 2>&1 && native="$(cygpath -w "$1")"
+    MSYS_NO_PATHCONV=1 parity_python -c "$NR_SNAPSHOT_PY" "$native" | tr -d '\r'
 }
 
 parity_sec_merge() {
@@ -558,12 +604,9 @@ parity_sec_render() {
 # identical token VALUES, isolating substitution logic from the real platform's
 # $HOME/$REPO_ROOT.
 #
-# The contract being asserted is NOT "identical for arbitrary input" -- it is
-# "identical for every value either twin can encounter on its own platform".
-# setup.ps1 escapes backslashes (a Windows root needs it for JSON); setup.sh does
-# not (a POSIX root has none, and bash cannot express the escape -- see
-# setup.sh render_template). So the fixture uses POSIX-form values, where the PS
-# escape is a no-op and the two shapes must agree exactly.
+# Both twins substitute the token value with its backslashes turned into forward
+# slashes (no JSON escaping), so the fixture below feeds Windows-form values with
+# backslashes and a space, and the two shapes must agree exactly.
 
 RENDER_OK=1
 RENDER_SKIPPED=0
@@ -822,7 +865,8 @@ def walk(d, prefix):
             walk(full, rel + "/")
 def emit(rel, full):
     if rel in ("__pycache__",) or rel.endswith("/__pycache__") or rel.startswith("__pycache__/") \
-            or "/__pycache__/" in rel or rel == "AppData/Local" or rel.startswith("AppData/Local/"):
+            or "/__pycache__/" in rel or rel == "AppData/Local" or rel.startswith("AppData/Local/") \
+            or rel == ".agent-playbook/deploy-lock.tsv":
         return
     shown = rel
     if rel == ide_prefix:
@@ -951,6 +995,8 @@ sys.stdout.write("".join(l + "\n" for l in out))
                 case "$rel" in
                     __pycache__|*/__pycache__|__pycache__/*|*/__pycache__/*) continue ;;
                     AppData/Local|AppData/Local/*) continue ;;
+                    # compared on its own, normalised (TWIN-OWNERSHIP)
+                    .agent-playbook/deploy-lock.tsv) continue ;;
                 esac
                 case "$rel" in
                     "$ide_prefix") rel="<KIRO_IDE_USER>" ;;
@@ -1027,6 +1073,212 @@ sys.stdout.write("".join(l + "\n" for l in out))
 fi
 }
 
+parity_sec_ownership() {
+# --- OWNERSHIP and TWIN-OWNERSHIP: the deploy lock's rules, on both twins ----
+#
+# Runs after SETUP-PARITY (it changes the sandboxes that section compares).
+# TWIN-OWNERSHIP first compares the two twins' deploy locks: they must be equal
+# once the template-file row's hash is masked (that render is writer-dependent
+# by design: /c/... from Git Bash, C:/... from setup.ps1). Then one collision
+# per ownership rule is planted in the setup.sh sandbox (OWNERSHIP, always
+# runs) and, where SETUP-PARITY ran, the same ones in the setup.ps1 sandbox
+# (TWIN-OWNERSHIP): setup runs again for Kiro and each outcome is checked; a
+# third setup.sh run must write nothing (no .bak growth); then a Kiro
+# uninstall and its outcomes. The fixtures forge lock rows and plant files;
+# they never touch the repo.
+OWNERSHIP_OK=1
+TWIN_OWNERSHIP_OK=1
+TWIN_OWNERSHIP_SKIPPED=0
+OWN_FAIL=0
+local sh_sb="$SETUP_VERIFY_SANDBOX" ps_sb="$TMPDIR_PARITY/setup-parity-sandbox2" twin=1
+if [ -z "$PS_BIN" ] || [ ! -f "$SETUP_PS1_SCRIPT" ] || [ "$(uname -o 2>/dev/null)" != "Msys" ] \
+    || [ "$(cat "$ps_sb.rc" 2>/dev/null)" != 0 ]; then
+    twin=0
+    TWIN_OWNERSHIP_SKIPPED=1
+    echo "TWIN-OWNERSHIP SKIP: no setup.ps1 sandbox (SETUP-PARITY did not deploy one here) -- the setup.ps1 lock and ownership checks are skipped."
+fi
+if [ "$twin" -eq 1 ]; then
+    awk -F'\t' -v OFS='\t' '$1 == "template-file" { $3 = "<render>" } 1' "$sh_sb/.agent-playbook/deploy-lock.tsv" > "$TMPDIR_PARITY/lock-sh.tsv"
+    awk -F'\t' -v OFS='\t' '$1 == "template-file" { $3 = "<render>" } 1' "$ps_sb/.agent-playbook/deploy-lock.tsv" > "$TMPDIR_PARITY/lock-ps.tsv"
+    if [ -s "$TMPDIR_PARITY/lock-sh.tsv" ] && cmp -s "$TMPDIR_PARITY/lock-sh.tsv" "$TMPDIR_PARITY/lock-ps.tsv"; then
+        echo "TWIN-OWNERSHIP OK: the setup.sh and setup.ps1 deploy locks agree ($(wc -l < "$TMPDIR_PARITY/lock-sh.tsv") lines, template hash masked)"
+    else
+        TWIN_OWNERSHIP_OK=0
+        echo "TWIN-OWNERSHIP DRIFT: the two deploy locks differ (- setup.sh, + setup.ps1):" >&2
+        diff "$TMPDIR_PARITY/lock-sh.tsv" "$TMPDIR_PARITY/lock-ps.tsv" | head -n 20 >&2 || true
+    fi
+fi
+
+own_plant "$sh_sb"
+[ "$twin" -eq 1 ] && own_plant "$ps_sb"
+own_run_sh "$sh_sb" own-sh-1 --providers kiro &
+local sh_pid=$!
+[ "$twin" -eq 1 ] && own_run_ps "$ps_sb" own-ps-1 -Providers kiro
+wait "$sh_pid" || true
+own_check_deploy "$sh_sb" "$TMPDIR_PARITY/own-sh-1.log" "setup.sh"
+[ "$OWN_FAIL" -eq 0 ] || OWNERSHIP_OK=0
+if [ "$twin" -eq 1 ]; then
+    OWN_FAIL=0
+    own_check_deploy "$ps_sb" "$TMPDIR_PARITY/own-ps-1.log" "setup.ps1"
+    [ "$OWN_FAIL" -eq 0 ] || TWIN_OWNERSHIP_OK=0
+fi
+
+OWN_FAIL=0
+nr_snapshot "$sh_sb" > "$TMPDIR_PARITY/own-rerun-1.tsv"
+own_run_sh "$sh_sb" own-sh-2 --providers kiro
+nr_snapshot "$sh_sb" > "$TMPDIR_PARITY/own-rerun-2.tsv"
+cmp -s "$TMPDIR_PARITY/own-rerun-1.tsv" "$TMPDIR_PARITY/own-rerun-2.tsv" \
+    || own_fail setup.sh "a re-run after the collisions writes nothing (no .bak growth)"
+own_plant_uninstall "$sh_sb"
+[ "$twin" -eq 1 ] && own_plant_uninstall "$ps_sb"
+own_run_sh "$sh_sb" own-sh-3 --uninstall --providers kiro &
+sh_pid=$!
+[ "$twin" -eq 1 ] && own_run_ps "$ps_sb" own-ps-3 -Uninstall -Providers kiro
+wait "$sh_pid" || true
+own_check_uninstall "$sh_sb" "setup.sh"
+[ "$OWN_FAIL" -eq 0 ] || OWNERSHIP_OK=0
+if [ "$twin" -eq 1 ]; then
+    OWN_FAIL=0
+    own_check_uninstall "$ps_sb" "setup.ps1"
+    [ "$OWN_FAIL" -eq 0 ] || TWIN_OWNERSHIP_OK=0
+fi
+if [ "$OWNERSHIP_OK" -eq 1 ]; then
+    echo "OWNERSHIP OK: setup.sh keeps, backs up, replaces, retires and uninstalls each planted collision by the deploy lock"
+else
+    echo "  --- setup.sh logs (tail) ---" >&2
+    tail -n 15 "$TMPDIR_PARITY/own-sh-1.log" "$TMPDIR_PARITY/own-sh-3.log" >&2 || true
+fi
+if [ "$twin" -eq 1 ] && [ "$TWIN_OWNERSHIP_OK" -eq 1 ]; then
+    echo "TWIN-OWNERSHIP OK: setup.ps1 meets the same ownership checks"
+elif [ "$twin" -eq 1 ]; then
+    echo "  --- setup.ps1 logs (tail) ---" >&2
+    tail -n 15 "$TMPDIR_PARITY/own-ps-1.log" "$TMPDIR_PARITY/own-ps-3.log" >&2 || true
+fi
+}
+
+# own_run_sh <sandbox> <log name> <args...> / own_run_ps: a sandboxed setup run, with no terminal
+# and never --yes (which would repoint the repo's memory link into the sandbox).
+own_run_sh() {
+    local sb="$1" log="$2"; shift 2
+    HOME="$sb" XDG_CONFIG_HOME="$sb/.config" APPDATA="$sb/AppData/Roaming" AGENT_PLAYBOOK_SKIP_KIRO_CLI=1 \
+        bash "$SETUP_SCRIPT" "$@" < /dev/null > "$TMPDIR_PARITY/$log.log" 2>&1 || true
+}
+own_run_ps() {
+    local sb="$1" log="$2"; shift 2
+    USERPROFILE="$(cygpath -w "$sb")" APPDATA="$(cygpath -w "$sb/AppData/Roaming")" AGENT_PLAYBOOK_SKIP_KIRO_CLI=1 \
+        "$PS_BIN" -NoProfile -NonInteractive -File "$(cygpath -w "$SETUP_PS1_SCRIPT")" "$@" \
+        < /dev/null > "$TMPDIR_PARITY/$log.log" 2>&1 || true
+}
+
+# Ownership fixtures for parity_sec_ownership.
+# own_plant <sandbox>: plant one collision per ownership rule into a deployed sandbox that has a lock.
+# own_check_deploy <sandbox> <setup log> <label>, own_check_uninstall <sandbox> <label>: assert the
+# outcome; each failed check prints a line and sets OWN_FAIL=1.
+
+own_sha() { sha256sum < "$1" | cut -c1-64; }
+
+own_lock_add() {   # own_lock_add <sandbox> <kind> <key> <value>
+    printf '%s\t%s\t%s\n' "$2" "$3" "$4" >> "$1/.agent-playbook/deploy-lock.tsv"
+}
+
+own_plant() {
+    local sb="$1" k="$1/.kiro" lock="$1/.agent-playbook/deploy-lock.tsv"
+    # 1. a file of yours inside a generated copy
+    printf 'mine\n' > "$k/skills/qdev/my-notes.md"
+    # 2. a file of a generated copy, edited
+    cp "$k/skills/qdev/SKILL.md" "$sb.qdev-skill.orig"
+    printf 'edited qdev\n' >> "$k/skills/qdev/SKILL.md"
+    cp "$k/skills/qdev/SKILL.md" "$sb.qdev-skill.edited"
+    # 3. a folder of yours at an overlay-bearing skill's name, with no lock rows
+    rm -rf "$k/skills/qreview"
+    mkdir -p "$k/skills/qreview"
+    printf 'user qreview\n' > "$k/skills/qreview/SKILL.md"
+    grep -v $'\t~/.kiro/skills/qreview/' "$lock" > "$lock.tmp" && mv "$lock.tmp" "$lock"
+    # 4. a copy-file row, edited
+    printf 'edited authoring\n' > "$k/AUTHORING.md"
+    # 5. a foreign symlink at a link path
+    printf 'foreign\n' > "$sb/foreign-target.md"
+    rm -f "$k/steering/agents.md"
+    MSYS=winsymlinks:nativestrict ln -s "$sb/foreign-target.md" "$k/steering/agents.md"
+    # 6. a locked, unedited file whose source is gone (a deleted skill)
+    mkdir -p "$k/skills/qgone"
+    printf 'gone\n' > "$k/skills/qgone/SKILL.md"
+    own_lock_add "$sb" copy-dir-recursive "~/.kiro/skills/qgone/SKILL.md" "$(own_sha "$k/skills/qgone/SKILL.md")"
+    # 7. a locked file whose source is gone, edited since setup wrote it
+    mkdir -p "$k/skills/qgone2"
+    printf 'edited gone\n' > "$k/skills/qgone2/SKILL.md"
+    own_lock_add "$sb" merge-file "~/.kiro/skills/qgone2/SKILL.md" "$(own_sha "$k/skills/qgone/SKILL.md")"
+    # 8. a locked file setup wrote in an older version, unedited: replaced, no backup
+    cp "$k/skills/qexplore/SKILL.md" "$sb.qexplore-skill.orig"
+    printf 'an older merge\n' > "$k/skills/qexplore/SKILL.md"
+    grep -v $'\t~/.kiro/skills/qexplore/SKILL.md\t' "$lock" > "$lock.tmp" && mv "$lock.tmp" "$lock"
+    own_lock_add "$sb" merge-file "~/.kiro/skills/qexplore/SKILL.md" "$(own_sha "$k/skills/qexplore/SKILL.md")"
+    # 9. a folder of yours with a SKILL.md at a plain skill's name (a link there before)
+    rm -f "$k/skills/qcouncil" 2>/dev/null || rmdir "$k/skills/qcouncil"
+    mkdir -p "$k/skills/qcouncil"
+    printf 'user qcouncil\n' > "$k/skills/qcouncil/SKILL.md"
+}
+
+own_fail() { echo "OWNERSHIP FAIL ($1): $2" >&2; OWN_FAIL=1; }
+
+own_is() {   # own_is <file> <text>: the file holds exactly text plus a newline
+    [ -f "$1" ] && [ ! -L "$1" ] && [ "$(cat "$1")" = "$2" ]
+}
+
+own_check_deploy() {
+    local sb="$1" log="$2" l="$3" k="$1/.kiro" lock="$1/.agent-playbook/deploy-lock.tsv"
+    own_is "$k/skills/qdev/my-notes.md" mine && [ ! -e "$k/skills/qdev/my-notes.md.bak" ] \
+        || own_fail "$l" "a file of yours inside a generated copy is left in place"
+    cmp -s "$k/skills/qdev/SKILL.md.bak" "$sb.qdev-skill.edited" && cmp -s "$k/skills/qdev/SKILL.md" "$sb.qdev-skill.orig" \
+        || own_fail "$l" "an edited file of a generated copy goes to .bak and is rewritten"
+    own_is "$k/skills/qreview/SKILL.md" "user qreview" && [ "$(find "$k/skills/qreview" | wc -l)" -eq 2 ] \
+        && grep -q 'KEPT: .*qreview' "$log" \
+        || own_fail "$l" "a folder of yours at an overlay skill's name is KEPT, untouched"
+    own_is "$k/AUTHORING.md.bak" "edited authoring" && cmp -s "$k/AUTHORING.md" "$REPO_ROOT/shared/AUTHORING.md" \
+        || own_fail "$l" "an edited copy-file row goes to .bak and is rewritten"
+    [ -L "$k/steering/agents.md.bak" ] && case "$(readlink "$k/steering/agents.md.bak")" in *foreign-target.md) true ;; *) false ;; esac \
+        && [ -L "$k/steering/agents.md" ] && case "$(readlink "$k/steering/agents.md")" in *shared/AGENTS.md|*shared\\AGENTS.md) true ;; *) false ;; esac \
+        || own_fail "$l" "a foreign symlink goes to .bak before the link is made"
+    [ ! -e "$k/skills/qgone" ] || own_fail "$l" "a locked unedited file whose source is gone is removed, with its folder"
+    [ ! -e "$k/skills/qgone2/SKILL.md" ] && own_is "$k/skills/qgone2/SKILL.md.bak" "edited gone" \
+        || own_fail "$l" "an edited file whose source is gone goes to .bak"
+    cmp -s "$k/skills/qexplore/SKILL.md" "$sb.qexplore-skill.orig" && [ ! -e "$k/skills/qexplore/SKILL.md.bak" ] \
+        || own_fail "$l" "a locked unedited file is replaced with no backup"
+    [ -d "$k/skills/qcouncil" ] && [ ! -L "$k/skills/qcouncil" ] && own_is "$k/skills/qcouncil/SKILL.md" "user qcouncil" \
+        && grep -q 'KEPT: .*qcouncil' "$log" \
+        || own_fail "$l" "a Kiro skill folder of yours with a SKILL.md is KEPT"
+    grep -q $'^backup\t~/.kiro/AUTHORING.md\t' "$lock" && grep -q $'^backup\t~/.kiro/steering/agents.md\t-$' "$lock" \
+        && ! grep -q 'qgone/' "$lock" && ! grep -q $'\t~/.kiro/skills/qreview/' "$lock" \
+        || own_fail "$l" "the lock records the backups and drops the retired and KEPT paths"
+}
+
+# own_plant_uninstall <sandbox>: an edited generated file and a .bak setup did not make.
+own_plant_uninstall() {
+    local k="$1/.kiro"
+    printf 'edited qtest\n' >> "$k/skills/qtest/SKILL.md"
+    cp "$k/skills/qtest/SKILL.md" "$1.qtest-skill.edited"
+    printf 'stray\n' > "$k/steering/kiro-guidelines.md.bak"
+}
+
+own_check_uninstall() {
+    local sb="$1" l="$2" k="$1/.kiro" lock="$1/.agent-playbook/deploy-lock.tsv"
+    cmp -s "$k/skills/qtest/SKILL.md" "$sb.qtest-skill.edited" || own_fail "$l" "uninstall keeps an edited generated file"
+    cmp -s "$k/skills/qdev/SKILL.md" "$sb.qdev-skill.edited" && [ ! -e "$k/skills/qdev/SKILL.md.bak" ] \
+        && own_is "$k/skills/qdev/my-notes.md" mine && [ "$(find "$k/skills/qdev" -type f | wc -l)" -eq 2 ] \
+        || own_fail "$l" "uninstall removes unedited generated files and restores the .bak setup made"
+    [ ! -e "$k/skills/qexplore" ] || own_fail "$l" "uninstall removes a generated copy left unedited, folder included"
+    own_is "$k/AUTHORING.md" "edited authoring" && [ ! -e "$k/AUTHORING.md.bak" ] \
+        || own_fail "$l" "uninstall removes an unedited copy-file row and restores its .bak"
+    [ -L "$k/steering/agents.md" ] && case "$(readlink "$k/steering/agents.md")" in *foreign-target.md) true ;; *) false ;; esac \
+        && [ ! -e "$k/steering/agents.md.bak" ] && [ ! -L "$k/steering/agents.md.bak" ] \
+        || own_fail "$l" "uninstall restores a backed-up foreign symlink"
+    own_is "$k/steering/kiro-guidelines.md.bak" stray && [ ! -e "$k/steering/kiro-guidelines.md" ] \
+        || own_fail "$l" "uninstall never restores a .bak setup did not make"
+    own_is "$k/skills/qreview/SKILL.md" "user qreview" && own_is "$k/skills/qcouncil/SKILL.md" "user qcouncil" \
+        || own_fail "$l" "uninstall leaves your own skill folders alone"
+    { [ ! -f "$lock" ] || ! grep -q $'\t~/.kiro/' "$lock"; } || own_fail "$l" "uninstall drops the Kiro rows from the lock"
+}
+
 # --- Parallel sections -----------------------------------------------------
 #
 # Every section above is a function. They share nothing but the preamble
@@ -1040,6 +1292,7 @@ fi
 
 MERGE_OK=0; MERGE_SKIPPED=0; RENDER_OK=0; RENDER_SKIPPED=0
 SETUP_VERIFY_OK=0; SETUP_PARITY_OK=0; SETUP_PARITY_SKIPPED=0
+NO_REWRITE_OK=0; OWNERSHIP_OK=0; TWIN_OWNERSHIP_OK=0; TWIN_OWNERSHIP_SKIPPED=0
 
 PARITY_JOBS_DIR="$TMPDIR_PARITY/jobs"
 mkdir -p "$PARITY_JOBS_DIR"
@@ -1088,8 +1341,9 @@ PARITY_PIDS=()
       SP_DEPLOY_PID="$!"
       trap 'wait "$SP_DEPLOY_PID" 2>/dev/null || true' EXIT
   fi
-  parity_step setup_verify parity_sec_setup_verify SETUP_VERIFY_OK
-  parity_step setup_parity parity_sec_setup_parity SETUP_PARITY_OK SETUP_PARITY_SKIPPED ) &
+  parity_step setup_verify parity_sec_setup_verify SETUP_VERIFY_OK NO_REWRITE_OK
+  parity_step setup_parity parity_sec_setup_parity SETUP_PARITY_OK SETUP_PARITY_SKIPPED
+  parity_step ownership parity_sec_ownership OWNERSHIP_OK TWIN_OWNERSHIP_OK TWIN_OWNERSHIP_SKIPPED ) &
 PARITY_PIDS+=("$!")
 ( parity_step merge parity_sec_merge MERGE_OK MERGE_SKIPPED ) & PARITY_PIDS+=("$!")
 ( parity_step render parity_sec_render RENDER_OK RENDER_SKIPPED ) & PARITY_PIDS+=("$!")
@@ -1099,7 +1353,7 @@ for pid in "${PARITY_PIDS[@]}"; do
 done
 
 # Replay in the original section order, then load each section's flags.
-for name in setup_verify merge render setup_parity; do
+for name in setup_verify merge render setup_parity ownership; do
     [ -f "$PARITY_JOBS_DIR/$name.out" ] && cat "$PARITY_JOBS_DIR/$name.out"
     [ -f "$PARITY_JOBS_DIR/$name.err" ] && cat "$PARITY_JOBS_DIR/$name.err" >&2
     if [ -f "$PARITY_JOBS_DIR/$name.status" ]; then
@@ -1113,7 +1367,9 @@ done
 
 # --- Verdict --------------------------------------------------------------
 
-if [ "$PARITY_FAIL" -eq 0 ] && [ "$INVENTORY_OK" -eq 1 ] && [ "$SETUP_VERIFY_OK" -eq 1 ] && [ "$MERGE_OK" -eq 1 ] && [ "$RENDER_OK" -eq 1 ] && [ "$SETUP_PARITY_OK" -eq 1 ]; then
+if [ "$PARITY_FAIL" -eq 0 ] && [ "$INVENTORY_OK" -eq 1 ] && [ "$SETUP_VERIFY_OK" -eq 1 ] && [ "$NO_REWRITE_OK" -eq 1 ] \
+    && [ "$OWNERSHIP_OK" -eq 1 ] && [ "$MERGE_OK" -eq 1 ] && [ "$RENDER_OK" -eq 1 ] && [ "$SETUP_PARITY_OK" -eq 1 ] \
+    && [ "$TWIN_OWNERSHIP_OK" -eq 1 ]; then
     echo "PARITY OK"
 
     # Loud warning when assertions were skipped (SKIPPED leaves *_OK=1, so
@@ -1122,18 +1378,21 @@ if [ "$PARITY_FAIL" -eq 0 ] && [ "$INVENTORY_OK" -eq 1 ] && [ "$SETUP_VERIFY_OK"
     [ "$MERGE_SKIPPED" -eq 1 ] && SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
     [ "$RENDER_SKIPPED" -eq 1 ] && SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
     [ "$SETUP_PARITY_SKIPPED" -eq 1 ] && SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+    [ "$TWIN_OWNERSHIP_SKIPPED" -eq 1 ] && SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
 
     # Count kept in step with the tally above by hand -- there is no derived
     # total, so a new assertion means editing both.
     if [ "$SKIPPED_COUNT" -gt 0 ]; then
         echo ""
-        echo "WARNING: $SKIPPED_COUNT of 3 parity assertions SKIPPED (see SKIP notices above for reasons)."
+        echo "WARNING: $SKIPPED_COUNT of 4 parity assertions SKIPPED (see SKIP notices above for reasons)."
         echo "         This is NOT a full green — only deployment-inventory agreement was verified."
         echo ""
     fi
 
     echo "  verify-deployment.py --list ↔ setup-model expected inventory: $(wc -l < "$VERIFY_LIST") entries match (overlay copy-dir + merge-file rows covered)"
     echo "  setup.sh sandboxed deploy ↔ verify-deployment.py: PASS (clean deploy under a sandbox HOME)"
+    echo "  setup.sh re-run on an unchanged tree: PASS (nothing written)"
+    echo "  setup.sh ownership rules (deploy lock): PASS (planted collisions kept, backed up, replaced, retired, uninstalled)"
     if [ "$MERGE_SKIPPED" -eq 1 ]; then
         echo "  cross-shell merge-equivalence: SKIPPED (see notice above)"
     else
@@ -1148,6 +1407,11 @@ if [ "$PARITY_FAIL" -eq 0 ] && [ "$INVENTORY_OK" -eq 1 ] && [ "$SETUP_VERIFY_OK"
         echo "  setup sh/ps1 sandboxed tree-parity: SKIPPED (see notice above)"
     else
         echo "  setup sh/ps1 sandboxed tree-parity: PASS (ps1 sandbox == sh sandbox, tree + verify-deployment.py clean)"
+    fi
+    if [ "$TWIN_OWNERSHIP_SKIPPED" -eq 1 ]; then
+        echo "  setup.ps1 deploy lock and ownership rules: SKIPPED (see notice above)"
+    else
+        echo "  setup.ps1 deploy lock and ownership rules: PASS (locks agree; the same collisions checked)"
     fi
     exit 0
 fi

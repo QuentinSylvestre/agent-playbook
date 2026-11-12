@@ -8,6 +8,14 @@ they deploy as generated `shared + overlay` copies. See
 `providers/kiro/steering/kiro-guidelines.md § Symlinks and Folder Structure
 in `.kiro/``.
 
+Setup records every file of a generated copy, and the copied and rendered
+`kiro-always` rows, in the deploy lock (`~/.agent-playbook/deploy-lock.tsv`).
+A re-run writes only the files that changed. A file you edited there is moved
+to `<file>.bak` before setup writes it again; a file you added is left alone.
+Once a source is gone, setup removes the copy it wrote, or backs it up when
+you edited it. A folder of yours at a skill's name is kept, and the skill is
+not deployed there.
+
 On-demand reference material (never deployed) lives in `providers/kiro/reference/`
 and is indexed from `memory/topics/kiro-cli.md`.
 
