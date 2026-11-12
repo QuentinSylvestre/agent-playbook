@@ -45,10 +45,8 @@ Store-repo WARN checks (never change the exit code):
     means a skip line); a leftover STORE.tmp-* file;
   - a folder directly under ~/.agent-playbook that is not a known one (KNOWN_HOME_DIRS): an agent improvised
     it. Temporary files belong in a store scratch folder. This guard reports it and never deletes it;
-  - an orphaned store: no .dream-state.json project path and no session cwd (Claude Code, Kiro) modified in
-    the last 90 days resolves to it through the resolver's find (which walks from the folder up to the
-    repo toplevel, so a session in a subfolder of the store's repo counts); for a `local` store, also when
-    its path no longer exists. A `store:<identity>` state key counts as a reference;
+  - a `local` store whose workspace folder no longer exists (the one case where deleting the store,
+    or moving it with /qmigrate-workspace, is the likely repair);
   - a git rebase, merge or cherry-pick stopped in the store repo (its memory files may hold conflict markers);
   - the store repo's origin is not the `stores_url=` of the pointer file (~/.agent-playbook/config, which
     setup writes; client content would be pushed somewhere else); no stores_url, or no origin, is a SKIP line;
@@ -65,8 +63,13 @@ Store-repo WARN checks (never change the exit code):
     its link) but never its plans/, which live in its store; and a no-create folder (the resolver's
     would_create_path is none), which keeps its memory in place.
 
-Output: "ok:", "FAIL:", "WARN:", "SKIP:" lines; the last line is "verify-stores: ok=N fail=M warn=K"
-(an orphaned store is a WARN line). Exit 0 (no FAIL), 1 (a FAIL), 2 (the guard could not run: venv missing,
+INFO lines (never a warning, never a repair): an unused store, one that no .dream-state.json project path
+and no session cwd (Claude Code, Kiro) modified in the last 90 days resolves to it through the resolver's find
+(which walks from the folder up to the repo toplevel, so a session in a subfolder of the store's repo counts).
+A `store:<identity>` state key counts as a reference. No recent use is not a reason to delete a store: its
+memory stays valid while the work is idle, so the line is a fact to read, not a question to ask.
+
+Output: "ok:", "FAIL:", "WARN:", "INFO:", "SKIP:" lines; the last line is "verify-stores: ok=N fail=M warn=K". Exit 0 (no FAIL), 1 (a FAIL), 2 (the guard could not run: venv missing,
 repo or store repo unusable, the scan failed).
 """
 import argparse
@@ -574,7 +577,7 @@ def kiro_session_cwds(kiro_dir, now, days):
 
 
 def load_state(path):
-    """(project keys, reason). reason is non-empty when the state could not be read (the orphan check is skipped)."""
+    """(project keys, reason). reason is non-empty when the state could not be read (the store-use check is skipped)."""
     if not path or not os.path.isfile(path):
         return [], "no .dream-state.json at %s" % path
     try:
@@ -588,9 +591,9 @@ def load_state(path):
     return [k for k in projects if isinstance(k, str)], ""
 
 
-def orphan_check(R, valid, rep, state_keys, state_reason, cwds, now):
+def store_use_check(R, valid, rep, state_keys, state_reason, cwds, now):
     if state_reason:
-        rep.add("SKIP: orphaned-store check  %s" % state_reason)
+        rep.add("SKIP: store-use check  %s" % state_reason)
         return None
     served, referenced, unresolved = set(), set(), 0
     folders = {}
@@ -611,17 +614,16 @@ def orphan_check(R, valid, rep, state_keys, state_reason, cwds, now):
         elif res.status == "failed":
             unresolved += 1
     for d, ident in valid:
-        reasons = []
-        if _norm(d) not in served and _norm(d) not in referenced:
-            reasons.append("no .dream-state.json project path and no session in the last %d days resolves to it -- "
-                           "if the work is gone, delete the store directory in the store repo and commit" % ORPHAN_DAYS)
+        name = os.path.basename(str(d))
         if ident.kind == "local" and not os.path.exists(ident.value):
-            reasons.append("its local path no longer exists (%s) -- move the store with /qmigrate-workspace or delete it"
-                           % ident.value)
-        if reasons:
-            rep.warning("stores/%s  orphaned: %s" % (os.path.basename(str(d)), "; ".join(reasons)))
+            rep.warning("stores/%s  workspace gone: its local path no longer exists (%s) -- move the store with "
+                        "/qmigrate-workspace, or delete it if the work is gone" % (name, ident.value))
+        elif _norm(d) not in served and _norm(d) not in referenced:
+            # a fact, not a defect: an idle workspace keeps its memory
+            rep.add("INFO: stores/%s  unused: no .dream-state.json project path and no session in the last %d days "
+                    "resolves to it" % (name, ORPHAN_DAYS))
     if unresolved:
-        rep.add("SKIP: %d folder(s) could not be resolved to a store and were left out of the orphan check" % unresolved)
+        rep.add("SKIP: %d folder(s) could not be resolved to a store and were left out of the store-use check" % unresolved)
 
 
 def pointer_store_text(text):
@@ -800,7 +802,7 @@ def store_checks(R, root, rep, opts, repo, now):
     blocklist_check(root, repo, rep)
     state_keys, state_reason = load_state(opts.state)
     cwds = session_cwds(opts.claude_projects, opts.kiro_sessions, now, ORPHAN_DAYS)
-    orphan_check(R, valid, rep, state_keys, state_reason, cwds, now)
+    store_use_check(R, valid, rep, state_keys, state_reason, cwds, now)
     candidates = list(state_keys) if not state_reason else []
     candidates = [k for k in candidates if not k.startswith("store:")] + list(cwds)
     seen, uniq = set(), []
@@ -1403,10 +1405,11 @@ def _selftest_stores(R, tmp, chk, skips):
     rc, out, _e = go(root)
     chk("no upstream is a skip line", rc == 0 and has(out, "SKIP: stores-repo push state", "no upstream") and count(out, "WARN:") == 0, repr(out))
 
-    # --- orphaned stores ---
+    # --- store use: unused stores are INFO, a gone local workspace is the only WARN ---
     root = clone()
     rc, out, _e = go(root, state=[])
-    chk("no state path, no session: orphan warn, exit 0", rc == 0 and has(out, "WARN: stores/proj-abcdef", "orphaned"), repr(out))
+    chk("no state path, no session: unused info, no warn, exit 0", rc == 0 and has(out, "INFO: stores/proj-abcdef", "unused")
+        and count(out, "WARN:") == 0, repr(out))
     sess = claude / "slug-a"
     sess.mkdir()
     jl = sess / "s1.jsonl"
@@ -1414,35 +1417,35 @@ def _selftest_stores(R, tmp, chk, skips):
     for days, expect in ((89, False), (91, True)):
         _backdate(jl, days * DAY)
         rc, out, _e = go(root, state=[])
-        chk("claude session %dd old: orphan=%s" % (days, expect), has(out, "WARN: stores/proj-abcdef", "orphaned") == expect, repr(out))
+        chk("claude session %dd old: unused=%s" % (days, expect), has(out, "INFO: stores/proj-abcdef", "unused") == expect, repr(out))
     _backdate(jl, 1 * DAY)
     jl.write_text(json.dumps({"type": "user", "cwd": str(proj / "sub")}) + "\n", encoding="utf-8")
     rc, out, _e = go(root, state=[])
-    chk("a session in a subfolder serves the repo's store", count(out, "WARN:") == 0, repr(out))
+    chk("a session in a subfolder serves the repo's store", not has(out, "INFO:", "unused"), repr(out))
     jl.unlink()
     ks = kiro / "hash1" / "sess_x"
     ks.mkdir(parents=True)
     (ks / "session.json").write_text(json.dumps({"id": "sess_x", "workspacePaths": [str(proj)]}), encoding="utf-8")
     rc, out, _e = go(root, state=[])
-    chk("a Kiro session serves the store", not has(out, "WARN:", "orphaned"), repr(out))
+    chk("a Kiro session serves the store", not has(out, "INFO:", "unused"), repr(out))
     _backdate(ks / "session.json", 95 * DAY)
     rc, out, _e = go(root, state=[])
-    chk("an old Kiro session does not", has(out, "WARN: stores/proj-abcdef", "orphaned"), repr(out))
+    chk("an old Kiro session does not", has(out, "INFO: stores/proj-abcdef", "unused"), repr(out))
     shutil.rmtree(str(kiro / "hash1"))
     rc, out, _e = go(root, state=["store:remote example.com/org/proj"])
-    chk("a store: state key references the store", count(out, "WARN:") == 0, repr(out))
+    chk("a store: state key references the store", not has(out, "INFO:", "unused"), repr(out))
     other = R.fixture_repo(work / "other", "https://example.com/org/other.git")
     rc, out, _e = go(root, state=[str(other)])
-    chk("a state path of another repo does not serve it", has(out, "WARN: stores/proj-abcdef", "orphaned"), repr(out))
+    chk("a state path of another repo does not serve it", has(out, "INFO: stores/proj-abcdef", "unused"), repr(out))
     root = clone()
     _store_text(root / "mono-654321", "remote example.com/org/proj\npath sub\n")
     _commit_all(root)
     rc, out, _e = go(root, state=[str(proj)])
-    chk("a subpath store is not served by the repo root", has(out, "WARN: stores/mono-654321", "orphaned")
-        and not has(out, "WARN: stores/proj-abcdef"), repr(out))
+    chk("a subpath store is not served by the repo root", has(out, "INFO: stores/mono-654321", "unused")
+        and not has(out, "INFO: stores/proj-abcdef"), repr(out))
     rc, out, _e = go(root, state=[str(proj / "sub")])
-    chk("a subpath store is served by a folder at that subpath", not has(out, "WARN: stores/mono-654321", "orphaned"), repr(out))
-    # local stores: a path that is gone is an orphan even when the state names it
+    chk("a subpath store is served by a folder at that subpath", not has(out, "INFO: stores/mono-654321", "unused"), repr(out))
+    # local stores: a path that is gone warns even when the state names it
     loc = work / "plain"
     loc.mkdir()
     lid = R.identity(str(loc))
@@ -1452,7 +1455,7 @@ def _selftest_stores(R, tmp, chk, skips):
         _store_text(root / "plain-111111", "local %s\n" % lid.path.value)
         _commit_all(root)
         rc, out, _e = go(root, state=[str(proj), str(loc)])
-        chk("a local store with its folder is quiet", count(out, "WARN:") == 0, repr(out))
+        chk("a local store with its folder is quiet", count(out, "WARN:") == 0 and not has(out, "INFO:", "unused"), repr(out))
         gone = work / "gone"
         gone.mkdir()
         gid = R.identity(str(gone))
@@ -1461,13 +1464,14 @@ def _selftest_stores(R, tmp, chk, skips):
         gone.rmdir()
         rc, out, _e = go(root, state=[str(proj), str(loc), str(gone)])
         chk("a local store whose path is gone warns, though the state names it",
-            has(out, "WARN: stores/gone-222222", "no longer exists") and not has(out, "WARN: stores/gone-222222", "no .dream-state.json"), repr(out))
+            has(out, "WARN: stores/gone-222222", "workspace gone") and not has(out, "INFO: stores/gone-222222"), repr(out))
         chk("...and only that store", count(out, "WARN:") == 1, repr(out))
     root = clone()
     write_state([str(proj)])
     state_file.write_text("{not json", encoding="utf-8")
     rc, out, _e = go(root)
-    chk("an unreadable state skips the orphan check, no false warning", rc == 0 and has(out, "SKIP: orphaned-store check") and count(out, "WARN:") == 0, repr(out))
+    chk("an unreadable state skips the store-use check, no false warning", rc == 0 and has(out, "SKIP: store-use check")
+        and count(out, "WARN:") == 0 and not has(out, "INFO:", "unused"), repr(out))
     write_state([str(proj)])
 
     # --- the reserved user/ (user-tier memory behind the config repo's `memory` link) is never a store ---
