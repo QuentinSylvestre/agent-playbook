@@ -111,8 +111,22 @@ jobs:
           HOME: ${{ runner.temp }}/home
         run: |
           printf '%s\n' '{"statusLine":{"command":"bash ~/.claude/statusline-command.sh"},"keep":1}' > "$HOME/.claude/settings.json"
-          ./setup.sh --uninstall --purge
-          test ! -e "$HOME/.claude/CLAUDE.md"
+          # A CLAUDE.md of your own: setup keeps it and links the playbook beside it in ~/.claude/rules.
+          rm "$HOME/.claude/CLAUDE.md"
+          printf 'mine\n' > "$HOME/.claude/CLAUDE.md"
+          ./setup.sh --providers claude < /dev/null
+          test -L "$HOME/.claude/rules/agent-playbook.md"
+          test -L "$HOME/.claude/rules/playbook-user-memory.md"
+          test -L "$HOME/.claude/rules/playbook-higher-order.md"
+          ./setup.sh --uninstall --purge --providers all
+          # test ! -e alone passes on a dangling link, so every removal is checked with ! -L too; one
+          # test per line, as bash -e does not stop on a failure inside an && list
+          test ! -L "$HOME/.claude/CLAUDE.md"
+          test "$(cat "$HOME/.claude/CLAUDE.md")" = mine
+          for f in agent-playbook.md playbook-user-memory.md playbook-higher-order.md; do
+            test ! -e "$HOME/.claude/rules/$f"
+            test ! -L "$HOME/.claude/rules/$f"
+          done
           test ! -e "$HOME/.agent-playbook/config"
           grep -q '"keep": 1' "$HOME/.claude/settings.json"
           ! grep -q statusline-command "$HOME/.claude/settings.json"

@@ -97,7 +97,8 @@ every backticked span of the last cell is a candidate citer (a " § <anchor>" su
 `AGENTS.md` naming the repo root's AGENTS.md). A row is OK when one candidate (a) matches the citer-path
 allowlist ([A-Za-z0-9._-] segments joined by single `/`, no segment ending in `.`), (b) exists as a file,
 (c) is UTF-8 text, (d) contains the topic path, and (e) is accepted: an inventory.tsv destination of
-~/.claude/CLAUDE.md, ~/.codex/AGENTS.md, ~/.gemini/GEMINI.md or under ~/.kiro/steering/ (four-field rows,
+~/.claude/CLAUDE.md, ~/.codex/AGENTS.md, ~/.gemini/GEMINI.md, a co-existence link beside one
+(~/.claude/rules/agent-playbook.md, ~/.gemini/AGENT-PLAYBOOK.md) or under ~/.kiro/steering/ (four-field rows,
 `#` comments skipped), shared/skills/<name>/SKILL.md, providers/<p>/skills/<name>/SKILL.md with no sibling
 OVERLAY.md, or the root AGENTS.md. A row with no passing citer is still OK when its last cell holds the
 waiver "(no always-loaded home — index only)". Otherwise the detail is "none-cited", or
@@ -163,7 +164,10 @@ PROVIDER_SKILL_RE = re.compile(r"providers/[^/]+/skills/[^/]+/SKILL\.md")
 SEPARATOR_RE = re.compile(r":?-+:?")
 FIRST_CELL_RE = re.compile(r"`([^`]+)`")
 SPAN_RE = re.compile(r"`([^`]*)`")
-ACCEPTED_DESTS = ("~/.claude/CLAUDE.md", "~/.codex/AGENTS.md", "~/.gemini/GEMINI.md")
+# The instruction files, and the co-existence links setup makes beside a user's own CLAUDE.md or GEMINI.md
+# (setup.sh "Co-existence"): those load in every session too.
+ACCEPTED_DESTS = ("~/.claude/CLAUDE.md", "~/.codex/AGENTS.md", "~/.gemini/GEMINI.md",
+                  "~/.claude/rules/agent-playbook.md", "~/.gemini/AGENT-PLAYBOOK.md")
 KIRO_STEERING = "~/.kiro/steering/"
 
 
@@ -1040,6 +1044,13 @@ def selftest():
         got = [f[1] for f in findings(out)]
         chk("findings print in scan order, an unreadable file included",
             got == ["memory/MEMORY.md", "memory/topics/alpha.md"], repr(out))
+
+        # --- accepted destinations: the instruction files and their co-existence links, never the memory rules ---
+        inv_lines = ["symlink-file	~/.claude/rules/agent-playbook.md	shared/A.md	claude",
+                     "symlink-file	~/.gemini/AGENT-PLAYBOOK.md	shared/B.md	gemini",
+                     "symlink-file	~/.claude/rules/playbook-user-memory.md	memory/MEMORY.md	claude"]
+        chk("a co-existence link is an accepted destination; a memory rules link is not",
+            accepted_sources(inv_lines) == ["shared/A.md", "shared/B.md"], repr(accepted_sources(inv_lines)))
 
         # --- the venv guard: another interpreter exits 2 before anything runs ---
         other_py = getattr(sys, "_base_executable", None)

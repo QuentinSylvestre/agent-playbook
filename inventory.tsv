@@ -37,6 +37,13 @@ symlink-file	~/.claude/notify-command.ps1	providers/claude/notify-command.ps1	cl
 symlink-file	~/.claude/memory-load-hook.py	providers/claude/memory-load-hook.py	claude
 symlink-file	~/.claude/memory-load-hook.ps1	providers/claude/memory-load-hook.ps1	claude
 symlink-file	~/.claude/agents/qdream-reader.md	providers/claude/agents/qdream-reader.md	claude
+# User memory and the higher-order tier, delivered in full at every session start: Claude Code
+# loads every ~/.claude/rules/*.md file whole, links included. The sources sit behind the repo's
+# gitignored memory link (the store repo's user/memory/); while it holds no user memory yet, setup
+# makes no link and verify-deployment reports SKIP. A user's own ~/.claude/CLAUDE.md is kept and
+# the playbook links ~/.claude/rules/agent-playbook.md beside it instead (setup's "Co-existence").
+symlink-file	~/.claude/rules/playbook-user-memory.md	memory/MEMORY.md	claude
+symlink-file	~/.claude/rules/playbook-higher-order.md	memory/HIGHER_ORDER.md	claude
 
 # --- Codex ---
 symlink-file	~/.codex/AGENTS.md	shared/AGENTS.md	codex

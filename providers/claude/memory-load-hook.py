@@ -6,17 +6,32 @@ prints one JSON object whose `hookSpecificOutput.additionalContext` holds,
 under a character cap (default 9,500; Claude Code saves anything over about
 10,000 to a file instead of injecting it):
 
-  1. a 2-line header;
-  2. the heading index of the config repo's user `memory/MEMORY.md`, by section;
-  3. the heading index of `memory/HIGHER_ORDER.md`;
+  1. a 2-line header, whose second line says which of two modes applied;
+  2. each tier's absolute file path;
+  3. in rules mode, the user and higher-order entries that carry a warning
+     mark, one line each with the file path; in index mode, the heading index
+     of the config repo's user `memory/MEMORY.md`, by section, then that of
+     `memory/HIGHER_ORDER.md`, marks inline;
   4. the `## Topics` rows of user memory (path and trigger), one line each;
-  5. each tier's absolute file path;
-  6. then the project tier in full when the remaining budget holds it,
+  5. then the project tier in full when the remaining budget holds it,
      otherwise its heading index.
 
-The fixed index (1-5) is reserved first. When it alone is over the cap, whole
-lines are dropped from the end of the user index and a `(+N more -- see
-<path>)` line replaces them; a line is never cut in half.
+Rules mode: setup links `~/.claude/rules/playbook-user-memory.md` to user
+`memory/MEMORY.md` and `~/.claude/rules/playbook-higher-order.md` to
+`memory/HIGHER_ORDER.md` (inventory.tsv), and Claude Code loads every
+`~/.claude/rules/*.md` file whole at session start, so both tiers are already
+delivered in full and the header says no read is needed. It applies only when
+both links resolve to the very files this hook reads (os.path.samefile; the
+rules folder is under CLAUDE_CONFIG_DIR when that is set, else `~/.claude`).
+Otherwise (setup not re-run, a link elsewhere, a tier unreadable) the hook
+falls back to index mode, whose header says to still read the files, and a
+link that resolves elsewhere gets a note. Rules mode leaves the project tier
+the rest of the cap.
+
+The fixed part (1-4) is reserved first. When it alone is over the cap, whole
+lines are dropped from the end of the user index (rules mode: of the marked
+entries) and a `(+N more -- see <path>)` line replaces them; a line is never
+cut in half.
 
 An entry is marked with a warning sign when a file cited on its `Source`
 line (its anchor, not a path named in prose) changed in git after its
@@ -104,6 +119,14 @@ MARK = "⚠"
 HEADER = ("Playbook memory index — a snapshot taken at session start; current files and the "
           "user's latest instructions win over it. Open an entry's file when its heading applies; "
           "%s = Source file changed since verified, re-check before relying" % MARK)
+HEADER_RULES = ("Playbook memory — a snapshot taken at session start; current files and the user's "
+                "latest instructions win over it. %s = Source file changed since verified, re-check "
+                "before relying" % MARK)
+DELIVER_INDEX = ("User and higher-order memory: heading index only (not delivery — still "
+                 "read those files).")
+DELIVER_RULES = ("User and higher-order memory: delivered in full via ~/.claude/rules (%s, %s) — "
+                 "no read needed.")
+RULES_LINKS = (("user", "playbook-user-memory.md"), ("higher-order", "playbook-higher-order.md"))
 IS_WINDOWS = os.name == "nt"
 SKIP_SECTIONS = {"topics", "declined"}
 
@@ -563,7 +586,29 @@ def read_tier(path):
         return None, "could not be read (%s); read it yourself" % type(e).__name__
 
 
-def build(cwd, config_repo, cap=DEFAULT_CAP, deadline=None, helpers=None):
+def default_rules_dir():
+    """Claude Code's user rules folder: <CLAUDE_CONFIG_DIR or ~/.claude>/rules."""
+    base = os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
+    return os.path.join(base, "rules")
+
+
+def rules_delivery(rules_dir, tiers):
+    """-> (links when both tiers are delivered in full through the rules folder, else None; notes)."""
+    links, notes = [], []
+    for tier, name in RULES_LINKS:
+        link = os.path.join(rules_dir, name)
+        path, problem = tiers[tier][0], tiers[tier][1]
+        try:
+            same = problem is None and os.path.samefile(link, path)
+        except OSError:
+            same = False
+        if not same and os.path.lexists(link):
+            notes.append("Note: %s does not resolve to %s; run the playbook setup again to relink it." % (link, path))
+        links.append(link if same else None)
+    return (links if all(links) else None), notes
+
+
+def build(cwd, config_repo, cap=DEFAULT_CAP, deadline=None, helpers=None, rules_dir=None):
     sr, me, dm = helpers if helpers is not None else load_helpers(config_repo)
     deadline = deadline if deadline is not None else START + TIME_CAP
     marks = Marks(None if isinstance(dm, Exception) else dm, deadline)
@@ -621,6 +666,8 @@ def build(cwd, config_repo, cap=DEFAULT_CAP, deadline=None, helpers=None):
         for path in conflicted:
             notes.append("Note: %s holds git conflict markers. Resolve them before relying on it." % path)
 
+    rules_links, rules_notes = rules_delivery(rules_dir or default_rules_dir(), tiers)
+    notes += rules_notes
     marked = marks.resolve() if marks.checks else set()
     # After the marks: the store repo notice spends what is left of the same deadline.
     if not isinstance(sr, Exception):
@@ -633,9 +680,11 @@ def build(cwd, config_repo, cap=DEFAULT_CAP, deadline=None, helpers=None):
         status = "%s marks missing where git could not read a repository." % MARK
     else:
         status = ""
-    deliver = ("User and higher-order memory: heading index only (not delivery — still "
-               "read those files).")
-    head = [HEADER, (deliver + " " + status).strip()]
+    if rules_links:
+        deliver = DELIVER_RULES % tuple(rules_links)
+        head = [HEADER_RULES, (deliver + " " + status).strip()]
+    else:
+        head = [HEADER, (DELIVER_INDEX + " " + status).strip()]
 
     def tier_block(tier, label):
         path, problem, entries, _ = tiers[tier]
@@ -681,15 +730,26 @@ def build(cwd, config_repo, cap=DEFAULT_CAP, deadline=None, helpers=None):
     proj_tail = ["(+%d more — see %s)" % (len(proj_entries), proj_path)] if proj_entries else []
     proj_reserve = proj_head if proj_head and proj_text is None else \
         proj_head + ident_line + [proj_title_index] + proj_tail
-    # Over the cap, whole lines go from the end of the user index first;
-    # the higher-order index and the topic rows are cut only when the user
-    # index is already gone (pathological, but the cap must still hold).
-    ho_text = [t for _, t in ho_lines]
-    fixed = head + user_title
-    fixed += trim(fixed, user_lines, ho_title + ho_text + topics_block + proj_reserve, cap,
-                  user_path)
-    fixed += ho_title
-    fixed += trim(fixed, ho_lines, topics_block + proj_reserve, cap, ho_path)
+    if rules_links:
+        # Rules mode: the tiers are in context already; only their paths and the marked entries, one line
+        # each with the file it is in, go out here.
+        fixed = head + ["User memory (%s): delivered in full by the rules link." % user_path,
+                        "Higher-order memory (%s): delivered in full by the rules link." % ho_path]
+        flagged = [(True, "- %s (%s)" % (h, tiers[t][0])) for t in ("user", "higher-order")
+                   for i, (_s, h, _b) in enumerate(tiers[t][2]) if h is not None and (t, i) in marked]
+        if flagged:
+            fixed += trim(fixed, [(False, "%s entries in user and higher-order memory:" % MARK)] + flagged,
+                          topics_block + proj_reserve, cap, user_path)
+    else:
+        # Over the cap, whole lines go from the end of the user index first;
+        # the higher-order index and the topic rows are cut only when the user
+        # index is already gone (pathological, but the cap must still hold).
+        ho_text = [t for _, t in ho_lines]
+        fixed = head + user_title
+        fixed += trim(fixed, user_lines, ho_title + ho_text + topics_block + proj_reserve, cap,
+                      user_path)
+        fixed += ho_title
+        fixed += trim(fixed, ho_lines, topics_block + proj_reserve, cap, ho_path)
     if topics_block:
         topic_lines = [(False, topics_block[0])] + [(True, t) for t in topics_block[1:]]
         fixed += trim(fixed, topic_lines, proj_reserve, cap, user_path)
@@ -864,6 +924,14 @@ def _run_case(case_dir, helpers):
                 os.symlink(os.path.join(root, ln["src"]), os.path.join(root, ln["dst"]), target_is_directory=True)
             except (OSError, NotImplementedError):
                 return ["SKIP: no symlink could be made"]
+        for ln in case.get("file_link", []):
+            # a file symlink, as setup links ~/.claude/rules/playbook-user-memory.md to memory/MEMORY.md
+            dst = os.path.join(root, ln["dst"])
+            os.makedirs(os.path.dirname(dst), exist_ok=True)
+            try:
+                os.symlink(os.path.join(root, ln["src"]), dst)
+            except (OSError, NotImplementedError):
+                return ["SKIP: no symlink could be made"]
         if case.get("store_repo"):
             # The case's store repo root (a directory of the tree holding STORE directories) becomes a
             # store repo by a `.git` folder made here (a fixture tree cannot commit a nested `.git`).
@@ -959,8 +1027,10 @@ def _run_case(case_dir, helpers):
             if "broken_helper" in case:
                 use[case["broken_helper"]] = RuntimeError("fixture: this helper could not load")
             try:
+                # The rules folder: the case's own, else the selftest's empty one (never the real ~/.claude).
+                rules_dir = os.path.normpath(case["rules_dir"]) if case.get("rules_dir") else None
                 out = build(os.path.normpath(case["cwd"]), os.path.normpath(case["config_repo"]),
-                            cap, deadline, tuple(use))
+                            cap, deadline, tuple(use), rules_dir)
             except Exception as e:  # the hook's main() would fail open; a case must not
                 return ["build raised %s: %s" % (type(e).__name__, e)]
             finally:
@@ -1010,6 +1080,9 @@ def selftest():
     iso = tempfile.mkdtemp(prefix="memory load hook iso ")
     os.makedirs(os.path.join(iso, "stores", ".git"))
     os.environ["AGENT_PLAYBOOK_STORES"] = os.path.join(iso, "stores")
+    # Nor the live ~/.claude/rules: an empty Claude Code config folder, so a case is in index mode unless it
+    # names its own rules folder.
+    os.environ["CLAUDE_CONFIG_DIR"] = os.path.join(iso, "claude")
     try:
         return _selftest_cases(fixdir, names)
     finally:

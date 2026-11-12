@@ -24,6 +24,23 @@ Inventory sources:
     overlay-bearing skills as copy-dir-recursive plus one merge-file row per
     merged target. Steering is symlinked on every platform (mode `kiro`);
     Windows copy mode was retired 2026-09-20.
+  - The Claude memory rows (~/.claude/rules/playbook-user-memory.md and
+    playbook-higher-order.md) link to <repo>/memory/MEMORY.md and HIGHER_ORDER.md,
+    behind the repo's gitignored memory link. While that source is absent (no
+    user memory in the store repo yet) setup makes no link, and the row is
+    SKIP no-source=<path>.
+
+Co-existence (lockstep with setup's "Co-existence" section): a regular file of the
+user's own at ~/.claude/CLAUDE.md or ~/.gemini/GEMINI.md is accepted in place of the
+link when the playbook loads beside it. For Claude Code that is the link
+~/.claude/rules/agent-playbook.md to shared/AGENTS.md; for Gemini CLI the link
+~/.gemini/AGENT-PLAYBOOK.md plus that name in `context.fileName` of
+~/.gemini/settings.json. Each part gets its own line (the settings line is
+OK|MISSING <settings.json> context.fileName...), and the instruction file is
+OK <path> user-file-kept playbook-via=<side link> when every part is there, else
+NOT_SYMLINK <path> user-file-kept-without-the-playbook. A byte copy of the source is
+not the user's own file (setup replaces it), so it stays NOT_SYMLINK. Codex has
+no such mechanism: its row is checked as a plain link.
 
 Overlay-merge awareness (lockstep with setup.sh / setup.ps1):
   setup MERGES a kiro overlay (`OVERLAY.md` for SKILL.md, `<stem>.OVERLAY.md`
@@ -117,6 +134,7 @@ transparently because tabs are not valid in path separators.
 Stdlib only, Python 3.8+. Runs only under the playbook venv (see the venv guard stub).
 """
 import hashlib
+import json
 import os
 import re
 import shutil
@@ -170,6 +188,7 @@ DIR_KINDS = (KIND_COPY_DIR_RECURSIVE, KIND_SYMLINK_DIR)
 LOCK_HEADER = "# agent-playbook deploy lock v1 (written by setup; kind<TAB>path<TAB>sha256)"
 LOCK_FILE_KINDS = ("copy-dir-recursive", "merge-file", "copy-file", "template-file")
 LOCK_SETTING_KEY = "kiro-cli/chat.defaultAgent"
+LOCK_GEMINI_KEY = "gemini/context.fileName"
 OWNED, FOREIGN = "owned-by-setup", "foreign"
 
 
@@ -193,7 +212,7 @@ def read_lock_keys(path):
             return set()
         kind, key, val = c
         if kind == "setting":
-            if key != LOCK_SETTING_KEY or not val:
+            if key not in (LOCK_SETTING_KEY, LOCK_GEMINI_KEY) or not val:
                 return set()
             continue
         if kind not in LOCK_FILE_KINDS + ("backup",) or not key.startswith("~/") or "/../" in "/" + key + "/":
@@ -203,6 +222,13 @@ def read_lock_keys(path):
         if kind != "backup":
             keys.add(key)
     return keys
+
+
+# Co-existence: the instruction file (manifest dest) -> the side link setup makes beside a user's own file.
+SIDE_LINKS = {"~/.claude/CLAUDE.md": ".claude/rules/agent-playbook.md",
+              "~/.gemini/GEMINI.md": ".gemini/AGENT-PLAYBOOK.md"}
+GEMINI_INSTRUCTIONS = "~/.gemini/GEMINI.md"
+GEMINI_SIDE_NAME = "AGENT-PLAYBOOK.md"
 
 
 STATUSES = ("OK", "MISSING", "WRONG_TARGET", "NOT_SYMLINK", "DRIFTED", "SKIP", "ORPHAN", "AMBIGUOUS_SKILL")
@@ -906,6 +932,63 @@ class Verifier(object):
             if m == mode:
                 yield kind, self.expand_dest(dest), self.expand_source(source)
 
+    def check_link_row(self, mode):
+        """The link rows of a Claude, Codex or Gemini mode, with the memory-source SKIP and co-existence."""
+        for kind, raw_dest, raw_source, m in self.manifest:
+            if m != mode:
+                continue
+            dest, source = self.expand_dest(raw_dest), self.expand_source(raw_source)
+            if mode == "gemini" and self.win and kind not in (KIND_SYMLINK_FILE, KIND_SYMLINK_DIR):
+                continue   # the .ps1 checks only the two symlink kinds here; the .sh checks every row
+            if raw_source.startswith("memory/") and not os.path.exists(source):
+                self.emit("SKIP", dest, "no-source=" + source)
+                continue
+            side = SIDE_LINKS.get(raw_dest)
+            if side and self.is_user_file(dest, source):
+                self.check_coexist(dest, source, self.join(self.home, side), raw_dest == GEMINI_INSTRUCTIONS)
+                continue
+            self.check_symlink(dest, source)
+
+    def is_user_file(self, path, source):
+        """A regular file (no link) that is not a byte copy of its source: the user's own instruction file."""
+        if os.path.islink(path) or (self.win and _ps_link_type(path)) or not os.path.isfile(path):
+            return False
+        try:
+            return not os.path.isfile(source) or not _files_equal(path, source)
+        except OSError:
+            return True
+
+    def check_coexist(self, dest, source, side, gemini):
+        ok_before = self.counts["OK"]
+        self.check_symlink(side, source)
+        ok = self.counts["OK"] > ok_before
+        if gemini:
+            ok = self.check_gemini_setting() and ok
+        if ok:
+            self.emit("OK", dest, "user-file-kept", "playbook-via=" + side)
+        else:
+            self.emit("NOT_SYMLINK", dest, "user-file-kept-without-the-playbook")
+
+    def check_gemini_setting(self):
+        """-> True when context.fileName of ~/.gemini/settings.json lists the playbook's file name."""
+        path = self.join(self.home, ".gemini/settings.json")
+        try:
+            with open(path, "rb") as fh:
+                raw = fh.read()
+            if raw.startswith(b"\xef\xbb\xbf"):
+                raw = raw[3:]
+            data = json.loads(raw.decode("utf-8")) if raw.strip() else {}
+            ctx = data.get("context") if isinstance(data, dict) else None
+            names = ctx.get("fileName") if isinstance(ctx, dict) else None
+        except (OSError, ValueError):
+            names = None
+        names = [names] if isinstance(names, str) else names
+        if isinstance(names, list) and GEMINI_SIDE_NAME in names:
+            self.emit("OK", path, "context.fileName")
+            return True
+        self.emit("MISSING", path, "context.fileName-lacks=" + GEMINI_SIDE_NAME)
+        return False
+
     def provider_installed(self, top):
         """-> True when the provider top folder is a directory. Not there at all: SKIP (not
         installed). A dangling symlink in its place: MISSING target=<link text>, a broken
@@ -954,22 +1037,17 @@ class Verifier(object):
     def check_all(self):
         claude_top = self.join(self.home, ".claude")
         if self.wanted("claude", claude_top):
-            for _kind, dest, source in self._mode_rows("claude"):
-                self.check_symlink(dest, source)
+            self.check_link_row("claude")
             self.check_skill_links(claude_top)
 
         codex_top = self.join(self.home, ".codex")
         if self.wanted("codex", codex_top):
-            for _kind, dest, source in self._mode_rows("codex"):
-                self.check_symlink(dest, source)
+            self.check_link_row("codex")
             self.check_skill_links(codex_top)
 
         gemini_top = self.join(self.home, ".gemini")
         if self.wanted("gemini", gemini_top):
-            for kind, dest, source in self._mode_rows("gemini"):
-                # The .ps1 checks only the two symlink kinds here; the .sh checks every row.
-                if not self.win or kind in (KIND_SYMLINK_FILE, KIND_SYMLINK_DIR):
-                    self.check_symlink(dest, source)
+            self.check_link_row("gemini")
             self.check_skill_links(gemini_top)
 
         if self.wanted("kiro", self.kiro_top):
@@ -1207,7 +1285,9 @@ def _st_build(base, links):
            "seed-file\t<KIRO_IDE_USER>/mcp.json\tproviders/kiro/settings/mcp.json\tkiro-always"]
     if links:
         inv[1:1] = ["symlink-file\t~/.claude/CLAUDE.md\tshared/AGENTS.md\tclaude",
-                    "symlink-file\t~/.codex/AGENTS.md\tshared/AGENTS.md\tcodex"]
+                    "symlink-file\t~/.claude/rules/playbook-user-memory.md\tmemory/MEMORY.md\tclaude",
+                    "symlink-file\t~/.codex/AGENTS.md\tshared/AGENTS.md\tcodex",
+                    "symlink-file\t~/.gemini/GEMINI.md\tshared/AGENTS.md\tgemini"]
         inv.append("symlink-file\t~/.kiro/steering/agents.md\tshared/AGENTS.md\tkiro")
     _w(os.path.join(repo, "inventory.tsv"), "\n".join(inv) + "\n")
     _w(os.path.join(repo, "setup.sh"), b"#!/bin/sh\n")
@@ -1419,6 +1499,65 @@ def _st_cases(tmp, links, skip_reason):
     check(has(out, "ORPHAN", "beta/stale.md", "foreign"), "a lock with a malformed row is no lock -> foreign")
 
     if links:
+        def mklink(target, at, is_dir=False):
+            if not os.path.isdir(os.path.dirname(at)):
+                os.makedirs(os.path.dirname(at))
+            os.symlink(target, at, target_is_directory=is_dir)
+
+        # The memory rows: no source (no user memory yet) -> SKIP; the link to it -> OK; no link -> MISSING.
+        repo, home, env = fresh()
+        rc, out, _ = _st_run(repo, env)
+        check(rc == 0 and has(out, "SKIP", ".claude/rules/playbook-user-memory.md", "no-source="),
+              "a memory row whose source is absent -> SKIP no-source=")
+        _w(os.path.join(repo, "memory", "MEMORY.md"), b"# Memory\n")
+        rc, out, _ = _st_run(repo, env)
+        check(rc == 1 and has(out, "MISSING", ".claude/rules/playbook-user-memory.md"),
+              "a memory row whose source exists but has no link -> MISSING")
+        mklink(os.path.join(repo, "memory", "MEMORY.md"), os.path.join(home, ".claude", "rules", "playbook-user-memory.md"))
+        rc, out, _ = _st_run(repo, env)
+        check(rc == 0 and has(out, "OK", ".claude/rules/playbook-user-memory.md"), "a memory rules link -> OK")
+
+        # Co-existence, Claude Code: a file of the user's own at CLAUDE.md plus the rules link verifies OK;
+        # without the rules link it fails.
+        repo, home, env = fresh()
+        claude_md = os.path.join(home, ".claude", "CLAUDE.md")
+        os.remove(claude_md)
+        _w(claude_md, b"my own instructions\n")
+        rc, out, _ = _st_run(repo, env)
+        check(rc == 1 and has(out, "NOT_SYMLINK", ".claude/CLAUDE.md", "user-file-kept-without")
+              and has(out, "MISSING", ".claude/rules/agent-playbook.md"),
+              "a user CLAUDE.md with no rules link -> NOT_SYMLINK and the side link MISSING")
+        mklink(os.path.join(repo, "shared", "AGENTS.md"), os.path.join(home, ".claude", "rules", "agent-playbook.md"))
+        rc, out, _ = _st_run(repo, env)
+        check(rc == 0 and has(out, "OK", ".claude/CLAUDE.md", "user-file-kept")
+              and has(out, "OK", ".claude/rules/agent-playbook.md"),
+              "a user CLAUDE.md beside the rules link -> OK user-file-kept (rc=%d)" % rc)
+
+        # Co-existence, Gemini CLI: the side link and the context.fileName entry are both required.
+        repo, home, env = fresh()
+        gem = os.path.join(home, ".gemini")
+        _w(os.path.join(gem, "GEMINI.md"), b"my gemini\n")
+        for s in ("alpha", "beta"):
+            mklink(os.path.join(repo, "shared", "skills", s), os.path.join(gem, "skills", s), True)
+        mklink(os.path.join(repo, "shared", "AGENTS.md"), os.path.join(gem, "AGENT-PLAYBOOK.md"))
+        _w(os.path.join(gem, "settings.json"), b'{"context": {"fileName": "GEMINI.md"}, "keep": 1}\n')
+        rc, out, _ = _st_run(repo, env)
+        check(rc == 1 and has(out, "MISSING", ".gemini/settings.json", "context.fileName-lacks=")
+              and has(out, "NOT_SYMLINK", ".gemini/GEMINI.md", "user-file-kept-without"),
+              "a user GEMINI.md with no context.fileName entry -> MISSING settings and NOT_SYMLINK")
+        _w(os.path.join(gem, "settings.json"), b'{"context": {"fileName": ["GEMINI.md", "AGENT-PLAYBOOK.md"]}}\n')
+        rc, out, _ = _st_run(repo, env)
+        check(rc == 0 and has(out, "OK", ".gemini/GEMINI.md", "user-file-kept")
+              and has(out, "OK", ".gemini/settings.json", "context.fileName"),
+              "a user GEMINI.md beside the side link and the settings entry -> OK (rc=%d)" % rc)
+        # A byte copy of the source is not the user's own file: it stays NOT_SYMLINK, side link or not.
+        os.remove(os.path.join(gem, "GEMINI.md"))
+        _w(os.path.join(gem, "GEMINI.md"), b"agents\n")
+        rc, out, _ = _st_run(repo, env)
+        check(rc == 1 and has(out, "NOT_SYMLINK", ".gemini/GEMINI.md")
+              and not has(out, "NOT_SYMLINK", ".gemini/GEMINI.md", "user-file-kept"),
+              "a byte copy of the source at GEMINI.md -> plain NOT_SYMLINK")
+
         # Coexistence: a skill of the user's own beside the playbook's per-skill links is never reported.
         repo, home, env = fresh()
         _w(os.path.join(home, ".claude", "skills", "my-own-skill", "SKILL.md"), b"# mine\n")
@@ -1582,6 +1721,11 @@ def selftest():
              old_provider_installed),
             ("a relative symlink target resolves against the cwd", g, "_link_dest", lambda link_path, raw: raw),
             ("an empty home is not rejected", g, "_require_home", lambda home: None),
+            ("a user's own instruction file is never accepted", Verifier, "is_user_file",
+             lambda self, path, source: False),
+            ("co-existence ignores the Gemini settings entry", Verifier, "check_gemini_setting", lambda self: True),
+            ("a memory row with no source is checked anyway", Verifier, "check_link_row",
+             lambda self, mode: [self.check_symlink(d, src) for _k, d, src in self._mode_rows(mode)]),
         ]
         originals = []
         for i, (label, owner, attr, replacement) in enumerate(mutations):

@@ -44,7 +44,24 @@ Interactive setup:
 5. Writes `~/.agent-playbook/config`.
 
 Setup records every file it writes in `~/.agent-playbook/deploy-lock.tsv`, so a re-run changes
-only what changed. A file of yours where the playbook puts a link is backed up to `<file>.bak` before it
+only what changed.
+
+Your own global instruction file stays where it is, and the playbook loads beside it:
+
+- Claude Code: a `~/.claude/CLAUDE.md` of yours is kept, and the playbook is linked as
+  `~/.claude/rules/agent-playbook.md`. Claude Code loads every file in that folder.
+- Gemini CLI: a `~/.gemini/GEMINI.md` of yours is kept. The playbook is linked as
+  `~/.gemini/AGENT-PLAYBOOK.md`, and that name is added to `context.fileName` in
+  `~/.gemini/settings.json`. This relies on a reading of Gemini CLI 0.28.2's source, not a runtime
+  check. A `settings.json` setup cannot parse is left alone, and your file is backed up instead.
+- Codex cannot load a second global file, so a `~/.codex/AGENTS.md` of yours is backed up and
+  replaced, and setup says so.
+
+Uninstall removes only the links and the setting entry setup added. For Claude Code, setup also links
+`~/.claude/rules/playbook-user-memory.md` and `~/.claude/rules/playbook-higher-order.md` to your user
+memory, so every session starts with both tiers in full (`providers/claude/README.md`).
+
+Any other file of yours where the playbook puts a link is backed up to `<file>.bak` before it
 is replaced: an interactive run asks first, while `--yes` and a run with no terminal back up without
 asking. A file setup wrote and you then edited is backed up the same way, without asking. Setup keeps
 one `.bak` per path, so a later backup replaces an earlier one. A skill folder of yours with a

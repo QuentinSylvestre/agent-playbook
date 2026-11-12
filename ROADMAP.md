@@ -5,10 +5,10 @@ comment there if one matters to you.
 
 ## Next
 
-- **Compose with other governance.** Today setup links its instruction file in place of yours,
-  backing yours up, and links skills one by one beside your own. The goal is for the playbook to be
-  one layer among several:
-  - your own global instructions plus the playbook's, without either replacing the other;
+- **Compose with other governance.** Setup keeps your own global instructions beside the
+  playbook's for Claude Code and Gemini CLI (Codex, which cannot load a second file, falls back to a
+  backup), and links skills one by one beside your own. The goal is for the playbook to be one layer
+  among several:
   - namespaced skills;
   - detection of conflicting rules between packs.
 - **CI-verified Windows setup.** `setup.ps1` parity with `setup.sh` is checked on Windows runners;

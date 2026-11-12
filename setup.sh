@@ -25,6 +25,8 @@ export MSYS="${MSYS:-winsymlinks:nativestrict}"
 #   neither     -- no terminal (scripts, test-parity.sh): every provider, a file of
 #                  yours is backed up and replaced, and the store repo, engine branch
 #                  and memory link are only reported, never created.
+# In every mode, your own ~/.claude/CLAUDE.md or ~/.gemini/GEMINI.md stays where it is and
+# the playbook loads beside it (see "Co-existence" below); Codex has no such mechanism.
 #
 # Kiro overlay merge: for a shared skill dir, kiro discipline deltas live under
 # providers/kiro/skills/<name>/ and are APPENDED to the deployed copy at setup time:
@@ -56,7 +58,8 @@ Deploys agent-playbook into the AI providers you choose. Safe to re-run.
   --dry-run          print every change instead of making it; nothing is written.
   --yes              accept every default without asking (create a local store repo
                      when none exists, create the engine branch, back up and replace
-                     a file of yours that is in the way).
+                     a file of yours that is in the way). Your own ~/.claude/CLAUDE.md
+                     or ~/.gemini/GEMINI.md is never replaced: the playbook loads beside it.
   --stores-url URL   clone the store repo from URL when it is missing.
   --no-stores        do not set up a store repo (memory is disabled until you do).
   --uninstall        remove what setup deployed for the chosen providers: links into
@@ -151,10 +154,12 @@ is_engine_link() {
 #   rows   : kind<TAB>path<TAB>value, sorted by byte order, one per path and kind class
 #   kind   : copy-dir-recursive (a plain file of a generated Kiro copy), merge-file (a merged file
 #            of one), copy-file, template-file (the manifest rows), backup (a .bak setup made),
-#            setting (the kiro-cli default agent setup set)
+#            setting (a setting setup changed: the kiro-cli default agent, or the name setup added
+#            to Gemini CLI's context.fileName)
 #   path   : the destination, home written as ~/, forward slashes; setting: kiro-cli/chat.defaultAgent
+#            or gemini/context.fileName
 #   value  : sha256, lowercase hex, of the bytes setup wrote; backup: of the .bak (- for a folder
-#            or a link); setting: the value setup replaced, as kiro-cli prints it in JSON (- if none)
+#            or a link); setting: the value setup replaced, as compact JSON (- if none)
 # The lock is untrusted input: a missing file, another first line or one malformed row means no
 # lock at all (the first-run case), and only ~/ paths with no .. segment are accepted.
 #
@@ -167,6 +172,7 @@ is_engine_link() {
 LOCK_HEADER="# agent-playbook deploy lock v1 (written by setup; kind<TAB>path<TAB>sha256)"
 LOCK_FILE="$HOME/.agent-playbook/deploy-lock.tsv"
 LOCK_SETTING_KEY="kiro-cli/chat.defaultAgent"
+LOCK_GEMINI_KEY="gemini/context.fileName"
 LOCK_WORK=""
 OWN_RULE_AWK='function own_rule(want, cur, lk) {
     if (cur == "-") return "write"
@@ -206,7 +212,7 @@ KEY_PROVIDER_AWK='function key_provider(k) {
     if (index(k, "~/.kiro/") == 1 || k == "'"$LOCK_SETTING_KEY"'") return "kiro"
     if (index(k, "~/.claude/") == 1) return "claude"
     if (index(k, "~/.codex/") == 1) return "codex"
-    if (index(k, "~/.gemini/") == 1) return "gemini"
+    if (index(k, "~/.gemini/") == 1 || k == "'"$LOCK_GEMINI_KEY"'") return "gemini"
     return "none"
 }'
 
@@ -217,10 +223,10 @@ lock_load() {
     : > "$LOCK_WORK/old"
     : > "$LOCK_WORK/new"
     [ -f "$LOCK_FILE" ] || return 0
-    if ! awk -F'\t' -v header="$LOCK_HEADER" -v skey="$LOCK_SETTING_KEY" '
+    if ! awk -F'\t' -v header="$LOCK_HEADER" -v skey="$LOCK_SETTING_KEY" -v gkey="$LOCK_GEMINI_KEY" '
         NR == 1 { if ($0 != header) exit 1; next }
         NF != 3 { exit 1 }
-        $1 == "setting" { if ($2 != skey || $3 == "") exit 1; next }
+        $1 == "setting" { if (($2 != skey && $2 != gkey) || $3 == "") exit 1; next }
         $1 !~ /^(copy-dir-recursive|merge-file|copy-file|template-file|backup)$/ { exit 1 }
         substr($2, 1, 2) != "~/" || ("/" $2 "/") ~ /\/\.\.\// { exit 1 }
         $1 == "backup" && $3 == "-" { next }
@@ -616,6 +622,133 @@ link_skills() {
             act rm "$dest"
         fi
     done
+}
+
+# --- Co-existence with your own instruction file ------------------------------
+# A regular file of yours at a client's global instruction path stays where it is, and the playbook
+# loads beside it through the client's own side-by-side mechanism:
+#   Claude Code: ~/.claude/rules/agent-playbook.md links to shared/AGENTS.md (Claude Code 2.1.322 loads
+#                every ~/.claude/rules/*.md whole, links included; measured 2026-11-12).
+#   Gemini CLI : ~/.gemini/AGENT-PLAYBOOK.md links to shared/AGENTS.md, and its name joins
+#                context.fileName in ~/.gemini/settings.json. Source-read, not runtime-verified: Gemini
+#                CLI 0.28.2 config.js:312 and memoryDiscovery.js:93-100 (read 2026-11-12).
+#                providers/gemini/context-filename.py makes the edit; the deploy lock records it as a
+#                setting row. A settings.json that does not parse, or no venv, falls back to the .bak
+#                below, with a note.
+#   Codex      : no side-by-side mechanism; your file gets the single .bak, then the link, and setup
+#                says so.
+# An empty path or a link is linked as before, and a co-existence link into this repo is removed then,
+# so the playbook never loads twice. Existing installs need no migration.
+CLAUDE_SIDE_LINK="$HOME/.claude/rules/agent-playbook.md"
+GEMINI_SIDE_NAME="AGENT-PLAYBOOK.md"
+GEMINI_SIDE_LINK="$HOME/.gemini/$GEMINI_SIDE_NAME"
+
+# user_instruction_file <dest> <source>: dest is a regular file of your own: not a link, not a file the
+# deploy lock names, and not a byte copy of the source (a copy left where a link could not be made).
+user_instruction_file() {
+    [ -f "$1" ] && [ ! -L "$1" ] || return 1
+    [ -z "$(awk -F'\t' -v k="$(lock_key "$1")" '$2 == k && $1 != "backup" && $1 != "setting"' "$LOCK_WORK/old")" ] || return 1
+    ! cmp -s "$1" "$2"
+}
+
+# drop_side_link <path>: remove a co-existence link into this repo (the instruction file is the link now).
+drop_side_link() {
+    if is_engine_link "$1"; then
+        echo "  REMOVE: $1 (the playbook loads through the instruction file itself now)"
+        act rm "$1"
+    fi
+}
+
+# gemini_context <add|remove> [prior]: providers/gemini/context-filename.py on ~/.gemini/settings.json;
+# prints its one line, or "unreadable <why>" when it cannot run.
+gemini_context() {
+    local py args
+    py="$(venv_python)"
+    if [ ! -x "$py" ]; then echo "unreadable there is no playbook venv to edit it with"; return 0; fi
+    args=("$1" --settings "$(native_path "$HOME/.gemini/settings.json")" --name "$GEMINI_SIDE_NAME")
+    [ "$DRY_RUN" -eq 1 ] && args+=(--dry-run)
+    # the prior value travels in the environment, as in setup.ps1 (see the helper's docstring)
+    { CONTEXT_FILENAME_PRIOR="${2:-}" "$py" -I "$SCRIPT_DIR/providers/gemini/context-filename.py" "${args[@]}" 2>&1 || true; } \
+        | head -n 1 | tr -d '\r'
+}
+
+# gemini_unset <prior>: take the name setup added out of context.fileName again; the lock row stays
+# when that cannot be done.
+gemini_unset() {
+    local res
+    res="$(gemini_context remove "$1")"
+    case "$res" in
+        removed) echo "  REMOVED: $GEMINI_SIDE_NAME from context.fileName in $HOME/.gemini/settings.json" ;;
+        absent) ;;
+        *) echo "  NOTE: $HOME/.gemini/settings.json cannot be edited (${res#unreadable }); remove $GEMINI_SIDE_NAME from its context.fileName by hand"
+           lock_add setting "$LOCK_GEMINI_KEY" "$1" ;;
+    esac
+}
+
+claude_instructions() {
+    local source="$1" dest="$2"
+    if user_instruction_file "$dest" "$source"; then
+        echo "  KEPT: $dest is your own file; the playbook loads beside it from $CLAUDE_SIDE_LINK (Claude Code reads every ~/.claude/rules/*.md)"
+        act mkdir -p "$(dirname "$CLAUDE_SIDE_LINK")"
+        link_file "$source" "$CLAUDE_SIDE_LINK"
+    else
+        link_file "$source" "$dest"
+        drop_side_link "$CLAUDE_SIDE_LINK"
+    fi
+}
+
+gemini_instructions() {
+    local source="$1" dest="$2" old res
+    old="$(lock_get setting "$LOCK_GEMINI_KEY")"
+    if user_instruction_file "$dest" "$source"; then
+        res="$(gemini_context add)"
+        case "$res" in
+            present) [ -z "$old" ] || lock_add setting "$LOCK_GEMINI_KEY" "$old" ;;
+            "added "*) lock_add setting "$LOCK_GEMINI_KEY" "${res#added }"
+                       if [ "$DRY_RUN" -eq 1 ]; then echo "    DRY: add $GEMINI_SIDE_NAME to context.fileName of $HOME/.gemini/settings.json"
+                       else echo "  SET: $GEMINI_SIDE_NAME in context.fileName of $HOME/.gemini/settings.json"; fi ;;
+            *) echo "  NOTE: $HOME/.gemini/settings.json cannot be edited (${res#unreadable }), so your $dest cannot stay beside the playbook's: it is backed up and replaced"
+               [ -z "$old" ] || lock_add setting "$LOCK_GEMINI_KEY" "$old"
+               link_file "$source" "$dest"
+               return 0 ;;
+        esac
+        echo "  KEPT: $dest is your own file; the playbook loads beside it from $GEMINI_SIDE_LINK (listed in context.fileName)"
+        link_file "$source" "$GEMINI_SIDE_LINK"
+        return 0
+    fi
+    link_file "$source" "$dest"
+    drop_side_link "$GEMINI_SIDE_LINK"
+    [ -z "$old" ] || gemini_unset "$old"
+}
+
+codex_instructions() {
+    local source="$1" dest="$2" mine=0
+    if user_instruction_file "$dest" "$source"; then mine=1; fi
+    link_file "$source" "$dest"
+    if [ "$mine" -eq 1 ] && { [ "$DRY_RUN" -eq 1 ] || is_engine_link "$dest"; }; then
+        echo "  NOTE: Codex has no way to load a second global instructions file, so yours cannot stay beside the playbook's: it is kept as ${dest}.bak"
+    fi
+}
+
+# deploy_instruction_file <manifest dest> <source> <dest>: 1 when the row is no client's instruction file.
+deploy_instruction_file() {
+    case "$1" in
+        "~/.claude/CLAUDE.md") claude_instructions "$2" "$3" ;;
+        "~/.gemini/GEMINI.md") gemini_instructions "$2" "$3" ;;
+        "~/.codex/AGENTS.md") codex_instructions "$2" "$3" ;;
+        *) return 1 ;;
+    esac
+    return 0
+}
+
+# memory_source_missing <manifest source> <source> <dest>: a row whose source lies in the gitignored
+# memory/ (user memory, behind the repo's memory link to the store repo) and is not there yet. No
+# dangling link is made: setup says so, and a later run links it once the store repo holds user memory.
+memory_source_missing() {
+    case "$1" in memory/*) ;; *) return 1 ;; esac
+    [ -e "$2" ] && return 1
+    echo "  NOTE: $3 is not linked yet: there is no $2 (no user memory in the store repo yet)"
+    return 0
 }
 
 # --- Providers -------------------------------------------------------------
@@ -1077,9 +1210,10 @@ deploy_manifest_links() {
         [ "${MANIFEST_MODES[$i]}" = "$mode" ] || continue
         dest="$(expand_dest "${MANIFEST_DESTS[$i]}")"
         source="$(expand_source "${MANIFEST_SOURCES[$i]}")"
+        if memory_source_missing "${MANIFEST_SOURCES[$i]}" "$source" "$dest"; then continue; fi
         act mkdir -p "$(dirname "$dest")"
         case "${MANIFEST_KINDS[$i]}" in
-            symlink-file) link_file "$source" "$dest" ;;
+            symlink-file) deploy_instruction_file "${MANIFEST_DESTS[$i]}" "$source" "$dest" || link_file "$source" "$dest" ;;
             symlink-dir)  link_dir  "$source" "$dest" ;;
         esac
     done
@@ -1421,7 +1555,7 @@ uninstall_lock_rows() {
 uninstall() {
     echo "=== Uninstall: ${PROVIDERS// /, } ==="
     if wants claude; then
-        uninstall_mode claude; unlink_skills "$HOME/.claude/skills"
+        uninstall_mode claude; unlink_engine "$CLAUDE_SIDE_LINK"; unlink_skills "$HOME/.claude/skills"
         if [ -x "$(venv_python)" ]; then
             act "$(venv_python)" -I "$SCRIPT_DIR/providers/claude/settings-entries.py" remove --home "$(native_path "$HOME")" \
                 || echo "  NOTE: the venv did not run, so remove the playbook's entries from ~/.claude/settings.json by hand"
@@ -1430,7 +1564,12 @@ uninstall() {
         fi
     fi
     if wants codex; then uninstall_mode codex; unlink_skills "$HOME/.codex/skills"; fi
-    if wants gemini; then uninstall_mode gemini; unlink_skills "$HOME/.gemini/skills"; fi
+    if wants gemini; then
+        uninstall_mode gemini; unlink_engine "$GEMINI_SIDE_LINK"; unlink_skills "$HOME/.gemini/skills"
+        # the name setup added to context.fileName (the lock's setting row); the rest of the file stays
+        old_gemini="$(lock_get setting "$LOCK_GEMINI_KEY")"
+        [ -z "$old_gemini" ] || gemini_unset "$old_gemini"
+    fi
     if wants kiro; then
         uninstall_mode kiro-always
         uninstall_mode kiro

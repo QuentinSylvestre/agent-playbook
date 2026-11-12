@@ -11,6 +11,8 @@
 #   neither     -- no console (redirected input/output, e.g. test-parity.sh): every
 #                  provider, a file of yours is backed up and replaced, and the store
 #                  repo, engine branch and memory link are only reported, never created.
+# In every mode, your own ~\.claude\CLAUDE.md or ~\.gemini\GEMINI.md stays where it is and
+# the playbook loads beside it (see "Co-existence" below); Codex has no such mechanism.
 #
 # Kiro overlay merge: for a shared skill dir, kiro discipline deltas live under
 # providers\kiro\skills\<name>\ and are APPENDED to the deployed copy at setup time:
@@ -55,7 +57,8 @@ Deploys agent-playbook into the AI providers you choose. Safe to re-run.
   -DryRun           print every change instead of making it; nothing is written.
   -Yes              accept every default without asking (create a local store repo
                     when none exists, create the engine branch, back up and replace
-                    a file of yours that is in the way).
+                    a file of yours that is in the way). Your own ~\.claude\CLAUDE.md
+                    or ~\.gemini\GEMINI.md is never replaced: the playbook loads beside it.
   -StoresUrl URL    clone the store repo from URL when it is missing.
   -NoStores         do not set up a store repo (memory is disabled until you do).
   -Uninstall        remove what setup deployed for the chosen providers: links into
@@ -128,6 +131,7 @@ function Remove-DirLink { param([string]$Path) Invoke-Act "rmdir $Path" { cmd /c
 $LockHeader = "# agent-playbook deploy lock v1 (written by setup; kind<TAB>path<TAB>sha256)"
 $LockFile = Join-Path (Join-Path $env:USERPROFILE ".agent-playbook") "deploy-lock.tsv"
 $LockSettingKey = "kiro-cli/chat.defaultAgent"
+$LockGeminiKey = "gemini/context.fileName"
 $LockFileKinds = @('copy-dir-recursive', 'merge-file', 'copy-file', 'template-file')
 $LockOld = New-Object 'System.Collections.Generic.List[string[]]'
 $LockOldValue = @{}
@@ -177,6 +181,7 @@ function ConvertFrom-LockKey {
 function Get-KeyProvider {
     param([string]$Key)
     if ($Key.StartsWith('~/.kiro/') -or $Key -eq $LockSettingKey) { return 'kiro' }
+    if ($Key -eq $LockGeminiKey) { return 'gemini' }
     foreach ($p in 'claude', 'codex', 'gemini') { if ($Key.StartsWith("~/.$p/")) { return $p } }
     return 'none'
 }
@@ -213,7 +218,7 @@ function Read-DeployLock {
         $c = $lines[$i].Split("`t")
         if ($c.Count -ne 3) { $ok = $false; break }
         if ($c[0] -ceq 'setting') {
-            if ($c[1] -cne $LockSettingKey -or $c[2] -eq '') { $ok = $false }
+            if (($c[1] -cne $LockSettingKey -and $c[1] -cne $LockGeminiKey) -or $c[2] -eq '') { $ok = $false }
         } elseif (($LockFileKinds + 'backup') -cnotcontains $c[0]) {
             $ok = $false
         } elseif (-not $c[1].StartsWith('~/') -or ("/" + $c[1] + "/").Contains('/../')) {
@@ -491,6 +496,144 @@ function Link-Skills {
             Remove-DirLink $_.FullName
         }
     }
+}
+
+# --- Co-existence with your own instruction file ------------------------------
+# A regular file of yours at a client's global instruction path stays where it is, and the playbook
+# loads beside it. The rules and each client's mechanism are documented once, in setup.sh's
+# "Co-existence" section: Claude Code reads every ~\.claude\rules\*.md (measured, Claude Code 2.1.322,
+# 2026-11-12); Gemini CLI reads every name in context.fileName from ~\.gemini\ (source-read, not
+# runtime-verified: Gemini CLI 0.28.2 config.js:312, memoryDiscovery.js:93-100); Codex has none, so
+# your file gets the single .bak.
+$ClaudeSideLink = Join-Path $env:USERPROFILE ".claude\rules\agent-playbook.md"
+$GeminiSideName = "AGENT-PLAYBOOK.md"
+$GeminiSideLink = Join-Path $env:USERPROFILE ".gemini\$GeminiSideName"
+$GeminiSettings = Join-Path $env:USERPROFILE ".gemini\settings.json"
+$PlaybookPython = Join-Path $ScriptDir '.venv-agent-playbook\Scripts\python.exe'
+if (-not (Test-Path -LiteralPath $PlaybookPython)) { $PlaybookPython = Join-Path $ScriptDir '.venv-agent-playbook/bin/python' }
+
+# Test-UserInstructionFile: Dest is a regular file of your own: not a link, not a file the deploy lock
+# names, and not a byte copy of Source (a copy left where a link could not be made).
+function Test-UserInstructionFile {
+    param([string]$Dest, [string]$Source)
+    if (-not (Test-RegularFile $Dest)) { return $false }
+    $key = ConvertTo-LockKey $Dest
+    foreach ($c in $LockOld) { if ($c[1] -ceq $key -and $c[0] -ne 'backup' -and $c[0] -ne 'setting') { return $false } }
+    return ((Get-FileSha $Dest) -ne (Get-FileSha $Source))
+}
+
+# Remove-SideLink: remove a co-existence link into this repo (the instruction file is the link now).
+function Remove-SideLink {
+    param([string]$Path)
+    if (Test-EngineLink $Path) {
+        Write-Host "  REMOVE: $Path (the playbook loads through the instruction file itself now)"
+        Invoke-Act "remove $Path" { Remove-Item -LiteralPath $Path -Force }
+    }
+}
+
+# Invoke-GeminiContext: providers\gemini\context-filename.py on ~\.gemini\settings.json; its one line,
+# or "unreadable <why>" when it cannot run. The prior value travels in the environment (the helper's
+# docstring says why).
+function Invoke-GeminiContext {
+    param([string]$Action, [string]$Prior = '')
+    if (-not (Test-Path -LiteralPath $PlaybookPython)) { return 'unreadable there is no playbook venv to edit it with' }
+    $helperArgs = @($Action, '--settings', $GeminiSettings, '--name', $GeminiSideName)
+    if ($DryRun) { $helperArgs += '--dry-run' }
+    $prevEap = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $env:CONTEXT_FILENAME_PRIOR = $Prior
+    try {
+        $out = @(& $PlaybookPython -I (Join-Path $ScriptDir 'providers\gemini\context-filename.py') @helperArgs 2>&1)
+    } catch {
+        $out = @("unreadable $($_.Exception.Message)")
+    } finally {
+        $ErrorActionPreference = $prevEap
+        Remove-Item Env:\CONTEXT_FILENAME_PRIOR -ErrorAction SilentlyContinue
+    }
+    if ($out.Count -eq 0) { return 'unreadable the helper printed nothing' }
+    return ([string]$out[0]).TrimEnd("`r")
+}
+
+# Remove-GeminiContextEntry: take the name setup added out of context.fileName again; the lock row stays
+# when that cannot be done.
+function Remove-GeminiContextEntry {
+    param([string]$Prior)
+    $res = Invoke-GeminiContext 'remove' $Prior
+    if ($res -eq 'removed') {
+        Write-Host "  REMOVED: $GeminiSideName from context.fileName in $GeminiSettings"
+    } elseif ($res -ne 'absent') {
+        Write-Host "  NOTE: $GeminiSettings cannot be edited ($($res -replace '^unreadable ', '')); remove $GeminiSideName from its context.fileName by hand"
+        Add-LockRow 'setting' $LockGeminiKey $Prior
+    }
+}
+
+function Deploy-ClaudeInstructions {
+    param([string]$Source, [string]$Dest)
+    if (Test-UserInstructionFile $Dest $Source) {
+        Write-Host "  KEPT: $Dest is your own file; the playbook loads beside it from $ClaudeSideLink (Claude Code reads every ~/.claude/rules/*.md)"
+        New-DirIfMissing (Split-Path -Parent $ClaudeSideLink)
+        Link-File -Target $Source -Link $ClaudeSideLink
+    } else {
+        Link-File -Target $Source -Link $Dest
+        Remove-SideLink $ClaudeSideLink
+    }
+}
+
+function Deploy-GeminiInstructions {
+    param([string]$Source, [string]$Dest)
+    $old = Get-LockValue 'setting' $LockGeminiKey
+    if (Test-UserInstructionFile $Dest $Source) {
+        $res = Invoke-GeminiContext 'add'
+        if ($res -eq 'present') {
+            if ($old) { Add-LockRow 'setting' $LockGeminiKey $old }
+        } elseif ($res.StartsWith('added ')) {
+            Add-LockRow 'setting' $LockGeminiKey $res.Substring(6)
+            if ($DryRun) { Write-Host "    DRY: add $GeminiSideName to context.fileName of $GeminiSettings" }
+            else { Write-Host "  SET: $GeminiSideName in context.fileName of $GeminiSettings" }
+        } else {
+            Write-Host "  NOTE: $GeminiSettings cannot be edited ($($res -replace '^unreadable ', '')), so your $Dest cannot stay beside the playbook's: it is backed up and replaced"
+            if ($old) { Add-LockRow 'setting' $LockGeminiKey $old }
+            Link-File -Target $Source -Link $Dest
+            return
+        }
+        Write-Host "  KEPT: $Dest is your own file; the playbook loads beside it from $GeminiSideLink (listed in context.fileName)"
+        Link-File -Target $Source -Link $GeminiSideLink
+        return
+    }
+    Link-File -Target $Source -Link $Dest
+    Remove-SideLink $GeminiSideLink
+    if ($old) { Remove-GeminiContextEntry $old }
+}
+
+function Deploy-CodexInstructions {
+    param([string]$Source, [string]$Dest)
+    $mine = Test-UserInstructionFile $Dest $Source
+    Link-File -Target $Source -Link $Dest
+    if ($mine -and ($DryRun -or (Test-EngineLink $Dest))) {
+        Write-Host "  NOTE: Codex has no way to load a second global instructions file, so yours cannot stay beside the playbook's: it is kept as ${Dest}.bak"
+    }
+}
+
+# Deploy-InstructionFile: $false when the row is no client's instruction file.
+function Deploy-InstructionFile {
+    param([string]$ManifestDest, [string]$Source, [string]$Dest)
+    switch -CaseSensitive ($ManifestDest) {
+        '~/.claude/CLAUDE.md' { $null = Deploy-ClaudeInstructions $Source $Dest; return $true }
+        '~/.gemini/GEMINI.md' { $null = Deploy-GeminiInstructions $Source $Dest; return $true }
+        '~/.codex/AGENTS.md' { $null = Deploy-CodexInstructions $Source $Dest; return $true }
+    }
+    return $false
+}
+
+# Test-MemorySourceMissing: a row whose source lies in the gitignored memory\ (user memory, behind the
+# repo's memory link to the store repo) and is not there yet. No dangling link is made: setup says so,
+# and a later run links it once the store repo holds user memory.
+function Test-MemorySourceMissing {
+    param([string]$ManifestSource, [string]$Source, [string]$Dest)
+    if (-not $ManifestSource.StartsWith('memory/')) { return $false }
+    if (Test-Path -LiteralPath $Source) { return $false }
+    Write-Host "  NOTE: $Dest is not linked yet: there is no $Source (no user memory in the store repo yet)"
+    return $true
 }
 
 # --- Owned files ---
@@ -1071,7 +1214,7 @@ Read-DeployLock
 if ($Uninstall) {
     Write-Host "=== Uninstall: $($Chosen -join ', ') ==="
     if (Test-Wants 'claude') {
-        Uninstall-Mode 'claude'; Remove-SkillLinks (Join-Path $env:USERPROFILE ".claude\skills")
+        Uninstall-Mode 'claude'; Remove-EngineLink $ClaudeSideLink; Remove-SkillLinks (Join-Path $env:USERPROFILE ".claude\skills")
         $uninstallPython = Join-Path $ScriptDir '.venv-agent-playbook\Scripts\python.exe'
         if (Test-Path -LiteralPath $uninstallPython) {
             Invoke-Act "remove the playbook's entries from ~\.claude\settings.json" {
@@ -1087,7 +1230,12 @@ if ($Uninstall) {
         }
     }
     if (Test-Wants 'codex') { Uninstall-Mode 'codex'; Remove-SkillLinks (Join-Path $env:USERPROFILE ".codex\skills") }
-    if (Test-Wants 'gemini') { Uninstall-Mode 'gemini'; Remove-SkillLinks (Join-Path $env:USERPROFILE ".gemini\skills") }
+    if (Test-Wants 'gemini') {
+        Uninstall-Mode 'gemini'; Remove-EngineLink $GeminiSideLink; Remove-SkillLinks (Join-Path $env:USERPROFILE ".gemini\skills")
+        # the name setup added to context.fileName (the lock's setting row); the rest of the file stays
+        $oldGemini = Get-LockValue 'setting' $LockGeminiKey
+        if ($oldGemini) { Remove-GeminiContextEntry $oldGemini }
+    }
     if (Test-Wants 'kiro') {
         Uninstall-Mode 'kiro-always'
         Uninstall-Mode 'kiro'
@@ -1359,9 +1507,10 @@ function Deploy-ManifestLinks {
     foreach ($entry in ($ManifestEntries | Where-Object { $_.mode -eq $Mode })) {
         $dest = Expand-Dest $entry.dest
         $source = Expand-Source $entry.source
+        if (Test-MemorySourceMissing $entry.source $source $dest) { continue }
         New-DirIfMissing (Split-Path -Parent $dest)
         switch ($entry.kind) {
-            'symlink-file' { Link-File -Target $source -Link $dest }
+            'symlink-file' { if (-not (Deploy-InstructionFile $entry.dest $source $dest)) { Link-File -Target $source -Link $dest } }
             'symlink-dir'  { Link-Dir  -Target $source -Link $dest }
         }
     }

@@ -1,0 +1,21 @@
+{
+  "description": "A rules link that resolves to another file than the one the hook reads (setup not re-run, or a link elsewhere): the hook falls back to the heading indexes, the header says to still read the files, and a note names the link.",
+  "cwd": "{{ROOT}}/proj",
+  "file_link": [
+    {"src": "cfg/memory/HIGHER_ORDER.md", "dst": "home/.claude/rules/playbook-user-memory.md"},
+    {"src": "cfg/memory/HIGHER_ORDER.md", "dst": "home/.claude/rules/playbook-higher-order.md"}
+  ],
+  "rules_dir": "{{ROOT}}/home/.claude/rules",
+  "contains": [
+    "User and higher-order memory: heading index only (not delivery — still read those files).",
+    "- User entry one",
+    "- Higher-order entry one",
+    "playbook-user-memory.md does not resolve to"
+  ],
+  "absent": [
+    "no read needed",
+    "playbook-higher-order.md does not resolve to"
+  ],
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores"
+}

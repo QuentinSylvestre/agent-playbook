@@ -26,6 +26,16 @@ Kiro has the same gap and a different fix: it needs a `.kiro/steering/` referenc
 with `inclusion: always`, written by `/qwire-governance`. Codex and Cursor read
 `AGENTS.md` directly.
 
+## Your own ~/.claude/CLAUDE.md
+
+Setup links `~/.claude/CLAUDE.md` to `shared/AGENTS.md`. When a regular file of
+yours already sits there, setup leaves it in place and links
+`~/.claude/rules/agent-playbook.md` to `shared/AGENTS.md` instead, so both load.
+Once `~/.claude/CLAUDE.md` is the playbook's link again, setup removes that rules
+link, so the playbook never loads twice. Uninstall removes the rules link and
+never touches your file. The same `~/.claude/rules/` folder carries the memory
+links described under § SessionStart memory hook.
+
 ## Store repo on a new machine
 
 Workspace memory, plans and artifacts, and your user memory (`user/memory/`), live in
@@ -181,18 +191,34 @@ Claude Code snapshots hooks at session start, so restart after editing, then run
 ### SessionStart memory hook
 
 `memory-load-hook.py` gives every session a memory floor without relying on the
-agent to read files. At each start, resume, `/clear` and compaction it injects:
+agent to read files. User memory and the higher-order tier reach Claude Code in
+full through two links setup makes (`inventory.tsv`):
+`~/.claude/rules/playbook-user-memory.md` to `memory/MEMORY.md` and
+`~/.claude/rules/playbook-higher-order.md` to `memory/HIGHER_ORDER.md`. Claude
+Code loads every `~/.claude/rules/*.md` file whole at session start, links
+included (measured on Claude Code 2.1.322, 2026-11-12, with a 74 KB file). While
+the store repo holds no user memory yet, setup makes no link and says so.
 
-- a heading index of user `memory/MEMORY.md` and `memory/HIGHER_ORDER.md`, with
-  ⚠ on an entry whose `Source` line cites a file that changed in git after its
+At each start, resume, `/clear` and compaction the hook injects:
+
+- a two-line header whose second line says which mode applied;
+- each tier's absolute path;
+- the user and higher-order entries marked ⚠, one line each with their file:
+  an entry whose `Source` line cites a file that changed in git after its
   `Verified` date (a path named only in prose is not checked);
-- the `## Topics` rows and each tier's absolute path;
+- the `## Topics` rows;
 - the project memory tier in full when it fits, otherwise its heading index.
+  The project tier gets the rest of the cap.
+
+That is rules mode, which applies when both links resolve to the files the hook
+reads. Otherwise (setup not re-run, a link that resolves elsewhere) the hook falls
+back to index mode: it injects heading indexes of the user and higher-order
+files, with the marks inline, and the header says to still read those files. A
+heading index is not delivery (`shared/AGENTS.md § Memory Management`,
+Read-time behavior).
 
 The injection is capped at 9,500 characters; Claude Code saves larger hook
-output to a file instead of injecting it. A heading index is not delivery, so
-the agent still reads the user and higher-order files
-(`shared/AGENTS.md § Memory Management`, Read-time behavior). The hook
+output to a file instead of injecting it. The hook
 resolves the project tier through the store resolver, so it also works for a
 project with no `CLAUDE.md` and for a session opened in a subfolder. It writes
 nothing, and on any error it injects a one-line notice and exits 0. The script

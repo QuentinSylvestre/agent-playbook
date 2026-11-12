@@ -1,0 +1,27 @@
+{
+  "description": "Both ~/.claude/rules links resolve to the files the hook reads: the header says the user and higher-order tiers are delivered in full and need no read, their heading indexes are not emitted, each tier's path and the Topics rows stay, and the project tier is delivered.",
+  "cwd": "{{ROOT}}/proj",
+  "file_link": [
+    {"src": "cfg/memory/MEMORY.md", "dst": "home/.claude/rules/playbook-user-memory.md"},
+    {"src": "cfg/memory/HIGHER_ORDER.md", "dst": "home/.claude/rules/playbook-higher-order.md"}
+  ],
+  "rules_dir": "{{ROOT}}/home/.claude/rules",
+  "contains": [
+    "User and higher-order memory: delivered in full via ~/.claude/rules (",
+    "no read needed",
+    "/cfg/memory/MEMORY.md): delivered in full by the rules link.",
+    "/cfg/memory/HIGHER_ORDER.md): delivered in full by the rules link.",
+    "memory/topics/git.md — a non-trivial git operation",
+    "Store-side entry",
+    "/stores/proj-dddddd/memory/MEMORY.md) — delivered in full"
+  ],
+  "absent": [
+    "- User entry one",
+    "- Higher-order entry one",
+    "heading index only",
+    "Feedback:",
+    "does not resolve to"
+  ],
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores"
+}

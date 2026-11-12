@@ -18,11 +18,12 @@
 #      two deployed TREES are compared (see its own block). No other script
 #      pair remains: every guard is a single Python script with its own
 #      --selftest.
-#      FOUR assertions carry a *_SKIPPED variable and are therefore tallied:
+#      FIVE assertions carry a *_SKIPPED variable and are therefore tallied:
 #      the setup pair (SETUP-PARITY), its deploy-lock and ownership leg
-#      (TWIN-OWNERSHIP), merge-equivalence and render-equivalence. The
-#      inventory assertion, SETUP-VERIFY, NO-REWRITE and OWNERSHIP (§ below)
-#      are NOT among them -- none has a *_SKIPPED variable and none can be
+#      (TWIN-OWNERSHIP), its co-existence leg (TWIN-COEXIST), merge-equivalence
+#      and render-equivalence. The inventory assertion, SETUP-VERIFY,
+#      NO-REWRITE, OWNERSHIP and COEXIST (§ below) are NOT among them -- none
+#      has a *_SKIPPED variable and none can be
 #      skipped, since all are bash-only and always run -- so do not count them
 #      when updating the hardcoded denominator in the verdict block. Adding an
 #      assertion means editing the tally, the verdict conditional, and that
@@ -1279,6 +1280,194 @@ own_check_uninstall() {
     { [ ! -f "$lock" ] || ! grep -q $'\t~/.kiro/' "$lock"; } || own_fail "$l" "uninstall drops the Kiro rows from the lock"
 }
 
+parity_sec_coexist() {
+# --- COEXIST and TWIN-COEXIST: your own instruction files, on both twins --------
+#
+# Area E of plan 261111_DEPLOYMENT_OWNERSHIP_AND_CLIENT_LOAD_VERIFICATION (SC-2, SC-7). A fresh
+# sandbox per fixture, deployed for Claude Code, Codex and Gemini CLI only (no Kiro, so it is quick):
+#   a: your own ~/.claude/CLAUDE.md, ~/.codex/AGENTS.md, and ~/.gemini/GEMINI.md with a
+#      settings.json that names it as a string beside another key;
+#   b: your own ~/.gemini/GEMINI.md and no settings.json (and nothing at ~/.claude/CLAUDE.md).
+# setup.sh deploys each (COEXIST, always runs) and, where PowerShell and Git Bash are both present,
+# setup.ps1 deploys a twin of each (TWIN-COEXIST). Checked per sandbox: the outcomes below and the
+# Claude memory rules links, verify-deployment.py clean, a second run writes nothing (mtime and
+# inode, as NO-REWRITE), the two twins' deploy locks byte-equal, and an uninstall that gives every
+# file of yours back and removes only what setup added. Never --yes (it would repoint the repo's
+# memory link into the sandbox).
+COEXIST_OK=1
+TWIN_COEXIST_OK=1
+TWIN_COEXIST_SKIPPED=0
+local twin=1 fx t sb pids=()
+if [ -z "$PS_BIN" ] || [ ! -f "$SETUP_PS1_SCRIPT" ] || [ "$(uname -o 2>/dev/null)" != "Msys" ]; then
+    twin=0
+    TWIN_COEXIST_SKIPPED=1
+    echo "TWIN-COEXIST SKIP: no PowerShell with Git Bash here -- the setup.ps1 co-existence checks are skipped."
+fi
+local twins="sh"
+[ "$twin" -eq 1 ] && twins="sh ps"
+for fx in a b; do
+    for t in $twins; do cx_plant "$TMPDIR_PARITY/cx-$t-$fx" "$fx"; done
+done
+# step <log suffix> <setup.sh args> -- <setup.ps1 args>: every sandbox, setup.sh in the background
+cx_all() {
+    local suffix="$1" sh_args="$2" ps_args="$3" fx2 p=()
+    for fx2 in a b; do
+        # shellcheck disable=SC2086
+        own_run_sh "$TMPDIR_PARITY/cx-sh-$fx2" "cx-sh-$fx2-$suffix" $sh_args &
+        p+=("$!")
+        # shellcheck disable=SC2086
+        [ "$twin" -eq 1 ] && own_run_ps "$TMPDIR_PARITY/cx-ps-$fx2" "cx-ps-$fx2-$suffix" $ps_args
+    done
+    for fx2 in "${p[@]}"; do wait "$fx2" || true; done
+}
+cx_all 1 "--providers claude,codex,gemini" "-Providers claude,codex,gemini"
+for fx in a b; do
+    for t in $twins; do
+        sb="$TMPDIR_PARITY/cx-$t-$fx"
+        cx_check_deploy "$sb" "$fx" "$t" "$TMPDIR_PARITY/cx-$t-$fx-1.log"
+        cx_verify "$sb" "$t"
+        cx_snapshot "$sb" > "$sb.snap1"
+    done
+done
+if [ "$twin" -eq 1 ]; then
+    for fx in a b; do
+        cmp -s "$TMPDIR_PARITY/cx-sh-$fx/.agent-playbook/deploy-lock.tsv" "$TMPDIR_PARITY/cx-ps-$fx/.agent-playbook/deploy-lock.tsv" \
+            || { cx_fail ps "fixture $fx: the setup.sh and setup.ps1 deploy locks differ"
+                 diff "$TMPDIR_PARITY/cx-sh-$fx/.agent-playbook/deploy-lock.tsv" "$TMPDIR_PARITY/cx-ps-$fx/.agent-playbook/deploy-lock.tsv" | head -n 10 >&2 || true; }
+    done
+fi
+cx_all 2 "--providers claude,codex,gemini" "-Providers claude,codex,gemini"
+for fx in a b; do
+    for t in $twins; do
+        sb="$TMPDIR_PARITY/cx-$t-$fx"
+        cx_snapshot "$sb" > "$sb.snap2"
+        cmp -s "$sb.snap1" "$sb.snap2" || { cx_fail "$t" "fixture $fx: a second run with co-existence active wrote something"
+                                            diff "$sb.snap1" "$sb.snap2" | head -n 10 >&2 || true; }
+    done
+done
+cx_all 3 "--uninstall --providers claude,codex,gemini" "-Uninstall -Providers claude,codex,gemini"
+for fx in a b; do
+    for t in $twins; do cx_check_uninstall "$TMPDIR_PARITY/cx-$t-$fx" "$fx" "$t"; done
+done
+if [ "$COEXIST_OK" -eq 1 ]; then
+    echo "COEXIST OK: setup.sh keeps your CLAUDE.md and GEMINI.md beside the playbook, backs up Codex's, links the memory rules, re-runs without writing and uninstalls to your files"
+else
+    echo "  --- setup.sh logs (tail) ---" >&2
+    tail -n 12 "$TMPDIR_PARITY/cx-sh-a-1.log" "$TMPDIR_PARITY/cx-sh-a-3.log" >&2 || true
+fi
+if [ "$twin" -eq 1 ] && [ "$TWIN_COEXIST_OK" -eq 1 ]; then
+    echo "TWIN-COEXIST OK: setup.ps1 meets the same co-existence checks, with a byte-equal deploy lock"
+elif [ "$twin" -eq 1 ]; then
+    echo "  --- setup.ps1 logs (tail) ---" >&2
+    tail -n 12 "$TMPDIR_PARITY/cx-ps-a-1.log" "$TMPDIR_PARITY/cx-ps-a-3.log" >&2 || true
+fi
+}
+
+# Co-existence fixtures for parity_sec_coexist. cx_fail <sh|ps> <what>: one failed check.
+cx_fail() {
+    echo "COEXIST FAIL (setup.$1): $2" >&2
+    if [ "$1" = sh ]; then COEXIST_OK=0; else TWIN_COEXIST_OK=0; fi
+}
+
+cx_plant() {   # cx_plant <sandbox> <a|b>
+    local sb="$1"
+    mkdir -p "$sb/.gemini"
+    printf 'my gemini\n' > "$sb/.gemini/GEMINI.md"
+    if [ "$2" = a ]; then
+        mkdir -p "$sb/.claude" "$sb/.codex"
+        printf 'my claude\n' > "$sb/.claude/CLAUDE.md"
+        printf 'my codex\n' > "$sb/.codex/AGENTS.md"
+        printf '{\n    "context": {"fileName": "GEMINI.md"},\n    "keep": 1\n}\n' > "$sb/.gemini/settings.json"
+    fi
+}
+
+# cx_link_to <link> <repo-relative target>: a link whose text ends with that target (either slash).
+cx_link_to() {
+    [ -L "$1" ] || return 1
+    case "$(readlink "$1" | tr '\\' '/')" in *"$2") return 0 ;; *) return 1 ;; esac
+}
+
+cx_absent() { [ ! -e "$1" ] && [ ! -L "$1" ]; }
+
+# cx_snapshot <sandbox>: nr_snapshot without PowerShell's own startup cache, which pwsh rewrites under a
+# sandbox USERPROFILE on every start (AppData/Local/Microsoft/PowerShell); setup.ps1 never writes it.
+cx_snapshot() {
+    nr_snapshot "$1" | grep -v '^AppData/Local/Microsoft/PowerShell/' || true
+}
+
+# cx_json <file> <python expression over d>: the file parses as JSON and the expression holds.
+cx_json() {
+    MSYS_NO_PATHCONV=1 parity_python -c 'import json, sys
+d = json.load(open(sys.argv[1], encoding="utf-8"))
+sys.exit(0 if eval(sys.argv[2]) else 1)' "$(parity_native_path "$1")" "$2" 2>/dev/null
+}
+
+cx_check_deploy() {   # cx_check_deploy <sandbox> <a|b> <sh|ps> <log>
+    local sb="$1" fx="$2" t="$3" log="$4" lock="$1/.agent-playbook/deploy-lock.tsv" n
+    if [ -e "$REPO_ROOT/memory/MEMORY.md" ] && [ -e "$REPO_ROOT/memory/HIGHER_ORDER.md" ]; then
+        cx_link_to "$sb/.claude/rules/playbook-user-memory.md" memory/MEMORY.md \
+            && cx_link_to "$sb/.claude/rules/playbook-higher-order.md" memory/HIGHER_ORDER.md \
+            || cx_fail "$t" "fixture $fx: the Claude memory rules links point to memory/MEMORY.md and memory/HIGHER_ORDER.md"
+    else
+        cx_absent "$sb/.claude/rules/playbook-user-memory.md" && grep -q 'playbook-user-memory.md is not linked yet' "$log" \
+            || cx_fail "$t" "fixture $fx: with no user memory, no dangling memory rules link is made, and setup says so"
+    fi
+    own_is "$sb/.gemini/GEMINI.md" "my gemini" && cx_link_to "$sb/.gemini/AGENT-PLAYBOOK.md" shared/AGENTS.md \
+        && cx_json "$sb/.gemini/settings.json" 'd["context"]["fileName"] == ["GEMINI.md", "AGENT-PLAYBOOK.md"]' \
+        || cx_fail "$t" "fixture $fx: your GEMINI.md stays, AGENT-PLAYBOOK.md links beside it and joins context.fileName"
+    if [ "$fx" = a ]; then
+        own_is "$sb/.claude/CLAUDE.md" "my claude" && cx_link_to "$sb/.claude/rules/agent-playbook.md" shared/AGENTS.md \
+            && grep -q 'CLAUDE.md is your own file' "$log" \
+            || cx_fail "$t" "your CLAUDE.md stays and ~/.claude/rules/agent-playbook.md links beside it, said once"
+        cx_link_to "$sb/.codex/AGENTS.md" shared/AGENTS.md && own_is "$sb/.codex/AGENTS.md.bak" "my codex" \
+            && grep -q 'Codex has no way to load a second global instructions file' "$log" \
+            || cx_fail "$t" "Codex has no co-existence: your AGENTS.md goes to .bak, the link is made, and setup says so"
+        cx_json "$sb/.gemini/settings.json" 'd["keep"] == 1 and len(d) == 2' \
+            || cx_fail "$t" "the settings.json edit keeps every other key"
+        grep -q $'^setting\tgemini/context.fileName\t"GEMINI.md"$' "$lock" && grep -q $'^backup\t~/.codex/AGENTS.md\t' "$lock" \
+            || cx_fail "$t" "the lock records the prior context.fileName and the Codex backup"
+    else
+        cx_link_to "$sb/.claude/CLAUDE.md" shared/AGENTS.md && cx_absent "$sb/.claude/rules/agent-playbook.md" \
+            || cx_fail "$t" "an empty CLAUDE.md path is linked as before, with no rules link beside it"
+        grep -q $'^setting\tgemini/context.fileName\t-$' "$lock" \
+            || cx_fail "$t" "with no settings.json, the lock records - as the prior context.fileName"
+    fi
+    n="$(grep -c $'^setting\t' "$lock" 2>/dev/null || true)"
+    [ "$n" = 1 ] || cx_fail "$t" "fixture $fx: exactly one setting row in the lock (got ${n:-0})"
+}
+
+cx_verify() {   # cx_verify <sandbox> <sh|ps>: verify-deployment.py clean, co-existence lines included
+    local sb="$1"
+    if HOME="$sb" XDG_CONFIG_HOME="$sb/.config" USERPROFILE="$(parity_native_path "$sb")" \
+        APPDATA="$(parity_native_path "$sb/AppData/Roaming")" "$VERIFY_PY" -I "$VERIFY_SCRIPT" > "$sb.verify" 2>&1 \
+        && grep -q $'^OK\t.*GEMINI.md\tuser-file-kept' "$sb.verify"; then
+        return 0
+    fi
+    cx_fail "$2" "verify-deployment.py is clean on the co-existence sandbox $(basename "$sb")"
+    grep -E $'^(MISSING|WRONG_TARGET|NOT_SYMLINK|DRIFTED)\t' "$sb.verify" | head -n 5 >&2 || true
+}
+
+cx_check_uninstall() {   # cx_check_uninstall <sandbox> <a|b> <sh|ps>
+    local sb="$1" fx="$2" t="$3" lock="$1/.agent-playbook/deploy-lock.tsv"
+    own_is "$sb/.gemini/GEMINI.md" "my gemini" && cx_absent "$sb/.gemini/AGENT-PLAYBOOK.md" \
+        && cx_absent "$sb/.claude/rules/playbook-user-memory.md" && cx_absent "$sb/.claude/rules/playbook-higher-order.md" \
+        || cx_fail "$t" "fixture $fx: uninstall keeps your GEMINI.md and removes the side and memory rules links"
+    { [ ! -f "$lock" ] || ! grep -q 'gemini/context.fileName' "$lock"; } \
+        || cx_fail "$t" "fixture $fx: uninstall drops the context.fileName row from the lock"
+    if [ "$fx" = a ]; then
+        own_is "$sb/.claude/CLAUDE.md" "my claude" && cx_absent "$sb/.claude/rules/agent-playbook.md" \
+            || cx_fail "$t" "uninstall never touches your CLAUDE.md and removes the rules link"
+        own_is "$sb/.codex/AGENTS.md" "my codex" && cx_absent "$sb/.codex/AGENTS.md.bak" \
+            || cx_fail "$t" "uninstall restores your Codex AGENTS.md from its .bak"
+        cx_json "$sb/.gemini/settings.json" 'd == {"context": {"fileName": "GEMINI.md"}, "keep": 1}' \
+            || cx_fail "$t" "uninstall takes the playbook's name out of context.fileName and restores the string"
+    else
+        cx_absent "$sb/.claude/CLAUDE.md" || cx_fail "$t" "fixture b: uninstall removes the CLAUDE.md link"
+        cx_json "$sb/.gemini/settings.json" 'd == {}' \
+            || cx_fail "$t" "fixture b: uninstall removes the context.fileName setup created, and the context object"
+    fi
+}
+
 # --- Parallel sections -----------------------------------------------------
 #
 # Every section above is a function. They share nothing but the preamble
@@ -1293,6 +1482,7 @@ own_check_uninstall() {
 MERGE_OK=0; MERGE_SKIPPED=0; RENDER_OK=0; RENDER_SKIPPED=0
 SETUP_VERIFY_OK=0; SETUP_PARITY_OK=0; SETUP_PARITY_SKIPPED=0
 NO_REWRITE_OK=0; OWNERSHIP_OK=0; TWIN_OWNERSHIP_OK=0; TWIN_OWNERSHIP_SKIPPED=0
+COEXIST_OK=0; TWIN_COEXIST_OK=0; TWIN_COEXIST_SKIPPED=0
 
 PARITY_JOBS_DIR="$TMPDIR_PARITY/jobs"
 mkdir -p "$PARITY_JOBS_DIR"
@@ -1347,13 +1537,14 @@ PARITY_PIDS=()
 PARITY_PIDS+=("$!")
 ( parity_step merge parity_sec_merge MERGE_OK MERGE_SKIPPED ) & PARITY_PIDS+=("$!")
 ( parity_step render parity_sec_render RENDER_OK RENDER_SKIPPED ) & PARITY_PIDS+=("$!")
+( parity_step coexist parity_sec_coexist COEXIST_OK TWIN_COEXIST_OK TWIN_COEXIST_SKIPPED ) & PARITY_PIDS+=("$!")
 
 for pid in "${PARITY_PIDS[@]}"; do
     wait "$pid" || true
 done
 
 # Replay in the original section order, then load each section's flags.
-for name in setup_verify merge render setup_parity ownership; do
+for name in setup_verify merge render setup_parity ownership coexist; do
     [ -f "$PARITY_JOBS_DIR/$name.out" ] && cat "$PARITY_JOBS_DIR/$name.out"
     [ -f "$PARITY_JOBS_DIR/$name.err" ] && cat "$PARITY_JOBS_DIR/$name.err" >&2
     if [ -f "$PARITY_JOBS_DIR/$name.status" ]; then
@@ -1369,7 +1560,7 @@ done
 
 if [ "$PARITY_FAIL" -eq 0 ] && [ "$INVENTORY_OK" -eq 1 ] && [ "$SETUP_VERIFY_OK" -eq 1 ] && [ "$NO_REWRITE_OK" -eq 1 ] \
     && [ "$OWNERSHIP_OK" -eq 1 ] && [ "$MERGE_OK" -eq 1 ] && [ "$RENDER_OK" -eq 1 ] && [ "$SETUP_PARITY_OK" -eq 1 ] \
-    && [ "$TWIN_OWNERSHIP_OK" -eq 1 ]; then
+    && [ "$TWIN_OWNERSHIP_OK" -eq 1 ] && [ "$COEXIST_OK" -eq 1 ] && [ "$TWIN_COEXIST_OK" -eq 1 ]; then
     echo "PARITY OK"
 
     # Loud warning when assertions were skipped (SKIPPED leaves *_OK=1, so
@@ -1379,12 +1570,13 @@ if [ "$PARITY_FAIL" -eq 0 ] && [ "$INVENTORY_OK" -eq 1 ] && [ "$SETUP_VERIFY_OK"
     [ "$RENDER_SKIPPED" -eq 1 ] && SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
     [ "$SETUP_PARITY_SKIPPED" -eq 1 ] && SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
     [ "$TWIN_OWNERSHIP_SKIPPED" -eq 1 ] && SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
+    [ "$TWIN_COEXIST_SKIPPED" -eq 1 ] && SKIPPED_COUNT=$((SKIPPED_COUNT + 1))
 
     # Count kept in step with the tally above by hand -- there is no derived
     # total, so a new assertion means editing both.
     if [ "$SKIPPED_COUNT" -gt 0 ]; then
         echo ""
-        echo "WARNING: $SKIPPED_COUNT of 4 parity assertions SKIPPED (see SKIP notices above for reasons)."
+        echo "WARNING: $SKIPPED_COUNT of 5 parity assertions SKIPPED (see SKIP notices above for reasons)."
         echo "         This is NOT a full green — only deployment-inventory agreement was verified."
         echo ""
     fi
@@ -1393,6 +1585,7 @@ if [ "$PARITY_FAIL" -eq 0 ] && [ "$INVENTORY_OK" -eq 1 ] && [ "$SETUP_VERIFY_OK"
     echo "  setup.sh sandboxed deploy ↔ verify-deployment.py: PASS (clean deploy under a sandbox HOME)"
     echo "  setup.sh re-run on an unchanged tree: PASS (nothing written)"
     echo "  setup.sh ownership rules (deploy lock): PASS (planted collisions kept, backed up, replaced, retired, uninstalled)"
+    echo "  setup.sh co-existence with your own instruction files: PASS (kept beside the playbook, Codex backed up, re-run writes nothing, uninstalled)"
     if [ "$MERGE_SKIPPED" -eq 1 ]; then
         echo "  cross-shell merge-equivalence: SKIPPED (see notice above)"
     else
@@ -1412,6 +1605,11 @@ if [ "$PARITY_FAIL" -eq 0 ] && [ "$INVENTORY_OK" -eq 1 ] && [ "$SETUP_VERIFY_OK"
         echo "  setup.ps1 deploy lock and ownership rules: SKIPPED (see notice above)"
     else
         echo "  setup.ps1 deploy lock and ownership rules: PASS (locks agree; the same collisions checked)"
+    fi
+    if [ "$TWIN_COEXIST_SKIPPED" -eq 1 ]; then
+        echo "  setup.ps1 co-existence: SKIPPED (see notice above)"
+    else
+        echo "  setup.ps1 co-existence: PASS (the same checks; deploy locks byte-equal)"
     fi
     exit 0
 fi
