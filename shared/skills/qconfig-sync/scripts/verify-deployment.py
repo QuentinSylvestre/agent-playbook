@@ -279,7 +279,9 @@ REMEDIATION = (
     "overlay files if it is a standalone kiro skill. Overlay with no SKILL.md and no shared skill: there is "
     "nothing to delete and removing the overlay discards its only content -- create the shared skill it "
     "extends, rename the directory to match one, or promote the overlay to a standalone SKILL.md. For "
-    "ORPHAN, delete the deployed file only after confirming its source was removed deliberately.")
+    "ORPHAN, delete the deployed file only after confirming its source was removed deliberately; an "
+    "ORPHAN with not-deployed=fixtures is a test fixture an older setup copied, safe to delete (setup "
+    "removes the ones it wrote unchanged).")
 
 # Windows file attributes / reparse tags (stat.* names exist only on Windows builds).
 _ATTR_HIDDEN = 0x2
