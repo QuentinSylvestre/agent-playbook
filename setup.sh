@@ -127,6 +127,11 @@ need_dir() {
             exit 1
         fi
     done
+    # Folders that all exist need no mkdir process (a dry run still prints the line)
+    if [ "$DRY_RUN" -eq 0 ]; then
+        for d in "$@"; do [ -d "$d" ] || { act mkdir -p "$@"; return; }; done
+        return 0
+    fi
     act mkdir -p "$@"
 }
 
@@ -591,8 +596,9 @@ read_manifest() {
         line_num=$((line_num + 1))
         [[ "$line" =~ ^[[:space:]]*# ]] && continue
         [[ "$line" =~ ^[[:space:]]*$ ]] && continue
-        local col_count
-        col_count=$(printf '%s' "$line" | awk -F'\t' '{print NF}')
+        local col_count tabs
+        tabs="${line//[!$'\t']/}"   # awk -F'\t' NF without a process: the tabs plus one
+        col_count=$(( ${#tabs} + 1 ))
         if [ "$col_count" -ne 4 ]; then
             echo "ERROR: manifest line $line_num has $col_count columns (expected 4): $line" >&2
             exit 2
@@ -750,7 +756,7 @@ list_shared_skills() {
     local d n
     for d in "$SHARED_DIR/skills"/*/; do
         [ -d "$d" ] || continue
-        n="$(basename "$d")"
+        n="${d%/}"; n="${n##*/}"   # basename, without a process: this runs once per skill per provider
         case "$n" in .trash|synced|.bucket-*) continue ;; esac
         printf '%s\n' "$n"
     done
@@ -1270,12 +1276,22 @@ engine_branch_step() {
 # Command substitution $(...) strips trailing newlines, so both bodies arrive newline-free;
 # printf re-adds exactly the separators above. out_file is a staging file in the lock's work
 # folder (also under --dry-run); deploy_generated_copy copies it into place.
+# File text is read with "$(<file)", the command substitution "$(cat file)" was, without starting
+# cat: the same trailing-newline handling, about 6 ms where cat took 78 under Git Bash. The read
+# builtin is no substitute there: it reads one byte per system call (210 ms on a 70 KB SKILL.md).
+
+# has_non_space <text>: true when the text holds a character that is not white space
+# (the test [ -n "$(printf '%s' "$text" | tr -d '[:space:]')" ], without a process).
+has_non_space() {
+    [[ "$1" == *[![:space:]]* ]]
+}
+
 merge_overlay() {
     local shared_file="$1" overlay_file="$2" out_file="$3"
     local shared_body overlay_body
-    shared_body="$(cat "$shared_file")"
-    overlay_body="$(cat "$overlay_file")"
-    if [ -n "$(printf '%s' "$overlay_body" | tr -d '[:space:]')" ]; then
+    shared_body="$(<"$shared_file")"
+    overlay_body="$(<"$overlay_file")"
+    if has_non_space "$overlay_body"; then
         printf '%s\n\n%s\n' "$shared_body" "$overlay_body" > "$out_file"
     else
         printf '%s\n' "$shared_body" > "$out_file"
@@ -1314,11 +1330,13 @@ aux_overlay_targets() {
 gen_expected() {
     local src_dir="$1" overlay_dir="$2" name="$3" w="$4" t ov
     mkdir -p "$w/merge"
-    (cd "$src_dir" && find . -name __pycache__ -prune -o -type f -print) | sed 's#^\./##' \
+    # Never copied: __pycache__ and any fixtures/ folder (selftest data, read only from the repo).
+    # Lockstep with setup.ps1 Get-FilesNoFollow and verify-deployment.py COPY_SKIP_DIRS.
+    (cd "$src_dir" && find . \( -name __pycache__ -o -type d -name fixtures \) -prune -o -type f -print) | sed 's#^\./##' \
         | awk -v d="$src_dir" '{ print $0 "\tcopy-dir-recursive\t" d "/" $0 }' > "$w/plain"
     : > "$w/merged"
     if [ -f "$overlay_dir/OVERLAY.md" ]; then
-        if [ -z "$(tr -d '[:space:]' < "$overlay_dir/OVERLAY.md")" ]; then
+        if ! has_non_space "$(<"$overlay_dir/OVERLAY.md")"; then
             echo "  SKIPPED EMPTY OVERLAY: $name"
         fi
         merge_overlay "$src_dir/SKILL.md" "$overlay_dir/OVERLAY.md" "$w/merge/SKILL.md"
@@ -1358,7 +1376,9 @@ deploy_generated_copy() {
     elif [ -e "$dest" ] && [ ! -d "$dest" ]; then
         make_way "$dest" || return 0
     elif [ -d "$dest" ]; then
-        find "$dest" -name __pycache__ -prune -o -type f -print0 > "$w/cur.lst"
+        # fixtures/ skipped here too: a leftover one in a copy without lock rows must not read as
+        # files of yours (KEPT below); lock_retire still removes the ones the lock names
+        find "$dest" \( -name __pycache__ -o -type d -name fixtures \) -prune -o -type f -print0 > "$w/cur.lst"
     fi
     sha_list "$w/cur.lst" > "$w/cur.h"
     awk -F'\t' -v pre="$prefix" 'index($2, pre) == 1 && ($1 == "copy-dir-recursive" || $1 == "merge-file") {
@@ -1470,7 +1490,7 @@ has_any_overlay() {
     [ -f "$overlay_dir/OVERLAY.md" ] && return 0
     for ov in "$overlay_dir"/*.OVERLAY.md; do
         [ -f "$ov" ] || continue
-        ov_name="$(basename "$ov")"
+        ov_name="${ov##*/}"
         [ "$ov_name" = "OVERLAY.md" ] && continue
         [ "$ov_name" = "SKILL.OVERLAY.md" ] && continue
         return 0
@@ -1611,7 +1631,7 @@ deploy_kiro() {
     KIRO_OVERLAY_ROOT="$SCRIPT_DIR/providers/kiro/skills"
     MANAGED_SKILLS=""
     for skill_dir in "$SHARED_DIR/skills"/*/; do
-        skill_name="$(basename "$skill_dir")"
+        skill_name="${skill_dir%/}"; skill_name="${skill_name##*/}"   # basename, without a process
         [ -f "$skill_dir/SKILL.md" ] || continue
         overlay_dir="$KIRO_OVERLAY_ROOT/$skill_name"
         dest="$KIRO_SKILLS_DIR/$skill_name"
@@ -1632,7 +1652,7 @@ deploy_kiro() {
     if [ -d "$kiro_provider_skills" ]; then
         echo "  Kiro-specific skills:"
         for skill_dir in "$kiro_provider_skills"/*/; do
-            skill_name="$(basename "$skill_dir")"
+            skill_name="${skill_dir%/}"; skill_name="${skill_name##*/}"
             if [ -f "$skill_dir/SKILL.md" ]; then
                 # Skip if this dir is a shared-skill overlay (SKILL.md and/or aux overlays)
                 # already merged above, rather than a standalone kiro-only skill.
@@ -1653,7 +1673,7 @@ deploy_kiro() {
     local entry entry_name
     for entry in "$KIRO_SKILLS_DIR"/*; do
         [ -e "$entry" ] || [ -L "$entry" ] || continue
-        entry_name="$(basename "$entry")"
+        entry_name="${entry##*/}"
         case " $MANAGED_SKILLS " in *" $entry_name "*) continue ;; esac
         if is_engine_link "$entry"; then
             echo "  REMOVE: $entry (stale)"
@@ -1799,7 +1819,7 @@ uninstall_generated_copies() {
     if [ "$LOCK_READABLE" -eq 0 ]; then
         # rows built from what setup writes now: the hash a file must still have to be removed
         for skill_dir in "$SHARED_DIR/skills"/*/; do
-            name="$(basename "$skill_dir")"
+            name="${skill_dir%/}"; name="${name##*/}"
             [ -f "$skill_dir/SKILL.md" ] && has_any_overlay "$SCRIPT_DIR/providers/kiro/skills/$name" || continue
             gen_expected "${skill_dir%/}" "$SCRIPT_DIR/providers/kiro/skills/$name" "$name" "$LOCK_WORK/unl-$name"
             awk -F'\t' -v eh="$LOCK_WORK/unl-$name/exp.h" -v pre="~/.kiro/skills/$name/" '

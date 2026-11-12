@@ -203,6 +203,16 @@ VALID_KINDS = (KIND_SYMLINK_FILE, KIND_SYMLINK_DIR, KIND_COPY_FILE, KIND_COPY_DI
 FILE_KINDS = (KIND_COPY_FILE, KIND_SYMLINK_FILE, KIND_TEMPLATE_FILE, KIND_SEED_FILE, KIND_MERGE_FILE)
 DIR_KINDS = (KIND_COPY_DIR_RECURSIVE, KIND_SYMLINK_DIR)
 
+# A folder never copied into a generated Kiro copy, like __pycache__ (setup.sh gen_expected and
+# deploy_generated_copy, setup.ps1 Get-FilesNoFollow): fixtures/ holds selftest data, which the
+# selftests read only from the repo. The orphan walk still reports a leftover one in a copy.
+COPY_SKIP_DIR = "fixtures"
+
+
+def _in_skipped_dir(rel):
+    """True when a relative path (/ or \\ separated) lies under a fixtures/ folder."""
+    return COPY_SKIP_DIR in re.split(r"[\\/]", rel)[:-1]
+
 # The deploy lock setup writes (setup.sh "Deploy lock" section): read only for the ORPHAN owner field.
 LOCK_HEADER = "# agent-playbook deploy lock v1 (written by setup; kind<TAB>path<TAB>sha256)"
 LOCK_FILE_KINDS = ("copy-dir-recursive", "merge-file", "copy-file", "template-file")
@@ -650,8 +660,9 @@ class Verifier(object):
         key = self.lock_key(dest)
         if key is not None and any(k.startswith(key + "/") for k in self.locked_keys()):
             return False
-        files = [os.path.relpath(f, dest).replace("\\", "/") for f in self._files_under(dest)
-                 if "__pycache__" not in os.path.relpath(f, dest).replace("\\", "/").split("/")]
+        # setup's KEPT test leaves __pycache__ and fixtures/ out of the files it counts
+        files = [r for r in (os.path.relpath(f, dest).replace("\\", "/") for f in self._files_under(dest))
+                 if "__pycache__" not in r.split("/") and not _in_skipped_dir(r)]
         if expected_rels is None:
             return bool(files)
         exp = set(r.lower() for r in expected_rels) if self.win else set(expected_rels)
@@ -951,14 +962,17 @@ class Verifier(object):
         else:
             self.emit("MISSING", path)
 
-    def _posix_find_files(self, top, rel=""):
-        """find . -name __pycache__ -prune -o -type f -print: relpaths in readdir order."""
+    def _posix_find_files(self, top, rel="", skip_fixtures=True):
+        """find . \\( -name __pycache__ -o -type d -name fixtures \\) -prune -o -type f -print: relpaths in
+        readdir order. skip_fixtures=False (the orphan walk) lists fixtures/ folders too."""
         for e in _entries(top if not rel else top + "/" + rel):
             if e.name == "__pycache__":
                 continue
             r = e.name if not rel else rel + "/" + e.name
             if e.is_dir(follow_symlinks=False):
-                for sub in self._posix_find_files(top, r):
+                if skip_fixtures and e.name == COPY_SKIP_DIR:
+                    continue
+                for sub in self._posix_find_files(top, r, skip_fixtures):
                     yield sub
             elif e.is_file(follow_symlinks=False):
                 yield r
@@ -977,9 +991,10 @@ class Verifier(object):
             source_full = os.path.abspath(source_dir)
             walk = []
             for full, st in _ps_recurse_files(source_full):
-                if _ps_link_type(full, st) or re.search(r"[\\/]__pycache__[\\/]", full):
+                rel = full[len(source_full):].lstrip("\\/")
+                if _ps_link_type(full, st) or re.search(r"[\\/]__pycache__[\\/]", full) or _in_skipped_dir(rel):
                     continue
-                walk.append((full[len(source_full):].lstrip("\\/"), full))
+                walk.append((rel, full))
         else:
             walk = [(rel, source_dir + "/" + rel) for rel in self._posix_find_files(source_dir)]
         for rel, source_file in walk:
@@ -1174,7 +1189,8 @@ class Verifier(object):
         if self.win:
             full = os.path.abspath(source_dir)
             return [f[len(full):].lstrip("\\/").replace("\\", "/") for f, st in _ps_recurse_files(full)
-                    if not _ps_link_type(f, st) and not re.search(r"[\\/]__pycache__[\\/]", f)]
+                    if not _ps_link_type(f, st) and not re.search(r"[\\/]__pycache__[\\/]", f)
+                    and not _in_skipped_dir(f[len(full):])]
         return list(self._posix_find_files(source_dir))
 
     def check_all(self):
@@ -1247,6 +1263,9 @@ class Verifier(object):
                 for full in sorted(found, key=lambda s: s.lower()):
                     rel = full[len(dest):].lstrip("\\/")
                     candidate = _winjoin(src, rel)
+                    if _in_skipped_dir(rel):
+                        self.emit("ORPHAN", full, "not-deployed=" + COPY_SKIP_DIR, self.lock_owner(full))
+                        continue
                     if os.path.exists(candidate) or full.lower() in exp_files:
                         continue
                     self.emit("ORPHAN", full, "expected-source=" + candidate, self.lock_owner(full))
@@ -1271,8 +1290,11 @@ class Verifier(object):
         for kind, dest, src, _mode in rows:
             if kind != KIND_COPY_DIR_RECURSIVE or not _dir_exists(dest) or os.path.islink(dest):
                 continue
-            for rel in sorted(self._posix_find_files(dest), key=_c_key):
+            for rel in sorted(self._posix_find_files(dest, skip_fixtures=False), key=_c_key):
                 deployed = dest + "/" + rel
+                if _in_skipped_dir(rel):
+                    self.emit("ORPHAN", deployed, "not-deployed=" + COPY_SKIP_DIR, self.lock_owner(deployed))
+                    continue
                 if os.path.exists(src + "/" + rel) or deployed in exp_files:
                     continue
                 self.emit("ORPHAN", deployed, "expected-source=%s/%s" % (src, rel), self.lock_owner(deployed))
@@ -1453,6 +1475,9 @@ def _st_build(base, links):
     _w(os.path.join(beta, "aux.md"), _ST_AUX_SHARED)
     _w(os.path.join(beta, "ref.md"), b"reference\n")
     _w(os.path.join(beta, "sub", "deep.md"), b"deep\n")
+    # selftest data setup never copies (a fixtures/ folder), and a FILE named fixtures, which it does
+    _w(os.path.join(beta, "scripts", "fixtures", "case", "case.json"), b"{}\n")
+    _w(os.path.join(beta, "sub", "fixtures"), b"a file, not a folder\n")
     _w(os.path.join(repo, "providers", "kiro", "skills", "beta", "OVERLAY.md"), _ST_OVERLAY)
     _w(os.path.join(repo, "providers", "kiro", "skills", "beta", "aux.OVERLAY.md"), _ST_AUX_OVERLAY)
     _w(os.path.join(repo, "providers", "kiro", "agents", "def.md"), _ST_TEMPLATE)
@@ -1475,6 +1500,7 @@ def _st_build(base, links):
     _w(os.path.join(kbeta, "aux.md"), _ST_AUX_MERGED)
     _w(os.path.join(kbeta, "ref.md"), b"reference\n")
     _w(os.path.join(kbeta, "sub", "deep.md"), b"deep\n")
+    _w(os.path.join(kbeta, "sub", "fixtures"), b"a file, not a folder\n")
     if links:
         def link(target, at, is_dir=False):
             d = os.path.dirname(at)
@@ -1532,6 +1558,9 @@ def _st_cases(tmp, links, skip_reason):
     check(has(out, "OK", ".kiro/skills/beta/SKILL.md"), "merged SKILL.md verifies OK")
     check(has(out, "OK", ".kiro/skills/beta/aux.md"), "merged aux file verifies OK")
     check(has(out, "OK", ".kiro/skills/beta/sub/deep.md"), "nested plain copy verifies OK")
+    check(not any("fixtures/case" in l.replace("\\", "/") for l in out),
+          "a source fixtures/ folder is not expected in the generated copy")
+    check(has(out, "OK", ".kiro/skills/beta/sub/fixtures"), "a FILE named fixtures is still copied and verified")
     check(has(out, "OK", ".kiro/agents/def.md"), "template render verifies OK")
     check(has(out, "OK", "Kiro/User/mcp.json"), "seed file present verifies OK despite in-app edit")
     check(out and out[-1].startswith("SUMMARY\t") and "REMEDIATION" not in "".join(out),
@@ -1614,6 +1643,8 @@ def _st_cases(tmp, links, skip_reason):
     repo, home, env = fresh()
     _w(os.path.join(home, ".kiro", "skills", "beta", "stale.md"), b"left behind\n")
     _w(os.path.join(home, ".kiro", "skills", "beta", "__pycache__", "x.pyc"), b"\0")
+    # an older copy's fixture file, whose source still exists: setup no longer deploys it
+    _w(os.path.join(home, ".kiro", "skills", "beta", "scripts", "fixtures", "case", "case.json"), b"{}\n")
     os.makedirs(os.path.join(home, ".kiro", "skills", "ghost"))
     os.makedirs(os.path.join(home, ".kiro", "skills", ".tool-managed"))
     rc, out, _ = _st_run(repo, env)
@@ -1622,7 +1653,9 @@ def _st_cases(tmp, links, skip_reason):
     check(has(out, "ORPHAN", ".kiro/skills/ghost", "no-source-skill"), "skill dir with no source -> ORPHAN")
     check(not any("__pycache__" in l or ".tool-managed" in l for l in out),
           "bytecode caches and dot entries are not orphans")
-    check(sum(1 for l in out if l.startswith("ORPHAN\t")) == 2, "exactly two ORPHAN lines")
+    check(has(out, "ORPHAN", ".kiro/skills/beta/scripts/fixtures/case/case.json", "not-deployed=fixtures"),
+          "a leftover fixtures/ file in a copy -> ORPHAN not-deployed=fixtures, though its source exists")
+    check(sum(1 for l in out if l.startswith("ORPHAN\t")) == 3, "exactly three ORPHAN lines")
     check(has(out, "ORPHAN", ".kiro/skills/ghost", "foreign") and has(out, "ORPHAN", "beta/stale.md", "foreign"),
           "with no deploy lock, an ORPHAN is foreign")
 

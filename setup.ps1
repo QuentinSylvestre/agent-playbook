@@ -894,8 +894,9 @@ function Write-OwnedFile {
     Add-LockRow $Kind $key $want
 }
 
-# Get-FilesNoFollow: the regular files under Root, recursively, never entering a link or a
-# __pycache__ folder (setup.sh: find -name __pycache__ -prune -o -type f). Paths are built from
+# Get-FilesNoFollow: the regular files under Root, recursively, never entering a link, a
+# __pycache__ folder or a fixtures folder (selftest data, read only from the repo; setup.sh:
+# find \( -name __pycache__ -o -type d -name fixtures \) -prune -o -type f). Paths are built from
 # Root as given: FullName would expand a short (8.3) name and stop matching the lock's keys.
 function Get-FilesNoFollow {
     param([string]$Root)
@@ -908,7 +909,7 @@ function Get-FilesNoFollow {
             if ($e.Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
             $full = [IO.Path]::Combine($d, $e.Name)
             if ($e.Attributes -band [IO.FileAttributes]::Directory) {
-                if ($e.Name -ne '__pycache__') { $stack.Push($full) }
+                if ($e.Name -ne '__pycache__' -and $e.Name -cne 'fixtures') { $stack.Push($full) }
             } else {
                 $out.Add($full)
             }
