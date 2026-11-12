@@ -252,20 +252,7 @@ Entry points: most work starts with `/qexplore`. `/qdev` can be invoked directly
 
 ### Standalone skills
 
-- `/qauto-research` — autonomous iterative optimization experiments in a dedicated git worktree on `research/*` branches.
-- `/qcouncil` — multi-perspective decision support, stakes-tiered (`shared/skills/qcouncil/SKILL.md § Stakes tier`). Called automatically on trade-off escalations per `§ Council-Enriched Escalation`; user-invokable standalone.
-- `/qexplain` — explain a code change for comprehension, not judgement: a validated, size-tiered HTML walkthrough plus a chat quiz. Manual invocation only (`disable-model-invocation`); no skill calls it and it calls none. Use `/qreview` to judge a change and `/qqa` to verify it at runtime.
-- `/qextract` — mine external content (articles, repos, videos) for playbook-improvement concepts. Chat-only; applies atomic changes directly or hands off to `/qexplore`/`/qplan`.
-- `/qhandoff` — export a Previously/Parked/Current handoff snapshot for cross-session continuation, into the project file or a standalone location.
-- `/qmigrate-workspace` — move or rename a workspace folder without losing any provider's session history or the playbook's tracking. Windows only; the cutover is user-run.
-- `/qmemory-eval` — read-only memory-health metrics over `.dream-state.json` and the memory files; also emitted in each full `/qdream` sweep Report.
-- `/qtest` — lifecycle testing orchestrator (plan | run): research-driven persistent test plans, parallel per-component runs, prioritized findings, `/qexplore`→`/qplan` handoff.
-- `/qutilities-disk-cleanup` — risk-categorized, user-gated disk space recovery.
-- `/qvalidate` — deterministic plan-file validator. Library called by the lifecycle skills at their checkpoints and user-invocable as `/qvalidate <plan-path>`; halts on FAIL per its `## Failure semantics`. The check list lives in that skill — do not re-enumerate it here.
-- `/qprototype` — throwaway prototype (logic or UI) that answers one design question before implementation; produces prototype code and a `PROTOTYPE_VERDICT.md`.
-- `/qicon-design` — app icons, logo marks, wordmarks, favicons and identity asset packs through adaptive questioning and visual concepting.
-- `/qvisualize` — standalone interactive HTML visualizations: charts, maps, calendars, mockups, simulations, system maps, PNG export.
-- `/qwait-what` — a user-typed nudge ("that last message did not land — re-pitch it in plain terms"). Never model-invoked.
+Every other skill is standalone; its description says when to use it. `/qexplain` and `/qwait-what` run only when the user types them, never on the model's own initiative.
 
 ## Harness Improvement Capture
 
