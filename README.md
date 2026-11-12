@@ -72,6 +72,44 @@ Non-interactive: `./setup.sh --yes --providers claude,codex`. Remove everything 
 
 Then, in any project, ask your agent to `/qexplore` a change.
 
+### Install with your agent
+
+An agent can run setup for you. Ask it to run `./setup.sh --dry-run --providers <list>` (or
+`.\setup.ps1 -DryRun -Providers <list>`) and show you the plan, then the same command without the
+dry-run flag. Run with no terminal, setup never asks: it backs up a file of yours at a link path
+without asking, and it never changes `~/.claude/settings.json`. Run setup yourself at a terminal
+once to add the Claude Code hook and status line entries there. Then ask the agent to run
+`/qconfig-sync`, which verifies the deployment.
+
+### When something looks wrong
+
+`/qconfig-sync` runs the checks below. To run one by hand, use the playbook's venv Python
+(`.venv-agent-playbook/Scripts/python.exe` on Windows, `.venv-agent-playbook/bin/python` elsewhere)
+from the repo root.
+
+| Symptom | Check | Action |
+|---|---|---|
+| A skill is missing in one client | `shared/skills/qconfig-sync/scripts/verify-deployment.py` | `MISSING` or `WRONG_TARGET`: re-run setup. `DRIFTED` on a Kiro copy: re-run setup after a source edit. |
+| A skill is deployed but the client does not offer it | `shared/skills/qconfig-sync/scripts/verify-client-load.py` | `INACTIVE`: re-run setup, check the client's skill folder holds the skill, then the client's own disabled list. |
+| A file of yours changed after setup | `<file>.bak` beside it | Setup moved your version there. Copy back what you need. |
+| `ORPHAN ... foreign` | verify-deployment | A file setup did not write. Delete it yourself if you no longer need it. |
+| Claude sessions start without memory | `providers/claude/settings-entries.py check` | Run setup at a terminal and accept the memory hook entry. |
+
+**Client load check.** `verify-deployment` proves a skill file is where setup put it.
+`verify-client-load.py` asks each client whether it lists the skill, with a read-only command that
+spends no model call. It reports `LOADED`, `INACTIVE`, `UNOBSERVABLE` or `SKIP <reason>`, and it only
+warns. A ledger in the script records, per client, the command used and the version and date it was
+measured on:
+
+| Client | Listing command | Measured on |
+|---|---|---|
+| Gemini CLI | `gemini skills list` (also starts your configured MCP servers) | 0.28.2, 2026-11-12 |
+| Codex | `codex debug prompt-input` | 0.162.0, 2026-11-12 |
+| Claude Code | none without a model call, so `UNOBSERVABLE` | 2.1.322, 2026-11-11 |
+| kiro-cli | none without a model call, so `UNOBSERVABLE` | 3.0.0, 2026-11-11 |
+
+When the installed version differs from the ledger's, the line says so and the check still tries.
+
 ## The skills
 
 | Area | Skills |
@@ -108,8 +146,7 @@ agent-playbook/ (this repo, public)         ~/.agent-playbook/
   `local-improvements` branch, never on `main`. Merge to `main`, or open a pull request upstream,
   when you choose.
 - **Coexistence.** Each skill is linked individually, so your own skills and other skill packs
-  in the same folder stay. Composing the playbook with your own global instructions is on the
-  [roadmap](ROADMAP.md).
+  in the same folder stay. Your own global instruction file stays too (see Quickstart).
 
 More: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and the vocabulary in
 [docs/GLOSSARY.md](docs/GLOSSARY.md).
