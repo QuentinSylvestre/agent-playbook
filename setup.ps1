@@ -108,9 +108,16 @@ function Confirm-Step {
     return ($ans -match '^(y|yes)$')
 }
 
+# New-DirIfMissing <folder>: make the folder. A file already at that path stops the run before anything
+# is written there, in a dry run too; setup.sh's need_dir stops the same way.
 function New-DirIfMissing {
     param([string]$Path)
-    if (-not (Test-Path $Path)) { Invoke-Act "mkdir $Path" { New-Item -ItemType Directory -Path $Path -Force | Out-Null } }
+    $attr = Get-PathAttributes $Path
+    if ($null -ne $attr -and -not ($attr -band [IO.FileAttributes]::Directory)) {
+        [Console]::Error.WriteLine("ERROR: $Path is a file, not a folder; setup stopped here (move it away, then re-run setup)")
+        exit 1
+    }
+    if ($null -eq $attr) { Invoke-Act "mkdir $Path" { New-Item -ItemType Directory -Path $Path -Force | Out-Null } }
 }
 
 # A path in the pointer file's form: absolute, forward slashes (setup.sh writes the same bytes).
@@ -286,6 +293,15 @@ function Test-RegularFile {
 function Read-DeployLock {
     $LockOld.Clear(); $LockOldValue.Clear()
     $rows = @()
+    # a folder (or a link) at the lock or journal path: stop before any change, since the lock could
+    # not be written at the end (setup.sh's lock_load stops the same way)
+    foreach ($p in @($LockFile, $LockJournal)) {
+        $attr = Get-PathAttributes $p
+        if ($null -ne $attr -and ($attr -band ([IO.FileAttributes]::Directory -bor [IO.FileAttributes]::ReparsePoint))) {
+            [Console]::Error.WriteLine("ERROR: $p is not a file; setup stopped before any change (move it away, then re-run setup)")
+            exit 1
+        }
+    }
     if (Test-Path -LiteralPath $LockFile -PathType Leaf) {
         $lines = Read-LockLines $LockFile
         $ok = ($lines.Count -ge 1) -and ($lines[0] -ceq $LockHeader)
@@ -383,8 +399,14 @@ function Complete-DeployLock {
     }
     New-DirIfMissing (Split-Path -Parent $LockFile)
     $tmp = "$LockFile.tmp-$PID"
-    [IO.File]::WriteAllBytes($tmp, $bytes)
-    if ($exists) { [IO.File]::Replace($tmp, $LockFile, [NullString]::Value) } else { [IO.File]::Move($tmp, $LockFile) }
+    try {
+        [IO.File]::WriteAllBytes($tmp, $bytes)
+        if ($exists) { [IO.File]::Replace($tmp, $LockFile, [NullString]::Value) } else { [IO.File]::Move($tmp, $LockFile) }
+    } catch {
+        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        [Console]::Error.WriteLine("ERROR: could not write ${LockFile}: $($_.Exception.Message); the next run reads its rows from $LockJournal")
+        exit 1
+    }
     Remove-Item -LiteralPath $LockJournal -Force -ErrorAction SilentlyContinue
     Write-Host "  WROTE: $LockFile"
 }

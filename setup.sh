@@ -115,6 +115,20 @@ act() {
     fi
 }
 
+# need_dir <folder>...: make each folder (act mkdir -p). A file already at one of those paths stops
+# the run before anything is written there, in a dry run too; setup.ps1's New-DirIfMissing stops
+# the same way.
+need_dir() {
+    local d
+    for d in "$@"; do
+        if [ -e "$d" ] && [ ! -d "$d" ]; then
+            echo "ERROR: $d is a file, not a folder; setup stopped here (move it away, then re-run setup)" >&2
+            exit 1
+        fi
+    done
+    act mkdir -p "$@"
+}
+
 # write_text <dest> <text>: write text (already carrying its trailing newline) to dest.
 write_text() {
     if [ "$DRY_RUN" -eq 1 ]; then
@@ -306,6 +320,14 @@ lock_load() {
     # every destination the manifest names now: never retired, whatever an old row says
     local i
     for i in "${!MANIFEST_DESTS[@]}"; do lock_key "$(expand_dest "${MANIFEST_DESTS[$i]}")"; echo; done > "$LOCK_WORK/mkeys"
+    # a folder (or anything not a file) at the lock or journal path: stop before any change, since
+    # the lock could not be written at the end (setup.ps1's Read-DeployLock stops the same way)
+    for i in "$LOCK_FILE" "$LOCK_JOURNAL"; do
+        if { [ -e "$i" ] || [ -L "$i" ]; } && { [ -L "$i" ] || [ ! -f "$i" ]; }; then
+            echo "ERROR: $i is not a file; setup stopped before any change (move it away, then re-run setup)" >&2
+            exit 1
+        fi
+    done
     if [ -f "$LOCK_FILE" ]; then
         if awk -F'\t' -v header="$LOCK_HEADER" -v skey="$LOCK_SETTING_KEY" -v gkey="$LOCK_GEMINI_KEY" '
             NR == 1 { if ($0 != header) exit 1; next }'"$LOCK_ROWS_AWK" "$LOCK_FILE"; then
@@ -372,8 +394,11 @@ lock_finish() {
     { printf '%s\n' "$LOCK_HEADER"; cat "$LOCK_WORK/rows"; } > "$out"
     if [ -f "$LOCK_FILE" ] && cmp -s "$out" "$LOCK_FILE"; then rm -f "$LOCK_JOURNAL"; echo "  OK: $LOCK_FILE"; return 0; fi
     mkdir -p "$(dirname "$LOCK_FILE")"
-    cp "$out" "$LOCK_FILE.tmp-$$"
-    mv -f "$LOCK_FILE.tmp-$$" "$LOCK_FILE"
+    if ! { cp "$out" "$LOCK_FILE.tmp-$$" && mv -f "$LOCK_FILE.tmp-$$" "$LOCK_FILE"; }; then
+        rm -f "$LOCK_FILE.tmp-$$"
+        echo "ERROR: could not write $LOCK_FILE; the next run reads its rows from $LOCK_JOURNAL" >&2
+        exit 1
+    fi
     rm -f "$LOCK_JOURNAL"
     echo "  WROTE: $LOCK_FILE"
 }
@@ -745,7 +770,7 @@ link_skills() {
             return 0
         fi
     fi
-    act mkdir -p "$dir"
+    need_dir "$dir"
     while IFS= read -r name; do
         dest="$dir/$name"
         if [ -e "$dest" ] && [ ! -L "$dest" ]; then
@@ -853,7 +878,7 @@ claude_instructions() {
     local source="$1" dest="$2"
     if user_instruction_file "$dest" "$source"; then
         echo "  KEPT: $dest is your own file; the playbook loads beside it from $CLAUDE_SIDE_LINK (Claude Code reads every ~/.claude/rules/*.md)"
-        act mkdir -p "$(dirname "$CLAUDE_SIDE_LINK")"
+        need_dir "$(dirname "$CLAUDE_SIDE_LINK")"
         link_file "$source" "$CLAUDE_SIDE_LINK"
         return 0
     fi
@@ -1002,7 +1027,7 @@ providers=${PROVIDERS// /,}
         echo "  OK: $CONFIG_FILE"
         return
     fi
-    act mkdir -p "$(dirname "$CONFIG_FILE")"
+    need_dir "$(dirname "$CONFIG_FILE")"
     write_text "$CONFIG_FILE" "$text"
     echo "  WROTE: $CONFIG_FILE"
 }
@@ -1101,7 +1126,7 @@ seed_user_memory() {
         return 0
     fi
     echo "  SEED: $mem (empty user memory from templates/memory/)"
-    act mkdir -p "$mem"
+    need_dir "$mem"
     for f in "$TEMPLATES_MEMORY"/*; do
         [ -f "$f" ] && act cp "$f" "$mem/"
     done
@@ -1109,7 +1134,7 @@ seed_user_memory() {
 
 create_store() {
     echo "  CREATE: $STORES (a new local store repo; add a remote and push it to keep it)"
-    act mkdir -p "$STORES"
+    need_dir "$STORES"
     act git -C "$STORES" init -q
     write_text "$STORES/.gitignore" "user/memory/.dream-journal.jsonl
 */STORE.tmp-*
@@ -1322,7 +1347,7 @@ deploy_generated_copy() {
         echo "  KEPT: $dest is your own folder; the playbook's $name skill is not deployed there (rename or remove it, then re-run setup, to get the playbook's)"
         return 0
     fi
-    act mkdir -p "$dest"
+    need_dir "$dest"
     # 4. write only the differences. Plain files go through one tar pipe (one process per copy,
     # not one per file); merged files and backups are handled one by one.
     : > "$w/batch"
@@ -1440,7 +1465,7 @@ deploy_manifest_links() {
         dest="$(expand_dest "${MANIFEST_DESTS[$i]}")"
         source="$(expand_source "${MANIFEST_SOURCES[$i]}")"
         if memory_source_missing "${MANIFEST_SOURCES[$i]}" "$source" "$dest"; then continue; fi
-        act mkdir -p "$(dirname "$dest")"
+        need_dir "$(dirname "$dest")"
         case "${MANIFEST_KINDS[$i]}" in
             symlink-file) deploy_instruction_file "${MANIFEST_DESTS[$i]}" "$source" "$dest" || link_file "$source" "$dest" ;;
             symlink-dir)  link_dir  "$source" "$dest" ;;
@@ -1450,7 +1475,7 @@ deploy_manifest_links() {
 
 deploy_claude() {
     echo "=== Claude Code ==="
-    act mkdir -p "$HOME/.claude"
+    need_dir "$HOME/.claude"
     deploy_manifest_links claude
     echo "  Skills (individual):"
     link_skills "$HOME/.claude/skills"
@@ -1459,7 +1484,7 @@ deploy_claude() {
 deploy_codex() {
     # Codex keeps built-in skills in skills/.system/: one link per skill preserves them.
     echo "=== Codex ==="
-    act mkdir -p "$HOME/.codex"
+    need_dir "$HOME/.codex"
     deploy_manifest_links codex
     echo "  Skills (individual):"
     link_skills "$HOME/.codex/skills"
@@ -1467,7 +1492,7 @@ deploy_codex() {
 
 deploy_gemini() {
     echo "=== Gemini CLI ==="
-    act mkdir -p "$HOME/.gemini"
+    need_dir "$HOME/.gemini"
     deploy_manifest_links gemini
     echo "  Skills (individual):"
     link_skills "$HOME/.gemini/skills"
@@ -1478,7 +1503,7 @@ deploy_kiro() {
     echo "=== Kiro CLI ==="
     KIRO_AGENTS_DIR="$HOME/.kiro/agents"
     KIRO_SETTINGS_DIR="$HOME/.kiro/settings"
-    act mkdir -p "$KIRO_AGENTS_DIR" "$KIRO_SETTINGS_DIR"
+    need_dir "$KIRO_AGENTS_DIR" "$KIRO_SETTINGS_DIR"
 
     # Deploy kiro-always entries from manifest
     for i in "${!MANIFEST_KINDS[@]}"; do
@@ -1486,7 +1511,7 @@ deploy_kiro() {
         dest="$(expand_dest "${MANIFEST_DESTS[$i]}")"
         source="$(expand_source "${MANIFEST_SOURCES[$i]}")"
         dest_parent="$(dirname "$dest")"
-        act mkdir -p "$dest_parent"
+        need_dir "$dest_parent"
         if [ -f "$source" ]; then
             if [ "${MANIFEST_KINDS[$i]}" = "template-file" ]; then
                 copy_template "$source" "$dest"
@@ -1536,7 +1561,7 @@ deploy_kiro() {
     echo "=== Kiro IDE ==="
     KIRO_STEERING_DIR="$HOME/.kiro/steering"
     KIRO_SKILLS_DIR="$HOME/.kiro/skills"
-    act mkdir -p "$KIRO_STEERING_DIR" "$KIRO_SKILLS_DIR"
+    need_dir "$KIRO_STEERING_DIR" "$KIRO_SKILLS_DIR"
 
     # Steering is flat: every deployed file sits directly in ~/.kiro/steering/.
     for i in "${!MANIFEST_KINDS[@]}"; do

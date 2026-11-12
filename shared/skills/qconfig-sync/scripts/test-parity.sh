@@ -1670,9 +1670,10 @@ parity_sec_coexist() {
 #   g: a first run with no venv (AGENT_PLAYBOOK_TEST_VENV_DIR names a folder that does not exist yet,
 #      outside the sandbox): setup makes the venv, then edits settings.json in that same run; a dry
 #      run before it says the venv comes first and writes nothing;
-#   h: (Gemini CLI only) a run that stops after the settings edit (setup.sh: ~/.gemini/skills is a
-#      file; setup.ps1: the deploy lock path is a folder) leaves the setting row in the lock journal;
-#      the next run, once the cause is gone, records it in the lock.
+#   h: (Gemini CLI only) a folder at the deploy lock path stops the run before any change; a file at
+#      ~/.gemini/skills stops it after the settings edit, keeps the file, leaves no lock temp file
+#      and leaves the setting row in the lock journal; the next run, once the cause is gone, records
+#      it in the lock. Both twins get the same triggers and the same ERROR lines.
 # setup.sh deploys each (COEXIST, always runs) and, where PowerShell and Git Bash are both present,
 # setup.ps1 deploys a twin of each (TWIN-COEXIST). Checked per sandbox: the outcomes below and the
 # Claude memory rules links, verify-deployment.py, a second run writes nothing (mtime and inode, as
@@ -2008,8 +2009,22 @@ cx_fixture_h() {
         sb="$TMPDIR_PARITY/cx-$t-h"
         mkdir -p "$sb/.gemini" "$sb/.agent-playbook"
         printf 'my gemini\n' > "$sb/.gemini/GEMINI.md"
-        if [ "$t" = sh ]; then printf 'not a folder\n' > "$sb/.gemini/skills"; else mkdir -p "$sb/.agent-playbook/deploy-lock.tsv"; fi
+        mkdir -p "$sb/.agent-playbook/deploy-lock.tsv"
     done
+    # run 0: a folder at the lock path stops both twins before any change
+    cx_run h 0 "--providers gemini" "-Providers gemini"
+    cx_wait
+    cx_rc h 0 nonzero
+    for t in $twins; do
+        sb="$TMPDIR_PARITY/cx-$t-h"
+        cx_absent "$sb/.gemini/settings.json" && cx_absent "$sb/.gemini/AGENT-PLAYBOOK.md" \
+            && [ -z "$(ls -A "$sb/.agent-playbook/deploy-lock.tsv")" ] \
+            && grep -q 'deploy-lock.tsv is not a file; setup stopped before any change' "$TMPDIR_PARITY/cx-$t-h-0.log" \
+            || cx_fail "$t" "fixture h: a folder at the lock path stops the run before any change, with an ERROR"
+        rmdir "$sb/.agent-playbook/deploy-lock.tsv"
+        printf 'not a folder\n' > "$sb/.gemini/skills"
+    done
+    # run 1: a file at ~/.gemini/skills stops both twins after the settings edit
     cx_run h 1 "--providers gemini" "-Providers gemini"
     cx_wait
     cx_rc h 1 nonzero
@@ -2017,8 +2032,11 @@ cx_fixture_h() {
         sb="$TMPDIR_PARITY/cx-$t-h"; j="$sb/.agent-playbook/deploy-lock.journal.tsv"
         grep -q $'^setting\tgemini/context.fileName\t+$' "$j" 2>/dev/null \
             && cx_json "$sb/.gemini/settings.json" 'd["context"]["fileName"] == ["GEMINI.md", "AGENT-PLAYBOOK.md"]' \
-            || cx_fail "$t" "fixture h: a run that stops after the settings edit leaves the setting row in the lock journal"
-        if [ "$t" = sh ]; then rm -f "$sb/.gemini/skills"; else rmdir "$sb/.agent-playbook/deploy-lock.tsv"; fi
+            && grep -q 'skills is a file, not a folder; setup stopped here' "$TMPDIR_PARITY/cx-$t-h-1.log" \
+            && [ "$(cat "$sb/.gemini/skills")" = "not a folder" ] \
+            && [ -z "$(find "$sb/.agent-playbook" -name 'deploy-lock.tsv.tmp-*')" ] \
+            || cx_fail "$t" "fixture h: a file at ~/.gemini/skills stops the run with an ERROR, keeps the file and leaves the setting row in the lock journal"
+        rm -f "$sb/.gemini/skills"
     done
     cx_run h 2 "--providers gemini" "-Providers gemini"
     cx_wait
