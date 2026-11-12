@@ -8,14 +8,14 @@ These patterns apply when the user has a presentation currently open in PowerPoi
 
 ## Establishing the COM connection
 
-`win32com.client.GetActiveObject("PowerPoint.Application")` connects to a running instance. `win32com.client.Dispatch("PowerPoint.Application")` creates a new invisible window — its `Presentations` collection is empty, so the **Never trust ActivePresentation** loop finds nothing.
+`win32com.client.GetActiveObject("PowerPoint.Application")` connects to a running instance. `win32com.client.Dispatch("PowerPoint.Application")` and `DispatchEx` do not create a separate PowerPoint: PowerPoint runs one instance per user, so both return the user's running instance when one exists, with the user's presentations in it. Never call `app.Quit()` on an instance the script did not start; it closes everything the user has open.
 
 ```python
 import win32com.client
 app = win32com.client.GetActiveObject("PowerPoint.Application")
 ```
 
-Use `GetActiveObject` for all live-open-presentation tasks; use `Dispatch` only when starting PowerPoint from a script.
+Use `GetActiveObject` for all live-open-presentation tasks. Use `Dispatch` only when no PowerPoint is running, and quit only an instance the script started.
 
 ---
 
