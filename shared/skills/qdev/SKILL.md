@@ -2,6 +2,7 @@
 name: qdev
 description: Execute implementation phases from a plan with built-in review after each phase. Auto-continues through phases when healthy, stops on blockers. Supports file-based and inline plans. Dispatches parallel sub-agents for [P:N] phases. Use after /qplan produces a plan, or to resume execution of an in-progress plan.
 argument-hint: "<path to project file> [optional: phase numbers, e.g. 1 or 1 to 3]"
+requires: "qqa, qreview, qvalidate"
 ---
 
 # Development

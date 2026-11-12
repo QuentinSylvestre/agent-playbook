@@ -118,6 +118,16 @@ Output schema and rationale: the header docstring of `verify-links.py` (run it w
 
 After the link check, the leak scan: `<python> shared/skills/qconfig-sync/scripts/leak-scan.py <repo>` fails on a tracked file holding a home path with a real user name, an email address outside the documentation domains, or a credential shape (one `LEAK<TAB>kind<TAB>path:line` line each, never the matched text). User memory and plans live in the store repo, so a hit in the engine is something personal about to be published: move it to the store repo or replace it with a placeholder (`C:\Users\alice`, `example.com`). A deliberate test string carries `leak-scan: ignore` on its line.
 
+#### Skill frontmatter check
+
+After the leak scan, run the skill guard. It checks every `shared/skills/*/SKILL.md` and every standalone `providers/kiro/skills/*/SKILL.md` (a folder with no `OVERLAY.md`): the strict flat frontmatter grammar, the required `name` and `description`, a quoted `argument-hint`, a `name` equal to the folder name that starts with `q` and appears once, and the optional quoted `requires` list of skills this skill depends on. Every `requires` entry must name a checked skill and appear in the body, and every skill the body invokes by explicit phrasing must be listed. The call-versus-mention rule is in the script's header docstring.
+
+**Invocation** (`<python>` as in the load-budget check below; its own `--selftest`, listed below, is its test): `<python> shared/skills/qconfig-sync/scripts/verify-skills.py <repo>`
+
+**Reporting rule**: surface every `FAIL` line (file, then what is wrong); exit 1 fails the sync under the halt rule, and nothing auto-repairs. Exit 2: the guard did not run.
+
+Output schema and rationale: the header docstring of `verify-skills.py` (run it with `--help`).
+
 #### Store-layout check
 
 After the link check, run the store-layout guard. It checks the store repo (`~/.agent-playbook/stores`) against `shared/skills/qdream/memory-rules.md § Workspace Store`: every store directory holds a valid `STORE` file in the resolver's normalized form, no two share an identity, and the reserved folder names appear only as that section lists them. It also fails any tracked config-repo file, archived plans included, that holds a term from the store repo's `BLOCKLIST` file, naming the file and the `BLOCKLIST` line, never the term: client names go in that list, never in the config repo. It also warns on an in-workspace `memory/` or `plans/` left in a known workspace; a no-create folder (`shared/skills/qdream/memory-rules.md § Resolution contract`) is exempt, and so is a config repo's `memory/` (the user tier), never its `plans/`.
@@ -148,7 +158,7 @@ Setup links the Claude Code scripts, but they only run once `~/.claude/settings.
 
 #### Memory-script selftests
 
-After the load-budget check, run the twenty-four selftests: the memory scripts' and the guards'. The Claude Code `SessionStart` hook imports internals of `dream-manifest.py`, `qmemory-eval.py`, `store-resolver.py` and `memory-entries.py`, and it fails open: a renamed helper would silently empty every session's memory index instead of failing loudly. `dream-sweep.py` and `dream-write.py` import `dream-manifest.py` too, and `dream-write.py` is the only script that writes memory files or the state file, or runs `git commit` and `git push`. The selftests catch a break at sync time. `dream-write.py --selftest` builds throwaway git repositories in the system temp directory and runs its cases in worker processes (four by default; the runner passes `--jobs 8`). It takes minutes: 252 s for 195 cases run alone with `--jobs 8` on the Windows development machine (2026-11-05, 22 cores), and up to 758 s while other work ran, because most of the time goes to launching `git`, about 69 times per case. A foreground call at a 120-300 second tool timeout is therefore killed before it finishes. Run by hand, run it in the background with its output written to a file, and allow a timeout of at least 15 minutes. A foreground timeout alone is not a hang or a deadlock: report one only after the background run has been observed to stall.
+After the load-budget check, run the twenty-five selftests: the memory scripts' and the guards'. The Claude Code `SessionStart` hook imports internals of `dream-manifest.py`, `qmemory-eval.py`, `store-resolver.py` and `memory-entries.py`, and it fails open: a renamed helper would silently empty every session's memory index instead of failing loudly. `dream-sweep.py` and `dream-write.py` import `dream-manifest.py` too, and `dream-write.py` is the only script that writes memory files or the state file, or runs `git commit` and `git push`. The selftests catch a break at sync time. `dream-write.py --selftest` builds throwaway git repositories in the system temp directory and runs its cases in worker processes (four by default; the runner passes `--jobs 8`). It takes minutes: 252 s for 195 cases run alone with `--jobs 8` on the Windows development machine (2026-11-05, 22 cores), and up to 758 s while other work ran, because most of the time goes to launching `git`, about 69 times per case. A foreground call at a 120-300 second tool timeout is therefore killed before it finishes. Run by hand, run it in the background with its output written to a file, and allow a timeout of at least 15 minutes. A foreground timeout alone is not a hang or a deadlock: report one only after the background run has been observed to stall.
 
 **Invocation** (`<python>` as above; if that file is missing, stop and report as below), from the repo root:
 
@@ -165,6 +175,7 @@ After the load-budget check, run the twenty-four selftests: the memory scripts' 
 - `<python> shared/skills/qconfig-sync/scripts/verify-citations.py --selftest`
 - `<python> shared/skills/qconfig-sync/scripts/verify-mass.py --selftest`
 - `<python> shared/skills/qconfig-sync/scripts/verify-links.py --selftest`
+- `<python> shared/skills/qconfig-sync/scripts/verify-skills.py --selftest`
 - `<python> shared/skills/qconfig-sync/scripts/leak-scan.py --selftest`
 - `<python> shared/skills/qdream/scripts/verify-dream-journal.py --selftest`
 - `<python> shared/skills/qdream/scripts/verify-dream-state.py --selftest`

@@ -2,6 +2,7 @@
 name: qexplore
 description: Explore codebase and refine requirements through thorough analysis and targeted questions. Use when starting work to reach high confidence before planning.
 argument-hint: "<work description>"
+requires: "qcouncil, qplan"
 ---
 
 # Exploration

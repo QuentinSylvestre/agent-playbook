@@ -2,6 +2,7 @@
 name: qclose
 description: Archive a completed plan or research run following the project's archival conventions. Adds completion summary, renames, and moves to archive location, then runs memory consolidation.
 argument-hint: "<path to project file> | research"
+requires: "qdream, qvalidate"
 ---
 
 # Close

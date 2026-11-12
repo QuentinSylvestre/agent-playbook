@@ -2,6 +2,7 @@
 name: qqa
 description: Runtime verification orchestrator — classifies change surfaces, delegates execution to leaf skills, produces structured PASS/FAIL/BLOCKED/SKIP verdicts with mandatory adversarial probing.
 argument-hint: "<phase number or change description>"
+requires: "qbrowser-test"
 ---
 
 # QA

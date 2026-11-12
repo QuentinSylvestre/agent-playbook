@@ -2,6 +2,7 @@
 name: qplan
 description: Write a phased implementation plan, scaling the template to match complexity. Use after /qexplore — explore first unless the user states they have already explored or supplies a complete intent file. Pass an existing plan path to review it.
 argument-hint: "<work description or path to existing project file>"
+requires: "qreview, qvalidate"
 ---
 
 # Plan
