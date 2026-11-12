@@ -42,6 +42,14 @@ NOT_SYMLINK <path> user-file-kept-without-the-playbook. A byte copy of the sourc
 not the user's own file (setup replaces it), so it stays NOT_SYMLINK. Codex has
 no such mechanism: its row is checked as a plain link.
 
+A folder of the user's own at a skill's name (lockstep with setup's KEPT rule) is
+OK <path> user-folder-kept playbook-skill-not-deployed, which does not fail the run: setup
+never replaces it, so the skill is not deployed there until the user renames or removes
+it. For Claude Code, Codex and Gemini CLI that is anything at the skill's path that is not
+a link. For Kiro it is a folder that holds a file and of which the deploy lock names no
+file; at an overlay-bearing skill it must also hold a file at a path setup does not write
+there (a folder holding only such paths is an older copy of setup's, checked as usual).
+
 Overlay-merge awareness (lockstep with setup.sh / setup.ps1):
   setup MERGES a kiro overlay (`OVERLAY.md` for SKILL.md, `<stem>.OVERLAY.md`
   for an aux file) into the deployed target rather than copying the overlay
@@ -72,8 +80,9 @@ Platform model:
   That order is the directory listing's own (os.scandir, as Get-ChildItem used): NTFS
   returns names sorted, so a walk is name-ordered there, files before subdirectories;
   another filesystem (FAT, a network share) may return a different order.
-  A template-file also verifies OK when it equals the render setup.sh produces under
-  Git Bash (/c/... roots), so a setup.sh deploy on Windows is not reported DRIFTED.
+  Both twins render C:/... roots; a template-file also verifies OK when it equals the
+  render an older setup.sh produced under Git Bash (/c/... roots), so a deploy made
+  before that change is not reported DRIFTED.
   POSIX: home = $HOME; the Kiro IDE dir = $APPDATA via cygpath when both exist,
   else ${XDG_CONFIG_HOME:-$HOME/.config}/Kiro/User; targets compared after
   realpath (readlink -f); walks follow find order.
@@ -99,9 +108,10 @@ ORPHAN, AMBIGUOUS_SKILL}.
                    the manifest does not claim to own. Its last field says whose
                    it is, read from setup's deploy lock
                    (~/.agent-playbook/deploy-lock.tsv): owned-by-setup (a file the
-                   lock names, a folder holding one, or a link into the repo) or
-                   foreign (anything else, a .bak setup made included). A missing
-                   or unreadable lock makes every file and folder foreign.
+                   lock names, a folder holding only such files, or a link into the
+                   repo), mixed (a folder holding files the lock names and files it
+                   does not) or foreign (anything else, a .bak setup made included).
+                   A missing or unreadable lock makes every file and folder foreign.
   AMBIGUOUS_SKILL  a providers/kiro/skills/<name>/ setup cannot deploy
                    coherently. Two shapes, different fixes -- read the detail
                    field: (a) SKILL.md AND an overlay, so setup deploys the
@@ -189,7 +199,8 @@ LOCK_HEADER = "# agent-playbook deploy lock v1 (written by setup; kind<TAB>path<
 LOCK_FILE_KINDS = ("copy-dir-recursive", "merge-file", "copy-file", "template-file")
 LOCK_SETTING_KEY = "kiro-cli/chat.defaultAgent"
 LOCK_GEMINI_KEY = "gemini/context.fileName"
-OWNED, FOREIGN = "owned-by-setup", "foreign"
+OWNED, FOREIGN, MIXED = "owned-by-setup", "foreign", "mixed"
+USER_FOLDER_KEPT = ("user-folder-kept", "playbook-skill-not-deployed")
 
 
 def read_lock_keys(path):
@@ -215,7 +226,8 @@ def read_lock_keys(path):
             if key not in (LOCK_SETTING_KEY, LOCK_GEMINI_KEY) or not val:
                 return set()
             continue
-        if kind not in LOCK_FILE_KINDS + ("backup",) or not key.startswith("~/") or "/../" in "/" + key + "/":
+        if (kind not in LOCK_FILE_KINDS + ("backup",) or not key.startswith("~/") or "/../" in "/" + key + "/"
+                or "\\" in key or ":" in key):
             return set()
         if not (kind == "backup" and val == "-") and not re.match(r"^[0-9a-f]{64}$", val):
             return set()
@@ -569,19 +581,72 @@ class Verifier(object):
             if self.win:
                 t, root = t.lower(), root.lower()
             return OWNED if t == root or t.startswith(root + "/") else FOREIGN
+        key = self.lock_key(full)
+        if key is None:
+            return FOREIGN
+        keys = self.locked_keys()
+        if key in keys:
+            return OWNED
+        if any(k.startswith(key + "/") for k in keys):
+            # a folder holding a locked file: setup's alone, or mixed when it also holds a file the
+            # lock does not name (setup removes only its own unedited files there)
+            for f in self._files_under(full):
+                if self.lock_key(f) not in keys:
+                    return MIXED
+            return OWNED
+        return FOREIGN
+
+    def locked_keys(self):
+        """The lock's file-row keys (lower case on Windows); empty for a missing or invalid lock."""
         if self._lock_keys is None:
             keys = read_lock_keys(self.join(self.home, ".agent-playbook/deploy-lock.tsv"))
             self._lock_keys = set(k.lower() for k in keys) if self.win else keys
+        return self._lock_keys
+
+    def lock_key(self, full):
+        """-> the lock's ~/ spelling of a path under home (lower case on Windows), or None."""
         home = self.home.replace("\\", "/").rstrip("/")
         p = full.replace("\\", "/")
         if self.win:
             home, p = home.lower(), p.lower()
         if not p.startswith(home + "/"):
-            return FOREIGN
-        key = "~/" + p[len(home) + 1:]
-        if key in self._lock_keys or any(k.startswith(key + "/") for k in self._lock_keys):
-            return OWNED
-        return FOREIGN
+            return None
+        return "~/" + p[len(home) + 1:]
+
+    def _files_under(self, top):
+        """Every entry under top that is not a folder, links included and never followed."""
+        out = []
+        for d, dirs, files in os.walk(top):
+            keep = []
+            for n in dirs:
+                full = os.path.join(d, n)
+                if os.path.islink(full) or (self.win and _ps_link_type(full)):
+                    out.append(full)
+                else:
+                    keep.append(n)
+            dirs[:] = keep
+            out.extend(os.path.join(d, n) for n in files)
+        return out
+
+    def user_folder_kept(self, dest, expected_rels=None, any_entry=False):
+        """setup's KEPT rule for a real entry at a skill's name: True when it is the user's own, so
+        setup leaves it and does not deploy the skill there. Claude Code, Codex, Gemini CLI
+        (any_entry): anything that is not a link. Kiro: not a link, and the lock names no file in
+        it; for a generated copy (expected_rels given) it must also hold a file at a path setup does
+        not write there (else it is an older copy of setup's, which setup updates)."""
+        if not os.path.lexists(dest) or os.path.islink(dest) or (self.win and _ps_link_type(dest)):
+            return False
+        if any_entry or not os.path.isdir(dest):
+            return True
+        key = self.lock_key(dest)
+        if key is not None and any(k.startswith(key + "/") for k in self.locked_keys()):
+            return False
+        files = [os.path.relpath(f, dest).replace("\\", "/") for f in self._files_under(dest)
+                 if "__pycache__" not in os.path.relpath(f, dest).replace("\\", "/").split("/")]
+        if expected_rels is None:
+            return bool(files)
+        exp = set(r.lower() for r in expected_rels) if self.win else set(expected_rels)
+        return any((f.lower() if self.win else f) not in exp for f in files)
 
     # --- output ---
     def emit(self, status, path, *extras):
@@ -1032,7 +1097,18 @@ class Verifier(object):
 
     def check_skill_links(self, top):
         for skill in self.list_skills(self.shared_skills):
-            self.check_symlink(self.join(top, "skills/" + skill), self.join(self.shared_skills, skill))
+            dest = self.join(top, "skills/" + skill)
+            if self.user_folder_kept(dest, any_entry=True):
+                self.emit("OK", dest, *USER_FOLDER_KEPT)
+                continue
+            self.check_symlink(dest, self.join(self.shared_skills, skill))
+
+    def _source_rels(self, source_dir):
+        if self.win:
+            full = os.path.abspath(source_dir)
+            return [f[len(full):].lstrip("\\/").replace("\\", "/") for f, st in _ps_recurse_files(full)
+                    if not _ps_link_type(f, st) and not re.search(r"[\\/]__pycache__[\\/]", f)]
+        return list(self._posix_find_files(source_dir))
 
     def check_all(self):
         claude_top = self.join(self.home, ".claude")
@@ -1065,15 +1141,23 @@ class Verifier(object):
                 dest = self.join(self.kiro_top, "skills/" + skill)
                 src = self.join(self.shared_skills, skill)
                 if self.has_any_overlay(overlay_dir):
-                    self.check_copy_dir_recursive(dest, src, overlay_dir)
+                    if _dir_exists(src) and self.user_folder_kept(dest, self._source_rels(src)):
+                        self.emit("OK", dest, *USER_FOLDER_KEPT)
+                    else:
+                        self.check_copy_dir_recursive(dest, src, overlay_dir)
+                elif self.user_folder_kept(dest):
+                    self.emit("OK", dest, *USER_FOLDER_KEPT)
                 else:
                     self.check_symlink(dest, src)
             if _dir_exists(self.kiro_provider_skills):
                 for skill in self.list_skills(self.kiro_provider_skills):
                     if self.has_any_overlay(self.join(self.kiro_overlay_root, skill)):
                         continue
-                    self.check_symlink(self.join(self.kiro_top, "skills/" + skill),
-                                       self.join(self.kiro_provider_skills, skill))
+                    dest = self.join(self.kiro_top, "skills/" + skill)
+                    if self.user_folder_kept(dest):
+                        self.emit("OK", dest, *USER_FOLDER_KEPT)
+                    else:
+                        self.check_symlink(dest, self.join(self.kiro_provider_skills, skill))
 
         self.orphan_walk()
         self.ambiguous_check()
@@ -1497,6 +1581,37 @@ def _st_cases(tmp, links, skip_reason):
     _w(lock_path, LOCK_HEADER + "\n" + "\n".join(lock_rows) + "\nnot a row\n")
     rc, out, _ = _st_run(repo, env)
     check(has(out, "ORPHAN", "beta/stale.md", "foreign"), "a lock with a malformed row is no lock -> foreign")
+    for bad_key in ("~/.kiro/..\\..\\Documents\\x", "~/.kiro/C:x", "~/.kiro/a/../b"):
+        _w(lock_path, LOCK_HEADER + "\n" + "\n".join(lock_rows + ["copy-file\t%s\t%s" % (bad_key, sha)]) + "\n")
+        rc, out, _ = _st_run(repo, env)
+        check(has(out, "ORPHAN", "beta/stale.md", "foreign"),
+              "a lock key holding \\, : or a .. segment makes the lock no lock (%s)" % bad_key)
+    # A folder holding a locked file and a file the lock does not name -> mixed.
+    _w(os.path.join(home, ".kiro", "skills", "gone", "mine.md"), b"yours\n")
+    _w(lock_path, LOCK_HEADER + "\n" + "\n".join(lock_rows) + "\n")
+    rc, out, _ = _st_run(repo, env)
+    check(has(out, "ORPHAN", ".kiro/skills/gone", "mixed"), "a folder holding locked and unlocked files -> mixed")
+
+    # A folder of the user's own at an overlay skill's name (no locked file, a file setup does not
+    # write) -> OK user-folder-kept, never failing; one holding only setup's paths is checked as usual.
+    repo, home, env = fresh()
+    kb = os.path.join(home, ".kiro", "skills", "beta")
+    shutil.rmtree(kb)
+    _w(os.path.join(kb, "SKILL.md"), b"my own beta\n")
+    _w(os.path.join(kb, "notes.md"), b"mine\n")
+    rc, out, _ = _st_run(repo, env)
+    check(rc == 0 and has(out, "OK", ".kiro/skills/beta", "user-folder-kept") and not bad(out),
+          "a user folder at an overlay skill's name -> OK user-folder-kept (rc=%d, %r)" % (rc, bad(out)))
+    os.remove(os.path.join(kb, "notes.md"))
+    rc, out, _ = _st_run(repo, env)
+    check(rc == 1 and has(out, "DRIFTED", ".kiro/skills/beta/SKILL.md") and not has(out, "OK", ".kiro/skills/beta", "user-folder-kept"),
+          "a folder holding only paths setup writes is an older copy -> checked, DRIFTED")
+    _w(os.path.join(kb, "notes.md"), b"mine\n")
+    _w(os.path.join(home, ".agent-playbook", "deploy-lock.tsv"),
+       LOCK_HEADER + "\nmerge-file\t~/.kiro/skills/beta/SKILL.md\t" + "0" * 64 + "\n")
+    rc, out, _ = _st_run(repo, env)
+    check(rc == 1 and not has(out, "OK", ".kiro/skills/beta", "user-folder-kept"),
+          "a folder the lock names a file of is setup's, never user-folder-kept")
 
     if links:
         def mklink(target, at, is_dir=False):
@@ -1564,6 +1679,16 @@ def _st_cases(tmp, links, skip_reason):
         rc, out, _ = _st_run(repo, env)
         check(rc == 0 and not any("my-own-skill" in l for l in out),
               "a user's own skill beside the playbook's links is not reported (rc=%d)" % rc)
+        # A folder of the user's own at a playbook skill's name: setup keeps it -> OK user-folder-kept.
+        alpha = os.path.join(home, ".claude", "skills", "alpha")
+        try:
+            os.unlink(alpha)   # the link (POSIX)
+        except OSError:
+            os.rmdir(alpha)    # a directory link or junction (Windows), never its target
+        _w(os.path.join(alpha, "SKILL.md"), b"# my alpha\n")
+        rc, out, _ = _st_run(repo, env)
+        check(rc == 0 and has(out, "OK", ".claude/skills/alpha", "user-folder-kept"),
+              "a user folder at a Claude skill's name -> OK user-folder-kept (rc=%d)" % rc)
         # A provider not chosen at setup (`providers=` of the pointer file) is skipped, never checked.
         _w(os.path.join(home, ".agent-playbook", "config"), b"providers=claude,kiro\n")
         rc, out, _ = _st_run(repo, env)

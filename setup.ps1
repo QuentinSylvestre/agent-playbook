@@ -25,9 +25,10 @@
 # warning. See Merge-Overlay / Get-AuxOverlayTargets / Deploy-GeneratedCopy below.
 #
 # Ownership: every regular file setup writes is recorded in the deploy lock
-# (~\.agent-playbook\deploy-lock.tsv, see "Deploy lock" below). A re-run writes only
-# what changed, removes what it wrote once the source is gone, and moves a file you
-# edited or own to <path>.bak (one backup per path) before it writes there.
+# (~\.agent-playbook\deploy-lock.tsv, see "Deploy lock" below), seed files excepted. A re-run
+# writes only what changed, removes what it wrote once the source is gone, and moves a file you
+# edited or own to <path>.bak (one backup per path) before it writes there. A backup that cannot
+# be made leaves that path unchanged and ends the run non-zero.
 
 param(
     [string]$Providers = "",
@@ -108,14 +109,54 @@ function New-DirIfMissing {
 # A path in the pointer file's form: absolute, forward slashes (setup.sh writes the same bytes).
 function ConvertTo-PointerPath { param([string]$Path) return $Path.Replace('\', '/') }
 
-# Test-EngineLink: a reparse point (symlink or junction) whose target lies inside this repo.
+# Get-LongPath: Path with backslashes and every 8.3 short name (QSYLVE~1.POL) expanded to the long
+# name on disk (setup.sh: long_path, cygpath -m -l). A part that does not exist is kept as written.
+function Get-LongPath {
+    param([string]$Path)
+    $p = $Path.Replace('/', '\')
+    if (-not $p.Contains('~')) { return $p }
+    $parts = $p.Split('\')
+    $out = $parts[0]
+    for ($i = 1; $i -lt $parts.Count; $i++) {
+        $n = $parts[$i]
+        if ($n.Contains('~') -and $out) {
+            $hit = @()
+            try { $hit = @((New-Object IO.DirectoryInfo ($out + '\')).GetFileSystemInfos($n)) } catch { $hit = @() }
+            if ($hit.Count -eq 1) { $n = $hit[0].Name }
+        }
+        $out = $out + '\' + $n
+    }
+    return $out
+}
+
+$EngineRootLong = Get-LongPath $ScriptDir
+
+# Test-UnderRoot: Path is Root or lies inside it, letter case ignored (NTFS ignores it).
+function Test-UnderRoot {
+    param([string]$Path, [string]$Root)
+    return ($Path -eq $Root) -or $Path.StartsWith($Root + '\', [StringComparison]::OrdinalIgnoreCase)
+}
+
+# Test-EngineLink: a reparse point (symlink or junction) whose target lies inside this repo. Both
+# sides are compared in their long form, case ignored, so a link made through the repo's 8.3 short
+# path is still the playbook's.
 function Test-EngineLink {
     param([string]$Path)
     $item = Get-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
     if (-not $item -or -not ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { return $false }
     $t = [string]($item.Target | Select-Object -First 1)
-    $t = $t -replace '^\\\\\?\\', ''
-    return ($t -eq $ScriptDir) -or $t.StartsWith($ScriptDir + '\', [StringComparison]::OrdinalIgnoreCase)
+    if (-not $t) { return $false }
+    $t = ($t -replace '^\\\\\?\\', '').Replace('/', '\')
+    if (-not [IO.Path]::IsPathRooted($t)) { $t = Join-Path (Split-Path -Parent $Path) $t }
+    if (Test-UnderRoot $t $ScriptDir) { return $true }
+    return (Test-UnderRoot (Get-LongPath $t) $EngineRootLong)
+}
+
+# Test-SameTarget: two link targets that name the same path.
+function Test-SameTarget {
+    param([string]$A, [string]$B)
+    if ($A -eq $B) { return $true }
+    return ((Get-LongPath ($A -replace '^\\\\\?\\', '')) -eq (Get-LongPath $B))
 }
 
 # Remove a directory link without following it (Remove-Item -Recurse can delete the target's files).
@@ -124,12 +165,20 @@ function Remove-DirLink { param([string]$Path) Invoke-Act "rmdir $Path" { cmd /c
 # --- Deploy lock -----------------------------------------------------------
 # ~\.agent-playbook\deploy-lock.tsv names the regular files setup wrote, so a re-run can tell its
 # own unedited files from yours. The format, the kinds and the ownership rule are documented once,
-# in setup.sh's "Deploy lock" section; this twin writes the same bytes on the same machine (rows
-# sorted by ordinal order, LF, no BOM). The path is built from $env:USERPROFILE only: PowerShell's
-# own $HOME and ~ name the real profile even when USERPROFILE points at a sandbox.
+# in setup.sh's "Deploy lock" section (the journal, the unreadable-lock .bak, and the rule for a
+# .bak that is not setup's or a backup that fails included); this twin writes the same bytes on the
+# same machine (rows sorted by ordinal order, LF, no BOM). The path is built from $env:USERPROFILE
+# only: PowerShell's own $HOME and ~ name the real profile even when USERPROFILE points at a sandbox.
+# Seed files are the ownership rule's one exception: written only when absent, never locked.
 
 $LockHeader = "# agent-playbook deploy lock v1 (written by setup; kind<TAB>path<TAB>sha256)"
 $LockFile = Join-Path (Join-Path $env:USERPROFILE ".agent-playbook") "deploy-lock.tsv"
+$LockJournal = Join-Path (Join-Path $env:USERPROFILE ".agent-playbook") "deploy-lock.journal.tsv"
+$script:LockReadable = $false
+$script:LockUnreadable = $false
+$script:BackupFailed = 0
+# keys this run had to leave alone (a failed or refused backup): never retired
+$LockHeld = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
 $LockSettingKey = "kiro-cli/chat.defaultAgent"
 $LockGeminiKey = "gemini/context.fileName"
 $LockFileKinds = @('copy-dir-recursive', 'merge-file', 'copy-file', 'template-file')
@@ -170,7 +219,28 @@ function ConvertTo-LockKey {
     if ($Path.StartsWith($env:USERPROFILE + '\', [StringComparison]::OrdinalIgnoreCase)) {
         return '~/' + $Path.Substring($env:USERPROFILE.Length + 1).Replace('\', '/')
     }
-    return $Path.Replace('\', '/')
+    return ''   # outside home: no lock spelling, never recorded
+}
+
+# Test-LockRow: one row of the lock format (setup.sh LOCK_ROWS_AWK).
+function Test-LockRow {
+    param([string[]]$c)
+    if ($c.Count -ne 3) { return $false }
+    if ($c[0] -ceq 'setting') { return (($c[1] -ceq $LockSettingKey -or $c[1] -ceq $LockGeminiKey) -and $c[2] -ne '') }
+    if (($LockFileKinds + 'backup') -cnotcontains $c[0]) { return $false }
+    if (-not $c[1].StartsWith('~/') -or ("/" + $c[1] + "/").Contains('/../') -or $c[1].Contains('\') -or $c[1].Contains(':')) { return $false }
+    if ($c[0] -ceq 'backup' -and $c[2] -ceq '-') { return $true }
+    return ($c[2] -cmatch '^[0-9a-f]{64}$')
+}
+
+# Read-LockLines: a lock-format file's lines (LF, no BOM), without the empty last one.
+function Read-LockLines {
+    param([string]$Path)
+    $text = $Utf8NoBom.GetString([IO.File]::ReadAllBytes($Path))
+    if ($text.Length -eq 0) { return , @() }
+    $lines = $text.Split("`n")
+    if ($text.EndsWith("`n")) { $lines = @($lines[0..($lines.Count - 2)]) }
+    return , $lines
 }
 
 function ConvertFrom-LockKey {
@@ -208,29 +278,38 @@ function Test-RegularFile {
 # line or one malformed row means no lock (the first-run case); only ~/ paths with no .. segment.
 function Read-DeployLock {
     $LockOld.Clear(); $LockOldValue.Clear()
-    if (-not (Test-Path -LiteralPath $LockFile -PathType Leaf)) { return }
-    $text = $Utf8NoBom.GetString([IO.File]::ReadAllBytes($LockFile))
-    $lines = $text.Split("`n")
-    if ($text.EndsWith("`n")) { $lines = @($lines[0..($lines.Count - 2)]) }
     $rows = @()
-    $ok = ($lines.Count -ge 1) -and ($lines[0] -ceq $LockHeader)
-    for ($i = 1; $ok -and $i -lt $lines.Count; $i++) {
-        $c = $lines[$i].Split("`t")
-        if ($c.Count -ne 3) { $ok = $false; break }
-        if ($c[0] -ceq 'setting') {
-            if (($c[1] -cne $LockSettingKey -and $c[1] -cne $LockGeminiKey) -or $c[2] -eq '') { $ok = $false }
-        } elseif (($LockFileKinds + 'backup') -cnotcontains $c[0]) {
-            $ok = $false
-        } elseif (-not $c[1].StartsWith('~/') -or ("/" + $c[1] + "/").Contains('/../')) {
-            $ok = $false
-        } elseif (-not ($c[0] -ceq 'backup' -and $c[2] -ceq '-') -and $c[2] -cnotmatch '^[0-9a-f]{64}$') {
-            $ok = $false
+    if (Test-Path -LiteralPath $LockFile -PathType Leaf) {
+        $lines = Read-LockLines $LockFile
+        $ok = ($lines.Count -ge 1) -and ($lines[0] -ceq $LockHeader)
+        $fileRows = @()
+        for ($i = 1; $ok -and $i -lt $lines.Count; $i++) {
+            $c = $lines[$i].Split("`t")
+            if (-not (Test-LockRow $c)) { $ok = $false; break }
+            $fileRows += , $c
         }
-        $rows += , $c
+        if ($ok) {
+            $script:LockReadable = $true
+            $rows = $fileRows
+        } else {
+            $script:LockUnreadable = $true
+            Write-Host "  NOTE: $LockFile is not a deploy lock this setup can read; treating this as a first run (it is kept as $LockFile.bak)"
+        }
     }
-    if (-not $ok) {
-        Write-Host "  NOTE: $LockFile is not a deploy lock this setup can read; treating this as a first run"
-        return
+    # backup rows of a run that stopped before writing its lock: newer than the lock's own rows
+    if (Test-Path -LiteralPath $LockJournal -PathType Leaf) {
+        $jrows = @(); $jok = $true
+        foreach ($line in (Read-LockLines $LockJournal)) {
+            $c = $line.Split("`t")
+            if ($c[0] -cne 'backup' -or -not (Test-LockRow $c)) { $jok = $false; break }
+            $jrows += , $c
+        }
+        if ($jok) {
+            $rows = @($jrows) + @($rows)
+            Write-Host "  NOTE: merged the backups an interrupted run recorded in $LockJournal"
+        } else {
+            Write-Host "  NOTE: $LockJournal is not a journal this setup can read; ignored"
+        }
     }
     foreach ($c in $rows) {
         $LockOld.Add($c)
@@ -239,8 +318,14 @@ function Read-DeployLock {
     }
 }
 
+# Add-LockRow: a row for the lock this run writes. A path outside home has no lock spelling: it is
+# not recorded (setup.sh lock_add).
 function Add-LockRow {
     param([string]$Kind, [string]$Key, [string]$Value)
+    if ($Kind -ne 'setting') {
+        if (-not $Key.StartsWith('~/')) { Write-Host "  NOTE: a path outside $env:USERPROFILE is not recorded in the deploy lock"; return }
+        if ($Key.Contains('\') -or $Key.Contains(':')) { Write-Host "  NOTE: $Key is not recorded in the deploy lock (its name holds \ or :)"; return }
+    }
     $LockNew.Add("$Kind`t$Key`t$Value")
 }
 
@@ -267,18 +352,31 @@ function Complete-DeployLock {
     $arr = $rows.ToArray()
     [Array]::Sort($arr, [StringComparer]::Ordinal)
     $exists = Test-Path -LiteralPath $LockFile -PathType Leaf
+    if ($script:LockUnreadable -and $exists) {
+        [IO.File]::Copy($LockFile, "$LockFile.bak", $true)
+        [IO.File]::Delete($LockFile)
+        $exists = $false
+        Write-Host "  BACKUP: $LockFile -> $LockFile.bak (a deploy lock this setup cannot read)"
+    }
     if ($arr.Count -eq 0) {
-        if ($DropEmpty -and $exists) { Remove-Item -LiteralPath $LockFile -Force; Write-Host "  REMOVED: $LockFile"; return }
-        if (-not $exists) { return }
+        if ($DropEmpty -and $exists) {
+            Remove-Item -LiteralPath $LockFile -Force; Remove-Item -LiteralPath $LockJournal -Force -ErrorAction SilentlyContinue
+            Write-Host "  REMOVED: $LockFile"; return
+        }
+        if (-not $exists) { Remove-Item -LiteralPath $LockJournal -Force -ErrorAction SilentlyContinue; return }
     }
     $text = $LockHeader + "`n"
     foreach ($r in $arr) { $text += $r + "`n" }
     $bytes = $Utf8NoBom.GetBytes($text)
-    if ($exists -and ((Get-BytesSha $bytes) -eq (Get-FileSha $LockFile))) { Write-Host "  OK: $LockFile"; return }
+    if ($exists -and ((Get-BytesSha $bytes) -eq (Get-FileSha $LockFile))) {
+        Remove-Item -LiteralPath $LockJournal -Force -ErrorAction SilentlyContinue
+        Write-Host "  OK: $LockFile"; return
+    }
     New-DirIfMissing (Split-Path -Parent $LockFile)
     $tmp = "$LockFile.tmp-$PID"
     [IO.File]::WriteAllBytes($tmp, $bytes)
     if ($exists) { [IO.File]::Replace($tmp, $LockFile, [NullString]::Value) } else { [IO.File]::Move($tmp, $LockFile) }
+    Remove-Item -LiteralPath $LockJournal -Force -ErrorAction SilentlyContinue
     Write-Host "  WROTE: $LockFile"
 }
 
@@ -288,7 +386,9 @@ function Get-LockCarryRows {
     $out = New-Object 'System.Collections.Generic.List[string]'
     foreach ($c in $LockOld) {
         if ($c[0] -eq 'backup') {
-            if ($null -ne (Get-PathAttributes ((ConvertFrom-LockKey $c[1]) + '.bak'))) { $out.Add($c -join "`t") }
+            $bp = ConvertFrom-LockKey $c[1]
+            # a .bak reached through a linked folder is not looked at (it may lie outside the deployment)
+            if ((Test-NoLinkParent $bp $env:USERPROFILE) -and $null -ne (Get-PathAttributes ($bp + '.bak'))) { $out.Add($c -join "`t") }
         } elseif (-not (Test-Wants (Get-KeyProvider $c[1]))) {
             $out.Add($c -join "`t")
         }
@@ -361,18 +461,58 @@ function Remove-PathNoFollow {
     }
 }
 
+# Move-PathNoFollow: rename a file, folder or link (a link is moved, never followed).
+function Move-PathNoFollow {
+    param([string]$From, [string]$To)
+    $item = Get-Item -LiteralPath $From -Force
+    if ($item.PSIsContainer) { [IO.Directory]::Move($From, $To) } else { [IO.File]::Move($From, $To) }
+}
+
 # Backup-Path: move a file, folder or link that is not setup's to <path>.bak, the single bounded
-# backup (an older .bak is removed first), and record the backup in the lock.
+# backup, and record the backup in the lock and its journal at once (setup.sh backup_path). An
+# existing <path>.bak is replaced only when the lock shows setup made it (and, for a file, that it is
+# unchanged since); otherwise it is yours: nothing moves, a WARN says what to do, and it returns 2. A
+# move that fails puts the older .bak back, prints an ERROR (the run then ends non-zero) and returns
+# 1. Returns 0 when the path is free. On any other value the caller skips its write and lock row.
 function Backup-Path {
     param([string]$Path)
+    $key = ConvertTo-LockKey $Path
+    $bak = "${Path}.bak"
     $h = if (Test-RegularFile $Path) { Get-FileSha $Path } else { '-' }
-    Write-Host "  BACKUP: $Path -> ${Path}.bak"
-    Invoke-Act "move $Path ${Path}.bak" {
-        Remove-PathNoFollow "${Path}.bak"
-        $item = Get-Item -LiteralPath $Path -Force
-        if ($item.PSIsContainer) { [IO.Directory]::Move($Path, "${Path}.bak") } else { [IO.File]::Move($Path, "${Path}.bak") }
+    if ($null -ne (Get-PathAttributes $bak)) {
+        $old = Get-LockValue 'backup' $key
+        if (-not $old -or ($old -ne '-' -and (-not (Test-RegularFile $bak) -or (Get-FileSha $bak) -ne $old))) {
+            Write-Host "  WARN: $bak is not a backup setup made, so $Path is left unchanged; move $bak away, then re-run setup"
+            [void]$LockHeld.Add($key)
+            return 2
+        }
     }
-    Add-LockRow 'backup' (ConvertTo-LockKey $Path) $h
+    Write-Host "  BACKUP: $Path -> $bak"
+    if ($DryRun) { Write-Host "    DRY: move $Path $bak"; Add-LockRow 'backup' $key $h; return 0 }
+    $aside = ''
+    $failed = $false
+    try {
+        if ($null -ne (Get-PathAttributes $bak)) { $aside = "$bak.tmp-$PID"; Move-PathNoFollow $bak $aside }
+        Move-PathNoFollow $Path $bak
+    } catch {
+        $failed = $true
+        if ($aside -and $null -ne (Get-PathAttributes $aside) -and $null -eq (Get-PathAttributes $bak)) {
+            try { Move-PathNoFollow $aside $bak } catch { }
+        }
+    }
+    if ($failed) {
+        [Console]::Error.WriteLine("ERROR: could not back up $Path; left unchanged")
+        $script:BackupFailed++
+        [void]$LockHeld.Add($key)
+        return 1
+    }
+    if ($aside) { Remove-PathNoFollow $aside }
+    Add-LockRow 'backup' $key $h
+    if ($key.StartsWith('~/')) {
+        New-DirIfMissing (Split-Path -Parent $LockJournal)
+        [IO.File]::AppendAllText($LockJournal, "backup`t$key`t$h`n", $Utf8NoBom)
+    }
+    return 0
 }
 
 # --- Linking ---------------------------------------------------------------
@@ -389,8 +529,7 @@ function Clear-WayFor {
             return $false
         }
     }
-    Backup-Path $Path
-    return $true
+    return ((Backup-Path $Path) -eq 0)
 }
 
 # Clear-LinkWay: before a link is made at Link. 'free' when the path is free (an outdated link into
@@ -401,7 +540,7 @@ function Clear-LinkWay {
     if (-not $item) { return 'free' }
     if ($item.Attributes -band [IO.FileAttributes]::ReparsePoint) {
         $currentTarget = $item.Target
-        if ($currentTarget -eq $Target) {
+        if (Test-SameTarget ([string]($currentTarget | Select-Object -First 1)) $Target) {
             Write-Host "  OK: $Link -> $Target"
             return 'ok'
         }
@@ -482,7 +621,7 @@ function Link-Skills {
         $dest = Join-Path $Dir $skill.Name
         $existing = Get-Item -LiteralPath $dest -Force -ErrorAction SilentlyContinue
         if ($existing -and -not ($existing.Attributes -band [IO.FileAttributes]::ReparsePoint)) {
-            Write-Host "  KEPT: $dest is your own folder; the playbook's $($skill.Name) skill is not linked there"
+            Write-Host "  KEPT: $dest is your own folder; the playbook's $($skill.Name) skill is not linked there (rename or remove it, then re-run setup, to get the playbook's)"
             continue
         }
         Link-Dir -Target $skill.FullName -Link $dest
@@ -651,11 +790,11 @@ function Write-OwnedFile {
         if (Test-EngineLink $Dest) {
             Write-Host "  REMOVE SYMLINK: $Dest"
             Invoke-Act "remove $Dest" { Remove-Item -LiteralPath $Dest -Force }
-        } else {
-            Backup-Path $Dest
+        } elseif ((Backup-Path $Dest) -ne 0) {
+            return
         }
     } elseif ($item -and $item.PSIsContainer) {
-        Backup-Path $Dest
+        if ((Backup-Path $Dest) -ne 0) { return }
     }
     $want = Get-BytesSha $Bytes
     $cur = if (Test-RegularFile $Dest) { Get-FileSha $Dest } else { '-' }
@@ -664,7 +803,7 @@ function Write-OwnedFile {
     switch (Get-OwnAction $want $cur $locked) {
         'keep' { Write-Host "  OK: $Dest (matches source)" }
         'backup' {
-            Backup-Path $Dest
+            if ((Backup-Path $Dest) -ne 0) { return }
             Invoke-Act "write $Dest" { [IO.File]::WriteAllBytes($Dest, $Bytes) }
             Write-Host "  WROTE: $Dest (yours kept as ${Dest}.bak)"
         }
@@ -700,15 +839,19 @@ function Get-FilesNoFollow {
 }
 
 # Invoke-LockRetire: rows of the previous lock under Prefix that this run did not record (their
-# source is gone). Each file is removed when unchanged since setup wrote it, else backed up; then
-# the empty folders above it are removed, up to the Kiro skills folder.
+# source is gone). A row for a current manifest destination, or for a path this run had to leave
+# alone, is never retired, and a key that differs from a recorded one only in letter case is the same
+# file. Each file is removed when unchanged since setup wrote it, else backed up; then the empty
+# folders above it are removed, up to the Kiro skills folder.
 function Invoke-LockRetire {
     param([string]$Prefix)
-    $recorded = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
+    $recorded = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
     foreach ($line in $LockNew) {
         $c = $line.Split("`t")
         if ($c[0] -ne 'backup' -and $c[0] -ne 'setting') { [void]$recorded.Add($c[1]) }
     }
+    foreach ($k in $LockHeld) { [void]$recorded.Add($k) }
+    foreach ($entry in $ManifestEntries) { $k = ConvertTo-LockKey (Expand-Dest $entry.dest); if ($k) { [void]$recorded.Add($k) } }
     $done = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::Ordinal)
     $todo = New-Object 'System.Collections.Generic.List[object]'
     foreach ($c in $LockOld) {
@@ -727,7 +870,7 @@ function Invoke-LockRetire {
             Write-Host "  REMOVED: $p (its source is gone)"
         } else {
             Write-Host "  NOTE: $p changed since setup wrote it and its source is gone"
-            Backup-Path $p
+            [void](Backup-Path $p)
         }
         $sd = Get-SkillDirOf $p
         if ($sd) { [void]$touched.Add($sd) }
@@ -738,12 +881,20 @@ function Invoke-LockRetire {
 # Deploy-GeneratedCopy: an overlay-bearing skill as a generated copy (setup.sh
 # deploy_generated_copy). Every expected file's bytes are known first (the shared file, or the
 # merge); then only the files that differ are written, each under the ownership rule. Files of the
-# copy whose source is gone are left to Invoke-LockRetire. A folder at Dest with files, none of
-# them locked and none equal to what setup writes, is yours: it is KEPT. Returns $false when
-# nothing was deployed.
+# copy whose source is gone are left to Invoke-LockRetire. A folder at Dest that the lock names no
+# file of is setup's (an older copy: an edited file goes to .bak) when every file in it sits at a
+# path setup writes for the skill; any other such folder is yours: it is KEPT. Names match whatever
+# the letter case. Returns $false when nothing was deployed.
 function Deploy-GeneratedCopy {
     param([string]$SourceDir, [string]$Dest, [string]$OverlayDir, [string]$Name)
     $prefix = "~/.kiro/skills/$Name/"
+    $exp = Get-GeneratedExpected $SourceDir $OverlayDir $Name
+    Deploy-GeneratedCopyTo $Dest $Name $prefix $exp
+}
+
+# Get-GeneratedExpected: the files a generated copy holds: rel -> @{Kind; Src or Bytes; Hash}.
+function Get-GeneratedExpected {
+    param([string]$SourceDir, [string]$OverlayDir, [string]$Name)
     # 1. the expected files: rel -> @{kind; src or bytes; hash}
     $exp = [ordered]@{}
     foreach ($f in (Get-FilesNoFollow $SourceDir)) {
@@ -761,6 +912,12 @@ function Deploy-GeneratedCopy {
     }
     $srcHashes = Get-ShaMap @($exp.Values | Where-Object { $_.Src } | ForEach-Object { $_.Src })
     foreach ($e in $exp.Values) { if ($e.Src) { $e.Hash = $srcHashes[$e.Src] } }
+    return $exp
+}
+
+function Deploy-GeneratedCopyTo {
+    param([string]$Dest, [string]$Name, [string]$Prefix, $exp)
+    $prefix = $Prefix
     # 2. what is there now
     $cur = @{}
     $item = Get-Item -LiteralPath $Dest -Force -ErrorAction SilentlyContinue
@@ -783,16 +940,15 @@ function Deploy-GeneratedCopy {
     }
     # 3. the decision per expected file
     $plan = New-Object 'System.Collections.Generic.List[object]'
-    $match = 0
     foreach ($rel in $exp.Keys) {
         $e = $exp[$rel]
         $c = if ($cur.ContainsKey($rel)) { $cur[$rel] } else { '-' }
         $l = if ($locked.ContainsKey($rel)) { $locked[$rel] } else { '-' }
-        if ($c -eq $e.Hash) { $match++ }
         $plan.Add(@((Get-OwnAction $e.Hash $c $l), $rel))
     }
-    if ($cur.Count -gt 0 -and $locked.Count -eq 0 -and $match -eq 0) {
-        Write-Host "  KEPT: $Dest is your own folder; the playbook's $Name skill is not deployed there"
+    $foreign = @($cur.Keys | Where-Object { -not $exp.Contains($_) }).Count
+    if ($cur.Count -gt 0 -and $locked.Count -eq 0 -and $foreign -gt 0) {
+        Write-Host "  KEPT: $Dest is your own folder; the playbook's $Name skill is not deployed there (rename or remove it, then re-run setup, to get the playbook's)"
         return $false
     }
     New-DirIfMissing $Dest
@@ -804,7 +960,7 @@ function Deploy-GeneratedCopy {
         if ($action -ne 'keep') {
             if (-not (Test-NoLinkParent $full $Dest)) { Write-Host "  SKIPPED: $full (a folder above it is a link)"; continue }
             if ($action -eq 'backup' -or ($action -eq 'write' -and $null -ne (Get-PathAttributes $full))) {
-                Backup-Path $full
+                if ((Backup-Path $full) -ne 0) { continue }
                 $nBackup++
             }
             $parent = Split-Path -Parent $full
@@ -824,15 +980,53 @@ function Deploy-GeneratedCopy {
 }
 
 # Free-RealSkillDir: a real folder at a Kiro skill name where a link goes (a generated copy left by
-# an older overlay, or a folder of yours). The files setup wrote there and left unchanged are
-# removed (Invoke-LockRetire); $true when the folder is then gone, $false when it holds anything else.
+# an older overlay, or a folder of yours). It decides first (setup.sh free_real_skill_dir): when every
+# entry in it is a file setup wrote and left unchanged, those are removed (Invoke-LockRetire) and
+# $true lets the link be made. Otherwise nothing there is touched and $false keeps the folder: a
+# folder of yours is reported KEPT, and one that also holds setup's files keeps them and their lock
+# rows, with a WARN that the skill is no longer updated there.
 function Free-RealSkillDir {
     param([string]$Name)
     $dest = Join-Path (Join-Path $env:USERPROFILE ".kiro\skills") $Name
-    Invoke-LockRetire "~/.kiro/skills/$Name/"
-    if ($DryRun) { return $false }
-    Remove-EmptyDirs $dest
-    return -not (Test-Path -LiteralPath $dest)
+    $prefix = "~/.kiro/skills/$Name/"
+    $rows = New-Object 'System.Collections.Generic.List[string[]]'
+    foreach ($c in $LockOld) {
+        if (($c[0] -eq 'copy-dir-recursive' -or $c[0] -eq 'merge-file') -and $c[1].StartsWith($prefix, [StringComparison]::Ordinal)) { $rows.Add($c) }
+    }
+    $want = @{}
+    foreach ($c in $rows) { $want[(ConvertFrom-LockKey $c[1])] = $c[2] }
+    # every entry that is not a folder, links included (setup.sh: find ! -type d)
+    $all = New-Object 'System.Collections.Generic.List[string]'
+    $stack = New-Object 'System.Collections.Generic.Stack[string]'
+    $stack.Push($dest)
+    while ($stack.Count) {
+        $d = $stack.Pop()
+        foreach ($e in (New-Object IO.DirectoryInfo $d).GetFileSystemInfos()) {
+            $full = [IO.Path]::Combine($d, $e.Name)
+            if (($e.Attributes -band [IO.FileAttributes]::Directory) -and -not ($e.Attributes -band [IO.FileAttributes]::ReparsePoint)) { $stack.Push($full) }
+            else { $all.Add($full) }
+        }
+    }
+    # files the lock names (edited or not), and every entry that is not such a file left unchanged
+    $nLocked = 0; $nOther = 0
+    foreach ($f in $all) {
+        $named = $want.ContainsKey($f) -and (Test-RegularFile $f)
+        if ($named) { $nLocked++ }
+        if (-not ($named -and (Get-FileSha $f) -eq $want[$f])) { $nOther++ }
+    }
+    if ($nOther -eq 0) {
+        Invoke-LockRetire $prefix
+        if ($DryRun) { return $false }
+        Remove-EmptyDirs $dest
+        if (-not (Test-Path -LiteralPath $dest)) { return $true }
+    }
+    if ($nLocked -gt 0) {
+        Write-Host "  WARN: $dest holds files of yours beside files setup wrote; the playbook's $Name skill is no longer updated there (move your files out of it, then re-run setup)"
+        foreach ($c in $rows) { $LockNew.Add($c -join "`t") }
+    } else {
+        Write-Host "  KEPT: $dest is your own folder; the playbook's $Name skill is not linked there (rename or remove it, then re-run setup, to get the playbook's)"
+    }
+    return $false
 }
 
 # --- Manifest reader -------------------------------------------------------
@@ -959,7 +1153,8 @@ function Test-Wants { param([string]$Name) return ($Name -in $Chosen) }
 # file paths share one contract.
 #
 # Tokens expand to the platform-native root with forward slashes (Windows:
-# C:/Users/X; POSIX: /home/x, unchanged). Templates use forward slashes for
+# C:/Users/X; POSIX: /home/x, unchanged); {{PLAYBOOK_ROOT}} in its long form (no 8.3 names), as
+# setup.sh renders it under Git Bash, so the two twins write the same bytes. Templates use forward slashes for
 # everything AFTER the token too, so Windows renders the mixed separator form
 # Kiro already accepts and POSIX renders a clean native path.
 function Render-Template {
@@ -973,7 +1168,7 @@ function Render-Template {
     # destination. This mirrors setup.sh/bash's render_template, whose $HOME and
     # $SCRIPT_DIR are already forward-slash on every platform bash runs on.
     $body = $body.Replace('{{USER_HOME}}', $env:USERPROFILE.Replace('\', '/'))
-    $body = $body.Replace('{{PLAYBOOK_ROOT}}', $ScriptDir.Replace('\', '/'))
+    $body = $body.Replace('{{PLAYBOOK_ROOT}}', $EngineRootLong.Replace('\', '/'))
     return $body + "`n"
 }
 
@@ -1089,6 +1284,10 @@ function Restore-Backup {
     $val = Get-LockValue 'backup' (ConvertTo-LockKey $Path)
     if (-not $val) { return }
     $bak = "$Path.bak"
+    if (-not (Test-NoLinkParent $Path $env:USERPROFILE)) {
+        Write-Host "  WARN: $bak is not restored: a folder above it is a link (restore it by hand if you need it)"
+        return
+    }
     if (-not (Get-Item -LiteralPath $bak -Force -ErrorAction SilentlyContinue)) { return }
     if (Get-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue) { Write-Host "  KEPT: $bak ($Path is still there)"; return }
     if ($val -ne '-' -and (-not (Test-RegularFile $bak) -or (Get-FileSha $bak) -ne $val)) {
@@ -1126,8 +1325,8 @@ function Uninstall-OwnedFile {
     if (Test-RegularFile $Dest) {
         $locked = Get-LockValue $Kind (ConvertTo-LockKey $Dest)
         if ($locked) { $same = ((Get-FileSha $Dest) -eq $locked) }
-        elseif ($Kind -eq 'template-file') { $same = ([IO.File]::ReadAllText($Dest) -eq (Render-Template $Source)) }
-        else { $same = ([IO.File]::ReadAllText($Dest) -eq [IO.File]::ReadAllText($Source)) }
+        elseif ($Kind -eq 'template-file') { $same = ((Get-FileSha $Dest) -eq (Get-BytesSha $Utf8NoBom.GetBytes((Render-Template $Source)))) }
+        else { $same = ((Get-FileSha $Dest) -eq (Get-FileSha $Source)) }
         if ($same) { Invoke-Act "remove $Dest" { Remove-Item -LiteralPath $Dest -Force }; Write-Host "  REMOVED: $Dest" }
         else { Write-Host "  KEPT: $Dest (changed since setup wrote it)" }
     }
@@ -1149,17 +1348,36 @@ function Uninstall-Mode {
 
 # Uninstall-GeneratedCopies: the files of the generated Kiro copies the lock names. Each is removed
 # when unchanged since setup wrote it, else kept; then the empty folders go and the backups setup
-# made there are restored.
+# made there are restored. With no readable lock, a file of a generated copy is removed only when it
+# equals what setup would write there now.
 function Uninstall-GeneratedCopies {
     $skillsRoot = Join-Path $env:USERPROFILE ".kiro\skills"
     $todo = New-Object 'System.Collections.Generic.List[object]'; $names = @()
+    $want = New-Object 'System.Collections.Generic.List[object]'
     foreach ($c in $LockOld) {
         if (($c[0] -ne 'copy-dir-recursive' -and $c[0] -ne 'merge-file') -or -not $c[1].StartsWith('~/.kiro/skills/', [StringComparison]::Ordinal)) { continue }
-        $n = $c[1].Split('/')[3]
-        if ($names -notcontains $n) { $names += $n }
-        $p = ConvertFrom-LockKey $c[1]
-        if ((Test-RegularFile $p) -and (Test-NoLinkParent $p $env:USERPROFILE)) { $todo.Add(@($p, $c[2])) }
+        $want.Add(@($c[1], $c[2]))
     }
+    if (-not $script:LockReadable) {
+        # rows built from what setup writes now: the hash a file must still have to be removed
+        $overlayRoot = Join-Path $ScriptDir "providers\kiro\skills"
+        foreach ($skill in (Get-ChildItem (Join-Path $SharedDir "skills") -Directory)) {
+            $ov = Join-Path $overlayRoot $skill.Name
+            if (-not (Test-Path (Join-Path $skill.FullName "SKILL.md")) -or -not (Test-HasAnyOverlay $ov)) { continue }
+            $exp = Get-GeneratedExpected $skill.FullName $ov $skill.Name
+            foreach ($rel in $exp.Keys) { $want.Add(@("~/.kiro/skills/$($skill.Name)/$rel", $exp[$rel].Hash)) }
+        }
+    }
+    foreach ($w in $want) {
+        $n = $w[0].Split('/')[3]
+        if ($names -notcontains $n) { $names += $n }
+        $p = ConvertFrom-LockKey $w[0]
+        if ((Test-RegularFile $p) -and (Test-NoLinkParent $p $env:USERPROFILE)) { $todo.Add(@($p, $w[1])) }
+    }
+    $existed = @($names | Sort-Object | Where-Object {
+        $d = Join-Path $skillsRoot $_
+        (Test-Path -LiteralPath $d -PathType Container) -and -not (Test-Reparse $d)
+    })
     $hashes = Get-ShaMap ($todo | ForEach-Object { $_[0] })
     foreach ($t in $todo) {
         if ($hashes[$t[0]] -eq $t[1]) {
@@ -1172,7 +1390,7 @@ function Uninstall-GeneratedCopies {
     foreach ($c in $LockOld) {
         if ($c[0] -eq 'backup' -and $c[1].StartsWith('~/.kiro/skills/', [StringComparison]::Ordinal)) { Restore-Backup (ConvertFrom-LockKey $c[1]) }
     }
-    foreach ($n in ($names | Sort-Object)) {
+    foreach ($n in $existed) {
         $d = Join-Path $skillsRoot $n
         if ((Test-Path -LiteralPath $d -PathType Container) -and -not (Test-Reparse $d)) {
             Write-Host "  KEPT: $d (holds files that are not setup's unchanged ones)"
@@ -1183,28 +1401,57 @@ function Uninstall-GeneratedCopies {
 }
 
 # Uninstall-KiroSetting: revert chat.defaultAgent only when the lock shows setup set it and it
-# still names kiro_default.
+# still names kiro_default. When the revert cannot be tried (no kiro-cli, AGENT_PLAYBOOK_SKIP_KIRO_CLI,
+# a value that cannot be read, a failed command), the lock keeps the row for a later uninstall.
 function Uninstall-KiroSetting {
-    if (-not (Get-Command kiro-cli -ErrorAction SilentlyContinue)) { return }
-    if ($env:AGENT_PLAYBOOK_SKIP_KIRO_CLI -eq '1') { Write-Host "  SKIP: kiro-cli settings (AGENT_PLAYBOOK_SKIP_KIRO_CLI=1)"; return }
     $val = Get-LockValue 'setting' $LockSettingKey
+    if (-not (Get-Command kiro-cli -ErrorAction SilentlyContinue)) {
+        if ($val) {
+            Write-Host "  NOTE: no kiro-cli here, so chat.defaultAgent is not reverted; the deploy lock keeps it for a later uninstall"
+            Add-LockRow 'setting' $LockSettingKey $val
+        }
+        return
+    }
+    if ($env:AGENT_PLAYBOOK_SKIP_KIRO_CLI -eq '1') {
+        Write-Host "  SKIP: kiro-cli settings (AGENT_PLAYBOOK_SKIP_KIRO_CLI=1)"
+        if ($val) { Add-LockRow 'setting' $LockSettingKey $val }
+        return
+    }
     if (-not $val) { Write-Host "  NOTE: setup did not set kiro-cli's chat.defaultAgent, so it is left as is"; return }
     $cur = Get-KiroDefaultAgent
-    if ($cur -ne '"kiro_default"') { Write-Host "  NOTE: kiro-cli's chat.defaultAgent changed since setup set it, so it is left as is"; return }
-    if ($val -eq '-') {
-        Invoke-Act "kiro-cli settings --global --delete chat.defaultAgent" { & kiro-cli settings --global --delete chat.defaultAgent }
-    } else {
-        $v = $val.Trim('"')
-        Invoke-Act "kiro-cli settings --global chat.defaultAgent $v" { & kiro-cli settings --global chat.defaultAgent $v }
+    if (-not $cur) {
+        Write-Host "  WARN: kiro-cli's chat.defaultAgent could not be read, so it is not reverted; the deploy lock keeps it for a later uninstall"
+        Add-LockRow 'setting' $LockSettingKey $val
+        return
     }
-    Write-Host "  RESTORED: kiro-cli chat.defaultAgent (to $val)"
+    if ($cur -ne '"kiro_default"') { Write-Host "  NOTE: kiro-cli's chat.defaultAgent changed since setup set it, so it is left as is"; return }
+    if ($DryRun) { Write-Host "    DRY: revert kiro-cli chat.defaultAgent to $val"; return }
+    $ok = $false
+    $prev = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        if ($val -eq '-') { & kiro-cli settings --global --delete chat.defaultAgent }
+        else { & kiro-cli settings --global chat.defaultAgent ($val.Trim('"')) }
+        $ok = ($LASTEXITCODE -eq 0)
+    } catch { $ok = $false } finally { $ErrorActionPreference = $prev }
+    if ($ok) { Write-Host "  RESTORED: kiro-cli chat.defaultAgent (to $val)" }
+    else {
+        Write-Host "  WARN: kiro-cli could not revert chat.defaultAgent; the deploy lock keeps it for a later uninstall"
+        Add-LockRow 'setting' $LockSettingKey $val
+    }
 }
 
-# Get-KiroDefaultAgent: kiro-cli's chat.defaultAgent as JSON with no whitespace ('' when unreadable).
+# Get-KiroDefaultAgent: kiro-cli's chat.defaultAgent as JSON on one line (its lines joined by a
+# space, the ends trimmed; spaces inside a value are kept), or '' when the read fails or prints
+# nothing (setup.sh kiro_default_agent).
 function Get-KiroDefaultAgent {
     $prev = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    try { return ((& kiro-cli settings -f json --global chat.defaultAgent 2>$null) -join '') -replace '\s', '' }
+    try {
+        $out = @(& kiro-cli settings -f json --global chat.defaultAgent 2>$null)
+        if ($LASTEXITCODE -ne 0) { return '' }
+        return (($out | ForEach-Object { ([string]$_).TrimEnd("`r") }) -join ' ').Trim()
+    }
     catch { return '' }
     finally { $ErrorActionPreference = $prev }
 }
@@ -1489,7 +1736,7 @@ $ErrorActionPreference = $prevEap
 Write-Host "=== Pointer file ==="
 $url = if ($StoresUrl) { $StoresUrl } else { Get-ConfigValue 'stores_url' }
 $text = "# agent-playbook pointer file, written by setup (shared/AGENTS.md, Config Repo Locations).`n"
-$text += "root=$(ConvertTo-PointerPath $ScriptDir)`n"
+$text += "root=$(ConvertTo-PointerPath $EngineRootLong)`n"
 $text += "stores=$(ConvertTo-PointerPath $Stores)`n"
 if ($url) { $text += "stores_url=$url`n" }
 $text += "engine_branch=$Branch`n"
@@ -1574,7 +1821,11 @@ if (Test-Wants 'kiro') {
         if ($oldSetting) { Add-LockRow 'setting' $LockSettingKey $oldSetting }
     } elseif (Get-Command kiro-cli -ErrorAction SilentlyContinue) {
         $prevAgent = Get-KiroDefaultAgent
-        if ($prevAgent -eq '"kiro_default"') {
+        if (-not $prevAgent) {
+            # a value setup cannot read is never replaced: uninstall could not put it back
+            Write-Host "  WARN: kiro-cli's chat.defaultAgent could not be read, so it is left as is"
+            if ($oldSetting) { Add-LockRow 'setting' $LockSettingKey $oldSetting }
+        } elseif ($prevAgent -eq '"kiro_default"') {
             Write-Host "  OK: chat.defaultAgent = kiro_default (global)"
             if ($oldSetting) { Add-LockRow 'setting' $LockSettingKey $oldSetting }
         } elseif ($DryRun) {
@@ -1584,7 +1835,7 @@ if (Test-Wants 'kiro') {
             try { & kiro-cli settings --global chat.defaultAgent kiro_default; $setOk = ($LASTEXITCODE -eq 0) } catch { $setOk = $false }
             if ($setOk) {
                 Write-Host "  SET: chat.defaultAgent = kiro_default (global)"
-                if ($prevAgent -eq '' -or $prevAgent -eq 'null') { $prevAgent = '-' }
+                if ($prevAgent -eq 'null') { $prevAgent = '-' }
                 Add-LockRow 'setting' $LockSettingKey $prevAgent
             } else {
                 Write-Warning "  WARN: Failed to set chat.defaultAgent"
@@ -1637,7 +1888,6 @@ if (Test-Wants 'kiro') {
             $existing = Get-Item -LiteralPath $dest -Force -ErrorAction SilentlyContinue
             if ($existing -and $existing.PSIsContainer -and
                 -not ($existing.Attributes -band [IO.FileAttributes]::ReparsePoint) -and -not (Free-RealSkillDir $name)) {
-                Write-Host "  KEPT: $dest is your own folder; the playbook's $name skill is not linked there"
                 continue
             }
             Link-Dir -Target $skill.FullName -Link $dest
@@ -1658,7 +1908,6 @@ if (Test-Wants 'kiro') {
                 $existing = Get-Item -LiteralPath $dest -Force -ErrorAction SilentlyContinue
                 if ($existing -and $existing.PSIsContainer -and
                     -not ($existing.Attributes -band [IO.FileAttributes]::ReparsePoint) -and -not (Free-RealSkillDir $_.Name)) {
-                    Write-Host "  KEPT: $dest is your own folder; the playbook's $($_.Name) skill is not linked there"
                     return
                 }
                 Link-Dir -Target $_.FullName -Link $dest
@@ -1702,17 +1951,28 @@ if (Test-Wants 'kiro') {
         (Join-Path $KiroSteeringDir "v3\kiro-cli-local-data.md"),
         (Join-Path $KiroSteeringDir "v3\memory-sources.md")
     )
+    # Each goes through the ownership rule: a link into this repo, or a file the lock names and
+    # unchanged since, is removed; anything else is yours and goes to <path>.bak.
     foreach ($stale in $StaleFiles) {
-        if (Test-Path $stale) {
-            Invoke-Act "remove $stale" { Remove-Item $stale -Force }
+        if ($null -eq (Get-PathAttributes $stale)) { continue }
+        $lk = ''
+        if (Test-RegularFile $stale) {
+            $sk = ConvertTo-LockKey $stale
+            foreach ($c in $LockOld) { if ($c[1] -ceq $sk -and $c[0] -ne 'backup' -and $c[0] -ne 'setting') { $lk = $c[2]; break } }
+        }
+        if ((Test-EngineLink $stale) -or ($lk -and (Get-FileSha $stale) -eq $lk)) {
+            Invoke-Act "remove $stale" { Remove-Item -LiteralPath $stale -Force }
             Write-Host "  REMOVED stale: $stale"
+        } else {
+            Write-Host "  NOTE: $stale is a retired playbook name, but not a file setup wrote unchanged"
+            [void](Backup-Path $stale)
         }
     }
     # Directories: the retired v2-only\ and v3\ steering subdirectories (kiro-cli v2
     # retirement, 2026-09-20). Removed only when empty, so a user-placed file survives.
     foreach ($staleDir in @((Join-Path $KiroSteeringDir "v2-only"), (Join-Path $KiroSteeringDir "v3"))) {
-        if ((Test-Path $staleDir -PathType Container) -and -not (Get-ChildItem $staleDir -Force | Select-Object -First 1)) {
-            Invoke-Act "remove $staleDir" { Remove-Item $staleDir -Force }
+        if ((Test-Path -LiteralPath $staleDir -PathType Container) -and -not (Get-ChildItem -LiteralPath $staleDir -Force | Select-Object -First 1)) {
+            Invoke-Act "remove $staleDir" { Remove-Item -LiteralPath $staleDir -Force }
             Write-Host "  REMOVED stale dir: $staleDir"
         }
     }
@@ -1733,6 +1993,7 @@ if (Test-Wants 'kiro') {
 
 Write-Host "=== Deploy lock ==="
 Complete-DeployLock -Carry (Get-LockCarryRows)
+$DeployFailed = $script:BackupFailed
 
 Write-Host ""
 Write-Host "Done (providers: $($Chosen -join ', ')). Run '/qconfig-sync' from any agent to verify."
@@ -1746,4 +2007,8 @@ if (Test-Wants 'claude') {
         Write-Host "NOTE: ~/.claude/settings.json was not changed. '/qconfig-sync' reports which Claude Code"
         Write-Host "      entries are set, and providers/claude/README.md says how to add them."
     }
+}
+if ($DeployFailed -gt 0) {
+    [Console]::Error.WriteLine("ERROR: $DeployFailed path(s) could not be backed up and were left unchanged (the ERROR lines above); close what holds them, then re-run setup")
+    exit 1
 }

@@ -39,9 +39,10 @@ export MSYS="${MSYS:-winsymlinks:nativestrict}"
 # warning. See merge_overlay / aux_overlay_targets / deploy_generated_copy below.
 #
 # Ownership: every regular file setup writes is recorded in the deploy lock
-# (~/.agent-playbook/deploy-lock.tsv, see "Deploy lock" below). A re-run writes only
-# what changed, removes what it wrote once the source is gone, and moves a file you
-# edited or own to <path>.bak (one backup per path) before it writes there.
+# (~/.agent-playbook/deploy-lock.tsv, see "Deploy lock" below), seed files excepted. A re-run
+# writes only what changed, removes what it wrote once the source is gone, and moves a file you
+# edited or own to <path>.bak (one backup per path) before it writes there. A backup that cannot
+# be made leaves that path unchanged and ends the run non-zero.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SHARED_DIR="$SCRIPT_DIR/shared"
@@ -138,18 +139,59 @@ native_path() {
     fi
 }
 
-# is_engine_link <path>: a symlink whose target lies inside this repo.
+IS_MSYS=0
+case "$(uname -s 2>/dev/null)" in MINGW*|MSYS*|CYGWIN*) IS_MSYS=1 ;; esac
+
+# long_path <path>: native_path, with every 8.3 short name (QSYLVE~1.POL) expanded under Git Bash.
+# A part of the path that does not exist is kept as written.
+long_path() {
+    local p="$1"
+    if [ "$IS_MSYS" -eq 0 ]; then printf '%s' "$p"; return; fi
+    if [ -e "$p" ] || [ "$(dirname "$p")" = "$p" ]; then
+        cygpath -m -l -a "$p"
+    else
+        printf '%s/%s' "$(long_path "$(dirname "$p")")" "$(basename "$p")"
+    fi
+}
+
+# canon_path <path>: one spelling per file, for comparing paths: long_path folded to lower case
+# under Git Bash (NTFS ignores case), the path itself elsewhere.
+canon_path() {
+    local p
+    if [ "$IS_MSYS" -eq 0 ]; then printf '%s' "$1"; return; fi
+    p="$(long_path "$1")"
+    printf '%s' "${p,,}"
+}
+
+ENGINE_ROOT_CANON=""
+[ "$IS_MSYS" -eq 1 ] && ENGINE_ROOT_CANON="$(canon_path "$SCRIPT_DIR")"
+ENGINE_ROOT_LONG="$(long_path "$SCRIPT_DIR")"
+
+# is_engine_link <path>: a symlink whose target lies inside this repo. Under Git Bash both sides are
+# compared in their long, case-folded form, so a link made through the repo's 8.3 short path (or by
+# setup.ps1 with other letter case) is still the playbook's.
 is_engine_link() {
     [ -L "$1" ] || return 1
     local t
     t="$(readlink "$1")"
-    case "$t" in "$SCRIPT_DIR"/*|"$SCRIPT_DIR") return 0 ;; *) return 1 ;; esac
+    case "$t" in "$SCRIPT_DIR"/*|"$SCRIPT_DIR") return 0 ;; esac
+    [ "$IS_MSYS" -eq 1 ] || return 1
+    case "$t" in /*|[A-Za-z]:*) ;; *) t="$(dirname "$1")/$t" ;; esac
+    t="$(canon_path "$t")"
+    case "$t" in "$ENGINE_ROOT_CANON"/*|"$ENGINE_ROOT_CANON") return 0 ;; *) return 1 ;; esac
+}
+
+# same_target <a> <b>: two link targets that name the same path.
+same_target() {
+    [ "$1" = "$2" ] && return 0
+    [ "$IS_MSYS" -eq 1 ] && [ "$(canon_path "$1")" = "$(canon_path "$2")" ]
 }
 
 # --- Deploy lock -----------------------------------------------------------
 # ~/.agent-playbook/deploy-lock.tsv names the regular files setup wrote, so a re-run can tell its
-# own unedited files from yours. Lockstep with setup.ps1 (both write the same bytes on one machine)
-# and verify-deployment.py (which reads it for ORPHAN lines). Format: UTF-8, LF, no BOM.
+# own unedited files from yours. Lockstep with setup.ps1 (both write the same bytes on one machine:
+# the template tokens render in the same C:/... form) and verify-deployment.py (which reads it for
+# ORPHAN and user-folder-kept lines). Format: UTF-8, LF, no BOM.
 #   line 1 : LOCK_HEADER below (it carries the format version)
 #   rows   : kind<TAB>path<TAB>value, sorted by byte order, one per path and kind class
 #   kind   : copy-dir-recursive (a plain file of a generated Kiro copy), merge-file (a merged file
@@ -161,16 +203,29 @@ is_engine_link() {
 #   value  : sha256, lowercase hex, of the bytes setup wrote; backup: of the .bak (- for a folder
 #            or a link); setting: the value setup replaced, as compact JSON (- if none)
 # The lock is untrusted input: a missing file, another first line or one malformed row means no
-# lock at all (the first-run case), and only ~/ paths with no .. segment are accepted.
+# lock at all (the first-run case), and only ~/ paths with no .. segment, no backslash and no colon
+# are accepted (setup never writes another key). An unreadable lock is moved to deploy-lock.tsv.bak
+# before the new one is written.
+# Journal: each backup row is also appended to deploy-lock.journal.tsv the moment the .bak exists, so
+# a run that stops half-way loses no backup; the next run (or uninstall) merges it, and the lock
+# write deletes it.
 #
-# Ownership rule (own_rule, the one decision for every file setup writes):
+# Ownership rule (own_rule, the one decision for every file setup writes; seed files are the one
+# exception: written only when absent, never locked, never replaced):
 #   no regular file at the path          -> write
 #   its bytes equal what setup writes now -> keep (no rewrite), and record it
 #   locked, and unchanged since setup     -> replace
 #   anything else (edited, or not setup's)-> move it to <path>.bak (one backup; the next replaces it),
 #                                            then write
+# A <path>.bak that the lock does not show setup made (or, for a file, one changed since) is yours:
+# setup leaves it and <path> untouched and says so. A move that fails leaves the path unchanged too,
+# prints an ERROR, and the run ends non-zero.
 LOCK_HEADER="# agent-playbook deploy lock v1 (written by setup; kind<TAB>path<TAB>sha256)"
 LOCK_FILE="$HOME/.agent-playbook/deploy-lock.tsv"
+LOCK_JOURNAL="$HOME/.agent-playbook/deploy-lock.journal.tsv"
+LOCK_READABLE=0
+LOCK_UNREADABLE=0
+BACKUP_FAILED=0
 LOCK_SETTING_KEY="kiro-cli/chat.defaultAgent"
 LOCK_GEMINI_KEY="gemini/context.fileName"
 LOCK_WORK=""
@@ -189,18 +244,35 @@ sha_of() {
 }
 
 # sha_list <NUL-separated path list file>: hash<TAB>path per file, one hasher run for the whole list.
+# With GNU sha256sum, -z keeps every name as it is (no backslash escaping); elsewhere an escaped
+# name loses its leading backslash marker. A name holding a tab or a newline cannot be listed.
+if [ "${SHA_CMD[0]}" = sha256sum ] && printf 'x' | sha256sum -z >/dev/null 2>&1; then SHA_Z=1; else SHA_Z=0; fi
 sha_list() {
     [ -s "$1" ] || return 0
-    xargs -0 "${SHA_CMD[@]}" -- < "$1" | awk '{ s = $0; if (substr(s, 1, 1) == "\\") s = substr(s, 2); print substr(s, 1, 64) "\t" substr(s, 67) }'
+    if [ "$SHA_Z" -eq 1 ]; then
+        xargs -0 sha256sum -z -- < "$1" | tr '\0' '\n' | awk '{ print substr($0, 1, 64) "\t" substr($0, 67) }'
+    else
+        xargs -0 "${SHA_CMD[@]}" -- < "$1" | awk '{ s = $0; if (substr(s, 1, 1) == "\\") s = substr(s, 2); print substr(s, 1, 64) "\t" substr(s, 67) }'
+    fi
 }
 
-# lock_key <path>: the lock's spelling of a destination path.
+# lock_key <path>: the lock's spelling of a destination path (~/...), or nothing outside home.
 lock_key() {
     case "$1" in
         "$HOME"/*) printf '~/%s' "${1#"$HOME"/}" ;;
-        *) native_path "$1" ;;
+        *) printf '' ;;
     esac
 }
+
+# LOCK_ROWS_AWK: exit 1 on the first row the lock format does not allow (header excluded).
+LOCK_ROWS_AWK='
+    NF != 3 { exit 1 }
+    $1 == "setting" { if (($2 != skey && $2 != gkey) || $3 == "") exit 1; next }
+    $1 !~ /^(copy-dir-recursive|merge-file|copy-file|template-file|backup)$/ { exit 1 }
+    substr($2, 1, 2) != "~/" || ("/" $2 "/") ~ /\/\.\.\// || $2 ~ /[\\:]/ { exit 1 }
+    $1 == "backup" && $3 == "-" { next }
+    $3 !~ /^[0-9a-f]+$/ || length($3) != 64 { exit 1 }
+'
 
 # lock_path <key>: the destination path a lock key names.
 lock_path() {
@@ -222,24 +294,41 @@ lock_load() {
     mkdir -p "$LOCK_WORK"
     : > "$LOCK_WORK/old"
     : > "$LOCK_WORK/new"
-    [ -f "$LOCK_FILE" ] || return 0
-    if ! awk -F'\t' -v header="$LOCK_HEADER" -v skey="$LOCK_SETTING_KEY" -v gkey="$LOCK_GEMINI_KEY" '
-        NR == 1 { if ($0 != header) exit 1; next }
-        NF != 3 { exit 1 }
-        $1 == "setting" { if (($2 != skey && $2 != gkey) || $3 == "") exit 1; next }
-        $1 !~ /^(copy-dir-recursive|merge-file|copy-file|template-file|backup)$/ { exit 1 }
-        substr($2, 1, 2) != "~/" || ("/" $2 "/") ~ /\/\.\.\// { exit 1 }
-        $1 == "backup" && $3 == "-" { next }
-        $3 !~ /^[0-9a-f]+$/ || length($3) != 64 { exit 1 }
-    ' "$LOCK_FILE"; then
-        echo "  NOTE: $LOCK_FILE is not a deploy lock this setup can read; treating this as a first run"
-        return 0
+    : > "$LOCK_WORK/held"
+    # every destination the manifest names now: never retired, whatever an old row says
+    local i
+    for i in "${!MANIFEST_DESTS[@]}"; do lock_key "$(expand_dest "${MANIFEST_DESTS[$i]}")"; echo; done > "$LOCK_WORK/mkeys"
+    if [ -f "$LOCK_FILE" ]; then
+        if awk -F'\t' -v header="$LOCK_HEADER" -v skey="$LOCK_SETTING_KEY" -v gkey="$LOCK_GEMINI_KEY" '
+            NR == 1 { if ($0 != header) exit 1; next }'"$LOCK_ROWS_AWK" "$LOCK_FILE"; then
+            LOCK_READABLE=1
+            tail -n +2 "$LOCK_FILE" > "$LOCK_WORK/old"
+        else
+            LOCK_UNREADABLE=1
+            echo "  NOTE: $LOCK_FILE is not a deploy lock this setup can read; treating this as a first run (it is kept as $LOCK_FILE.bak)"
+        fi
     fi
-    tail -n +2 "$LOCK_FILE" > "$LOCK_WORK/old"
+    # backup rows of a run that stopped before writing its lock: newer than the lock's own rows
+    if [ -f "$LOCK_JOURNAL" ]; then
+        if awk -F'\t' -v skey="$LOCK_SETTING_KEY" -v gkey="$LOCK_GEMINI_KEY" '$1 != "backup" { exit 1 }'"$LOCK_ROWS_AWK" "$LOCK_JOURNAL"; then
+            cat "$LOCK_JOURNAL" "$LOCK_WORK/old" > "$LOCK_WORK/old.j"
+            mv "$LOCK_WORK/old.j" "$LOCK_WORK/old"
+            echo "  NOTE: merged the backups an interrupted run recorded in $LOCK_JOURNAL"
+        else
+            echo "  NOTE: $LOCK_JOURNAL is not a journal this setup can read; ignored"
+        fi
+    fi
 }
 
-# lock_add <kind> <key> <value>: record a row for the lock this run writes.
+# lock_add <kind> <key> <value>: record a row for the lock this run writes. A path outside home has
+# no lock spelling: it is not recorded.
 lock_add() {
+    if [ "$1" != setting ]; then
+        case "$2" in
+            "~/"*) case "$2" in *\\*|*:*) echo "  NOTE: $2 is not recorded in the deploy lock (its name holds \\ or :)"; return 0 ;; esac ;;
+            *) echo "  NOTE: a path outside $HOME is not recorded in the deploy lock"; return 0 ;;
+        esac
+    fi
     printf '%s\t%s\t%s\n' "$1" "$2" "$3" >> "$LOCK_WORK/new"
 }
 
@@ -258,19 +347,24 @@ lock_finish() {
         function cls(k) { return (k == "backup" || k == "setting") ? k : "file" }
         { key = cls($1) SUBSEP $2; if (key in seen) next; seen[key] = 1; print }
     ' "$LOCK_WORK/new" "$carry" | LC_ALL=C sort > "$LOCK_WORK/rows"
+    if [ "$LOCK_UNREADABLE" -eq 1 ] && [ -f "$LOCK_FILE" ]; then
+        mv -f "$LOCK_FILE" "$LOCK_FILE.bak"
+        echo "  BACKUP: $LOCK_FILE -> $LOCK_FILE.bak (a deploy lock this setup cannot read)"
+    fi
     if [ ! -s "$LOCK_WORK/rows" ]; then
         if [ "${2:-}" = drop-empty ] && [ -f "$LOCK_FILE" ]; then
-            rm -f "$LOCK_FILE"
+            rm -f "$LOCK_FILE" "$LOCK_JOURNAL"
             echo "  REMOVED: $LOCK_FILE"
             return 0
         fi
-        [ -f "$LOCK_FILE" ] || return 0
+        if [ ! -f "$LOCK_FILE" ]; then rm -f "$LOCK_JOURNAL"; return 0; fi
     fi
     { printf '%s\n' "$LOCK_HEADER"; cat "$LOCK_WORK/rows"; } > "$out"
-    if [ -f "$LOCK_FILE" ] && cmp -s "$out" "$LOCK_FILE"; then echo "  OK: $LOCK_FILE"; return 0; fi
+    if [ -f "$LOCK_FILE" ] && cmp -s "$out" "$LOCK_FILE"; then rm -f "$LOCK_JOURNAL"; echo "  OK: $LOCK_FILE"; return 0; fi
     mkdir -p "$(dirname "$LOCK_FILE")"
     cp "$out" "$LOCK_FILE.tmp-$$"
     mv -f "$LOCK_FILE.tmp-$$" "$LOCK_FILE"
+    rm -f "$LOCK_JOURNAL"
     echo "  WROTE: $LOCK_FILE"
 }
 
@@ -283,7 +377,8 @@ lock_carry_rows() {
     while IFS=$'\t' read -r kind key val; do
         [ "$kind" = backup ] || continue
         p="$HOME/${key#\~/}"
-        if [ -e "$p.bak" ] || [ -L "$p.bak" ]; then printf '%s\t%s\t%s\n' "$kind" "$key" "$val" >> "$1"; fi
+        # a .bak reached through a linked folder is not looked at (it may lie outside the deployment)
+        if no_link_parent "$p" "$HOME" && { [ -e "$p.bak" ] || [ -L "$p.bak" ]; }; then printf '%s\t%s\t%s\n' "$kind" "$key" "$val" >> "$1"; fi
     done < "$LOCK_WORK/old"
 }
 
@@ -305,9 +400,11 @@ locked_files_present() {
     : > "$3"
     [ -d "$2" ] || return 0
     find "$2" -type f -print 2>/dev/null > "$3.found" || true
-    awk -F'\t' -v found="$3.found" -v home="$HOME" '
-        FILENAME == found { f[$0] = 1; next }
-        { p = home "/" substr($2, 3); if (p in f) print p }
+    # under Git Bash a row matches its file whatever the letter case (NTFS ignores it)
+    awk -F'\t' -v found="$3.found" -v home="$HOME" -v fold="$IS_MSYS" '
+        function k(s) { return fold ? tolower(s) : s }
+        FILENAME == found { f[k($0)] = $0; next }
+        { p = k(home "/" substr($2, 3)); if (p in f) print f[p] }
     ' "$3.found" "$1" | tr '\n' '\0' > "$3"
 }
 
@@ -331,14 +428,46 @@ remove_listed() {
 }
 
 # backup_path <path>: move a file, folder or link that is not setup's to <path>.bak, the single
-# bounded backup (an older .bak is removed first), and record the backup in the lock.
+# bounded backup, and record the backup in the lock and its journal at once. An existing <path>.bak
+# is replaced only when the lock shows setup made it (and, for a file, that it is unchanged since);
+# otherwise it is yours: nothing moves, a WARN says what to do, and it returns 2. A move that fails
+# puts the older .bak back, prints an ERROR (the run then ends non-zero) and returns 1. On any
+# non-zero return the caller skips its write and the lock row for that path.
 backup_path() {
-    local p="$1" h="-"
+    local p="$1" h="-" key old aside=""
+    key="$(lock_key "$p")"
     if [ -f "$p" ] && [ ! -L "$p" ]; then h="$(sha_of "$p")"; fi
+    if [ -e "${p}.bak" ] || [ -L "${p}.bak" ]; then
+        old="$(lock_get backup "$key")"
+        if [ -z "$old" ] || { [ "$old" != "-" ] && { [ -L "${p}.bak" ] || [ ! -f "${p}.bak" ] || [ "$(sha_of "${p}.bak")" != "$old" ]; }; }; then
+            echo "  WARN: ${p}.bak is not a backup setup made, so $p is left unchanged; move ${p}.bak away, then re-run setup"
+            printf '%s\n' "$key" >> "$LOCK_WORK/held"
+            return 2
+        fi
+    fi
     echo "  BACKUP: $p -> ${p}.bak"
-    if [ -e "${p}.bak" ] || [ -L "${p}.bak" ]; then act rm -rf "${p}.bak"; fi
-    act mv "$p" "${p}.bak"
-    lock_add backup "$(lock_key "$p")" "$h"
+    if [ "$DRY_RUN" -eq 1 ]; then
+        echo "    DRY: mv $p ${p}.bak"
+        lock_add backup "$key" "$h"
+        return 0
+    fi
+    if [ -e "${p}.bak" ] || [ -L "${p}.bak" ]; then
+        aside="${p}.bak.tmp-$$"
+        mv "${p}.bak" "$aside" 2>/dev/null || aside="!"
+    fi
+    if [ "$aside" = "!" ] || ! mv "$p" "${p}.bak" 2>/dev/null; then
+        case "$aside" in ""|"!") ;; *) mv "$aside" "${p}.bak" 2>/dev/null || true ;; esac
+        echo "ERROR: could not back up $p; left unchanged" >&2
+        BACKUP_FAILED=$((BACKUP_FAILED + 1))
+        printf '%s\n' "$key" >> "$LOCK_WORK/held"
+        return 1
+    fi
+    case "$aside" in "") ;; *) rm -rf "$aside" ;; esac
+    lock_add backup "$key" "$h"
+    case "$key" in
+        "~/"*) mkdir -p "$(dirname "$LOCK_JOURNAL")"; printf 'backup\t%s\t%s\n' "$key" "$h" >> "$LOCK_JOURNAL" ;;
+    esac
+    return 0
 }
 
 # own_write <kind> <dest> <file holding the bytes to write>: a copy-file or template-file row
@@ -352,10 +481,10 @@ own_write() {
             echo "  REMOVE SYMLINK: $dest"
             act rm "$dest"
         else
-            backup_path "$dest"
+            backup_path "$dest" || return 0
         fi
     elif [ -d "$dest" ]; then
-        backup_path "$dest"
+        backup_path "$dest" || return 0
     fi
     exp="$(sha_of "$src")"
     if [ -f "$dest" ] && [ ! -L "$dest" ]; then cur="$(sha_of "$dest")"; fi
@@ -363,30 +492,36 @@ own_write() {
     action="$(printf '%s\t%s\t%s\n' "$exp" "$cur" "${lk:--}" | awk -F'\t' "$OWN_RULE_AWK"'{ print own_rule($1, $2, $3) }')"
     case "$action" in
         keep) echo "  OK: $dest (matches source)" ;;
-        backup) backup_path "$dest"; act cp "$src" "$dest"; echo "  WROTE: $dest (yours kept as ${dest}.bak)" ;;
+        backup) backup_path "$dest" || return 0
+                act cp "$src" "$dest"; echo "  WROTE: $dest (yours kept as ${dest}.bak)" ;;
         *) act cp "$src" "$dest"; echo "  WROTE: $dest" ;;
     esac
     lock_add "$kind" "$key" "$exp"
 }
 
 # lock_retire <key prefix>: rows of the previous lock under the prefix that this run did not record
-# (their source is gone). Each file is removed when unchanged since setup wrote it, else backed up;
+# (their source is gone). A row for a current manifest destination, or for a path this run had to
+# leave alone, is never retired; under Git Bash a key that differs from a recorded one only in letter
+# case is the same file. Each file is removed when unchanged since setup wrote it, else backed up;
 # then the empty folders above it are removed, up to the Kiro skills folder.
 lock_retire() {
     local prefix="$1" w="$LOCK_WORK/retire" kind key val p h
-    awk -F'\t' -v pre="$prefix" -v newf="$LOCK_WORK/new" '
-        FILENAME == newf { if ($1 != "backup" && $1 != "setting") rec[$2] = 1; next }
-        $1 == "backup" || $1 == "setting" || index($2, pre) != 1 || ($2 in rec) || ($2 in seen) { next }
+    awk -F'\t' -v pre="$prefix" -v newf="$LOCK_WORK/new" -v heldf="$LOCK_WORK/held" -v mkf="$LOCK_WORK/mkeys" -v fold="$IS_MSYS" '
+        function k(s) { return fold ? tolower(s) : s }
+        FILENAME == newf { if ($1 != "backup" && $1 != "setting") rec[k($2)] = 1; next }
+        FILENAME == heldf || FILENAME == mkf { if ($0 != "") rec[k($0)] = 1; next }
+        $1 == "backup" || $1 == "setting" || index($2, pre) != 1 || (k($2) in rec) || ($2 in seen) { next }
         { seen[$2] = 1; print }
-    ' "$LOCK_WORK/new" "$LOCK_WORK/old" > "$w"
+    ' "$LOCK_WORK/new" "$LOCK_WORK/held" "$LOCK_WORK/mkeys" "$LOCK_WORK/old" > "$w"
     [ -s "$w" ] || return 0
     p="$HOME/${prefix#\~/}"
     locked_files_present "$w" "${p%/}" "$w.lst"
     sha_list "$w.lst" > "$w.h"
     # current hash<TAB>locked hash<TAB>path, for the files still there
-    awk -F'\t' -v hf="$w.h" -v home="$HOME" '
-        FILENAME == hf { h[$2] = $1; next }
-        { p = home "/" substr($2, 3); if (p in h) print h[p] "\t" $3 "\t" p }
+    awk -F'\t' -v hf="$w.h" -v home="$HOME" -v fold="$IS_MSYS" '
+        function k(s) { return fold ? tolower(s) : s }
+        FILENAME == hf { h[k($2)] = $1; real[k($2)] = $2; next }
+        { p = k(home "/" substr($2, 3)); if (p in h) print h[p] "\t" $3 "\t" real[p] }
     ' "$w.h" "$w" > "$w.plan"
     : > "$w.rm"
     while IFS=$'\t' read -r h val p; do
@@ -395,7 +530,7 @@ lock_retire() {
             echo "  REMOVED: $p (its source is gone)"
         else
             echo "  NOTE: $p changed since setup wrote it and its source is gone"
-            backup_path "$p"
+            backup_path "$p" || true
         fi
     done < "$w.plan"
     remove_listed "$w.rm"
@@ -477,26 +612,20 @@ expand_source() {
 #
 # Templates use forward slashes for everything AFTER the token.
 #
-# NO backslash escaping here, deliberately. setup.ps1's Render-Template escapes
-# backslashes for JSON because a Windows root (C:\Users\X) needs it; this twin
-# is the POSIX deploy path, where $HOME and $SCRIPT_DIR never contain a
-# backslash, so escaping would be dead code. (Bash parameter expansion cannot
-# express it anyway -- ${v//\\/\\\\} is a silent no-op, verified on bash 5.2.)
-# The cross-shell contract is therefore: both twins emit identical bytes for
-# every value either can encounter on its own platform -- which is what
-# test-parity.sh's render-equivalence assertion checks.
+# Token values: {{USER_HOME}} is home in native_path form and {{PLAYBOOK_ROOT}} the repo root in
+# long_path form, so under Git Bash both read C:/Users/... exactly as setup.ps1 writes them (the
+# two twins write the same bytes, and a run through the repo's 8.3 short path renders the same).
+# No backslash escaping: forward slashes are valid in every consumer (JSON, file:// URIs,
+# markdown) and need none. The cross-shell contract is checked by test-parity.sh's
+# render-equivalence assertion and by its deploy-lock comparison of the two twins.
 render_template() {
     local src="$1"
-    local body
+    local body home root
     body="$(cat "$src")"
-    # Forward slashes, not backslashes: templates embed these tokens in file://
-    # URIs and plain markdown as well as JSON, and forward slashes are valid in
-    # all three with no escaping needed. $HOME/$SCRIPT_DIR are already
-    # forward-slash on every platform bash runs on, so this is normally a
-    # no-op -- it exists for symmetry with setup.ps1's Render-Template, which
-    # must convert a native Windows backslash path.
-    body="${body//\{\{USER_HOME\}\}/${HOME//\\//}}"
-    body="${body//\{\{PLAYBOOK_ROOT\}\}/${SCRIPT_DIR//\\//}}"
+    home="$(native_path "$HOME")"
+    root="$ENGINE_ROOT_LONG"
+    body="${body//\{\{USER_HOME\}\}/${home//\\//}}"
+    body="${body//\{\{PLAYBOOK_ROOT\}\}/${root//\\//}}"
     printf '%s\n' "$body"
 }
 
@@ -539,7 +668,7 @@ make_way() {
             return 1
         fi
     fi
-    backup_path "$p"
+    backup_path "$p" || return 1
     return 0
 }
 
@@ -549,7 +678,7 @@ link_way() {
     local p="$1" target="$2" cur
     if [ -L "$p" ]; then
         cur="$(readlink "$p")"
-        if [ "$cur" = "$target" ]; then
+        if same_target "$cur" "$target"; then
             echo "  OK: $p -> $target"
             return 2
         fi
@@ -610,7 +739,7 @@ link_skills() {
     while IFS= read -r name; do
         dest="$dir/$name"
         if [ -e "$dest" ] && [ ! -L "$dest" ]; then
-            echo "  KEPT: $dest is your own folder; the playbook's $name skill is not linked there"
+            echo "  KEPT: $dest is your own folder; the playbook's $name skill is not linked there (rename or remove it, then re-run setup, to get the playbook's)"
             continue
         fi
         link_dir "$SHARED_DIR/skills/$name" "$dest"
@@ -814,7 +943,7 @@ write_pointer() {
     local url="${STORES_URL:-$(config_value stores_url)}"
     local text
     text="# agent-playbook pointer file, written by setup (shared/AGENTS.md, Config Repo Locations).
-root=$(native_path "$SCRIPT_DIR")
+root=$ENGINE_ROOT_LONG
 stores=$(native_path "$STORES")
 "
     [ -n "$url" ] && text="${text}stores_url=$url
@@ -1070,18 +1199,11 @@ aux_overlay_targets() {
     done
 }
 
-# deploy_generated_copy <skill dir> <dest> <overlay dir> <name>: an overlay-bearing skill as a
-# generated copy. Every expected file's bytes are known first (the shared file, or the merge
-# staged in the lock's work folder); then only the files that differ are written, each under the
-# ownership rule. Files of the copy whose source is gone are left to lock_retire. A folder at dest
-# with files, none of them locked and none equal to what setup writes, is yours: it is KEPT.
-# Returns 1 when nothing was deployed.
-deploy_generated_copy() {
-    local src_dir="$1" dest="$2" overlay_dir="$3" name="$4"
-    local w="$LOCK_WORK/gen-$name" prefix="~/.kiro/skills/$name/" t ov nlk ncur nmatch
-    local action rel kind src h full n_write=0 n_backup=0 n_keep=0
+# gen_expected <skill dir> <overlay dir> <name> <work folder>: the files a generated copy holds, as
+# <work>/exp (rel<TAB>kind<TAB>file holding the bytes to write) and <work>/exp.h (hash<TAB>file).
+gen_expected() {
+    local src_dir="$1" overlay_dir="$2" name="$3" w="$4" t ov
     mkdir -p "$w/merge"
-    # 1. the expected files: rel<TAB>kind<TAB>file holding the bytes to write
     (cd "$src_dir" && find . -name __pycache__ -prune -o -type f -print) | sed 's#^\./##' \
         | awk -v d="$src_dir" '{ print $0 "\tcopy-dir-recursive\t" d "/" $0 }' > "$w/plain"
     : > "$w/merged"
@@ -1100,6 +1222,20 @@ deploy_generated_copy() {
         "$w/merged" "$w/plain" > "$w/exp"
     cut -f3 "$w/exp" | tr '\n' '\0' > "$w/exp.lst"
     sha_list "$w/exp.lst" > "$w/exp.h"
+}
+
+# deploy_generated_copy <skill dir> <dest> <overlay dir> <name>: an overlay-bearing skill as a
+# generated copy. Every expected file's bytes are known first (the shared file, or the merge
+# staged in the lock's work folder); then only the files that differ are written, each under the
+# ownership rule. Files of the copy whose source is gone are left to lock_retire. A folder at dest
+# that the lock names no file of is setup's (an older copy: an edited file goes to .bak) when every
+# file in it sits at a path setup writes for the skill; any other such folder is yours: it is KEPT.
+# Under Git Bash file names match whatever the letter case, as NTFS does.
+deploy_generated_copy() {
+    local src_dir="$1" dest="$2" overlay_dir="$3" name="$4"
+    local w="$LOCK_WORK/gen-$name" prefix="~/.kiro/skills/$name/" nlk ncur nforeign
+    local action rel kind src h full n_write=0 n_backup=0 n_keep=0
+    gen_expected "$src_dir" "$overlay_dir" "$name" "$w"
     # 2. what is there now
     : > "$w/cur.lst"
     if [ -L "$dest" ]; then
@@ -1107,10 +1243,10 @@ deploy_generated_copy() {
             echo "  REMOVE SYMLINK: $dest (now a generated copy)"
             act rm "$dest"
         else
-            make_way "$dest" || return 1
+            make_way "$dest" || return 0
         fi
     elif [ -e "$dest" ] && [ ! -d "$dest" ]; then
-        make_way "$dest" || return 1
+        make_way "$dest" || return 0
     elif [ -d "$dest" ]; then
         find "$dest" -name __pycache__ -prune -o -type f -print0 > "$w/cur.lst"
     fi
@@ -1119,19 +1255,20 @@ deploy_generated_copy() {
         print substr($2, length(pre) + 1) "\t" $3 }' "$LOCK_WORK/old" > "$w/lk"
     # 3. the decision per expected file: action<TAB>rel<TAB>kind<TAB>src<TAB>expected hash
     awk -F'\t' -v OFS='\t' -v eh="$w/exp.h" -v ch="$w/cur.h" -v lf="$w/lk" -v dp="$dest/" -v st="$w/stat" \
-        "$OWN_RULE_AWK"'
+        -v fold="$IS_MSYS" "$OWN_RULE_AWK"'
+        function k(s) { return fold ? tolower(s) : s }
         FILENAME == eh { h[$2] = $1; next }
-        FILENAME == ch { cur[substr($2, length(dp) + 1)] = $1; ncur++; next }
-        FILENAME == lf { lk[$1] = $2; nlk++; next }
-        { e = h[$3]; c = ($1 in cur) ? cur[$1] : "-"; l = ($1 in lk) ? lk[$1] : "-"
-          if (c == e) nmatch++
+        FILENAME == ch { cur[k(substr($2, length(dp) + 1))] = $1; ncur++; next }
+        FILENAME == lf { lk[k($1)] = $2; nlk++; next }
+        { r = k($1); want[r] = 1; e = h[$3]; c = (r in cur) ? cur[r] : "-"; l = (r in lk) ? lk[r] : "-"
           print own_rule(e, c, l), $1, $2, $3, e }
-        END { print nlk + 0, ncur + 0, nmatch + 0 > st }
+        END { for (r in cur) if (!(r in want)) nforeign++
+              print nlk + 0, ncur + 0, nforeign + 0 > st }
     ' "$w/exp.h" "$w/cur.h" "$w/lk" "$w/exp" > "$w/plan"
-    read -r nlk ncur nmatch < "$w/stat"
-    if [ "$ncur" -gt 0 ] && [ "$nlk" -eq 0 ] && [ "$nmatch" -eq 0 ]; then
-        echo "  KEPT: $dest is your own folder; the playbook's $name skill is not deployed there"
-        return 1
+    read -r nlk ncur nforeign < "$w/stat"
+    if [ "$ncur" -gt 0 ] && [ "$nlk" -eq 0 ] && [ "$nforeign" -gt 0 ]; then
+        echo "  KEPT: $dest is your own folder; the playbook's $name skill is not deployed there (rename or remove it, then re-run setup, to get the playbook's)"
+        return 0
     fi
     act mkdir -p "$dest"
     # 4. write only the differences. Plain files go through one tar pipe (one process per copy,
@@ -1145,7 +1282,7 @@ deploy_generated_copy() {
                 continue
             fi
             if [ "$action" = backup ] || { [ "$action" = write ] && { [ -L "$full" ] || [ -e "$full" ]; }; }; then
-                backup_path "$full"
+                backup_path "$full" || continue
                 n_backup=$((n_backup + 1))
             fi
             if [ "$kind" = copy-dir-recursive ]; then
@@ -1174,14 +1311,43 @@ deploy_generated_copy() {
 }
 
 # free_real_skill_dir <name>: a real folder at a Kiro skill name where a link goes (a generated
-# copy left by an older overlay, or a folder of yours). The files setup wrote there and left
-# unchanged are removed (lock_retire); 0 when the folder is then gone, 1 when it holds anything else.
+# copy left by an older overlay, or a folder of yours). It decides first: when every entry in it is a
+# file setup wrote and left unchanged, those files are removed (lock_retire) and 0 lets the link be
+# made. Otherwise nothing there is touched and 1 keeps the folder: a folder of yours is reported
+# KEPT, and one that also holds setup's files keeps them and their lock rows, with a WARN that the
+# skill is no longer updated there.
 free_real_skill_dir() {
-    local dest="$KIRO_SKILLS_DIR/$1"
-    lock_retire "~/.kiro/skills/$1/"
-    [ "$DRY_RUN" -eq 1 ] && return 1
-    find "$dest" -type d -empty -delete 2>/dev/null || true
-    [ ! -e "$dest" ]
+    local dest="$KIRO_SKILLS_DIR/$1" prefix="~/.kiro/skills/$1/" w="$LOCK_WORK/free-$1" nlocked nother
+    find "$dest" ! -type d -print 2>/dev/null > "$w.all" || true
+    tr '\n' '\0' < "$w.all" > "$w.lst"
+    sha_list "$w.lst" > "$w.h"
+    # locked<TAB>other: files the lock names (edited or not), and every entry that is not such a file
+    # left unchanged since setup wrote it
+    awk -F'\t' -v hf="$w.h" -v allf="$w.all" -v pre="$prefix" -v home="$HOME" -v fold="$IS_MSYS" '
+        function k(s) { return fold ? tolower(s) : s }
+        FILENAME == hf { h[k($2)] = $1; next }
+        FILENAME == allf { all[k($0)] = 1; next }
+        ($1 == "copy-dir-recursive" || $1 == "merge-file") && index($2, pre) == 1 {
+            p = k(home "/" substr($2, 3))
+            if ((p in h) && !(p in named)) { named[p] = 1; nl++ }
+            if ((p in h) && h[p] == $3) ok[p] = 1 }
+        END { for (p in all) if (!(p in ok)) no++; print nl + 0 "\t" no + 0 }
+    ' "$w.h" "$w.all" "$LOCK_WORK/old" > "$w.n"
+    IFS=$'\t' read -r nlocked nother < "$w.n"
+    if [ "$nother" -eq 0 ]; then
+        lock_retire "$prefix"
+        [ "$DRY_RUN" -eq 1 ] && return 1
+        find "$dest" -type d -empty -delete 2>/dev/null || true
+        [ ! -e "$dest" ] && return 0
+    fi
+    if [ "$nlocked" -gt 0 ]; then
+        echo "  WARN: $dest holds files of yours beside files setup wrote; the playbook's $1 skill is no longer updated there (move your files out of it, then re-run setup)"
+        awk -F'\t' -v pre="$prefix" '($1 == "copy-dir-recursive" || $1 == "merge-file") && index($2, pre) == 1' \
+            "$LOCK_WORK/old" >> "$LOCK_WORK/new"
+    else
+        echo "  KEPT: $dest is your own folder; the playbook's $1 skill is not linked there (rename or remove it, then re-run setup, to get the playbook's)"
+    fi
+    return 1
 }
 
 # has_any_overlay <overlay_dir>
@@ -1200,6 +1366,17 @@ has_any_overlay() {
         return 0
     done
     return 1
+}
+
+# kiro_default_agent: kiro-cli's global chat.defaultAgent as JSON on one line (its lines joined by a
+# space, the ends trimmed; spaces inside a value are kept). Prints nothing and returns 1 when the
+# read fails or prints nothing.
+kiro_default_agent() {
+    local v
+    v="$(kiro-cli settings -f json --global chat.defaultAgent 2>/dev/null)" || return 1
+    v="$(printf '%s' "$v" | tr -d '\r' | tr '\n' ' ' | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+    [ -n "$v" ] || return 1
+    printf '%s' "$v"
 }
 
 # --- Deploy, per provider ----------------------------------------------------
@@ -1277,15 +1454,19 @@ deploy_kiro() {
         echo "  SKIP: kiro-cli settings (AGENT_PLAYBOOK_SKIP_KIRO_CLI=1)"
         [ -z "$old_setting" ] || lock_add setting "$LOCK_SETTING_KEY" "$old_setting"
     elif command -v kiro-cli &>/dev/null; then
-        prev="$(kiro-cli settings -f json --global chat.defaultAgent 2>/dev/null | tr -d '[:space:]' || true)"
-        if [ "$prev" = '"kiro_default"' ]; then
+        prev="$(kiro_default_agent || true)"
+        if [ -z "$prev" ]; then
+            # a value setup cannot read is never replaced: uninstall could not put it back
+            echo "  WARN: kiro-cli's chat.defaultAgent could not be read, so it is left as is"
+            [ -z "$old_setting" ] || lock_add setting "$LOCK_SETTING_KEY" "$old_setting"
+        elif [ "$prev" = '"kiro_default"' ]; then
             echo "  OK: chat.defaultAgent = kiro_default (global)"
             [ -z "$old_setting" ] || lock_add setting "$LOCK_SETTING_KEY" "$old_setting"
         elif [ "$DRY_RUN" -eq 1 ]; then
             echo "    DRY: kiro-cli settings --global chat.defaultAgent kiro_default"
         elif kiro-cli settings --global chat.defaultAgent kiro_default; then
             echo "  SET: chat.defaultAgent = kiro_default (global)"
-            case "$prev" in ""|null) prev="-" ;; esac
+            [ "$prev" != null ] || prev="-"
             lock_add setting "$LOCK_SETTING_KEY" "$prev"
         else
             echo "  WARN: Failed to set chat.defaultAgent" >&2
@@ -1325,11 +1506,10 @@ deploy_kiro() {
         overlay_dir="$KIRO_OVERLAY_ROOT/$skill_name"
         dest="$KIRO_SKILLS_DIR/$skill_name"
         if has_any_overlay "$overlay_dir"; then
-            deploy_generated_copy "${skill_dir%/}" "$dest" "$overlay_dir" "$skill_name" || true
+            deploy_generated_copy "${skill_dir%/}" "$dest" "$overlay_dir" "$skill_name"
         else
             # a real folder here: a generated copy left by an older overlay, or yours
             if [ -d "$dest" ] && [ ! -L "$dest" ] && ! free_real_skill_dir "$skill_name"; then
-                echo "  KEPT: $dest is your own folder; the playbook's $skill_name skill is not linked there"
                 continue
             fi
             link_dir "${skill_dir%/}" "$dest"
@@ -1349,7 +1529,6 @@ deploy_kiro() {
                 has_any_overlay "$KIRO_OVERLAY_ROOT/$skill_name" && continue
                 dest="$KIRO_SKILLS_DIR/$skill_name"
                 if [ -d "$dest" ] && [ ! -L "$dest" ] && ! free_real_skill_dir "$skill_name"; then
-                    echo "  KEPT: $dest is your own folder; the playbook's $skill_name skill is not linked there"
                     continue
                 fi
                 link_dir "${skill_dir%/}" "$dest"
@@ -1381,13 +1560,23 @@ deploy_kiro() {
     # that the current manifest no longer owns. NEVER list a path the manifest currently
     # deploys (this runs after the steering loop and would delete the fresh link).
     # Frozen at these 7 entries: add no new ones. The deploy lock covers every later
-    # retirement (lock_retire above). Entries are dated.
+    # retirement (lock_retire above). Entries are dated. Each goes through the ownership rule: a link
+    # into this repo, or a file the lock names and unchanged since, is removed; anything else is
+    # yours and goes to <path>.bak.
     echo "=== Cleanup stale files ==="
-    local stale stale_dir
+    local stale stale_dir lk
     for stale in "$KIRO_AGENTS_DIR/kiro_default.json" "$KIRO_STEERING_DIR/claude-code-local-data.md" "$KIRO_STEERING_DIR/v2-only/kiro-cli-local-data.md" "$KIRO_STEERING_DIR/v2-only/memory-sources.md" "$KIRO_STEERING_DIR/v2-only/session-resume-recovery-2.14.0.md" "$KIRO_STEERING_DIR/v3/kiro-cli-local-data.md" "$KIRO_STEERING_DIR/v3/memory-sources.md"; do   # kiro_default.json: 2026-08-18; the rest: 2026-09-20
-        if [ -e "$stale" ] || [ -L "$stale" ]; then
+        [ -e "$stale" ] || [ -L "$stale" ] || continue
+        lk=""
+        if [ -f "$stale" ] && [ ! -L "$stale" ]; then
+            lk="$(awk -F'\t' -v k="$(lock_key "$stale")" '$2 == k && $1 != "backup" && $1 != "setting" { print $3; exit }' "$LOCK_WORK/old")"
+        fi
+        if is_engine_link "$stale" || { [ -n "$lk" ] && [ "$(sha_of "$stale")" = "$lk" ]; }; then
             act rm -f "$stale"
             echo "  REMOVED stale: $stale"
+        else
+            echo "  NOTE: $stale is a retired playbook name, but not a file setup wrote unchanged"
+            backup_path "$stale" || true
         fi
     done
     # Directories: the retired v2-only/ and v3/ steering subdirectories (kiro-cli v2
@@ -1418,6 +1607,10 @@ restore_backup() {
     local p="$1" val
     val="$(lock_get backup "$(lock_key "$p")")"
     [ -n "$val" ] || return 0
+    if ! no_link_parent "$p" "$HOME"; then
+        echo "  WARN: $p.bak is not restored: a folder above it is a link (restore it by hand if you need it)"
+        return 0
+    fi
     [ -e "$p.bak" ] || [ -L "$p.bak" ] || return 0
     if [ -e "$p" ] || [ -L "$p" ]; then
         echo "  KEPT: $p.bak ($p is still there)"
@@ -1457,7 +1650,8 @@ uninstall_owned_file() {
         if [ -n "$lk" ]; then
             [ "$(sha_of "$dest")" = "$lk" ] && same=1
         elif [ "$kind" = template-file ]; then
-            [ "$(render_template "$source")" = "$(cat "$dest")" ] && same=1
+            render_template "$source" > "$LOCK_WORK/uninstall-render"
+            cmp -s "$LOCK_WORK/uninstall-render" "$dest" && same=1
         else
             cmp -s "$source" "$dest" && same=1
         fi
@@ -1486,16 +1680,34 @@ uninstall_mode() {
 
 # uninstall_generated_copies: the files of the generated Kiro copies the lock names. Each is removed
 # when unchanged since setup wrote it, else kept; then the empty folders go and the backups setup
-# made there are restored.
+# made there are restored. With no readable lock, a file of a generated copy is removed only when it
+# equals what setup would write there now.
 uninstall_generated_copies() {
-    local w="$LOCK_WORK/uninstall" h val p kind key n_kept=0 d
+    local w="$LOCK_WORK/uninstall" h val p key d skill_dir name
     awk -F'\t' '($1 == "copy-dir-recursive" || $1 == "merge-file") && index($2, "~/.kiro/skills/") == 1' \
         "$LOCK_WORK/old" > "$w"
+    if [ "$LOCK_READABLE" -eq 0 ]; then
+        # rows built from what setup writes now: the hash a file must still have to be removed
+        for skill_dir in "$SHARED_DIR/skills"/*/; do
+            name="$(basename "$skill_dir")"
+            [ -f "$skill_dir/SKILL.md" ] && has_any_overlay "$SCRIPT_DIR/providers/kiro/skills/$name" || continue
+            gen_expected "${skill_dir%/}" "$SCRIPT_DIR/providers/kiro/skills/$name" "$name" "$LOCK_WORK/unl-$name"
+            awk -F'\t' -v eh="$LOCK_WORK/unl-$name/exp.h" -v pre="~/.kiro/skills/$name/" '
+                FILENAME == eh { h[$2] = $1; next } { print $2 "\t" pre $1 "\t" h[$3] }
+            ' "$LOCK_WORK/unl-$name/exp.h" "$LOCK_WORK/unl-$name/exp" >> "$w"
+        done
+    fi
+    cut -f2 "$w" | awk -F/ '{ print $4 }' | LC_ALL=C sort -u > "$w.names"
+    : > "$w.existed"
+    while IFS= read -r d; do
+        if [ -d "$HOME/.kiro/skills/$d" ] && [ ! -L "$HOME/.kiro/skills/$d" ]; then printf '%s\n' "$d" >> "$w.existed"; fi
+    done < "$w.names"
     locked_files_present "$w" "$HOME/.kiro/skills" "$w.lst"
     sha_list "$w.lst" > "$w.h"
-    awk -F'\t' -v hf="$w.h" -v home="$HOME" '
-        FILENAME == hf { h[$2] = $1; next }
-        { p = home "/" substr($2, 3); if (p in h) print h[p] "\t" $3 "\t" p }
+    awk -F'\t' -v hf="$w.h" -v home="$HOME" -v fold="$IS_MSYS" '
+        function k(s) { return fold ? tolower(s) : s }
+        FILENAME == hf { h[k($2)] = $1; real[k($2)] = $2; next }
+        { p = k(home "/" substr($2, 3)); if (p in h) print h[p] "\t" $3 "\t" real[p] }
     ' "$w.h" "$w" > "$w.plan"
     : > "$w.rm"
     while IFS=$'\t' read -r h val p; do
@@ -1503,47 +1715,58 @@ uninstall_generated_copies() {
             printf '%s\0' "$p" >> "$w.rm"
         else
             echo "  KEPT: $p (changed since setup wrote it)"
-            n_kept=$((n_kept + 1))
         fi
     done < "$w.plan"
     remove_listed "$w.rm"
     awk -F'\t' '$1 == "backup" && index($2, "~/.kiro/skills/") == 1 { print $2 }' "$LOCK_WORK/old" > "$w.bak"
     while IFS= read -r key; do restore_backup "$(lock_path "$key")"; done < "$w.bak"
-    for d in $(cut -f2 "$w" | awk -F/ '{ print $4 }' | LC_ALL=C sort -u); do
+    while IFS= read -r d; do
         if [ -d "$HOME/.kiro/skills/$d" ] && [ ! -L "$HOME/.kiro/skills/$d" ]; then
             echo "  KEPT: $HOME/.kiro/skills/$d (holds files that are not setup's unchanged ones)"
         else
             echo "  REMOVED: $HOME/.kiro/skills/$d (generated copy)"
         fi
-    done
+    done < "$w.existed"
 }
 
 # uninstall_kiro_setting: revert chat.defaultAgent only when the lock shows setup set it and it
-# still names kiro_default.
+# still names kiro_default. When the revert cannot be tried (no kiro-cli, AGENT_PLAYBOOK_SKIP_KIRO_CLI,
+# a value that cannot be read, a failed command), the lock keeps the row for a later uninstall.
 uninstall_kiro_setting() {
     local val cur v
-    command -v kiro-cli >/dev/null 2>&1 || return 0
     val="$(lock_get setting "$LOCK_SETTING_KEY")"
+    if ! command -v kiro-cli >/dev/null 2>&1; then
+        [ -z "$val" ] || { echo "  NOTE: no kiro-cli here, so chat.defaultAgent is not reverted; the deploy lock keeps it for a later uninstall"; lock_add setting "$LOCK_SETTING_KEY" "$val"; }
+        return 0
+    fi
     if [ "${AGENT_PLAYBOOK_SKIP_KIRO_CLI:-}" = "1" ]; then
         echo "  SKIP: kiro-cli settings (AGENT_PLAYBOOK_SKIP_KIRO_CLI=1)"
+        [ -z "$val" ] || lock_add setting "$LOCK_SETTING_KEY" "$val"
         return 0
     fi
     if [ -z "$val" ]; then
         echo "  NOTE: setup did not set kiro-cli's chat.defaultAgent, so it is left as is"
         return 0
     fi
-    cur="$(kiro-cli settings -f json --global chat.defaultAgent 2>/dev/null | tr -d '[:space:]' || true)"
+    if ! cur="$(kiro_default_agent)"; then
+        echo "  WARN: kiro-cli's chat.defaultAgent could not be read, so it is not reverted; the deploy lock keeps it for a later uninstall"
+        lock_add setting "$LOCK_SETTING_KEY" "$val"
+        return 0
+    fi
     if [ "$cur" != '"kiro_default"' ]; then
         echo "  NOTE: kiro-cli's chat.defaultAgent changed since setup set it, so it is left as is"
         return 0
     fi
-    if [ "$val" = "-" ]; then
-        act kiro-cli settings --global --delete chat.defaultAgent
+    if [ "$DRY_RUN" -eq 1 ]; then
+        echo "    DRY: revert kiro-cli chat.defaultAgent to $val"
+    elif [ "$val" = "-" ] && kiro-cli settings --global --delete chat.defaultAgent; then
+        echo "  RESTORED: kiro-cli chat.defaultAgent (to ${val})"
+    elif [ "$val" != "-" ] && { v="${val#\"}"; v="${v%\"}"; kiro-cli settings --global chat.defaultAgent "$v"; }; then
+        echo "  RESTORED: kiro-cli chat.defaultAgent (to ${val})"
     else
-        v="${val#\"}"; v="${v%\"}"
-        act kiro-cli settings --global chat.defaultAgent "$v"
+        echo "  WARN: kiro-cli could not revert chat.defaultAgent; the deploy lock keeps it for a later uninstall"
+        lock_add setting "$LOCK_SETTING_KEY" "$val"
     fi
-    echo "  RESTORED: kiro-cli chat.defaultAgent (to ${val})"
 }
 
 # uninstall_lock_rows <file>: the rows of the previous lock that belong to providers not uninstalled.
@@ -1637,4 +1860,8 @@ if wants claude; then
         echo "NOTE: ~/.claude/settings.json was not changed. '/qconfig-sync' reports which Claude Code"
         echo "      entries are set, and providers/claude/README.md says how to add them."
     fi
+fi
+if [ "$BACKUP_FAILED" -gt 0 ]; then
+    echo "ERROR: $BACKUP_FAILED path(s) could not be backed up and were left unchanged (the ERROR lines above); close what holds them, then re-run setup" >&2
+    exit 1
 fi

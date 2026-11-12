@@ -43,8 +43,8 @@ Interactive setup:
 4. Offers to clone your store repo or create a new one (see below).
 5. Writes `~/.agent-playbook/config`.
 
-Setup records every file it writes in `~/.agent-playbook/deploy-lock.tsv`, so a re-run changes
-only what changed.
+Setup records every file it writes in `~/.agent-playbook/deploy-lock.tsv` (except the Kiro seed
+files, which it writes only when absent), so a re-run changes only what changed.
 
 Your own global instruction file stays where it is, and the playbook loads beside it:
 
@@ -64,8 +64,11 @@ memory, so every session starts with both tiers in full (`providers/claude/READM
 Any other file of yours where the playbook puts a link is backed up to `<file>.bak` before it
 is replaced: an interactive run asks first, while `--yes` and a run with no terminal back up without
 asking. A file setup wrote and you then edited is backed up the same way, without asking. Setup keeps
-one `.bak` per path, so a later backup replaces an earlier one. A skill folder of yours with a
-playbook skill's name is never replaced.
+one `.bak` per path, so a later backup replaces an earlier one. A `.bak` that setup did not make
+is never replaced: setup leaves it and the file beside it alone, and says so. When a backup cannot
+be made (another program holds the file open), setup leaves that path as it is, prints an `ERROR`,
+and ends with a non-zero exit code; close the program and run setup again. A skill folder of yours
+with a playbook skill's name is never replaced; rename or remove it to get the playbook's skill.
 
 Non-interactive: `./setup.sh --yes --providers claude,codex`. Remove everything again with
 `./setup.sh --uninstall` (add `--purge` to drop the pointer file too). See `./setup.sh --help`.

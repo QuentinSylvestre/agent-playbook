@@ -5,7 +5,9 @@
 #         | template-file | seed-file
 # - template-file: copied with {{USER_HOME}} / {{PLAYBOOK_ROOT}} substituted at deploy
 #   time. Tokens expand to the platform-native root written with forward slashes
-#   (C:/Users/X on Windows), so no consumer needs a backslash escape; authors MUST use
+#   (C:/Users/X on Windows, from setup.sh under Git Bash as from setup.ps1, so both write
+#   the same bytes; {{PLAYBOOK_ROOT}} with no 8.3 short names), so no consumer needs a
+#   backslash escape; authors MUST use
 #   forward slashes for everything after the token too (Windows tolerates the mixed
 #   form, POSIX needs it). Consumers are JSON, markdown, and YAML values written in
 #   double quotes.

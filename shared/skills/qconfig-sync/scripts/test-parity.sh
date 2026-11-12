@@ -459,12 +459,22 @@ fi
 # SC-1 of plan 261111_DEPLOYMENT_OWNERSHIP_AND_CLIENT_LOAD_VERIFICATION: the
 # deploy lock and the per-file comparison make a re-run a no-op. Every entry
 # under the sandbox HOME (files, links, folders) keeps its type, mtime and inode
-# across run 2, the deploy lock included. Always runs.
+# across run 2, the deploy lock included. Always runs. Under Git Bash run 2 starts setup.sh through
+# the repo's 8.3 short path (cygpath -d) when it has one, so the playbook's links, made through the
+# long path, must still read as its own (no .bak, no relink); a SKIP line says when there is none.
 NO_REWRITE_OK=1
+local nr_script="$SETUP_SCRIPT" nr_short
+if [ "$PARITY_ON_WINDOWS" -eq 1 ] && nr_short="$(cygpath -u "$(cygpath -d "$REPO_ROOT" 2>/dev/null)" 2>/dev/null)" \
+    && [ -n "$nr_short" ] && [ "$nr_short" != "$REPO_ROOT" ] && [ -f "$nr_short/setup.sh" ]; then
+    nr_script="$nr_short/setup.sh"
+    echo "NO-REWRITE: run 2 starts setup.sh through the repo's 8.3 short path $nr_short"
+else
+    echo "NO-REWRITE SKIP (short path): the repo has no 8.3 short path here; run 2 uses the long path"
+fi
 nr_snapshot "$SETUP_VERIFY_SANDBOX" > "$TMPDIR_PARITY/no-rewrite-1.tsv"
 if HOME="$SETUP_VERIFY_SANDBOX" XDG_CONFIG_HOME="$SETUP_VERIFY_SANDBOX/.config" \
     APPDATA="$SETUP_VERIFY_SANDBOX/AppData/Roaming" \
-    AGENT_PLAYBOOK_SKIP_KIRO_CLI=1 bash "$SETUP_SCRIPT" < /dev/null > "$TMPDIR_PARITY/no-rewrite.log" 2>&1; then
+    AGENT_PLAYBOOK_SKIP_KIRO_CLI=1 bash "$nr_script" < /dev/null > "$TMPDIR_PARITY/no-rewrite.log" 2>&1; then
     nr_exit=0
 else
     nr_exit=$?
@@ -996,7 +1006,7 @@ sys.stdout.write("".join(l + "\n" for l in out))
                 case "$rel" in
                     __pycache__|*/__pycache__|__pycache__/*|*/__pycache__/*) continue ;;
                     AppData/Local|AppData/Local/*) continue ;;
-                    # compared on its own, normalised (TWIN-OWNERSHIP)
+                    # byte-compared on its own (TWIN-OWNERSHIP)
                     .agent-playbook/deploy-lock.tsv) continue ;;
                 esac
                 case "$rel" in
@@ -1078,20 +1088,26 @@ parity_sec_ownership() {
 # --- OWNERSHIP and TWIN-OWNERSHIP: the deploy lock's rules, on both twins ----
 #
 # Runs after SETUP-PARITY (it changes the sandboxes that section compares).
-# TWIN-OWNERSHIP first compares the two twins' deploy locks: they must be equal
-# once the template-file row's hash is masked (that render is writer-dependent
-# by design: /c/... from Git Bash, C:/... from setup.ps1). Then one collision
-# per ownership rule is planted in the setup.sh sandbox (OWNERSHIP, always
-# runs) and, where SETUP-PARITY ran, the same ones in the setup.ps1 sandbox
-# (TWIN-OWNERSHIP): setup runs again for Kiro and each outcome is checked; a
-# third setup.sh run must write nothing (no .bak growth); then a Kiro
-# uninstall and its outcomes. The fixtures forge lock rows and plant files;
-# they never touch the repo.
+# TWIN-OWNERSHIP first compares the two twins' deploy locks: they must be byte-equal (both twins
+# render the template tokens in the same C:/... form), and a second setup.ps1 run must write nothing
+# (as NO-REWRITE does for setup.sh). Then, on the setup.sh sandbox (OWNERSHIP, always runs) and,
+# where SETUP-PARITY ran, the setup.ps1 one (TWIN-OWNERSHIP), the same steps run with a stub
+# kiro-cli on PATH (see own_stub; never the real one) and each outcome is checked:
+#   1. one collision per ownership rule is planted; setup runs for Kiro; it sets chat.defaultAgent;
+#   2. a re-run writes nothing (no .bak growth) and keeps chat.defaultAgent as it is;
+#   3. a file held open by another process cannot be backed up (the run ends non-zero, the path is
+#      left alone), a .bak that is not setup's is left alone, a later backup replaces an earlier
+#      one, and a chat.defaultAgent that cannot be read is not set;
+#   4. a Kiro uninstall (the setting unreadable: its lock row is kept), with a journal row an
+#      interrupted run left; 5. a second uninstall reverts the setting;
+#   6. an uninstall with an unreadable lock: the lock goes to .bak, and only files equal to what
+#      setup writes now are removed.
+# Every run's exit code is checked. The fixtures forge lock rows and plant files; they never touch
+# the repo.
 OWNERSHIP_OK=1
 TWIN_OWNERSHIP_OK=1
 TWIN_OWNERSHIP_SKIPPED=0
-OWN_FAIL=0
-local sh_sb="$SETUP_VERIFY_SANDBOX" ps_sb="$TMPDIR_PARITY/setup-parity-sandbox2" twin=1
+local sh_sb="$SETUP_VERIFY_SANDBOX" ps_sb="$TMPDIR_PARITY/setup-parity-sandbox2" twin=1 sh_pid
 if [ -z "$PS_BIN" ] || [ ! -f "$SETUP_PS1_SCRIPT" ] || [ "$(uname -o 2>/dev/null)" != "Msys" ] \
     || [ "$(cat "$ps_sb.rc" 2>/dev/null)" != 0 ]; then
     twin=0
@@ -1099,82 +1115,218 @@ if [ -z "$PS_BIN" ] || [ ! -f "$SETUP_PS1_SCRIPT" ] || [ "$(uname -o 2>/dev/null
     echo "TWIN-OWNERSHIP SKIP: no setup.ps1 sandbox (SETUP-PARITY did not deploy one here) -- the setup.ps1 lock and ownership checks are skipped."
 fi
 if [ "$twin" -eq 1 ]; then
-    awk -F'\t' -v OFS='\t' '$1 == "template-file" { $3 = "<render>" } 1' "$sh_sb/.agent-playbook/deploy-lock.tsv" > "$TMPDIR_PARITY/lock-sh.tsv"
-    awk -F'\t' -v OFS='\t' '$1 == "template-file" { $3 = "<render>" } 1' "$ps_sb/.agent-playbook/deploy-lock.tsv" > "$TMPDIR_PARITY/lock-ps.tsv"
-    if [ -s "$TMPDIR_PARITY/lock-sh.tsv" ] && cmp -s "$TMPDIR_PARITY/lock-sh.tsv" "$TMPDIR_PARITY/lock-ps.tsv"; then
-        echo "TWIN-OWNERSHIP OK: the setup.sh and setup.ps1 deploy locks agree ($(wc -l < "$TMPDIR_PARITY/lock-sh.tsv") lines, template hash masked)"
+    if [ -s "$sh_sb/.agent-playbook/deploy-lock.tsv" ] && cmp -s "$sh_sb/.agent-playbook/deploy-lock.tsv" "$ps_sb/.agent-playbook/deploy-lock.tsv"; then
+        echo "TWIN-OWNERSHIP OK: the setup.sh and setup.ps1 deploy locks are byte-equal ($(wc -l < "$sh_sb/.agent-playbook/deploy-lock.tsv") lines)"
     else
         TWIN_OWNERSHIP_OK=0
         echo "TWIN-OWNERSHIP DRIFT: the two deploy locks differ (- setup.sh, + setup.ps1):" >&2
-        diff "$TMPDIR_PARITY/lock-sh.tsv" "$TMPDIR_PARITY/lock-ps.tsv" | head -n 20 >&2 || true
+        diff "$sh_sb/.agent-playbook/deploy-lock.tsv" "$ps_sb/.agent-playbook/deploy-lock.tsv" | head -n 20 >&2 || true
+    fi
+    cx_snapshot "$ps_sb" > "$TMPDIR_PARITY/nr-ps-1.tsv"
+    own_run_ps "$ps_sb" nr-ps
+    cx_snapshot "$ps_sb" > "$TMPDIR_PARITY/nr-ps-2.tsv"
+    if own_rc nr-ps 0 && cmp -s "$TMPDIR_PARITY/nr-ps-1.tsv" "$TMPDIR_PARITY/nr-ps-2.tsv"; then
+        echo "TWIN-OWNERSHIP OK: a second setup.ps1 run wrote nothing ($(wc -l < "$TMPDIR_PARITY/nr-ps-1.tsv") entries kept their mtime and inode)"
+    else
+        TWIN_OWNERSHIP_OK=0
+        echo "TWIN-OWNERSHIP FAIL: the second setup.ps1 run changed the sandbox (exit=$(cat "$TMPDIR_PARITY/nr-ps.rc"))" >&2
+        diff "$TMPDIR_PARITY/nr-ps-1.tsv" "$TMPDIR_PARITY/nr-ps-2.tsv" | head -n 20 >&2 || true
     fi
 fi
 
+# the stub kiro-cli, one per twin; a twin whose shell would not resolve it runs with
+# AGENT_PLAYBOOK_SKIP_KIRO_CLI=1 instead and its setting checks are skipped
+own_stub "$sh_sb" sh
+[ "$twin" -eq 1 ] && own_stub "$ps_sb" ps
+own_stub_state "$sh_sb" '"my_agent"' ok
+[ "$twin" -eq 1 ] && own_stub_state "$ps_sb" '"my_agent"' ok
+
+# 1. collisions, and chat.defaultAgent set
 own_plant "$sh_sb"
 [ "$twin" -eq 1 ] && own_plant "$ps_sb"
 own_run_sh "$sh_sb" own-sh-1 --providers kiro &
-local sh_pid=$!
+sh_pid=$!
 [ "$twin" -eq 1 ] && own_run_ps "$ps_sb" own-ps-1 -Providers kiro
 wait "$sh_pid" || true
-own_check_deploy "$sh_sb" "$TMPDIR_PARITY/own-sh-1.log" "setup.sh"
-[ "$OWN_FAIL" -eq 0 ] || OWNERSHIP_OK=0
-if [ "$twin" -eq 1 ]; then
-    OWN_FAIL=0
-    own_check_deploy "$ps_sb" "$TMPDIR_PARITY/own-ps-1.log" "setup.ps1"
-    [ "$OWN_FAIL" -eq 0 ] || TWIN_OWNERSHIP_OK=0
-fi
+own_check_deploy "$sh_sb" "$TMPDIR_PARITY/own-sh-1.log" "setup.sh" own-sh-1
+[ "$twin" -eq 1 ] && own_check_deploy "$ps_sb" "$TMPDIR_PARITY/own-ps-1.log" "setup.ps1" own-ps-1
 
-OWN_FAIL=0
-nr_snapshot "$sh_sb" > "$TMPDIR_PARITY/own-rerun-1.tsv"
-own_run_sh "$sh_sb" own-sh-2 --providers kiro
-nr_snapshot "$sh_sb" > "$TMPDIR_PARITY/own-rerun-2.tsv"
-cmp -s "$TMPDIR_PARITY/own-rerun-1.tsv" "$TMPDIR_PARITY/own-rerun-2.tsv" \
-    || own_fail setup.sh "a re-run after the collisions writes nothing (no .bak growth)"
+# 2. a re-run writes nothing
+own_stub_state "$sh_sb" '' ok
+[ "$twin" -eq 1 ] && own_stub_state "$ps_sb" '' ok
+nr_snapshot "$sh_sb" > "$TMPDIR_PARITY/own-rerun-sh-1.tsv"
+[ "$twin" -eq 1 ] && cx_snapshot "$ps_sb" > "$TMPDIR_PARITY/own-rerun-ps-1.tsv"
+own_run_sh "$sh_sb" own-sh-2 --providers kiro &
+sh_pid=$!
+[ "$twin" -eq 1 ] && own_run_ps "$ps_sb" own-ps-2 -Providers kiro
+wait "$sh_pid" || true
+nr_snapshot "$sh_sb" > "$TMPDIR_PARITY/own-rerun-sh-2.tsv"
+[ "$twin" -eq 1 ] && cx_snapshot "$ps_sb" > "$TMPDIR_PARITY/own-rerun-ps-2.tsv"
+own_check_rerun "$sh_sb" setup.sh own-sh-2 sh
+[ "$twin" -eq 1 ] && own_check_rerun "$ps_sb" setup.ps1 own-ps-2 ps
+
+# 3. a backup that cannot be made, a .bak that is not setup's, a later backup, an unreadable setting
+own_plant_hold "$sh_sb"
+[ "$twin" -eq 1 ] && own_plant_hold "$ps_sb"
+own_stub_state "$sh_sb" '' fail-read
+[ "$twin" -eq 1 ] && own_stub_state "$ps_sb" '' fail-read
+own_run_sh "$sh_sb" own-sh-3 --providers kiro &
+sh_pid=$!
+[ "$twin" -eq 1 ] && own_run_ps "$ps_sb" own-ps-3 -Providers kiro
+wait "$sh_pid" || true
+own_release "$sh_sb"
+[ "$twin" -eq 1 ] && own_release "$ps_sb"
+own_check_hold "$sh_sb" setup.sh own-sh-3
+[ "$twin" -eq 1 ] && own_check_hold "$ps_sb" setup.ps1 own-ps-3
+
+# 4. uninstall, the setting unreadable; 5. uninstall again, the setting reverted
 own_plant_uninstall "$sh_sb"
 [ "$twin" -eq 1 ] && own_plant_uninstall "$ps_sb"
-own_run_sh "$sh_sb" own-sh-3 --uninstall --providers kiro &
+own_run_sh "$sh_sb" own-sh-4 --uninstall --providers kiro &
 sh_pid=$!
-[ "$twin" -eq 1 ] && own_run_ps "$ps_sb" own-ps-3 -Uninstall -Providers kiro
+[ "$twin" -eq 1 ] && own_run_ps "$ps_sb" own-ps-4 -Uninstall -Providers kiro
 wait "$sh_pid" || true
-own_check_uninstall "$sh_sb" "setup.sh"
-[ "$OWN_FAIL" -eq 0 ] || OWNERSHIP_OK=0
-if [ "$twin" -eq 1 ]; then
-    OWN_FAIL=0
-    own_check_uninstall "$ps_sb" "setup.ps1"
-    [ "$OWN_FAIL" -eq 0 ] || TWIN_OWNERSHIP_OK=0
-fi
+own_check_uninstall "$sh_sb" "setup.sh" own-sh-4
+[ "$twin" -eq 1 ] && own_check_uninstall "$ps_sb" "setup.ps1" own-ps-4
+own_stub_state "$sh_sb" '' ok
+[ "$twin" -eq 1 ] && own_stub_state "$ps_sb" '' ok
+own_run_sh "$sh_sb" own-sh-5 --uninstall --providers kiro &
+sh_pid=$!
+[ "$twin" -eq 1 ] && own_run_ps "$ps_sb" own-ps-5 -Uninstall -Providers kiro
+wait "$sh_pid" || true
+own_check_revert "$sh_sb" setup.sh own-sh-5
+[ "$twin" -eq 1 ] && own_check_revert "$ps_sb" setup.ps1 own-ps-5
+
+# 6. uninstall with an unreadable lock
+own_plant_nolock "$sh_sb"
+[ "$twin" -eq 1 ] && own_plant_nolock "$ps_sb"
+own_run_sh "$sh_sb" own-sh-6 --uninstall --providers kiro &
+sh_pid=$!
+[ "$twin" -eq 1 ] && own_run_ps "$ps_sb" own-ps-6 -Uninstall -Providers kiro
+wait "$sh_pid" || true
+own_check_nolock "$sh_sb" setup.sh own-sh-6
+[ "$twin" -eq 1 ] && own_check_nolock "$ps_sb" setup.ps1 own-ps-6
+
 if [ "$OWNERSHIP_OK" -eq 1 ]; then
-    echo "OWNERSHIP OK: setup.sh keeps, backs up, replaces, retires and uninstalls each planted collision by the deploy lock"
+    echo "OWNERSHIP OK: setup.sh keeps, backs up, replaces, retires and uninstalls each planted collision by the deploy lock, fails loudly on a backup it cannot make, and sets and reverts chat.defaultAgent through a stub kiro-cli"
 else
     echo "  --- setup.sh logs (tail) ---" >&2
-    tail -n 15 "$TMPDIR_PARITY/own-sh-1.log" "$TMPDIR_PARITY/own-sh-3.log" >&2 || true
+    tail -n 15 "$TMPDIR_PARITY/own-sh-1.log" "$TMPDIR_PARITY/own-sh-3.log" "$TMPDIR_PARITY/own-sh-4.log" >&2 || true
 fi
 if [ "$twin" -eq 1 ] && [ "$TWIN_OWNERSHIP_OK" -eq 1 ]; then
     echo "TWIN-OWNERSHIP OK: setup.ps1 meets the same ownership checks"
 elif [ "$twin" -eq 1 ]; then
     echo "  --- setup.ps1 logs (tail) ---" >&2
-    tail -n 15 "$TMPDIR_PARITY/own-ps-1.log" "$TMPDIR_PARITY/own-ps-3.log" >&2 || true
+    tail -n 15 "$TMPDIR_PARITY/own-ps-1.log" "$TMPDIR_PARITY/own-ps-3.log" "$TMPDIR_PARITY/own-ps-4.log" >&2 || true
 fi
 }
 
 # own_run_sh <sandbox> <log name> <args...> / own_run_ps: a sandboxed setup run, with no terminal
-# and never --yes (which would repoint the repo's memory link into the sandbox).
+# and never --yes (which would repoint the repo's memory link into the sandbox). The exit code goes
+# to <log name>.rc. With a stub kiro-cli made for the sandbox (own_stub), PATH starts with the stub
+# and holds no folder with another kiro-cli, and AGENT_PLAYBOOK_SKIP_KIRO_CLI is unset; otherwise
+# AGENT_PLAYBOOK_SKIP_KIRO_CLI=1, so the real kiro-cli is never run.
 own_run_sh() {
-    local sb="$1" log="$2"; shift 2
-    HOME="$sb" XDG_CONFIG_HOME="$sb/.config" APPDATA="$sb/AppData/Roaming" AGENT_PLAYBOOK_SKIP_KIRO_CLI=1 \
-        bash "$SETUP_SCRIPT" "$@" < /dev/null > "$TMPDIR_PARITY/$log.log" 2>&1 || true
+    local sb="$1" log="$2" rc=0; shift 2
+    if [ -f "$sb.stub/use" ]; then
+        env -u AGENT_PLAYBOOK_SKIP_KIRO_CLI HOME="$sb" XDG_CONFIG_HOME="$sb/.config" APPDATA="$sb/AppData/Roaming" \
+            KIRO_STUB_DIR="$(parity_native_path "$sb.stub")" PATH="$sb.stub/bin-sh:$(own_path_without_kiro)" \
+            bash "$SETUP_SCRIPT" "$@" < /dev/null > "$TMPDIR_PARITY/$log.log" 2>&1 || rc=$?
+    else
+        HOME="$sb" XDG_CONFIG_HOME="$sb/.config" APPDATA="$sb/AppData/Roaming" AGENT_PLAYBOOK_SKIP_KIRO_CLI=1 \
+            bash "$SETUP_SCRIPT" "$@" < /dev/null > "$TMPDIR_PARITY/$log.log" 2>&1 || rc=$?
+    fi
+    echo "$rc" > "$TMPDIR_PARITY/$log.rc"
 }
 own_run_ps() {
-    local sb="$1" log="$2"; shift 2
-    USERPROFILE="$(cygpath -w "$sb")" APPDATA="$(cygpath -w "$sb/AppData/Roaming")" AGENT_PLAYBOOK_SKIP_KIRO_CLI=1 \
-        "$PS_BIN" -NoProfile -NonInteractive -File "$(cygpath -w "$SETUP_PS1_SCRIPT")" "$@" \
-        < /dev/null > "$TMPDIR_PARITY/$log.log" 2>&1 || true
+    local sb="$1" log="$2" rc=0; shift 2
+    if [ -f "$sb.stub/use" ]; then
+        env -u AGENT_PLAYBOOK_SKIP_KIRO_CLI USERPROFILE="$(cygpath -w "$sb")" APPDATA="$(cygpath -w "$sb/AppData/Roaming")" \
+            KIRO_STUB_DIR="$(cygpath -w "$sb.stub")" PATH="$sb.stub/bin-ps:$(own_path_without_kiro)" \
+            "$PS_BIN" -NoProfile -NonInteractive -File "$(cygpath -w "$SETUP_PS1_SCRIPT")" "$@" \
+            < /dev/null > "$TMPDIR_PARITY/$log.log" 2>&1 || rc=$?
+    else
+        USERPROFILE="$(cygpath -w "$sb")" APPDATA="$(cygpath -w "$sb/AppData/Roaming")" AGENT_PLAYBOOK_SKIP_KIRO_CLI=1 \
+            "$PS_BIN" -NoProfile -NonInteractive -File "$(cygpath -w "$SETUP_PS1_SCRIPT")" "$@" \
+            < /dev/null > "$TMPDIR_PARITY/$log.log" 2>&1 || rc=$?
+    fi
+    echo "$rc" > "$TMPDIR_PARITY/$log.rc"
 }
 
-# Ownership fixtures for parity_sec_ownership.
-# own_plant <sandbox>: plant one collision per ownership rule into a deployed sandbox that has a lock.
-# own_check_deploy <sandbox> <setup log> <label>, own_check_uninstall <sandbox> <label>: assert the
-# outcome; each failed check prints a line and sets OWN_FAIL=1.
+# own_rc <log name> <0|nonzero>: the run's exit code was 0, or was not.
+own_rc() {
+    local rc
+    rc="$(cat "$TMPDIR_PARITY/$1.rc" 2>/dev/null || echo missing)"
+    if [ "$2" = 0 ]; then [ "$rc" = 0 ]; else [ "$rc" != 0 ] && [ "$rc" != missing ]; fi
+}
+
+# own_path_without_kiro: PATH minus every folder that holds a kiro-cli (the real one included).
+own_path_without_kiro() {
+    local IFS=: d out=""
+    for d in $PATH; do
+        [ -n "$d" ] || continue
+        if [ -e "$d/kiro-cli" ] || [ -e "$d/kiro-cli.exe" ] || [ -e "$d/kiro-cli.cmd" ]; then continue; fi
+        out="${out:+$out:}$d"
+    done
+    printf '%s' "$out"
+}
+
+# own_stub <sandbox> <sh|ps>: a stub kiro-cli beside the sandbox (never inside it, so the snapshot
+# compares do not see it): <sandbox>.stub/{bin-sh/kiro-cli, bin-ps/kiro-cli.cmd} run stub.py, which
+# logs each call to calls.log, answers `settings -f json --global chat.defaultAgent` from value.json
+# (null when absent; exit 1 in mode fail-read) and sets or deletes the value. Used only when the
+# twin's own shell resolves kiro-cli to the stub (else <sandbox>.stub/use is not made).
+OWN_STUB_PY='import json, os, sys
+d = os.environ["KIRO_STUB_DIR"]
+a = sys.argv[1:]
+with open(os.path.join(d, "calls.log"), "a", encoding="utf-8") as f:
+    f.write(" ".join(a) + "\n")
+mode = open(os.path.join(d, "mode"), encoding="utf-8").read().strip()
+val = os.path.join(d, "value.json")
+if a == ["settings", "-f", "json", "--global", "chat.defaultAgent"]:
+    if mode == "fail-read":
+        sys.exit(1)
+    print(open(val, encoding="utf-8").read().strip() if os.path.exists(val) else "null")
+elif a == ["settings", "--global", "--delete", "chat.defaultAgent"]:
+    if os.path.exists(val):
+        os.remove(val)
+elif len(a) == 4 and a[:3] == ["settings", "--global", "chat.defaultAgent"]:
+    open(val, "w", encoding="utf-8").write(json.dumps(a[3]))
+else:
+    sys.exit(2)
+'
+own_stub() {
+    local sb="$1" t="$2" st="$1.stub" py_w got
+    mkdir -p "$st/bin-sh" "$st/bin-ps"
+    printf '%s' "$OWN_STUB_PY" > "$st/stub.py"
+    py_w="$(parity_native_path "$VERIFY_PY")"
+    printf '#!/usr/bin/env bash\nexec "%s" -I "%s" "$@"\n' "$VERIFY_PY" "$(parity_native_path "$st/stub.py")" > "$st/bin-sh/kiro-cli"
+    chmod +x "$st/bin-sh/kiro-cli"
+    printf '@"%s" -I "%s" %%*\r\n' "$py_w" "$(parity_native_path "$st/stub.py")" > "$st/bin-ps/kiro-cli.cmd"
+    if [ "$t" = sh ]; then
+        got="$(PATH="$st/bin-sh:$(own_path_without_kiro)" command -v kiro-cli || true)"
+        [ "$got" = "$st/bin-sh/kiro-cli" ] && : > "$st/use"
+    else
+        got="$(PATH="$st/bin-ps:$(own_path_without_kiro)" "$PS_BIN" -NoProfile -NonInteractive -Command '(Get-Command kiro-cli -ErrorAction SilentlyContinue).Source' < /dev/null 2>/dev/null | tr -d '\r' || true)"
+        [ "$(printf '%s' "$got" | tr '\\' '/' | tr 'A-Z' 'a-z')" = "$(cygpath -m "$st/bin-ps/kiro-cli.cmd" | tr 'A-Z' 'a-z')" ] && : > "$st/use"
+    fi
+    [ -f "$st/use" ] || echo "OWNERSHIP SKIP ($t): kiro-cli does not resolve to the stub here (got '$got'); its chat.defaultAgent checks are skipped"
+}
+
+# own_stub_state <sandbox> <value json, or '' to keep it> <ok|fail-read>: the stub's mode, and its
+# value when one is given; the call log starts empty.
+own_stub_state() {
+    [ -z "$2" ] || printf '%s' "$2" > "$1.stub/value.json"
+    printf '%s\n' "$3" > "$1.stub/mode"
+    : > "$1.stub/calls.log"
+}
+
+# own_stub_used <sandbox>: the stub runs for this twin.
+own_stub_used() { [ -f "$1.stub/use" ]; }
+
+# Ownership fixtures. own_plant <sandbox>: one collision per ownership rule in a deployed sandbox
+# that has a lock. Each own_check_* asserts outcomes; a failed check prints a line and sets the
+# twin's flag to 0.
 
 own_sha() { sha256sum < "$1" | cut -c1-64; }
 
@@ -1182,19 +1334,27 @@ own_lock_add() {   # own_lock_add <sandbox> <kind> <key> <value>
     printf '%s\t%s\t%s\n' "$2" "$3" "$4" >> "$1/.agent-playbook/deploy-lock.tsv"
 }
 
+own_lock_drop() {   # own_lock_drop <sandbox> <key prefix>: remove the lock's rows under the prefix
+    local lock="$1/.agent-playbook/deploy-lock.tsv"
+    awk -F'\t' -v pre="$2" 'index($2, pre) != 1' "$lock" > "$lock.tmp" && mv "$lock.tmp" "$lock"
+}
+
 own_plant() {
-    local sb="$1" k="$1/.kiro" lock="$1/.agent-playbook/deploy-lock.tsv"
+    local sb="$1" k="$1/.kiro" lock="$1/.agent-playbook/deploy-lock.tsv" f
     # 1. a file of yours inside a generated copy
     printf 'mine\n' > "$k/skills/qdev/my-notes.md"
     # 2. a file of a generated copy, edited
     cp "$k/skills/qdev/SKILL.md" "$sb.qdev-skill.orig"
     printf 'edited qdev\n' >> "$k/skills/qdev/SKILL.md"
     cp "$k/skills/qdev/SKILL.md" "$sb.qdev-skill.edited"
-    # 3. a folder of yours at an overlay-bearing skill's name, with no lock rows
+    # 3. a folder of yours at an overlay-bearing skill's name, with no lock rows: a file setup does
+    #    not write there, and one byte-identical to setup's (that alone never makes it setup's)
     rm -rf "$k/skills/qreview"
     mkdir -p "$k/skills/qreview"
     printf 'user qreview\n' > "$k/skills/qreview/SKILL.md"
-    grep -v $'\t~/.kiro/skills/qreview/' "$lock" > "$lock.tmp" && mv "$lock.tmp" "$lock"
+    printf 'my own\n' > "$k/skills/qreview/my-own.md"
+    cp "$REPO_ROOT/shared/skills/qreview/full-effort.md" "$k/skills/qreview/full-effort.md"
+    own_lock_drop "$sb" "~/.kiro/skills/qreview/"
     # 4. a copy-file row, edited
     printf 'edited authoring\n' > "$k/AUTHORING.md"
     # 5. a foreign symlink at a link path
@@ -1218,23 +1378,66 @@ own_plant() {
     rm -f "$k/skills/qcouncil" 2>/dev/null || rmdir "$k/skills/qcouncil"
     mkdir -p "$k/skills/qcouncil"
     printf 'user qcouncil\n' > "$k/skills/qcouncil/SKILL.md"
+    # 10. an older generated copy the lock names no file of, every file at a path setup writes, one
+    #     edited: it is setup's, so the edited file goes to .bak
+    cp "$k/skills/qplan/SKILL.md" "$sb.qplan-skill.orig"
+    printf 'an older qplan\n' > "$k/skills/qplan/SKILL.md"
+    own_lock_drop "$sb" "~/.kiro/skills/qplan/"
+    # 11. a plain skill's folder holding a file setup wrote, unchanged, beside a file of yours: kept
+    #     whole, setup's file and its lock row included, with a warning
+    rm -f "$k/skills/qhandoff" 2>/dev/null || rmdir "$k/skills/qhandoff"
+    mkdir -p "$k/skills/qhandoff"
+    cp "$REPO_ROOT/shared/skills/qhandoff/SKILL.md" "$k/skills/qhandoff/SKILL.md"
+    printf 'mine\n' > "$k/skills/qhandoff/mine.md"
+    own_lock_add "$sb" copy-dir-recursive "~/.kiro/skills/qhandoff/SKILL.md" "$(own_sha "$k/skills/qhandoff/SKILL.md")"
+    #     the same with the file setup wrote edited since: kept too, never backed up
+    rm -f "$k/skills/qclose" 2>/dev/null || rmdir "$k/skills/qclose"
+    mkdir -p "$k/skills/qclose"
+    { cat "$REPO_ROOT/shared/skills/qclose/SKILL.md"; printf 'edited qclose\n'; } > "$k/skills/qclose/SKILL.md"
+    cp "$k/skills/qclose/SKILL.md" "$sb.qclose-skill.edited"
+    printf 'mine\n' > "$k/skills/qclose/mine.md"
+    own_lock_add "$sb" copy-dir-recursive "~/.kiro/skills/qclose/SKILL.md" "$(own_sha "$REPO_ROOT/shared/skills/qclose/SKILL.md")"
+    # 12. a file of a generated copy whose name and lock row differ from the source only in letter
+    #     case (NTFS keeps either): the same file, neither backed up nor retired
+    if [ "$(uname -o 2>/dev/null)" = Msys ]; then   # NTFS only: elsewhere letter case makes another file
+    f="$k/skills/qtest/plan-process.md"
+    mv "$f" "$k/skills/qtest/x.tmp" && mv "$k/skills/qtest/x.tmp" "$k/skills/qtest/PLAN-process.md"
+    grep -v $'\t~/.kiro/skills/qtest/plan-process.md\t' "$lock" > "$lock.tmp" && mv "$lock.tmp" "$lock"
+    own_lock_add "$sb" copy-dir-recursive "~/.kiro/skills/qtest/PLAN-process.md" "$(own_sha "$k/skills/qtest/PLAN-process.md")"
+    fi
+    # 13. an edited template-file row
+    cp "$k/agents/kiro_default.md" "$sb.kiro-default.orig"
+    printf 'edited template\n' >> "$k/agents/kiro_default.md"
+    cp "$k/agents/kiro_default.md" "$sb.kiro-default.edited"
+    # 14. a folder above a generated copy's file is a link: that file is skipped
+    mkdir -p "$sb.linked-refs"
+    rm -rf "$k/skills/qextract/references"
+    MSYS=winsymlinks:nativestrict ln -s "$sb.linked-refs" "$k/skills/qextract/references"
+    # 15. a lock row for a seed file (setup never writes one): never retired
+    own_lock_add "$sb" copy-file "~/.kiro/settings/mcp.json" "$(own_sha "$k/settings/mcp.json")"
+    # 16. a retired playbook name (the frozen stale list) holding a file of yours: backed up
+    printf 'my json\n' > "$k/agents/kiro_default.json"
 }
 
-own_fail() { echo "OWNERSHIP FAIL ($1): $2" >&2; OWN_FAIL=1; }
+own_fail() {   # own_fail <setup.sh|setup.ps1> <what>
+    echo "OWNERSHIP FAIL ($1): $2" >&2
+    if [ "$1" = setup.sh ]; then OWNERSHIP_OK=0; else TWIN_OWNERSHIP_OK=0; fi
+}
 
 own_is() {   # own_is <file> <text>: the file holds exactly text plus a newline
     [ -f "$1" ] && [ ! -L "$1" ] && [ "$(cat "$1")" = "$2" ]
 }
 
-own_check_deploy() {
+own_check_deploy() {   # own_check_deploy <sandbox> <log> <label> <log name>
     local sb="$1" log="$2" l="$3" k="$1/.kiro" lock="$1/.agent-playbook/deploy-lock.tsv"
+    own_rc "$4" 0 || own_fail "$l" "the collision run exits 0 (got $(cat "$TMPDIR_PARITY/$4.rc"))"
     own_is "$k/skills/qdev/my-notes.md" mine && [ ! -e "$k/skills/qdev/my-notes.md.bak" ] \
         || own_fail "$l" "a file of yours inside a generated copy is left in place"
     cmp -s "$k/skills/qdev/SKILL.md.bak" "$sb.qdev-skill.edited" && cmp -s "$k/skills/qdev/SKILL.md" "$sb.qdev-skill.orig" \
         || own_fail "$l" "an edited file of a generated copy goes to .bak and is rewritten"
-    own_is "$k/skills/qreview/SKILL.md" "user qreview" && [ "$(find "$k/skills/qreview" | wc -l)" -eq 2 ] \
-        && grep -q 'KEPT: .*qreview' "$log" \
-        || own_fail "$l" "a folder of yours at an overlay skill's name is KEPT, untouched"
+    own_is "$k/skills/qreview/SKILL.md" "user qreview" && own_is "$k/skills/qreview/my-own.md" "my own" \
+        && [ "$(find "$k/skills/qreview" | wc -l)" -eq 4 ] && grep -q 'KEPT: .*qreview' "$log" \
+        || own_fail "$l" "a folder of yours at an overlay skill's name is KEPT, untouched, though one file equals setup's"
     own_is "$k/AUTHORING.md.bak" "edited authoring" && cmp -s "$k/AUTHORING.md" "$REPO_ROOT/shared/AUTHORING.md" \
         || own_fail "$l" "an edited copy-file row goes to .bak and is rewritten"
     [ -L "$k/steering/agents.md.bak" ] && case "$(readlink "$k/steering/agents.md.bak")" in *foreign-target.md) true ;; *) false ;; esac \
@@ -1248,36 +1451,200 @@ own_check_deploy() {
     [ -d "$k/skills/qcouncil" ] && [ ! -L "$k/skills/qcouncil" ] && own_is "$k/skills/qcouncil/SKILL.md" "user qcouncil" \
         && grep -q 'KEPT: .*qcouncil' "$log" \
         || own_fail "$l" "a Kiro skill folder of yours with a SKILL.md is KEPT"
+    own_is "$k/skills/qplan/SKILL.md.bak" "an older qplan" && cmp -s "$k/skills/qplan/SKILL.md" "$sb.qplan-skill.orig" \
+        && grep -q $'^merge-file\t~/.kiro/skills/qplan/SKILL.md\t' "$lock" \
+        || own_fail "$l" "an older copy with no lock rows and only setup's paths is setup's: the edited file goes to .bak"
+    cmp -s "$k/skills/qhandoff/SKILL.md" "$REPO_ROOT/shared/skills/qhandoff/SKILL.md" && own_is "$k/skills/qhandoff/mine.md" mine \
+        && [ ! -L "$k/skills/qhandoff" ] && grep -q 'WARN: .*qhandoff.*no longer updated there' "$log" \
+        && grep -q $'^copy-dir-recursive\t~/.kiro/skills/qhandoff/SKILL.md\t' "$lock" \
+        || own_fail "$l" "a plain skill's folder with setup's file beside yours is kept whole, with a warning and its lock row"
+    cmp -s "$k/skills/qclose/SKILL.md" "$sb.qclose-skill.edited" && [ ! -e "$k/skills/qclose/SKILL.md.bak" ] \
+        && own_is "$k/skills/qclose/mine.md" mine && grep -q 'WARN: .*qclose.*no longer updated there' "$log" \
+        || own_fail "$l" "a plain skill's folder with an edited file of setup's beside yours is kept whole, nothing backed up"
+    if [ "$(uname -o 2>/dev/null)" = Msys ]; then
+    [ -f "$k/skills/qtest/PLAN-process.md" ] && cmp -s "$k/skills/qtest/PLAN-process.md" "$REPO_ROOT/shared/skills/qtest/plan-process.md" \
+        && [ ! -e "$k/skills/qtest/plan-process.md.bak" ] && [ ! -e "$k/skills/qtest/PLAN-process.md.bak" ] \
+        || own_fail "$l" "a file whose name differs from its source only in letter case is neither backed up nor retired"
+    fi
+    cmp -s "$k/agents/kiro_default.md.bak" "$sb.kiro-default.edited" && cmp -s "$k/agents/kiro_default.md" "$sb.kiro-default.orig" \
+        || own_fail "$l" "an edited template-file row goes to .bak and is rendered again"
+    [ -z "$(ls -A "$sb.linked-refs")" ] && grep -q 'SKIPPED: .*references.*a folder above it is a link' "$log" \
+        || own_fail "$l" "a file under a linked folder of a generated copy is skipped, never written through the link"
+    [ -f "$k/settings/mcp.json" ] && ! grep -q 'settings/mcp.json' "$lock" \
+        || own_fail "$l" "a lock row for a seed file never retires the seed (and is not kept)"
+    own_is "$k/agents/kiro_default.json.bak" "my json" && [ ! -e "$k/agents/kiro_default.json" ] \
+        && grep -q $'^backup\t~/.kiro/agents/kiro_default.json\t' "$lock" \
+        || own_fail "$l" "a retired playbook name holding a file of yours goes to .bak"
     grep -q $'^backup\t~/.kiro/AUTHORING.md\t' "$lock" && grep -q $'^backup\t~/.kiro/steering/agents.md\t-$' "$lock" \
         && ! grep -q 'qgone/' "$lock" && ! grep -q $'\t~/.kiro/skills/qreview/' "$lock" \
-        || own_fail "$l" "the lock records the backups and drops the retired and KEPT paths"
+        && [ ! -e "$sb/.agent-playbook/deploy-lock.journal.tsv" ] \
+        || own_fail "$l" "the lock records the backups and drops the retired and KEPT paths, and the journal is gone"
+    if own_stub_used "$sb"; then
+        grep -q '^settings --global chat.defaultAgent kiro_default$' "$sb.stub/calls.log" \
+            && grep -q $'^setting\tkiro-cli/chat.defaultAgent\t"my_agent"$' "$lock" \
+            || own_fail "$l" "chat.defaultAgent is set to kiro_default and the value it replaced is recorded"
+    fi
 }
 
-# own_plant_uninstall <sandbox>: an edited generated file and a .bak setup did not make.
+own_check_rerun() {   # own_check_rerun <sandbox> <label> <log name> <sh|ps>
+    own_rc "$3" 0 || own_fail "$2" "the re-run exits 0 (got $(cat "$TMPDIR_PARITY/$3.rc"))"
+    cmp -s "$TMPDIR_PARITY/own-rerun-$4-1.tsv" "$TMPDIR_PARITY/own-rerun-$4-2.tsv" \
+        || { own_fail "$2" "a re-run after the collisions writes nothing (no .bak growth)"
+             diff "$TMPDIR_PARITY/own-rerun-$4-1.tsv" "$TMPDIR_PARITY/own-rerun-$4-2.tsv" | head -n 10 >&2 || true; }
+    if own_stub_used "$1"; then
+        ! grep -q 'chat.defaultAgent kiro_default' "$1.stub/calls.log" \
+            && grep -q $'^setting\tkiro-cli/chat.defaultAgent\t"my_agent"$' "$1/.agent-playbook/deploy-lock.tsv" \
+            || own_fail "$2" "a chat.defaultAgent that is kiro_default already is not set again, and its row is kept"
+    fi
+}
+
+# own_plant_hold <sandbox>: a file held open (no delete sharing) by another process, a .bak of yours
+# beside an edited file, and a second edit of a file setup backed up already.
+own_plant_hold() {
+    local sb="$1" k="$1/.kiro" f
+    printf 'edited held\n' >> "$k/skills/qexplore-other/SKILL.md"
+    cp "$k/skills/qexplore-other/SKILL.md" "$sb.held.edited"
+    printf 'edited browser\n' >> "$k/skills/qbrowser-test/SKILL.md"
+    cp "$k/skills/qbrowser-test/SKILL.md" "$sb.browser.edited"
+    printf 'my own backup\n' > "$k/skills/qbrowser-test/SKILL.md.bak"
+    printf 'edited2 authoring\n' > "$k/AUTHORING.md"
+    rm -f "$sb.hold-ready" "$sb.hold-stop" "$sb.hold-skip" "$sb.hold-pid"
+    if [ "$(uname -o 2>/dev/null)" = "Msys" ] && [ -n "$PS_BIN" ]; then
+        # Windows: another process holds the file open without delete sharing, so it cannot move.
+        # The holder gives up after five minutes, so a killed run never leaves it holding the file.
+        f="$(parity_native_path "$k/skills/qexplore-other/SKILL.md")"
+        "$PS_BIN" -NoProfile -NonInteractive -Command "\$f = [IO.File]::Open('$f', 'Open', 'Read', 'Read'); [IO.File]::WriteAllText('$(parity_native_path "$sb.hold-ready")', 'x'); \$n = 0; while (-not (Test-Path -LiteralPath '$(parity_native_path "$sb.hold-stop")') -and \$n -lt 3000) { Start-Sleep -Milliseconds 100; \$n++ }; \$f.Close()" < /dev/null > /dev/null 2>&1 &
+        echo "$!" > "$sb.hold-pid"
+        local i=0
+        while [ ! -f "$sb.hold-ready" ] && [ "$i" -lt 300 ]; do sleep 0.1; i=$((i + 1)); done
+    else
+        # POSIX: an open file can always be renamed, so the folder is made read-only instead
+        chmod a-w "$k/skills/qexplore-other"
+        if : 2>/dev/null > "$k/skills/qexplore-other/.probe"; then
+            rm -f "$k/skills/qexplore-other/.probe"
+            chmod u+w "$k/skills/qexplore-other"
+            : > "$sb.hold-skip"
+        else
+            : > "$sb.hold-ready"
+        fi
+    fi
+}
+
+own_release() {
+    : > "$1.hold-stop"
+    if [ -f "$1.hold-pid" ]; then wait "$(cat "$1.hold-pid")" 2>/dev/null || true; fi
+    [ "$(uname -o 2>/dev/null)" = "Msys" ] || chmod u+w "$1/.kiro/skills/qexplore-other" 2>/dev/null || true
+}
+
+own_check_hold() {   # own_check_hold <sandbox> <label> <log name>
+    local sb="$1" l="$2" k="$1/.kiro" lock="$1/.agent-playbook/deploy-lock.tsv" log="$TMPDIR_PARITY/$3.log"
+    if [ -f "$sb.hold-skip" ]; then
+        echo "OWNERSHIP SKIP ($l): a file cannot be made unmovable here (a read-only folder is still writable: root?); the failed-backup checks are skipped"
+    elif [ ! -f "$sb.hold-ready" ]; then
+        own_fail "$l" "the file holder did not start"
+    else
+    own_rc "$3" nonzero && grep -q "ERROR: could not back up .*qexplore-other.SKILL.md; left unchanged" "$log" \
+        || own_fail "$l" "a backup that cannot be made prints an ERROR and the run ends non-zero (got $(cat "$TMPDIR_PARITY/$3.rc"))"
+    cmp -s "$k/skills/qexplore-other/SKILL.md" "$sb.held.edited" && [ ! -e "$k/skills/qexplore-other/SKILL.md.bak" ] \
+        && ! grep -q $'\t~/.kiro/skills/qexplore-other/SKILL.md\t' "$lock" \
+        || own_fail "$l" "a file that cannot be backed up is left unchanged, with no .bak and no lock row"
+    fi
+    cmp -s "$k/skills/qbrowser-test/SKILL.md" "$sb.browser.edited" && own_is "$k/skills/qbrowser-test/SKILL.md.bak" "my own backup" \
+        && grep -q 'WARN: .*qbrowser-test.SKILL.md.bak is not a backup setup made' "$log" \
+        && ! grep -q $'\t~/.kiro/skills/qbrowser-test/SKILL.md\t' "$lock" \
+        || own_fail "$l" "a .bak that is not setup's is left alone, and so is the file beside it"
+    own_is "$k/AUTHORING.md.bak" "edited2 authoring" && cmp -s "$k/AUTHORING.md" "$REPO_ROOT/shared/AUTHORING.md" \
+        || own_fail "$l" "a later backup replaces the earlier one setup made"
+    [ ! -e "$sb/.agent-playbook/deploy-lock.journal.tsv" ] || own_fail "$l" "the journal is gone once the lock is written"
+    if own_stub_used "$sb"; then
+        ! grep -q 'chat.defaultAgent kiro_default' "$sb.stub/calls.log" \
+            && grep -q $'^setting\tkiro-cli/chat.defaultAgent\t"my_agent"$' "$lock" \
+            || own_fail "$l" "a chat.defaultAgent that cannot be read is not set, and the row is not replaced by -"
+    fi
+}
+
+# own_plant_uninstall <sandbox>: an edited generated file, a .bak setup did not make, an edited .bak
+# setup made, and a journal row left by an interrupted run.
 own_plant_uninstall() {
-    local k="$1/.kiro"
+    local sb="$1" k="$1/.kiro"
     printf 'edited qtest\n' >> "$k/skills/qtest/SKILL.md"
     cp "$k/skills/qtest/SKILL.md" "$1.qtest-skill.edited"
     printf 'stray\n' > "$k/steering/kiro-guidelines.md.bak"
+    printf 'edited bak\n' >> "$k/agents/kiro_default.md.bak"
+    printf 'my child\n' > "$k/agents/qdream_child.md.bak"
+    printf 'backup\t~/.kiro/agents/qdream_child.md\t%s\n' "$(own_sha "$k/agents/qdream_child.md.bak")" \
+        > "$sb/.agent-playbook/deploy-lock.journal.tsv"
+    own_stub_state "$sb" '' fail-read
 }
 
-own_check_uninstall() {
+own_check_uninstall() {   # own_check_uninstall <sandbox> <label> <log name>
     local sb="$1" l="$2" k="$1/.kiro" lock="$1/.agent-playbook/deploy-lock.tsv"
+    own_rc "$3" 0 || own_fail "$l" "uninstall exits 0 (got $(cat "$TMPDIR_PARITY/$3.rc"))"
     cmp -s "$k/skills/qtest/SKILL.md" "$sb.qtest-skill.edited" || own_fail "$l" "uninstall keeps an edited generated file"
     cmp -s "$k/skills/qdev/SKILL.md" "$sb.qdev-skill.edited" && [ ! -e "$k/skills/qdev/SKILL.md.bak" ] \
         && own_is "$k/skills/qdev/my-notes.md" mine && [ "$(find "$k/skills/qdev" -type f | wc -l)" -eq 2 ] \
         || own_fail "$l" "uninstall removes unedited generated files and restores the .bak setup made"
     [ ! -e "$k/skills/qexplore" ] || own_fail "$l" "uninstall removes a generated copy left unedited, folder included"
-    own_is "$k/AUTHORING.md" "edited authoring" && [ ! -e "$k/AUTHORING.md.bak" ] \
+    own_is "$k/AUTHORING.md" "edited2 authoring" && [ ! -e "$k/AUTHORING.md.bak" ] \
         || own_fail "$l" "uninstall removes an unedited copy-file row and restores its .bak"
     [ -L "$k/steering/agents.md" ] && case "$(readlink "$k/steering/agents.md")" in *foreign-target.md) true ;; *) false ;; esac \
         && [ ! -e "$k/steering/agents.md.bak" ] && [ ! -L "$k/steering/agents.md.bak" ] \
         || own_fail "$l" "uninstall restores a backed-up foreign symlink"
     own_is "$k/steering/kiro-guidelines.md.bak" stray && [ ! -e "$k/steering/kiro-guidelines.md" ] \
         || own_fail "$l" "uninstall never restores a .bak setup did not make"
+    [ ! -e "$k/agents/kiro_default.md" ] && [ -f "$k/agents/kiro_default.md.bak" ] \
+        && grep -q 'KEPT: .*kiro_default.md.bak (changed since setup made it)' "$TMPDIR_PARITY/$3.log" \
+        || own_fail "$l" "uninstall keeps a .bak edited since setup made it"
+    own_is "$k/agents/qdream_child.md" "my child" && [ ! -e "$k/agents/qdream_child.md.bak" ] \
+        || own_fail "$l" "uninstall restores a backup an interrupted run recorded only in the journal"
     own_is "$k/skills/qreview/SKILL.md" "user qreview" && own_is "$k/skills/qcouncil/SKILL.md" "user qcouncil" \
-        || own_fail "$l" "uninstall leaves your own skill folders alone"
-    { [ ! -f "$lock" ] || ! grep -q $'\t~/.kiro/' "$lock"; } || own_fail "$l" "uninstall drops the Kiro rows from the lock"
+        && own_is "$k/skills/qhandoff/mine.md" mine && [ ! -e "$k/skills/qhandoff/SKILL.md" ] \
+        || own_fail "$l" "uninstall leaves your own skill folders alone, and takes setup's file out of a mixed one"
+    { [ ! -f "$lock" ] || ! grep -q $'\t~/.kiro/' "$lock"; } && [ ! -e "$sb/.agent-playbook/deploy-lock.journal.tsv" ] \
+        || own_fail "$l" "uninstall drops the Kiro rows from the lock, and the journal"
+    if own_stub_used "$sb"; then
+        grep -q $'^setting\tkiro-cli/chat.defaultAgent\t"my_agent"$' "$lock" && ! grep -q 'chat.defaultAgent my_agent' "$sb.stub/calls.log" \
+            || own_fail "$l" "an uninstall that cannot read chat.defaultAgent does not revert it and keeps its lock row"
+    fi
+}
+
+own_check_revert() {   # own_check_revert <sandbox> <label> <log name>
+    local sb="$1" lock="$1/.agent-playbook/deploy-lock.tsv"
+    own_rc "$3" 0 || own_fail "$2" "the second uninstall exits 0"
+    if own_stub_used "$sb"; then
+        grep -q '^settings --global chat.defaultAgent my_agent$' "$sb.stub/calls.log" \
+            && [ "$(cat "$sb.stub/value.json")" = '"my_agent"' ] && [ ! -f "$lock" ] \
+            || own_fail "$2" "a later uninstall reverts chat.defaultAgent to the value setup replaced, and the lock goes"
+    fi
+}
+
+# own_plant_nolock <sandbox>: a lock with a row setup never writes (a backslash key), files of a
+# generated copy equal to what setup writes (and one that is not), and copy-file rows (one equal to
+# its source only when letter case is ignored).
+own_plant_nolock() {
+    local sb="$1" k="$1/.kiro" lock="$1/.agent-playbook/deploy-lock.tsv"
+    mkdir -p "$sb/.agent-playbook"
+    printf '%s\n%s\t%s\t%s\n' "# agent-playbook deploy lock v1 (written by setup; kind<TAB>path<TAB>sha256)" \
+        copy-file '~/.kiro/..\..\Documents\x' "$(printf '0%.0s' $(seq 64))" > "$lock"
+    cp "$lock" "$sb.bad-lock"
+    cp "$REPO_ROOT/shared/skills/qtest/plan-process.md" "$REPO_ROOT/shared/skills/qtest/run-process.md" "$k/skills/qtest/"
+    cp "$REPO_ROOT/providers/kiro/agents/qdream_child.md" "$k/agents/qdream_child.md"
+    tr 'a-z' 'A-Z' < "$REPO_ROOT/shared/AUTHORING.md" > "$k/AUTHORING.md"
+    cp "$k/AUTHORING.md" "$sb.authoring.upper"
+}
+
+own_check_nolock() {   # own_check_nolock <sandbox> <label> <log name>
+    local sb="$1" l="$2" k="$1/.kiro" lock="$1/.agent-playbook/deploy-lock.tsv"
+    own_rc "$3" 0 || own_fail "$l" "the no-lock uninstall exits 0"
+    [ ! -e "$lock" ] && cmp -s "$lock.bak" "$sb.bad-lock" \
+        || own_fail "$l" "a lock with a backslash key is no lock, and it is moved to deploy-lock.tsv.bak"
+    [ ! -e "$k/skills/qtest/plan-process.md" ] && [ ! -e "$k/skills/qtest/run-process.md" ] \
+        && cmp -s "$k/skills/qtest/SKILL.md" "$sb.qtest-skill.edited" \
+        || own_fail "$l" "with no lock, uninstall removes a generated copy's files equal to setup's output and keeps the rest"
+    [ ! -e "$k/agents/qdream_child.md" ] && cmp -s "$k/AUTHORING.md" "$sb.authoring.upper" \
+        || own_fail "$l" "with no lock, uninstall removes a copy-file equal to its source byte for byte, and only then"
+    own_is "$k/skills/qreview/SKILL.md" "user qreview" && own_is "$k/skills/qreview/my-own.md" "my own" \
+        || own_fail "$l" "with no lock, uninstall leaves your own files alone"
 }
 
 parity_sec_coexist() {
@@ -1319,6 +1686,11 @@ cx_all() {
         [ "$twin" -eq 1 ] && own_run_ps "$TMPDIR_PARITY/cx-ps-$fx2" "cx-ps-$fx2-$suffix" $ps_args
     done
     for fx2 in "${p[@]}"; do wait "$fx2" || true; done
+    for fx2 in a b; do
+        own_rc "cx-sh-$fx2-$suffix" 0 || cx_fail sh "fixture $fx2: run $suffix exits 0 (got $(cat "$TMPDIR_PARITY/cx-sh-$fx2-$suffix.rc"))"
+        [ "$twin" -eq 0 ] || own_rc "cx-ps-$fx2-$suffix" 0 \
+            || cx_fail ps "fixture $fx2: run $suffix exits 0 (got $(cat "$TMPDIR_PARITY/cx-ps-$fx2-$suffix.rc"))"
+    done
 }
 cx_all 1 "--providers claude,codex,gemini" "-Providers claude,codex,gemini"
 for fx in a b; do
