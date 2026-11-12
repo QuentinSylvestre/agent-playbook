@@ -113,6 +113,8 @@ When you change your recommendation on the same question more than once (i.e., y
 2. **Opt-in step**: offer to invoke `/qcouncil`. The user must explicitly accept before the council runs.
 3. **Dispatch step**: if the user accepts, invoke council per `shared/skills/qcouncil/SKILL.md § Council-Enriched Escalation (canonical body)` (Dispatch and Presentation format subsections; `shared/AGENTS.md § Council-Enriched Escalation` carries the trigger rule, not these subsections). In oscillation mode the orchestrator does NOT add its own recommendation — present summary + full council output + decision prompt (skip Presentation format item 2).
 
+**A change caused by new input is not an oscillation.** New input is a goal, constraint or fact the user stated after your earlier recommendation, or a probe result. When you change a recommendation for that reason, name the input in the same message ("you added the goal of supporting more users, so I now recommend B"). The gate counts only changes that name no new input.
+
 ## Convergence test
 
 Before producing the final summary:
