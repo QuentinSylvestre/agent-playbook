@@ -3,7 +3,8 @@
 
 Prints each file shown, the files left out and the setting names their change touches,
 any credential-shaped match (path and line only, never the value), the size tier, the
-plans named by commit scopes, and whether to propose a split. It prints no file content.
+plans named by commit scopes, the production subsystems, a HEAVY warning when the one page
+will be long, and whether D2 is installed (D2 line). It prints no file content.
 
 Standard library only; nothing to install. <python> is the interpreter of <config-repo>/.venv-agent-playbook, run with -I (shared/AGENTS.md, Config Repo Locations).
 
@@ -29,7 +30,7 @@ import time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))  # -I leaves the script's folder off the path
 import qexplain_diff as qd  # noqa: E402
 
-SPLIT_READING_LINES = 2500
+HEAVY_READING_LINES = 2500
 
 
 def tier(lines):
@@ -42,13 +43,49 @@ def tier(lines):
     return "Large"
 
 
+def heavy_reasons(reading, plan_count):
+    """Why the single page will be long. It is a warning only: the page is never split."""
+    reasons = []
+    if reading > HEAVY_READING_LINES:
+        reasons.append(f"{reading} lines to read, over {HEAVY_READING_LINES}")
+    if plan_count > 1:
+        reasons.append(f"{plan_count} plans")
+    return reasons
+
+
 def selftest():
     """Parser, filter and scanner checks that need no repository."""
-    fails = []
+    fails, total = [], [0]
 
     def check(ok, name):
+        total[0] += 1
         if not ok:
             fails.append(name)
+
+    # Subsystems, HEAVY and the D2 lookup
+    check(qd.subsystem_of("src/api/v1/x.py") == "src/api", "subsystem keeps two directory levels")
+    check(qd.subsystem_of("tool/x.py") == "tool", "subsystem keeps one level when there is one")
+    check(qd.subsystem_of("README.md") == "(repo root)", "a root file belongs to the repo root")
+    check(qd.subsystem_of("gw/src/a/x.go", labelled=True) == "gw/src/a", "a labelled target keeps its label")
+    check(qd.subsystem_of("gw/x.go", labelled=True) == "gw", "a labelled root file is the label")
+    check(qd.production_subsystems(["src/a/x.py", "src/a/y.py", "tests/t_x.py", "docs/a.md", "go.sum", "web/b/c.js", "cfg/x.yaml"])
+          == ["src/a", "web/b", "cfg"], "tests, docs and generated files form no subsystem")
+    check(heavy_reasons(2500, 1) == [] and heavy_reasons(2501, 1) != [] and heavy_reasons(10, 2) == ["2 plans"], "HEAVY thresholds")
+    saved = {k: os.environ.get(k) for k in ("QEXPLAIN_D2", "PATH")}
+    try:
+        os.environ["QEXPLAIN_D2"] = os.path.join(os.path.dirname(os.path.abspath(__file__)), "no-such-d2")
+        os.environ["PATH"] = os.path.dirname(os.path.abspath(__file__)) + os.sep + "empty-path-dir"
+        check(qd.find_d2() is None, "QEXPLAIN_D2 naming no file means d2 not found")
+        os.environ["QEXPLAIN_D2"] = os.path.abspath(__file__)
+        check(qd.find_d2() == os.path.abspath(__file__), "QEXPLAIN_D2 naming a file is used")
+    finally:
+        for k, v in saved.items():
+            if v is None:
+                os.environ.pop(k, None)
+            else:
+                os.environ[k] = v
+    check(not qd.d2_refusals("a -> b: hello\nb: B {class: new}") and len(qd.d2_refusals("a: A {icon: https://x/y.svg}")) == 1
+          and qd.d2_refusals("...@other") and qd.d2_refusals("x: @file") and qd.d2_refusals("@import foo"), "D2 refusals")
 
     fake = "Zq7Mv2Lp9Xk4"
     for line, want in (("export A=1", False), ("broker: a", False)):
@@ -164,7 +201,7 @@ def selftest():
     check(qd.scan_files(qd.split_files(hdr)), "text before the first hunk is scanned")
     for name in fails:
         print(f"FAIL\t{name}")
-    print(f"selftest: {len(fails)} failed")
+    print(f"selftest: {total[0]} cases, {len(fails)} failed")
     return 1 if fails else 0
 
 
@@ -241,16 +278,15 @@ def main():
     for why in skipped:
         print(f"PLAN-SKIPPED\t{why}")
 
-    reasons = []
-    if reading > SPLIT_READING_LINES:
-        reasons.append(f"{reading} lines to read, over {SPLIT_READING_LINES}")
-    distinct = list(dict.fromkeys(slug for _, slug in plans))
-    if len(distinct) > 1:
-        reasons.append(f"{len(distinct)} plans")
+    reasons = heavy_reasons(reading, len(dict.fromkeys(slug for _, slug in plans)))
     if reasons:
-        print("SPLIT\tpropose a split: " + "; ".join(reasons))
+        print("HEAVY\tthe page will be long: " + "; ".join(reasons))
+    areas = qd.production_subsystems([p for p, _ in kept], labelled=bool(args.target))
+    print(f"SUBSYSTEMS\t{len(areas)}\t" + (", ".join(qd.safe_path(a) for a in areas) or "(none)"))
     if repos > 1:
         print(f"REPOS\t{repos} repos in one artifact")
+    exe = qd.find_d2()
+    print("D2\t" + ((qd.d2_version(exe) or "found, version unreadable") if exe else "not found"))
     return 0
 
 

@@ -16,6 +16,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 
 # Always left out, matched against the file name, ignoring case.
@@ -511,3 +512,55 @@ def setting_names(path, block):
             name = None
         names.append(line[0] + (name or "(line without a setting name)"))
     return names
+
+
+# ---- Subsystems, D2 lookup and D2 source refusals (shared by measure-change.py and build-explanation.py) ----
+
+PRODUCTION_KINDS = ("src", "config", "other")  # tests, docs and generated files belong to no subsystem
+SUBSYSTEM_DEPTH = 2
+D2_REFUSALS = [
+    (re.compile(r"""\bicon["']?\s*:""", re.I), "refused construct icon:, which pulls an image from outside the page. Remove it and use a class instead"),
+    (re.compile(r"@import", re.I), "refused construct @import, which reads another file. Inline what you need"),
+    (re.compile(r"\.\.\.\s*@"), "refused construct ...@ import, which reads another file. Inline what you need"),
+    # Any @ that starts a token imports a file, quoted or not, so refuse whatever follows it.
+    (re.compile(r"""(?:^|[\s:{;\[,(])@\S""", re.M), "refused construct @ import (quoted or not), which reads another file. Inline what you need"),
+    (re.compile(r"""(?:^|[\s{;,])["']?link["']?\s*:""", re.I | re.M), "refused construct link:, which writes a clickable href into the page. Remove it"),
+    (re.compile(r"""(?:^|[\s{;,])["']?(?:layers|scenarios|steps)["']?\s*:""", re.M), "refused construct layers:, scenarios: or steps:, which make d2 write extra files. Draw one diagram per file"),
+    (re.compile(r"\bd2-config\b"), "refused construct d2-config, which would override the layout, theme and sketch settings the build owns. Remove it"),
+]
+
+
+def subsystem_of(path, labelled=False):
+    """Name the area a file belongs to: the repo label (labelled targets only) plus the first two directories."""
+    parts = path.split("/")
+    label = parts.pop(0) if labelled and len(parts) > 1 else None
+    segs = ([label] if label else []) + parts[:-1][:SUBSYSTEM_DEPTH]
+    return "/".join(segs) if segs else "(repo root)"
+
+
+def production_subsystems(paths, labelled=False):
+    """Distinct subsystems of the production files among paths, in first-seen order."""
+    return list(dict.fromkeys(subsystem_of(p, labelled) for p in paths if file_type(p) in PRODUCTION_KINDS))
+
+
+def find_d2():
+    """Path of the d2 executable, or None. QEXPLAIN_D2 wins; when it is set but names no file, d2 counts as not found."""
+    env = os.environ.get("QEXPLAIN_D2")
+    if env:
+        return env if os.path.isfile(env) else None
+    return shutil.which("d2")
+
+
+def d2_version(exe):
+    """The d2 version text (for example v0.9.0), or None when it cannot be read."""
+    try:
+        proc = subprocess.run([exe, "--version"], capture_output=True, timeout=15)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    text = proc.stdout.decode("utf-8", "replace").strip().splitlines()
+    return text[0].strip() if proc.returncode == 0 and text else None
+
+
+def d2_refusals(text):
+    """Reasons a D2 source may not be rendered. An empty list means it may."""
+    return [why for rx, why in D2_REFUSALS if rx.search(text)]
