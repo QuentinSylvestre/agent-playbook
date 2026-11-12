@@ -301,6 +301,17 @@ the entry is listed. Then open a new session in a project with memory and ask
 for one of its memory entry headings; the agent should quote it without reading
 a file.
 
+## qdream phase-agent guard
+
+Setup links `agents/qdream-phase.md` and the launcher `~/.claude/qdream-phase-hook.sh`; the hook command is
+`bash "$HOME/.claude/qdream-phase-hook.sh" || exit 2`, which Claude Code runs in Git Bash on Windows. The hook is declared in the agent's frontmatter and runs
+only while a `/qdream` phase agent runs, so it needs no `settings.json` entry. It refuses every Bash command but
+one venv-python call of a qdream script subcommand a phase runs, every write outside the sweep's
+`dream-work/handoff/`, and every child but `qdream-reader`. Its tests: `<python> -I
+providers/claude/qdream-phase-hook.py --selftest` (also in `/qconfig-sync`'s check runner). To see it enforce,
+launch one `qdream-phase` agent that tries a refused call (for example `sed -i` on a scratch file) and confirm
+the refusal message.
+
 ## Why setup asks
 
 Claude Code owns this file and rewrites it while it runs, and the sounds and the

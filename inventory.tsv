@@ -39,6 +39,8 @@ symlink-file	~/.claude/notify-command.ps1	providers/claude/notify-command.ps1	cl
 symlink-file	~/.claude/memory-load-hook.py	providers/claude/memory-load-hook.py	claude
 symlink-file	~/.claude/memory-load-hook.ps1	providers/claude/memory-load-hook.ps1	claude
 symlink-file	~/.claude/agents/qdream-reader.md	providers/claude/agents/qdream-reader.md	claude
+symlink-file	~/.claude/agents/qdream-phase.md	providers/claude/agents/qdream-phase.md	claude
+symlink-file	~/.claude/qdream-phase-hook.sh	providers/claude/qdream-phase-hook.sh	claude
 # User memory and the higher-order tier, delivered in full at every session start: Claude Code
 # loads every ~/.claude/rules/*.md file whole, links included. The sources sit behind the repo's
 # gitignored memory link (the store repo's user/memory/); while it holds no user memory yet, setup
