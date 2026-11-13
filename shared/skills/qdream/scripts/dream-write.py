@@ -3569,7 +3569,11 @@ def fill_tokens(run, cost, orient):
     readable transcript: the script's totals replace whatever the inputs
     file holds. An entry that is not a readable transcript: tokens null.
     No transcript path at all (an empty list, or session ids only): the
-    inputs file's values stay. Each outcome adds a line to the summary."""
+    inputs file's values stay. weighted_tokens and phase_weighted_tokens come
+    from the transcripts only, never from the inputs file. Each outcome adds a
+    line to the summary."""
+    cost.pop("weighted_tokens", None)
+    cost.pop("phase_weighted_tokens", None)
     sess = orient.get("orchestrator_sessions") or []
     paths = [s for s in sess if isinstance(s, str) and s.lower().endswith(".jsonl")]
     if not paths:
@@ -3598,15 +3602,18 @@ def fill_tokens(run, cost, orient):
     run.notes.append("tokens: %d from %d transcript(s), by role %s (a lower bound: the "
                      "running transcripts are still being written)"
                      % (total, len(paths), ", ".join("%s=%d" % kv for kv in roles.items())))
-    weighted = 0
+    weighted = phase = 0
     for p in paths:
-        n, why = dm.session_weighted(p, orient.get("snapshot_at"))
+        n, ph, why = dm.session_weighted(p, orient.get("snapshot_at"))
         if why:
             run.notes.append("weighted tokens: not recorded -- %s" % ascii_safe(why, 200))
             return
         weighted += n
+        phase += ph
     cost["weighted_tokens"] = weighted
-    run.notes.append("weighted tokens: %d since %s" % (weighted, orient.get("snapshot_at")))
+    cost["phase_weighted_tokens"] = phase
+    run.notes.append("weighted tokens: %d since %s, phase agents %d"
+                     % (weighted, orient.get("snapshot_at"), phase))
 
 
 def compute_apply(run, obj, inp, dec):

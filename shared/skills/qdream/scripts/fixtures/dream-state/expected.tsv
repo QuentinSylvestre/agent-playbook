@@ -130,3 +130,10 @@ v3-quiet-missing.json	1	-	FAIL: quiet_sweeps missing or not an object (required 
 v3-similar-declined.json	0	ledger-baseline.json	ok: similar_declined (1 records)
 v3-similar-bad-sha.json	1	-	FAIL: similar_declined[0] -- a must be a lowercase 64-hex sha256
 v2-with-similar-declined.json	1	-	FAIL: v2 file carries v3 section "similar_declined" (half-migrated write?)
+v3-cost-phase-weighted-valid.json	0	-	ok: cost_records (2 records)
+v3-cost-phase-weighted-over-total.json	1	-	FAIL: cost_records[0] -- phase_weighted_tokens must be a non-negative integer no larger than weighted_tokens, which it requires
+v3-cost-phase-weighted-no-total.json	1	-	FAIL: cost_records[0] -- phase_weighted_tokens must be a non-negative integer no larger than weighted_tokens, which it requires
+v3-cost-phase-weighted-equal.json	0	-	ok: cost_records (2 records)
+v3-cost-phase-weighted-negative.json	1	-	FAIL: cost_records[0] -- phase_weighted_tokens must be a non-negative integer no larger than weighted_tokens, which it requires
+v3-cost-phase-weighted-bool.json	1	-	FAIL: cost_records[0] -- phase_weighted_tokens must be a non-negative integer no larger than weighted_tokens, which it requires
+v3-cost-phase-weighted-string.json	1	-	FAIL: cost_records[0] -- phase_weighted_tokens must be a non-negative integer no larger than weighted_tokens, which it requires

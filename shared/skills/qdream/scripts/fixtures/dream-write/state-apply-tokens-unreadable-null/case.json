@@ -1,5 +1,5 @@
 {
-  "description": "state apply writes tokens null, never the inputs file's value, when an orchestrator_sessions transcript gives no count (an existing file with no message.usage record: review R8 makes `handoff check orient.json` refuse a missing path, so the null branch is reached this way); the reason is printed.",
+  "description": "state apply writes tokens null, never the inputs file's value, when an orchestrator_sessions transcript gives no count (an existing file with no message.usage record: review R8 makes `handoff check orient.json` refuse a missing path, so the null branch is reached this way); the reason is printed. weighted_tokens and phase_weighted_tokens the inputs file gives are dropped: only the transcripts give them.",
   "now": "2026-10-12T12:00:00Z",
   "store_repo": "stores",
   "setup": [
@@ -67,7 +67,7 @@
   "steps": [
     {
       "write": {
-        "home/.agent-playbook/dream-work/handoff/state-inputs.json": "{\n  \"decisions_sha\": \"{SHA256:handoff/decisions.json}\",\n  \"human_expiries\": [],\n  \"rejected_lessons\": [],\n  \"outcome_tags\": [\n    {\n      \"target\": \"T1\",\n      \"applied\": \"2026-10-12\"\n    },\n    {\n      \"target\": \"T2\",\n      \"applied\": \"2026-10-12\"\n    },\n    {\n      \"target\": \"T0\",\n      \"applied\": \"2026-09-01\",\n      \"outcome\": \"not-recurred\",\n      \"checked\": \"2026-10-12\"\n    }\n  ],\n  \"cost_record\": {\n    \"date\": \"2026-10-12\",\n    \"kind\": \"sweep\",\n    \"projects_analyzed\": 1,\n    \"sessions_read\": 2,\n    \"bytes_read\": 1000,\n    \"agents\": {\n      \"task4\": 2,\n      \"verifier\": 1\n    },\n    \"models\": {\n      \"task4\": \"model-a\",\n      \"verifier\": \"model-a\"\n    },\n    \"findings\": {\n      \"surfaced\": 3,\n      \"kept\": 2,\n      \"dropped_by_stage\": {\n        \"already_known\": 1,\n        \"not_durable\": 0,\n        \"unsupported\": 0,\n        \"suppressed\": 0,\n        \"contradicts_governance\": 0\n      }\n    },\n    \"proposals\": {\n      \"surfaced\": 1,\n      \"applied\": 1\n    },\n    \"tokens\": 5\n  },\n  \"episodic_ledger\": [\n    {\n      \"what\": \"governance conflict adjudicated: keep-entry\",\n      \"where\": \"Alpha only + shared/AGENTS.md \u00a7 Git Staging\",\n      \"when\": \"2026-10-12\",\n      \"outcome\": \"keep-entry\",\n      \"support_set\": [\n        \"project memory ({ROOT}/proj/alpha) \u00a7 Alpha only\"\n      ]\n    }\n  ]\n}\n"
+        "home/.agent-playbook/dream-work/handoff/state-inputs.json": "{\n  \"decisions_sha\": \"{SHA256:handoff/decisions.json}\",\n  \"human_expiries\": [],\n  \"rejected_lessons\": [],\n  \"outcome_tags\": [\n    {\n      \"target\": \"T1\",\n      \"applied\": \"2026-10-12\"\n    },\n    {\n      \"target\": \"T2\",\n      \"applied\": \"2026-10-12\"\n    },\n    {\n      \"target\": \"T0\",\n      \"applied\": \"2026-09-01\",\n      \"outcome\": \"not-recurred\",\n      \"checked\": \"2026-10-12\"\n    }\n  ],\n  \"cost_record\": {\n    \"date\": \"2026-10-12\",\n    \"kind\": \"sweep\",\n    \"projects_analyzed\": 1,\n    \"sessions_read\": 2,\n    \"bytes_read\": 1000,\n    \"agents\": {\n      \"task4\": 2,\n      \"verifier\": 1\n    },\n    \"models\": {\n      \"task4\": \"model-a\",\n      \"verifier\": \"model-a\"\n    },\n    \"findings\": {\n      \"surfaced\": 3,\n      \"kept\": 2,\n      \"dropped_by_stage\": {\n        \"already_known\": 1,\n        \"not_durable\": 0,\n        \"unsupported\": 0,\n        \"suppressed\": 0,\n        \"contradicts_governance\": 0\n      }\n    },\n    \"proposals\": {\n      \"surfaced\": 1,\n      \"applied\": 1\n    },\n    \"tokens\": 5,\n    \"weighted_tokens\": 987654,\n    \"phase_weighted_tokens\": 87654\n  },\n  \"episodic_ledger\": [\n    {\n      \"what\": \"governance conflict adjudicated: keep-entry\",\n      \"where\": \"Alpha only + shared/AGENTS.md \\u00a7 Git Staging\",\n      \"when\": \"2026-10-12\",\n      \"outcome\": \"keep-entry\",\n      \"support_set\": [\n        \"project memory ({ROOT}/proj/alpha) \\u00a7 Alpha only\"\n      ]\n    }\n  ]\n}\n"
       }
     },
     {
@@ -93,6 +93,13 @@
       "root_contains": {
         "repo/memory/.dream-state.json": [
           "\"tokens\": null"
+        ]
+      },
+      "root_not_contains": {
+        "repo/memory/.dream-state.json": [
+          "987654",
+          "87654",
+          "phase_weighted_tokens"
         ]
       }
     }

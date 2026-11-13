@@ -1,5 +1,5 @@
 {
-  "description": "state apply fills the cost record's tokens and tokens_by_role from the transcripts orient.json's orchestrator_sessions name (the dream-manifest.py baseline --by-role count, summed), replacing the inputs file's values; the real validator accepts the record. An entry that is not a readable transcript gives tokens null and no tokens_by_role, with the reason in the summary.",
+  "description": "state apply fills the cost record's tokens and tokens_by_role from the transcripts orient.json's orchestrator_sessions name (the dream-manifest.py baseline --by-role count, summed), replacing the inputs file's values; the real validator accepts the record. An entry that is not a readable transcript gives tokens null and no tokens_by_role, with the reason in the summary. A phase-agent transcript (Dream Phase Agent Brief) adds to the orchestrator's tokens, and its weighted tokens are recorded apart as phase_weighted_tokens. Weighted tokens count only records from orient.json's snapshot_at on: a session record and an earlier sweep's phase agent before it are left out, and a phase agent whose brief record is before it keeps its role.",
   "now": "2026-10-12T12:00:00Z",
   "store_repo": "stores",
   "setup": [
@@ -53,8 +53,11 @@
     {
       "write": {
         "home/.agent-playbook/dream-work/handoff/orient.json": "{\n  \"snapshot_at\": \"2026-10-12T11:00:00Z\",\n  \"since\": \"2026-10-01T00:00:00Z\",\n  \"confirmed\": [],\n  \"model_routing\": {\n    \"provider\": \"claude\",\n    \"task4\": \"model-a\",\n    \"verifier\": \"model-b\"\n  },\n  \"dirty_at_orient\": true,\n  \"repos\": [],\n  \"recover_lines\": [],\n  \"orchestrator_sessions\": [\n    \"{ROOT}/home/transcripts/s1.jsonl\"\n  ]\n}\n",
-        "home/transcripts/s1.jsonl": "{\"type\": \"user\", \"message\": {\"role\": \"user\", \"content\": \"run the sweep\"}}\n{\"type\": \"assistant\", \"message\": {\"id\": \"m1\", \"model\": \"x\", \"usage\": {\"input_tokens\": 100, \"output_tokens\": 20, \"cache_creation_input_tokens\": 0, \"cache_read_input_tokens\": 0}}}\n{\"type\": \"assistant\", \"message\": {\"id\": \"m1\", \"model\": \"x\", \"usage\": {\"input_tokens\": 100, \"output_tokens\": 30, \"cache_creation_input_tokens\": 0, \"cache_read_input_tokens\": 0}}}\n",
-        "home/transcripts/s1/subagents/agent-d1.jsonl": "{\"type\": \"user\", \"message\": {\"role\": \"user\", \"content\": \"# Dream Drafter Brief\\nD01\"}}\n{\"type\": \"assistant\", \"message\": {\"id\": \"m2\", \"model\": \"y\", \"usage\": {\"input_tokens\": 7, \"output_tokens\": 3, \"cache_creation_input_tokens\": 0, \"cache_read_input_tokens\": 0}}}\n"
+        "home/transcripts/s1.jsonl": "{\"type\": \"user\", \"message\": {\"role\": \"user\", \"content\": \"run the sweep\"}}\n{\"type\": \"assistant\", \"message\": {\"id\": \"m1\", \"model\": \"x\", \"usage\": {\"input_tokens\": 100, \"output_tokens\": 20, \"cache_creation_input_tokens\": 0, \"cache_read_input_tokens\": 0}}}\n{\"type\": \"assistant\", \"message\": {\"id\": \"m1\", \"model\": \"x\", \"usage\": {\"input_tokens\": 100, \"output_tokens\": 30, \"cache_creation_input_tokens\": 0, \"cache_read_input_tokens\": 0}}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-12T10:00:00Z\", \"message\": {\"id\": \"m0\", \"model\": \"x\", \"usage\": {\"input_tokens\": 1000, \"output_tokens\": 0, \"cache_creation_input_tokens\": 0, \"cache_read_input_tokens\": 0}}}\n",
+        "home/transcripts/s1/subagents/agent-d1.jsonl": "{\"type\": \"user\", \"message\": {\"role\": \"user\", \"content\": \"# Dream Drafter Brief\\nD01\"}}\n{\"type\": \"assistant\", \"message\": {\"id\": \"m2\", \"model\": \"y\", \"usage\": {\"input_tokens\": 7, \"output_tokens\": 3, \"cache_creation_input_tokens\": 0, \"cache_read_input_tokens\": 0}}}\n",
+        "home/transcripts/s1/subagents/agent-p1.jsonl": "{\"type\": \"user\", \"message\": {\"role\": \"user\", \"content\": \"# Dream Phase Agent Brief\\nGather\"}}\n{\"type\": \"assistant\", \"message\": {\"id\": \"m3\", \"model\": \"x\", \"usage\": {\"input_tokens\": 40, \"output_tokens\": 2, \"cache_creation_input_tokens\": 0, \"cache_read_input_tokens\": 0}}}\n",
+        "home/transcripts/s1/subagents/agent-p0.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-12T10:00:00Z\", \"message\": {\"role\": \"user\", \"content\": \"# Dream Phase Agent Brief\\nGather\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-12T10:01:00Z\", \"message\": {\"id\": \"m4\", \"model\": \"x\", \"usage\": {\"input_tokens\": 500, \"output_tokens\": 0, \"cache_creation_input_tokens\": 0, \"cache_read_input_tokens\": 0}}}\n",
+        "home/transcripts/s1/subagents/agent-p2.jsonl": "{\"type\": \"user\", \"timestamp\": \"2026-10-12T10:59:00Z\", \"message\": {\"role\": \"user\", \"content\": \"# Dream Phase Agent Brief\\nSynthesize\"}}\n{\"type\": \"assistant\", \"timestamp\": \"2026-10-12T11:01:00Z\", \"message\": {\"id\": \"m5\", \"model\": \"x\", \"usage\": {\"input_tokens\": 30, \"output_tokens\": 0, \"cache_creation_input_tokens\": 0, \"cache_read_input_tokens\": 0}}}\n"
       }
     },
     {
@@ -87,14 +90,17 @@
         "repo/memory/.dream-journal.jsonl"
       ],
       "stdout_contains": [
-        "tokens: 140 from 1 transcript(s)",
+        "tokens: 1712 from 1 transcript(s)",
         "drafter=10",
-        "orchestrator=130"
+        "orchestrator=1702",
+        "weighted tokens: 352 since 2026-10-12T11:00:00Z, phase agents 80"
       ],
       "root_contains": {
         "repo/memory/.dream-state.json": [
-          "\"tokens\": 140",
-          "\"drafter\": 10"
+          "\"tokens\": 1712",
+          "\"drafter\": 10",
+          "\"weighted_tokens\": 352",
+          "\"phase_weighted_tokens\": 80"
         ]
       }
     }
