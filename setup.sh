@@ -565,15 +565,28 @@ lock_retire() {
         { p = k(home "/" substr($2, 3)); if (p in h) print h[p] "\t" $3 "\t" real[p] }
     ' "$w.h" "$w" > "$w.plan"
     : > "$w.rm"
+    local nfx=0 why top="${p%/}" r isfx
     while IFS=$'\t' read -r h val p; do
+        # a skill's fixtures/ file whose source still exists: setup stopped deploying fixtures/ folders
+        isfx=0; why="its source is gone"
+        case "$p" in
+            "$HOME"/.kiro/skills/*/*)
+                r="${p#"$HOME"/.kiro/skills/}"
+                case "/${r#*/}" in
+                    */fixtures/*) if [ -f "$SHARED_DIR/skills/$r" ]; then isfx=1; why="setup no longer deploys fixtures/ folders"; fi ;;
+                esac ;;
+        esac
         if [ "$h" = "$val" ]; then
             printf '%s\0' "$p" >> "$w.rm"
-            echo "  REMOVED: $p (its source is gone)"
+            if [ "$isfx" -eq 1 ]; then nfx=$((nfx + 1)); else echo "  REMOVED: $p ($why)"; fi
         else
-            echo "  NOTE: $p changed since setup wrote it and its source is gone"
+            echo "  NOTE: $p changed since setup wrote it and $why"
             backup_path "$p" || true
         fi
     done < "$w.plan"
+    if [ "$nfx" -gt 0 ]; then
+        echo "  REMOVED: $nfx unchanged file(s) under fixtures/ folders in $top (setup no longer deploys fixtures/ folders)"
+    fi
     remove_listed "$w.rm"
 }
 
@@ -1280,8 +1293,10 @@ engine_branch_step() {
 # cat: the same trailing-newline handling, about 6 ms where cat took 78 under Git Bash. The read
 # builtin is no substitute there: it reads one byte per system call (210 ms on a 70 KB SKILL.md).
 
-# has_non_space <text>: true when the text holds a character that is not white space
-# (the test [ -n "$(printf '%s' "$text" | tr -d '[:space:]')" ], without a process).
+# has_non_space <text>: true when the text holds a character that is not white space. It replaced
+# [ -n "$(printf '%s' "$text" | tr -d '[:space:]')" ] and agrees with it on ASCII white space; in a
+# UTF-8 locale it also counts Unicode spaces (no-break space, em space) as white space, as
+# setup.ps1's .Trim() does, where the byte-wise tr did not.
 has_non_space() {
     [[ "$1" == *[![:space:]]* ]]
 }
@@ -1352,20 +1367,50 @@ gen_expected() {
     sha_list "$w/exp.lst" > "$w/exp.h"
 }
 
+# fixture_leftovers <skill dir> <dest> <work folder>: the files under a fixtures/ folder of the copy
+# at dest, which setup no longer deploys (gen_expected) but an older setup did, as <work>/fx:
+# rel<TAB>own<TAB>hash, own 1 when the file equals the source file at the same path (that older
+# setup's unchanged copy), else 0 (an edit, a .bak, a file of yours). Only the copy's fixtures/
+# folders are walked, so a copy without any costs one find. Lockstep with setup.ps1
+# Get-FixtureLeftovers and verify-deployment.py user_folder_kept.
+fixture_leftovers() {
+    local src_dir="$1" dest="$2" w="$3" d p
+    : > "$w/fx"
+    : > "$w/fx.lst"
+    { [ -d "$dest" ] && [ ! -L "$dest" ]; } || return 0
+    while IFS= read -r -d '' d; do
+        find "$d" -name __pycache__ -prune -o -type f -print0 >> "$w/fx.lst"
+    done < <(find "$dest" -name __pycache__ -prune -o -type d -name fixtures -print0 -prune)
+    [ -s "$w/fx.lst" ] || return 0
+    sha_list "$w/fx.lst" > "$w/fx.dh"
+    : > "$w/fx.slst"
+    while IFS= read -r -d '' p; do
+        p="$src_dir/${p#"$dest"/}"
+        if [ -f "$p" ] && [ ! -L "$p" ]; then printf '%s\0' "$p" >> "$w/fx.slst"; fi
+    done < "$w/fx.lst"
+    sha_list "$w/fx.slst" > "$w/fx.sh"
+    awk -F'\t' -v OFS='\t' -v sh="$w/fx.sh" -v sp="$src_dir/" -v dp="$dest/" '
+        FILENAME == sh { s[substr($2, length(sp) + 1)] = $1; next }
+        { r = substr($2, length(dp) + 1); print r, ((r in s) && s[r] == $1) ? 1 : 0, $1 }
+    ' "$w/fx.sh" "$w/fx.dh" > "$w/fx"
+}
+
 # deploy_generated_copy <skill dir> <dest> <overlay dir> <name>: an overlay-bearing skill as a
 # generated copy. Every expected file's bytes are known first (the shared file, or the merge
 # staged in the lock's work folder); then only the files that differ are written, each under the
 # ownership rule. Files of the copy whose source is gone are left to lock_retire. A folder at dest
 # that the lock names no file of is setup's (an older copy: an edited file goes to .bak) when every
-# file in it sits at a path setup writes for the skill; any other such folder is yours: it is KEPT.
-# Under Git Bash file names match whatever the letter case, as NTFS does.
+# file in it sits at a path setup writes for the skill, or is a fixtures/ file equal to its source
+# (fixture_leftovers); any other such folder is yours: it is KEPT. Under Git Bash file names match
+# whatever the letter case, as NTFS does.
 deploy_generated_copy() {
     local src_dir="$1" dest="$2" overlay_dir="$3" name="$4"
     local w="$LOCK_WORK/gen-$name" prefix="~/.kiro/skills/$name/" nlk ncur nforeign
-    local action rel kind src h full n_write=0 n_backup=0 n_keep=0
+    local action rel kind src h full n_write=0 n_backup=0 n_keep=0 n nfx
     gen_expected "$src_dir" "$overlay_dir" "$name" "$w"
     # 2. what is there now
     : > "$w/cur.lst"
+    : > "$w/fx"
     if [ -L "$dest" ]; then
         if is_engine_link "$dest"; then
             echo "  REMOVE SYMLINK: $dest (now a generated copy)"
@@ -1376,9 +1421,10 @@ deploy_generated_copy() {
     elif [ -e "$dest" ] && [ ! -d "$dest" ]; then
         make_way "$dest" || return 0
     elif [ -d "$dest" ]; then
-        # fixtures/ skipped here too: a leftover one in a copy without lock rows must not read as
-        # files of yours (KEPT below); lock_retire still removes the ones the lock names
+        # fixtures/ is listed apart (fixture_leftovers): for the KEPT test below, a leftover equal
+        # to its source is setup's, any other is yours; lock_retire removes the ones the lock names
         find "$dest" \( -name __pycache__ -o -type d -name fixtures \) -prune -o -type f -print0 > "$w/cur.lst"
+        fixture_leftovers "$src_dir" "$dest" "$w"
     fi
     sha_list "$w/cur.lst" > "$w/cur.h"
     awk -F'\t' -v pre="$prefix" 'index($2, pre) == 1 && ($1 == "copy-dir-recursive" || $1 == "merge-file") {
@@ -1396,6 +1442,11 @@ deploy_generated_copy() {
               print nlk + 0, ncur + 0, nforeign + 0 > st }
     ' "$w/exp.h" "$w/cur.h" "$w/lk" "$w/exp" > "$w/plan"
     read -r nlk ncur nforeign < "$w/stat"
+    # leftover fixtures/ files: all count as files there, the ones not equal to their source as yours
+    if [ -s "$w/fx" ]; then
+        read -r n nfx < <(awk -F'\t' '$2 == 0 { f++ } END { print NR + 0, f + 0 }' "$w/fx")
+        ncur=$((ncur + n)); nforeign=$((nforeign + nfx))
+    fi
     if [ "$ncur" -gt 0 ] && [ "$nlk" -eq 0 ] && [ "$nforeign" -gt 0 ]; then
         echo "  KEPT: $dest is your own folder; the playbook's $name skill is not deployed there (rename or remove it, then re-run setup, to get the playbook's)"
         return 0
@@ -1431,6 +1482,20 @@ deploy_generated_copy() {
             echo "    DRY: copy $(tr -cd '\0' < "$w/batch" | wc -c | tr -d ' ') files from $src_dir to $dest"
         else
             (cd "$src_dir" && tar -cf - --null -T "$w/batch") | (cd "$dest" && tar -xmf -)
+        fi
+    fi
+    # 5. an older setup's fixtures/ files the lock names nothing of: the ones equal to their source
+    # are its unchanged copies, removed (lock_retire handles the ones the lock names; any other is
+    # yours and stays)
+    if [ -s "$w/fx" ]; then
+        awk -F'\t' -v lf="$w/lk" -v dp="$dest/" -v fold="$IS_MSYS" '
+            function k(s) { return fold ? tolower(s) : s }
+            FILENAME == lf { lk[k($1)] = 1; next }
+            $2 == 1 && !(k($1) in lk) { print dp $1 }' "$w/lk" "$w/fx" > "$w/fx.rm.l"
+        if [ -s "$w/fx.rm.l" ]; then
+            tr '\n' '\0' < "$w/fx.rm.l" > "$w/fx.rm"
+            echo "  REMOVED: $(wc -l < "$w/fx.rm.l" | tr -d ' ') unchanged file(s) under fixtures/ folders in $dest (setup no longer deploys fixtures/ folders)"
+            remove_listed "$w/fx.rm"
         fi
     fi
     if [ "$n_write" -eq 0 ]; then
@@ -1825,6 +1890,10 @@ uninstall_generated_copies() {
             awk -F'\t' -v eh="$LOCK_WORK/unl-$name/exp.h" -v pre="~/.kiro/skills/$name/" '
                 FILENAME == eh { h[$2] = $1; next } { print $2 "\t" pre $1 "\t" h[$3] }
             ' "$LOCK_WORK/unl-$name/exp.h" "$LOCK_WORK/unl-$name/exp" >> "$w"
+            # an older setup's fixtures/ files, still equal to their source, are setup's too
+            fixture_leftovers "${skill_dir%/}" "$HOME/.kiro/skills/$name" "$LOCK_WORK/unl-$name"
+            awk -F'\t' -v pre="~/.kiro/skills/$name/" '$2 == 1 { print "copy-dir-recursive\t" pre $1 "\t" $3 }' \
+                "$LOCK_WORK/unl-$name/fx" >> "$w"
         done
     fi
     cut -f2 "$w" | awk -F/ '{ print $4 }' | LC_ALL=C sort -u > "$w.names"

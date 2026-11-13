@@ -1093,7 +1093,8 @@ parity_sec_ownership() {
 # (as NO-REWRITE does for setup.sh). Then, on the setup.sh sandbox (OWNERSHIP, always runs) and,
 # where SETUP-PARITY ran, the setup.ps1 one (TWIN-OWNERSHIP), the same steps run with a stub
 # kiro-cli on PATH (see own_stub; never the real one) and each outcome is checked:
-#   1. one collision per ownership rule is planted; setup runs for Kiro; it sets chat.defaultAgent;
+#   1. one collision per ownership rule is planted (an older copy's fixtures/ files among them);
+#      setup runs for Kiro; it sets chat.defaultAgent; the two twins' locks are byte-equal after;
 #   2. a re-run writes nothing (no .bak growth) and keeps chat.defaultAgent as it is;
 #   3. a file held open by another process cannot be backed up (the run ends non-zero, the path is
 #      left alone), a .bak that is not setup's is left alone, a later backup replaces an earlier
@@ -1101,7 +1102,7 @@ parity_sec_ownership() {
 #   4. a Kiro uninstall (the setting unreadable: its lock row is kept), with a journal row an
 #      interrupted run left; 5. a second uninstall reverts the setting;
 #   6. an uninstall with an unreadable lock: the lock goes to .bak, and only files equal to what
-#      setup writes now are removed.
+#      setup writes now (or, under fixtures/, to their source) are removed.
 # Every run's exit code is checked. The fixtures forge lock rows and plant files; they never touch
 # the repo.
 OWNERSHIP_OK=1
@@ -1150,6 +1151,10 @@ sh_pid=$!
 wait "$sh_pid" || true
 own_check_deploy "$sh_sb" "$TMPDIR_PARITY/own-sh-1.log" "setup.sh" own-sh-1
 [ "$twin" -eq 1 ] && own_check_deploy "$ps_sb" "$TMPDIR_PARITY/own-ps-1.log" "setup.ps1" own-ps-1
+if [ "$twin" -eq 1 ] && ! cmp -s "$sh_sb/.agent-playbook/deploy-lock.tsv" "$ps_sb/.agent-playbook/deploy-lock.tsv"; then
+    own_fail setup.ps1 "after the collision run the two twins' deploy locks are byte-equal (- setup.sh, + setup.ps1):"
+    diff "$sh_sb/.agent-playbook/deploy-lock.tsv" "$ps_sb/.agent-playbook/deploy-lock.tsv" | head -n 20 >&2 || true
+fi
 
 # 2. a re-run writes nothing
 own_stub_state "$sh_sb" '' ok
@@ -1383,6 +1388,10 @@ own_plant() {
     mkdir -p "$k/skills/qgone"
     printf 'gone\n' > "$k/skills/qgone/SKILL.md"
     own_lock_add "$sb" copy-dir-recursive "~/.kiro/skills/qgone/SKILL.md" "$(own_sha "$k/skills/qgone/SKILL.md")"
+    #    with a fixtures/ file: its source is gone too, so it is named as such, not as fixtures
+    mkdir -p "$k/skills/qgone/scripts/fixtures"
+    printf 'gone fixture\n' > "$k/skills/qgone/scripts/fixtures/case.json"
+    own_lock_add "$sb" copy-dir-recursive "~/.kiro/skills/qgone/scripts/fixtures/case.json" "$(own_sha "$k/skills/qgone/scripts/fixtures/case.json")"
     # 7. a locked file whose source is gone, edited since setup wrote it
     mkdir -p "$k/skills/qgone2"
     printf 'edited gone\n' > "$k/skills/qgone2/SKILL.md"
@@ -1435,6 +1444,21 @@ own_plant() {
     own_lock_add "$sb" copy-file "~/.kiro/settings/mcp.json" "$(own_sha "$k/settings/mcp.json")"
     # 16. a retired playbook name (the frozen stale list) holding a file of yours: backed up
     printf 'my json\n' > "$k/agents/kiro_default.json"
+    # 17. an older copy's fixtures/ files with lock rows (setup no longer deploys fixtures/ folders):
+    #     the unchanged ones go, named on one summary line; an edited one goes to .bak
+    local fxr=scripts/fixtures/dream-check/budget
+    for f in cases.json tree/memory/MEMORY.md tree/memory/HIGHER_ORDER.md; do
+        mkdir -p "$(dirname "$k/skills/qdream/$fxr/$f")"
+        cp "$REPO_ROOT/shared/skills/qdream/$fxr/$f" "$k/skills/qdream/$fxr/$f"
+        own_lock_add "$sb" copy-dir-recursive "~/.kiro/skills/qdream/$fxr/$f" "$(own_sha "$k/skills/qdream/$fxr/$f")"
+    done
+    printf 'edited fixture\n' >> "$k/skills/qdream/$fxr/cases.json"
+    cp "$k/skills/qdream/$fxr/cases.json" "$sb.fixture.edited"
+    # 18. an older copy of setup's the lock names no file of, plus a file of yours under fixtures/
+    #     (no source file at that path): it is yours, so the folder is KEPT
+    own_lock_drop "$sb" "~/.kiro/skills/qqa/"
+    mkdir -p "$k/skills/qqa/fixtures"
+    printf 'mine\n' > "$k/skills/qqa/fixtures/mine.json"
 }
 
 own_fail() {   # own_fail <setup.sh|setup.ps1> <what>
@@ -1462,6 +1486,8 @@ own_check_deploy() {   # own_check_deploy <sandbox> <log> <label> <log name>
         && [ -L "$k/steering/agents.md" ] && case "$(readlink "$k/steering/agents.md")" in *shared/AGENTS.md|*shared\\AGENTS.md) true ;; *) false ;; esac \
         || own_fail "$l" "a foreign symlink goes to .bak before the link is made"
     [ ! -e "$k/skills/qgone" ] || own_fail "$l" "a locked unedited file whose source is gone is removed, with its folder"
+    grep -q 'REMOVED: .*qgone.scripts.fixtures.case.json (its source is gone)' "$log" \
+        || own_fail "$l" "a deleted skill's fixtures/ file is retired as one whose source is gone"
     [ ! -e "$k/skills/qgone2/SKILL.md" ] && own_is "$k/skills/qgone2/SKILL.md.bak" "edited gone" \
         || own_fail "$l" "an edited file whose source is gone goes to .bak"
     cmp -s "$k/skills/qexplore/SKILL.md" "$sb.qexplore-skill.orig" && [ ! -e "$k/skills/qexplore/SKILL.md.bak" ] \
@@ -1493,6 +1519,19 @@ own_check_deploy() {   # own_check_deploy <sandbox> <log> <label> <log name>
     own_is "$k/agents/kiro_default.json.bak" "my json" && [ ! -e "$k/agents/kiro_default.json" ] \
         && grep -q $'^backup\t~/.kiro/agents/kiro_default.json\t' "$lock" \
         || own_fail "$l" "a retired playbook name holding a file of yours goes to .bak"
+    local fxd="$k/skills/qdream/scripts/fixtures/dream-check/budget"
+    cmp -s "$fxd/cases.json.bak" "$sb.fixture.edited" && [ ! -e "$fxd/cases.json" ] && [ ! -e "$fxd/tree" ] \
+        && [ "$(find "$k/skills/qdream/scripts/fixtures" -type f | wc -l)" -eq 1 ] \
+        && grep -q 'REMOVED: 2 unchanged file(s) under fixtures/ folders in ' "$log" \
+        && grep -q 'NOTE: .*cases.json changed since setup wrote it and setup no longer deploys fixtures/ folders' "$log" \
+        && ! grep -q 'qdream.scripts.fixtures.*(its source is gone)' "$log" \
+        && grep -q $'^backup\t~/.kiro/skills/qdream/scripts/fixtures/dream-check/budget/cases.json\t' "$lock" \
+        && ! grep -qE $'^(copy-dir-recursive|merge-file)\t~/.kiro/skills/qdream/scripts/fixtures/' "$lock" \
+        || own_fail "$l" "an older copy's locked fixtures/ files: the unchanged ones go on one summary line, an edited one to .bak"
+    [ -z "$(find "$k/skills" -path '*/fixtures/*' -type f ! -name '*.bak' ! -path '*/qqa/fixtures/mine.json' | head -n 1)" ] \
+        || own_fail "$l" "no generated copy holds a fixtures/ file setup wrote"
+    own_is "$k/skills/qqa/fixtures/mine.json" mine && grep -q 'KEPT: .*qqa' "$log" && ! grep -q $'\t~/.kiro/skills/qqa/' "$lock" \
+        || own_fail "$l" "a folder the lock names nothing of, with a fixtures/ file of yours, is KEPT"
     grep -q $'^backup\t~/.kiro/AUTHORING.md\t' "$lock" && grep -q $'^backup\t~/.kiro/steering/agents.md\t-$' "$lock" \
         && ! grep -q 'qgone/' "$lock" && ! grep -q $'\t~/.kiro/skills/qreview/' "$lock" \
         && [ ! -e "$sb/.agent-playbook/deploy-lock.journal.tsv" ] \
@@ -1526,6 +1565,15 @@ own_plant_hold() {
     cp "$k/skills/qbrowser-test/SKILL.md" "$sb.browser.edited"
     printf 'my own backup\n' > "$k/skills/qbrowser-test/SKILL.md.bak"
     printf 'edited2 authoring\n' > "$k/AUTHORING.md"
+    # an older copy the lock names nothing of, whose only other files are fixtures/ files equal to
+    # their source: it is setup's, so it is deployed (not KEPT) and those files are removed
+    local fxr=scripts/fixtures/dream-check/budget f
+    rm -f "$k/skills/qdream/$fxr/cases.json.bak"
+    own_lock_drop "$sb" "~/.kiro/skills/qdream/"
+    for f in cases.json tree/memory/MEMORY.md; do
+        mkdir -p "$(dirname "$k/skills/qdream/$fxr/$f")"
+        cp "$REPO_ROOT/shared/skills/qdream/$fxr/$f" "$k/skills/qdream/$fxr/$f"
+    done
     rm -f "$sb.hold-ready" "$sb.hold-stop" "$sb.hold-skip" "$sb.hold-pid"
     if [ "$(uname -o 2>/dev/null)" = "Msys" ] && [ -n "$PS_BIN" ]; then
         # Windows: another process holds the file open without delete sharing, so it cannot move.
@@ -1573,6 +1621,10 @@ own_check_hold() {   # own_check_hold <sandbox> <label> <log name>
         || own_fail "$l" "a .bak that is not setup's is left alone, and so is the file beside it"
     own_is "$k/AUTHORING.md.bak" "edited2 authoring" && cmp -s "$k/AUTHORING.md" "$REPO_ROOT/shared/AUTHORING.md" \
         || own_fail "$l" "a later backup replaces the earlier one setup made"
+    ! grep -q 'KEPT: .*qdream' "$log" && [ ! -e "$k/skills/qdream/scripts/fixtures" ] \
+        && grep -q 'REMOVED: 2 unchanged file(s) under fixtures/ folders in .*qdream' "$log" \
+        && grep -q $'^merge-file\t~/.kiro/skills/qdream/SKILL.md\t' "$lock" \
+        || own_fail "$l" "an older copy with no lock rows whose fixtures/ files equal their source is deployed, and those files go"
     [ ! -e "$sb/.agent-playbook/deploy-lock.journal.tsv" ] || own_fail "$l" "the journal is gone once the lock is written"
     if own_stub_used "$sb"; then
         ! grep -q 'chat.defaultAgent kiro_default' "$sb.stub/calls.log" \
@@ -1649,6 +1701,11 @@ own_plant_nolock() {
     cp "$REPO_ROOT/providers/kiro/agents/qdream_child.md" "$k/agents/qdream_child.md"
     tr 'a-z' 'A-Z' < "$REPO_ROOT/shared/AUTHORING.md" > "$k/AUTHORING.md"
     cp "$k/AUTHORING.md" "$sb.authoring.upper"
+    # an older copy's fixtures/ files: one equal to its source, one edited
+    local fxs="$REPO_ROOT/shared/skills/qdream/scripts/fixtures/dream-check/budget" fxd="$k/skills/qdream/scripts/fixtures/dream-check/budget"
+    mkdir -p "$fxd/tree/memory"
+    cp "$fxs/tree/memory/MEMORY.md" "$fxd/tree/memory/MEMORY.md"
+    { cat "$fxs/cases.json"; printf 'edited nolock\n'; } > "$fxd/cases.json"
 }
 
 own_check_nolock() {   # own_check_nolock <sandbox> <label> <log name>
@@ -1663,6 +1720,9 @@ own_check_nolock() {   # own_check_nolock <sandbox> <label> <log name>
         || own_fail "$l" "with no lock, uninstall removes a copy-file equal to its source byte for byte, and only then"
     own_is "$k/skills/qreview/SKILL.md" "user qreview" && own_is "$k/skills/qreview/my-own.md" "my own" \
         || own_fail "$l" "with no lock, uninstall leaves your own files alone"
+    local fxd="$k/skills/qdream/scripts/fixtures/dream-check/budget"
+    [ ! -e "$fxd/tree/memory/MEMORY.md" ] && [ -f "$fxd/cases.json" ] && grep -q 'edited nolock' "$fxd/cases.json" \
+        || own_fail "$l" "with no lock, uninstall removes an older copy's fixtures/ file equal to its source and keeps an edited one"
 }
 
 parity_sec_coexist() {

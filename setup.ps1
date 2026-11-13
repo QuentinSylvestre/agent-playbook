@@ -918,6 +918,46 @@ function Get-FilesNoFollow {
     return , $out.ToArray()
 }
 
+# Get-FixtureLeftovers: the files under a fixtures folder of the copy at Dest, which setup no longer
+# deploys (Get-FilesNoFollow) but an older setup did: rel (/ separated) -> @{Hash; Own}, Own $true
+# when the file equals the source file at the same path (that older setup's unchanged copy), else
+# $false (an edit, a .bak, a file of yours). Lockstep with setup.sh fixture_leftovers.
+function Get-FixtureLeftovers {
+    param([string]$SourceDir, [string]$Dest)
+    $out = @{}
+    $item = Get-Item -LiteralPath $Dest -Force -ErrorAction SilentlyContinue
+    if (-not $item -or -not $item.PSIsContainer -or ($item.Attributes -band [IO.FileAttributes]::ReparsePoint)) { return $out }
+    $files = New-Object 'System.Collections.Generic.List[string]'
+    $stack = New-Object 'System.Collections.Generic.Stack[object]'
+    $stack.Push(@($Dest, $false))
+    while ($stack.Count) {
+        $top = $stack.Pop(); $d = $top[0]; $inFx = $top[1]
+        foreach ($e in (New-Object IO.DirectoryInfo $d).GetFileSystemInfos()) {
+            if ($e.Attributes -band [IO.FileAttributes]::ReparsePoint) { continue }
+            $full = [IO.Path]::Combine($d, $e.Name)
+            if ($e.Attributes -band [IO.FileAttributes]::Directory) {
+                if ($e.Name -ne '__pycache__') { $stack.Push(@($full, ($inFx -or $e.Name -ceq 'fixtures'))) }
+            } elseif ($inFx) {
+                $files.Add($full)
+            }
+        }
+    }
+    if (-not $files.Count) { return $out }
+    $dh = Get-ShaMap $files.ToArray()
+    $src = @{}
+    foreach ($f in $files) {
+        $rel = $f.Substring($Dest.Length + 1)
+        $s = Join-Path $SourceDir $rel
+        if (Test-RegularFile $s) { $src[$f] = $s }
+    }
+    $sh = if ($src.Count) { Get-ShaMap @($src.Values) } else { @{} }
+    foreach ($f in $files) {
+        $own = $src.ContainsKey($f) -and $sh[$src[$f]] -eq $dh[$f]
+        $out[$f.Substring($Dest.Length + 1).Replace('\', '/')] = @{ Hash = $dh[$f]; Own = $own }
+    }
+    return $out
+}
+
 # Invoke-LockRetire: rows of the previous lock under Prefix that this run did not record (their
 # source is gone). A row for a current manifest destination, or for a path this run had to leave
 # alone, is never retired, and a key that differs from a recorded one only in letter case is the same
@@ -943,17 +983,33 @@ function Invoke-LockRetire {
     if (-not $todo.Count) { return }
     $hashes = Get-ShaMap ($todo | ForEach-Object { $_[0] })
     $touched = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    $nfx = 0
     foreach ($t in $todo) {
         $p = $t[0]
+        # a skill's fixtures file whose source still exists: setup stopped deploying fixtures folders
+        $isFx = $false
+        $skillsRoot = Join-Path $env:USERPROFILE ".kiro\skills"
+        if ($p.StartsWith($skillsRoot + '\', [StringComparison]::OrdinalIgnoreCase)) {
+            $r = $p.Substring($skillsRoot.Length + 1)
+            $i = $r.IndexOf('\')
+            if ($i -gt 0 -and ('\' + $r.Substring($i + 1)) -cmatch '\\fixtures\\') {
+                $isFx = Test-RegularFile (Join-Path (Join-Path $SharedDir "skills") $r)
+            }
+        }
+        $why = if ($isFx) { 'setup no longer deploys fixtures/ folders' } else { 'its source is gone' }
         if ($hashes[$p] -eq $t[1]) {
             Invoke-Act "remove $p" { [IO.File]::Delete($p) }
-            Write-Host "  REMOVED: $p (its source is gone)"
+            if ($isFx) { $nfx++ } else { Write-Host "  REMOVED: $p ($why)" }
         } else {
-            Write-Host "  NOTE: $p changed since setup wrote it and its source is gone"
+            Write-Host "  NOTE: $p changed since setup wrote it and $why"
             [void](Backup-Path $p)
         }
         $sd = Get-SkillDirOf $p
         if ($sd) { [void]$touched.Add($sd) }
+    }
+    if ($nfx) {
+        $top = (ConvertFrom-LockKey $Prefix).TrimEnd('\', '/')
+        Write-Host "  REMOVED: $nfx unchanged file(s) under fixtures/ folders in $top (setup no longer deploys fixtures/ folders)"
     }
     foreach ($sd in $touched) { Remove-EmptyDirs $sd }
 }
@@ -963,13 +1019,14 @@ function Invoke-LockRetire {
 # merge); then only the files that differ are written, each under the ownership rule. Files of the
 # copy whose source is gone are left to Invoke-LockRetire. A folder at Dest that the lock names no
 # file of is setup's (an older copy: an edited file goes to .bak) when every file in it sits at a
-# path setup writes for the skill; any other such folder is yours: it is KEPT. Names match whatever
-# the letter case. Returns $false when nothing was deployed.
+# path setup writes for the skill, or is a fixtures file equal to its source (Get-FixtureLeftovers);
+# any other such folder is yours: it is KEPT. Names match whatever the letter case. Returns $false
+# when nothing was deployed.
 function Deploy-GeneratedCopy {
     param([string]$SourceDir, [string]$Dest, [string]$OverlayDir, [string]$Name)
     $prefix = "~/.kiro/skills/$Name/"
     $exp = Get-GeneratedExpected $SourceDir $OverlayDir $Name
-    Deploy-GeneratedCopyTo $Dest $Name $prefix $exp
+    Deploy-GeneratedCopyTo $Dest $Name $prefix $exp (Get-FixtureLeftovers $SourceDir $Dest)
 }
 
 # Get-GeneratedExpected: the files a generated copy holds: rel -> @{Kind; Src or Bytes; Hash}.
@@ -996,7 +1053,7 @@ function Get-GeneratedExpected {
 }
 
 function Deploy-GeneratedCopyTo {
-    param([string]$Dest, [string]$Name, [string]$Prefix, $exp)
+    param([string]$Dest, [string]$Name, [string]$Prefix, $exp, [hashtable]$Fx = @{})
     $prefix = $Prefix
     # 2. what is there now
     $cur = @{}
@@ -1027,7 +1084,9 @@ function Deploy-GeneratedCopyTo {
         $plan.Add(@((Get-OwnAction $e.Hash $c $l), $rel))
     }
     $foreign = @($cur.Keys | Where-Object { -not $exp.Contains($_) }).Count
-    if ($cur.Count -gt 0 -and $locked.Count -eq 0 -and $foreign -gt 0) {
+    # leftover fixtures files: all count as files there, the ones not equal to their source as yours
+    $foreign += @($Fx.Values | Where-Object { -not $_.Own }).Count
+    if (($cur.Count + $Fx.Count) -gt 0 -and $locked.Count -eq 0 -and $foreign -gt 0) {
         Write-Host "  KEPT: $Dest is your own folder; the playbook's $Name skill is not deployed there (rename or remove it, then re-run setup, to get the playbook's)"
         return $false
     }
@@ -1053,6 +1112,18 @@ function Deploy-GeneratedCopyTo {
             $nKeep++
         }
         Add-LockRow $e.Kind ($prefix + $rel) $e.Hash
+    }
+    # 5. an older setup's fixtures files the lock names nothing of: the ones equal to their source
+    # are its unchanged copies, removed (Invoke-LockRetire handles the ones the lock names; any other
+    # is yours and stays)
+    $fxRm = @($Fx.Keys | Where-Object { $Fx[$_].Own -and -not $locked.ContainsKey($_) } | Sort-Object)
+    if ($fxRm.Count) {
+        Write-Host "  REMOVED: $($fxRm.Count) unchanged file(s) under fixtures/ folders in $Dest (setup no longer deploys fixtures/ folders)"
+        foreach ($rel in $fxRm) {
+            $full = Join-Path $Dest ($rel.Replace('/', '\'))
+            Invoke-Act "remove $full" { [IO.File]::Delete($full) }
+        }
+        Remove-EmptyDirs $Dest
     }
     if ($nWrite -eq 0) { Write-Host "  OK: $Dest (generated copy, $nKeep files)" }
     else { Write-Host "  UPDATED: $Dest (generated copy: $nWrite written, $nBackup backed up, $nKeep unchanged)" }
@@ -1446,6 +1517,9 @@ function Uninstall-GeneratedCopies {
             if (-not (Test-Path (Join-Path $skill.FullName "SKILL.md")) -or -not (Test-HasAnyOverlay $ov)) { continue }
             $exp = Get-GeneratedExpected $skill.FullName $ov $skill.Name
             foreach ($rel in $exp.Keys) { $want.Add(@("~/.kiro/skills/$($skill.Name)/$rel", $exp[$rel].Hash)) }
+            # an older setup's fixtures files, still equal to their source, are setup's too
+            $fx = Get-FixtureLeftovers $skill.FullName (Join-Path $skillsRoot $skill.Name)
+            foreach ($rel in $fx.Keys) { if ($fx[$rel].Own) { $want.Add(@("~/.kiro/skills/$($skill.Name)/$rel", $fx[$rel].Hash)) } }
         }
     }
     foreach ($w in $want) {

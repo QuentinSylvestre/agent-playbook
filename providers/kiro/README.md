@@ -8,7 +8,9 @@ they deploy as generated `shared + overlay` copies. See
 `providers/kiro/steering/kiro-guidelines.md § Symlinks and Folder Structure
 in `.kiro/``.
 
-Setup records every file of a generated copy, and the copied and rendered
+A generated copy holds every file of its shared skill except `__pycache__`
+and `fixtures/` folders (selftest data, read only from the repo). Setup
+records every file of a generated copy, and the copied and rendered
 `kiro-always` rows, in the deploy lock (`~/.agent-playbook/deploy-lock.tsv`).
 A re-run writes only the files that changed. A file you edited there is moved
 to `<file>.bak` before setup writes it again; a file you added is left alone.

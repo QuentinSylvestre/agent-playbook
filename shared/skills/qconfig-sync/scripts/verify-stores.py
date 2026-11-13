@@ -701,9 +701,10 @@ def unwired_check(R, valid, kiro_cwds, rep):
     seen = set()
     checked = set()  # one entry per session, so folders repeat; each result depends on the folder alone
     for c in kiro_cwds:
-        if _norm(c) in checked:
+        nc = _norm(c)
+        if nc in checked:
             continue
-        checked.add(_norm(c))
+        checked.add(nc)
         if not os.path.isdir(c):
             continue
         res = R.find(c)
@@ -1589,6 +1590,14 @@ def _selftest_stores(R, tmp, chk, skips):
     chk("unwired: a subfolder session names the repo root, once",
         sum(1 for l in out if l.startswith("WARN:") and "never wired" in l and "in %s" % str(proj).replace("\\", "/") in l) == 1,
         repr(out))
+    # several sessions in one folder (each folder is checked once): still one WARN, same text
+    ku2 = kiro / "hash-unwired" / "sess_u2"
+    ku2.mkdir(parents=True)
+    (ku2 / "session.json").write_text(json.dumps({"id": "sess_u2", "workspacePaths": [str(proj / "sub")]}),
+                                      encoding="utf-8")
+    rc, out2, _e = go(root, state=[str(proj)])
+    chk("unwired: two sessions in one folder give the output of one", out2 == out, repr(out2))
+    shutil.rmtree(str(ku2))
     psteer.mkdir(parents=True, exist_ok=True)
     pointer.write_text("# pointer\n", encoding="utf-8")
     rc, out, _e = go(root, state=[str(proj)])

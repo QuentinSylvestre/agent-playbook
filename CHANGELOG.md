@@ -22,6 +22,13 @@ All notable changes to this project are recorded here. The format follows
 
 - A store's `artifacts/` holds only files the user asked to keep. The uncommitted warning for
   that folder now says to move the file to `scratch/` or ask the user.
+- Kiro generated copies no longer include `fixtures/` folders (selftest data), which cuts a
+  Kiro setup run and `/qconfig-sync`'s parity check by about half. The first setup run after
+  the update removes the fixture files an older setup wrote, on one summary line, and moves an
+  edited one to `.bak`. `verify-deployment` reports any fixture file left in a copy as
+  `ORPHAN … not-deployed=fixtures`.
+- `/qdream`'s sweep Report shows the share of weighted tokens its phase agents spent, recorded
+  as `phase_weighted_tokens` in the state file's cost record.
 
 ### Fixed
 

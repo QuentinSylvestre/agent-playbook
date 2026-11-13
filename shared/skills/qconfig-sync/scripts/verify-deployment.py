@@ -152,6 +152,7 @@ transparently because tabs are not valid in path separators.
 
 Stdlib only, Python 3.8+. Runs only under the playbook venv (see the venv guard stub).
 """
+import filecmp
 import hashlib
 import json
 import os
@@ -280,8 +281,9 @@ REMEDIATION = (
     "nothing to delete and removing the overlay discards its only content -- create the shared skill it "
     "extends, rename the directory to match one, or promote the overlay to a standalone SKILL.md. For "
     "ORPHAN, delete the deployed file only after confirming its source was removed deliberately; an "
-    "ORPHAN with not-deployed=fixtures is a test fixture an older setup copied, safe to delete (setup "
-    "removes the ones it wrote unchanged).")
+    "ORPHAN with not-deployed=fixtures is a test fixture an older setup copied: an owned-by-setup one goes "
+    "on the next setup run; a foreign one may be your edit (a .bak) or a file of yours, so check it before "
+    "deleting it.")
 
 # Windows file attributes / reparse tags (stat.* names exist only on Windows builds).
 _ATTR_HIDDEN = 0x2
@@ -649,12 +651,14 @@ class Verifier(object):
             out.extend(os.path.join(d, n) for n in files)
         return out
 
-    def user_folder_kept(self, dest, expected_rels=None, any_entry=False):
+    def user_folder_kept(self, dest, expected_rels=None, any_entry=False, src=None):
         """setup's KEPT rule for a real entry at a skill's name: True when it is the user's own, so
         setup leaves it and does not deploy the skill there. Claude Code, Codex, Gemini CLI
         (any_entry): anything that is not a link. Kiro: not a link, and the lock names no file in
         it; for a generated copy (expected_rels given) it must also hold a file at a path setup does
-        not write there (else it is an older copy of setup's, which setup updates)."""
+        not write there (else it is an older copy of setup's, which setup updates). A file under a
+        fixtures/ folder is setup's only when it equals the file at the same path under src (an
+        older setup copied fixtures; setup.sh fixture_leftovers, setup.ps1 Get-FixtureLeftovers)."""
         if not os.path.lexists(dest) or os.path.islink(dest) or (self.win and _ps_link_type(dest)):
             return False
         if any_entry or not os.path.isdir(dest):
@@ -662,13 +666,30 @@ class Verifier(object):
         key = self.lock_key(dest)
         if key is not None and any(k.startswith(key + "/") for k in self.locked_keys()):
             return False
-        # setup's KEPT test leaves __pycache__ and fixtures/ out of the files it counts
-        files = [r for r in (os.path.relpath(f, dest).replace("\\", "/") for f in self._files_under(dest))
-                 if "__pycache__" not in r.split("/") and not _in_skipped_dir(r)]
+        # setup's KEPT test counts regular files only (find -type f; Get-FilesNoFollow skips reparse
+        # points), never __pycache__; a hard link is a regular file. A fixtures/ file counts as a file
+        # there, and as the user's unless it equals its source.
+        def is_link(p):
+            return os.path.islink(p) or (self.win and _ps_link_type(p) in ("SymbolicLink", "Junction"))
+        files = [r for r in (os.path.relpath(f, dest).replace("\\", "/") for f in self._files_under(dest)
+                             if not is_link(f))
+                 if "__pycache__" not in r.split("/")]
         if expected_rels is None:
             return bool(files)
         exp = set(r.lower() for r in expected_rels) if self.win else set(expected_rels)
-        return any((f.lower() if self.win else f) not in exp for f in files)
+
+        def setups(f):
+            if _in_skipped_dir(f):
+                d = os.path.join(dest, *f.split("/"))
+                if src is None:
+                    return False
+                s = os.path.join(src, *f.split("/"))
+                try:
+                    return os.path.isfile(s) and not os.path.islink(s) and filecmp.cmp(s, d, shallow=False)
+                except OSError:
+                    return False   # unreadable: not shown to be setup's, so the user's
+            return (f.lower() if self.win else f) in exp
+        return any(not setups(f) for f in files)
 
     # --- output ---
     def emit(self, status, path, *extras):
@@ -1226,7 +1247,7 @@ class Verifier(object):
                 dest = self.join(self.kiro_top, "skills/" + skill)
                 src = self.join(self.shared_skills, skill)
                 if self.has_any_overlay(overlay_dir):
-                    if _dir_exists(src) and self.user_folder_kept(dest, self._source_rels(src)):
+                    if _dir_exists(src) and self.user_folder_kept(dest, self._source_rels(src), src=src):
                         self.emit("OK", dest, *USER_FOLDER_KEPT)
                     else:
                         self.check_copy_dir_recursive(dest, src, overlay_dir)
@@ -1714,6 +1735,21 @@ def _st_cases(tmp, links, skip_reason):
     rc, out, _ = _st_run(repo, env)
     check(rc == 1 and not has(out, "OK", ".kiro/skills/beta", "user-folder-kept"),
           "a folder the lock names a file of is setup's, never user-folder-kept")
+
+    # An older copy's fixtures/ file in a folder the lock names nothing of: equal to its source it is
+    # setup's, so the folder is checked as usual; edited it is the user's, so the folder is kept
+    # (setup.sh fixture_leftovers, setup.ps1 Get-FixtureLeftovers).
+    repo, home, env = fresh()
+    kfx = os.path.join(home, ".kiro", "skills", "beta", "scripts", "fixtures", "case", "case.json")
+    _w(kfx, b"{}\n")
+    rc, out, _ = _st_run(repo, env)
+    check(not has(out, "OK", ".kiro/skills/beta", "user-folder-kept")
+          and has(out, "ORPHAN", "beta/scripts/fixtures/case/case.json", "not-deployed=fixtures"),
+          "a leftover fixtures/ file equal to its source leaves the copy setup's -> checked, ORPHAN")
+    _w(kfx, b"{\"edited\": true}\n")
+    rc, out, _ = _st_run(repo, env)
+    check(rc == 0 and has(out, "OK", ".kiro/skills/beta", "user-folder-kept"),
+          "an edited leftover fixtures/ file is the user's -> OK user-folder-kept (rc=%d)" % rc)
 
     if links:
         def mklink(target, at, is_dir=False):

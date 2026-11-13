@@ -58,8 +58,9 @@ HERE = Path(os.path.realpath(__file__)).parent
 DEFAULT_REPO = HERE.parents[3]  # scripts -> qconfig-sync -> skills -> shared -> repo
 WINDOWS = os.name == "nt"
 TIMEOUT_S = 900
-# test-parity.sh measured 490 s alone and 747 s inside the runner on 2026-11-12 (1007 s alone before
-# Kiro copies dropped fixtures/): its own cap, with margin for a loaded machine.
+# test-parity.sh measured 490 s alone and 747 to 943 s inside the runner on 2026-11-12, single runs
+# on a machine whose own load moved them by about 30% (1007 s alone before Kiro copies dropped
+# fixtures/): its own cap, with margin for a loaded machine.
 TIMEOUT_BY_CHECK = {"test-parity": 1500}
 FLAG_RE = re.compile(r"\b(FAIL(ED)?|SKIP(PED)?|DRIFT(ED)?|MISSING(_PATH|_ANCHOR)?|OVER|WARN(ING)?|INACTIVE|ORPHAN"
                      r"|WRONG_TARGET|NOT_SYMLINK|AMBIGUOUS_SKILL)\b")
