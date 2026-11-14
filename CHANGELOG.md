@@ -20,6 +20,18 @@ All notable changes to this project are recorded here. The format follows
 
 ### Changed
 
+- Setup is one Python implementation, `setup/setup.py`, on every platform. `setup.sh` and
+  `setup.ps1` keep their names and options; each now finds Python 3.8+ and runs it, and without
+  Python it stops with what to install and how to remove a deployment by hand (README,
+  Uninstall). A setup run takes about 1.5 s instead of 9 to 33 s. Setup now refuses a few
+  destructive steps the shell versions took: it never replaces a `.bak` folder it made earlier, an
+  existing `deploy-lock.tsv.bak` or your store `.gitignore`, never writes through a link, and a link
+  it cannot make or remove ends the run with exit 1.
+- `deploy_model.py` holds the deploy model setup writes from and `verify-deployment.py` checks
+  against; golden files written by the old shell setup pin its merge and render bytes.
+- `test-parity.sh` is gone: `setup/test_setup.py` deploys into sandbox homes and checks the same
+  rules in about 10 s instead of about 7 minutes.
+
 - A store's `artifacts/` holds only files the user asked to keep. The uncommitted warning for
   that folder now says to move the file to `scratch/` or ask the user.
 - Kiro generated copies no longer include `fixtures/` folders (selftest data), which cuts a
