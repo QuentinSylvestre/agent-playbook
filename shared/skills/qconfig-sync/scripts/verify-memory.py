@@ -550,16 +550,29 @@ def bad_path(p):
     return any(seg.endswith(".") for seg in p.split("/"))
 
 
+def _deploy_model():
+    """deploy_model.py beside this script (the manifest parser setup uses), loaded by path."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deploy_model.py")
+    try:
+        spec = importlib.util.spec_from_file_location("deploy_model_for_verify_memory", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+    except Exception as exc:
+        raise CouldNotRun("cannot load %s (%s: %s)" % (path, type(exc).__name__, exc))
+    return mod
+
+
 def accepted_sources(inv_lines):
+    """The sources of the inventory rows whose destination loads at session start. A malformed row
+    stops the check (exit 2), as it stops setup."""
+    dm = _deploy_model()
+    try:
+        entries = dm.parse_manifest("\n".join(inv_lines))
+    except dm.ManifestError as exc:
+        raise CouldNotRun("inventory.tsv: " + str(exc))
     out = []
-    for l in inv_lines:
-        t = trim(l)
-        if not t or t.startswith("#"):
-            continue
-        parts = l.split("\t")
-        if len(parts) != 4:
-            continue
-        dest, src = trim(parts[1]), trim(parts[2])
+    for e in entries:
+        dest, src = e.dest, e.source
         if not src:
             continue
         if dest in ACCEPTED_DESTS or (dest.startswith(KIRO_STEERING) and len(dest) > len(KIRO_STEERING)):

@@ -88,7 +88,14 @@ if ($NoStores) { $pass += '--no-stores' }
 if ($Uninstall) { $pass += '--uninstall' }
 if ($Purge) { $pass += '--purge' }
 
+$prevName = $env:AGENT_PLAYBOOK_SETUP_NAME
 $env:AGENT_PLAYBOOK_SETUP_NAME = 'setup.ps1'
 $pre = @($python[1])
-& $python[0] @pre -X utf8 -I (Join-Path $PSScriptRoot 'setup\setup.py') @pass
-exit $LASTEXITCODE
+try {
+    & $python[0] @pre -X utf8 -I (Join-Path $PSScriptRoot 'setup\setup.py') @pass
+    $code = $LASTEXITCODE
+} finally {
+    # the variable is for this run only: never leave it in the caller's session
+    $env:AGENT_PLAYBOOK_SETUP_NAME = $prevName
+}
+exit $code

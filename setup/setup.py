@@ -50,9 +50,10 @@ backup per path). An existing .bak is replaced only when the lock shows setup ma
 file, that it is unchanged); otherwise nothing moves and a WARN says what to do. A backup that cannot
 be made leaves that path unchanged and ends the run with exit 1.
 
-Exit codes: 0 done; 1 a path could not be backed up, a lock that could not be written, or an
-unexpected error; 2 a usage error, a missing prerequisite or a precondition (a file where a folder
-goes, a venv folder that is not a venv, an unknown provider, a bad manifest).
+Exit codes: 0 done; 1 a path that could not be backed up, linked or unlinked (left unchanged), a
+file where a folder goes, a lock that could not be written, or an unexpected error; 2 a usage error, a
+missing prerequisite or a precondition (a venv folder that is not a venv, an unknown provider, a bad
+manifest).
 
 Environment: AGENT_PLAYBOOK_STORES (store repo path), AGENT_PLAYBOOK_CONFIG (pointer file path),
 AGENT_PLAYBOOK_SKIP_KIRO_CLI=1 (do not change kiro-cli's global settings). Test seams:
@@ -64,7 +65,6 @@ command and flag spelling you ran.
 Stdlib only, Python 3.8+.
 """
 
-import hashlib
 import importlib.util
 import os
 import re
@@ -73,7 +73,6 @@ import stat
 import subprocess
 import sys
 import tempfile
-import uuid
 
 WIN = os.name == "nt"
 SEP = "\\" if WIN else "/"
@@ -85,6 +84,7 @@ ALL_PROVIDERS = ("claude", "codex", "gemini", "kiro")
 
 
 def _load_model():
+    sys.dont_write_bytecode = True   # a dry run writes nothing, not even a __pycache__ in the repo
     path = os.path.join(REPO, "shared", "skills", "qconfig-sync", "scripts", "deploy_model.py")
     spec = importlib.util.spec_from_file_location("deploy_model", path)
     mod = importlib.util.module_from_spec(spec)
@@ -428,7 +428,15 @@ def need_dir(p):
         act("mkdir " + p, lambda: os.makedirs(p, exist_ok=True))
 
 
+def fail_path(line):
+    """An ERROR for a path left unchanged; the run then ends with exit 1."""
+    global BACKUP_FAILED
+    err(line)
+    BACKUP_FAILED += 1
+
+
 def remove_dir_link(p):
+    """Remove a folder link without following it. False (an ERROR, counted) when it is still there."""
     def go():
         try:
             if WIN:
@@ -437,18 +445,29 @@ def remove_dir_link(p):
                 os.unlink(p)
         except OSError:
             pass
-    act("rmdir " + p, go)
+        if path_exists(p):
+            fail_path("ERROR: could not remove the link %s; left unchanged" % p)
+            return False
+        return True
+    return act("rmdir " + p, go) is not False
 
 
 def remove_file(p):
-    act("remove " + p, lambda: os.unlink(p))
+    """Remove a file or a file link. False (an ERROR, counted) when that fails."""
+    def go():
+        try:
+            os.unlink(p)
+            return True
+        except OSError as exc:
+            fail_path("ERROR: could not remove %s (%s); left unchanged" % (p, exc))
+            return False
+    return act("remove " + p, go) is not False
 
 
 def remove_link(p):
     if is_container(p):
-        remove_dir_link(p)
-    else:
-        remove_file(p)
+        return remove_dir_link(p)
+    return remove_file(p)
 
 
 def rmtree_no_follow(p):
@@ -498,8 +517,10 @@ def sha_map(paths):
 def make_link(target, link, is_dir):
     try:
         os.symlink(target, link, target_is_directory=is_dir)
+        return True
     except OSError as exc:
-        err("ERROR: could not link %s -> %s (%s)" % (link, target, exc))
+        fail_path("ERROR: could not link %s -> %s (%s)" % (link, target, exc))
+        return False
 
 
 # --- home, lock state ------------------------------------------------------------------
@@ -571,18 +592,22 @@ def read_deploy_lock():
             jlines = dm.read_lock_lines(LOCK_JOURNAL)
         except (OSError, UnicodeDecodeError):
             jlines, jok = [], False
+        bad = 0
         for line in jlines:
             c = line.split("\t")
             jkind = c[0] == "backup" or (c[0] == "setting" and len(c) == 3 and c[1] == LOCK_GEMINI_KEY)
             if not jkind or not dm.is_lock_row(c):
-                jok = False
-                break
+                bad += 1   # each row stands alone: a line half-written by a killed run drops only itself
+                continue
             jrows.append(c)
-        if jok:
-            rows = jrows + rows
-            say("  NOTE: merged the rows an interrupted run recorded in %s" % LOCK_JOURNAL)
-        else:
+        if not jok:
             say("  NOTE: %s is not a journal this setup can read; ignored" % LOCK_JOURNAL)
+        else:
+            rows = jrows + rows
+            if jrows:
+                say("  NOTE: merged the rows an interrupted run recorded in %s" % LOCK_JOURNAL)
+            if bad:
+                say("  NOTE: %d line(s) of %s are not journal rows; ignored" % (bad, LOCK_JOURNAL))
     for c in rows:
         LOCK_OLD.append(c)
         k = F(c[0] + "\t" + c[1])
@@ -611,10 +636,12 @@ def complete_deploy_lock(carry, drop_empty=False):
     rows, data = dm.lock_bytes(list(LOCK_NEW) + list(carry))
     exists = test_leaf(LOCK_FILE)
     if LOCK_UNREADABLE and exists:
-        shutil.copyfile(LOCK_FILE, LOCK_FILE + ".bak")
-        os.unlink(LOCK_FILE)
+        keep = LOCK_FILE + ".bak"
+        if path_exists(keep):
+            keep = "%s.bak-%d" % (LOCK_FILE, os.getpid())   # a .bak already there is never replaced
+        os.rename(LOCK_FILE, keep)
         exists = False
-        say("  BACKUP: %s -> %s.bak (a deploy lock this setup cannot read)" % (LOCK_FILE, LOCK_FILE))
+        say("  BACKUP: %s -> %s (a deploy lock this setup cannot read)" % (LOCK_FILE, keep))
 
     def drop_journal():
         try:
@@ -732,6 +759,11 @@ def backup_path(p):
             say("  WARN: %s is not a backup setup made, so %s is left unchanged; move %s away, then re-run setup" % (bak, p, bak))
             LOCK_HELD.add(F(key))
             return 2
+        if old == "-" and is_dir_entry(bak):
+            # a folder has no recorded hash: it may hold your edits since, so it is never replaced
+            say("  WARN: %s is a folder setup moved there earlier and may hold your edits, so %s is left unchanged; move %s away, then re-run setup" % (bak, p, bak))
+            LOCK_HELD.add(F(key))
+            return 2
     say("  BACKUP: %s -> %s" % (p, bak))
     if O.dry_run:
         say("    DRY: move %s %s" % (p, bak))
@@ -756,12 +788,15 @@ def backup_path(p):
         BACKUP_FAILED += 1
         LOCK_HELD.add(F(key))
         return 1
-    if aside:
-        remove_path_no_follow(aside)
     add_lock_row("backup", key, h)
     if key.startswith("~/"):
         need_dir(parent(LOCK_JOURNAL))
         append_text(LOCK_JOURNAL, "backup\t%s\t%s\n" % (key, h))
+    if aside:
+        try:
+            remove_path_no_follow(aside)
+        except OSError as exc:
+            say("  WARN: could not remove the older backup %s (%s); delete it by hand" % (aside, exc))
     return 0
 
 
@@ -790,8 +825,7 @@ def clear_link_way(link, target):
             return "ok"
         if engine_link(link):
             say("  UPDATE: %s (was -> %s)" % (link, cur))
-            remove_link(link)
-            return "free"
+            return "free" if remove_link(link) else "skip"
     if clear_way_for(link):
         return "free"
     return "skip"
@@ -800,15 +834,15 @@ def clear_link_way(link, target):
 def link_file(target, link):
     if clear_link_way(link, target) != "free":
         return
-    act("link %s -> %s" % (link, target), lambda: make_link(target, link, False))
-    say("  LINKED: %s -> %s" % (link, target))
+    if act("link %s -> %s" % (link, target), lambda: make_link(target, link, False)) is not False:
+        say("  LINKED: %s -> %s" % (link, target))
 
 
 def link_dir(target, link):
     if clear_link_way(link, target) != "free":
         return
-    act("link %s -> %s" % (link, target), lambda: make_link(target, link, True))
-    say("  LINKED: %s -> %s" % (link, target))
+    if act("link %s -> %s" % (link, target), lambda: make_link(target, link, True)) is not False:
+        say("  LINKED: %s -> %s" % (link, target))
 
 
 def list_dirs(root, skip_cache=False):
@@ -841,7 +875,8 @@ def link_skills(d):
     if is_reparse(d):
         if engine_link(d):
             say("  CONVERT: %s (one link per skill instead of the whole folder)" % d)
-            remove_dir_link(d)
+            if not remove_dir_link(d):
+                return
         else:
             say("  SKIPPED: %s links to %s, not to this repo; link the skills by hand" % (d, link_target(d)))
             return
@@ -1032,7 +1067,8 @@ def write_owned_file(kind, dest, data):
     if is_reparse(dest):
         if engine_link(dest):
             say("  REMOVE SYMLINK: " + dest)
-            remove_file(dest)
+            if not remove_file(dest):
+                return
         elif backup_path(dest) != 0:
             return
     elif path_exists(dest) and is_container(dest):
@@ -1160,7 +1196,8 @@ def deploy_generated_copy_to(dest, name, prefix, exp, fx):
     if is_reparse(dest):
         if engine_link(dest):
             say("  REMOVE SYMLINK: %s (now a generated copy)" % dest)
-            remove_dir_link(dest)
+            if not remove_dir_link(dest):
+                return False
         elif not clear_way_for(dest):
             return False
     elif path_exists(dest) and not is_container(dest):
@@ -1183,6 +1220,10 @@ def deploy_generated_copy_to(dest, name, prefix, exp, fx):
         say("  KEPT: %s is your own folder; the playbook's %s skill is not deployed there (rename or remove it, then re-run setup, to get the playbook's)" % (dest, name))
         return False
     need_dir(dest)
+    if is_reparse(dest) and not O.dry_run:
+        # never write a copy through a link: its files would land wherever the link points
+        fail_path("ERROR: %s is a link, not a folder; the %s skill is not deployed there" % (dest, name))
+        return False
     n_write = n_backup = n_keep = 0
     for a, rel in plan:
         e = exp[rel]
@@ -1277,6 +1318,9 @@ def copy_seed(source, dest):
     """A seed is written only when the destination is absent: the app owns the live file."""
     if os.path.exists(dest):
         say("  OK: %s (present; seed not overwritten)" % dest)
+        return
+    if is_reparse(dest):
+        say("  NOTE: %s is a link to a missing file; it is not seeded (setup never writes through a link there)" % dest)
         return
     data = render(source)
     act("write " + dest, lambda: write_bytes(dest, data))
@@ -1519,8 +1563,9 @@ def run_uninstall(config_file):
     complete_deploy_lock(keep, drop_empty=True)
     if O.purge:
         mem = pj(REPO, "memory")
-        if is_reparse(mem):
-            remove_dir_link(mem)
+        if home_sandboxed():
+            say("  SKIPPED: %s (HOME is sandboxed; the repo's memory link is never removed from a sandbox)" % mem)
+        elif is_reparse(mem) and remove_dir_link(mem):
             say("  REMOVED: %s (link; the store repo is untouched)" % mem)
         if os.path.exists(config_file):
             remove_file(config_file)
@@ -1668,7 +1713,11 @@ def store_repo_step(stores):
         say("  CREATE: %s (a new local store repo; add a remote and push it to keep it)" % stores)
         need_dir(stores)
         act("git init " + stores, lambda: git("-C", stores, "init", "-q"))
-        write_text(pj(stores, ".gitignore"), "user/memory/.dream-journal.jsonl\n*/STORE.tmp-*\n*/scratch/\n")
+        gi = pj(stores, ".gitignore")
+        if path_exists(gi):
+            say("  KEPT: %s (yours; add user/memory/.dream-journal.jsonl, */STORE.tmp-* and */scratch/ to it)" % gi)
+        else:
+            write_text(gi, "user/memory/.dream-journal.jsonl\n*/STORE.tmp-*\n*/scratch/\n")
 
     def clone(url):
         say("  CLONE: %s -> %s" % (url, stores))
@@ -1755,7 +1804,7 @@ def memory_link_step(stores):
             do_link = False
         else:
             say("  UPDATE: %s (was -> %s)" % (link, cur))
-            remove_dir_link(link)
+            do_link = remove_dir_link(link)
     elif path_exists(link):
         say("  NOTE: %s is a real folder; memory stays there until you move it to %s" % (link, target))
         do_link = False
@@ -2102,7 +2151,7 @@ def run(argv):
             say("NOTE: ~/.claude/settings.json was not changed. '/qconfig-sync' reports which Claude Code")
             say("      entries are set, and providers/claude/README.md says how to add them.")
     if failed > 0:
-        stop(1, "ERROR: %d path(s) could not be backed up and were left unchanged (the ERROR lines above); close what holds them, then re-run setup" % failed)
+        stop(1, "ERROR: %d path(s) could not be backed up, linked or unlinked and were left unchanged (the ERROR lines above); close what holds them, then re-run setup" % failed)
     return 0
 
 

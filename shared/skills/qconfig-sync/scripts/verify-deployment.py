@@ -64,7 +64,7 @@ Overlay-merge awareness (the model setup/setup.py writes from):
   for an aux file) into the deployed target rather than copying the overlay
   standalone. This verifier mirrors that model: for an overlay-bearing skill it
   recomputes the expected merged content (deploy_model.py's merge_overlay_bytes, the
-  module setup writes from, and _has_any_overlay) and
+  module setup writes from, and its has_any_overlay) and
   byte-compares the DEPLOYED file against the COMPUTED merge -- so a correct merge
   verifies OK and a stale/corrupt merge still reports DRIFTED. The overlay fragments
   themselves are merge INPUTS, never standalone deploy targets, so they are never
@@ -682,58 +682,24 @@ class Verifier(object):
             names.append(name)
         return names
 
-    def _aux_overlays(self, overlay_dir):
-        """*.OVERLAY.md fragments except the reserved SKILL.OVERLAY.md: [(name, full)]."""
-        found = []
-        if self.win:
-            for name, full, st in _ps_children(overlay_dir, force=False):
-                if _ps_is_dir_item(st):
-                    continue
-                low = name.lower()
-                if low.endswith(".overlay.md") and low not in ("overlay.md", "skill.overlay.md"):
-                    found.append((name, full))
-            return found
-        for name in sorted((e.name for e in _entries(overlay_dir)), key=_c_key):
-            if name.startswith(".") or not name.endswith(".OVERLAY.md") or len(name) <= len(".OVERLAY.md"):
-                continue
-            full = overlay_dir + "/" + name
-            if not os.path.isfile(full) or name in ("OVERLAY.md", "SKILL.OVERLAY.md"):
-                continue
-            found.append((name, full))
-        return found
-
     def has_any_overlay(self, overlay_dir):
-        if not _dir_exists(overlay_dir):
-            return False
-        ov = self.join(overlay_dir, "OVERLAY.md")
-        if (os.path.exists(ov) if self.win else os.path.isfile(ov)):
-            return True
-        return bool(self._aux_overlays(overlay_dir))
+        return dm.has_any_overlay(overlay_dir)
 
     def merge_targets(self, shared_skill_dir, overlay_dir):
-        """[(target relpath, shared file, overlay file)] in --list order."""
+        """[(target relpath, shared file, overlay file)] in --list order: the merges setup writes
+        (deploy_model.py's OVERLAY.md rule and aux_overlay_targets)."""
         if not _dir_exists(overlay_dir):
             return []
         targets = {}
+        key = (lambda t: t.lower()) if self.win else (lambda t: t)
         skill_ov = self.join(overlay_dir, "OVERLAY.md")
         shared_md = self.join(shared_skill_dir, "SKILL.md")
-        if self.win:
-            if os.path.exists(skill_ov) and os.path.exists(shared_md):
-                targets["skill.md"] = ("SKILL.md", shared_md, skill_ov)
-            for name, full in self._aux_overlays(overlay_dir):
-                target = name[:-len(".OVERLAY.md")] + ".md"
-                shared_target = self.join(shared_skill_dir, target)
-                if os.path.exists(shared_target):
-                    targets[target.lower()] = (target, shared_target, full)
-            return [targets[k] for k in sorted(targets)]
-        if os.path.isfile(skill_ov) and os.path.isfile(shared_md):
-            targets["SKILL.md"] = ("SKILL.md", shared_md, skill_ov)
-        for name, full in self._aux_overlays(overlay_dir):
-            target = name[:-len(".OVERLAY.md")] + ".md"
-            shared_target = shared_skill_dir + "/" + target
-            if os.path.isfile(shared_target):
-                targets[target] = (target, shared_target, full)
-        return [targets[k] for k in sorted(targets, key=_c_key)]
+        if os.path.exists(skill_ov) and os.path.exists(shared_md):
+            targets[key("SKILL.md")] = ("SKILL.md", shared_md, skill_ov)
+        for target, full in dm.aux_overlay_targets(overlay_dir, shared_skill_dir):
+            targets[key(target)] = (target, self.join(shared_skill_dir, target), full)
+        order = sorted(targets) if self.win else sorted(targets, key=_c_key)
+        return [targets[k] for k in order]
 
     # --- --list ---
     def inventory(self):
@@ -871,16 +837,9 @@ class Verifier(object):
         if overlay_dir and self.has_any_overlay(overlay_dir):
             for target, shared_file, ov_file in self.merge_targets(source_dir, overlay_dir):
                 merge[target.lower() if self.win else target] = (shared_file, ov_file)
-        if self.win:
-            source_full = os.path.abspath(source_dir)
-            walk = []
-            for full, st in _ps_recurse_files(source_full):
-                rel = full[len(source_full):].lstrip("\\/")
-                if _ps_link_type(full, st) or re.search(r"[\\/]__pycache__[\\/]", full) or _in_skipped_dir(rel):
-                    continue
-                walk.append((rel, full))
-        else:
-            walk = [(rel, source_dir + "/" + rel) for rel in self._posix_find_files(source_dir)]
+        # the files setup copies (deploy_model.py files_no_follow: no link, __pycache__ or fixtures/)
+        top = source_dir.rstrip("\\/")
+        walk = [(f[len(top) + 1:], f) for f in dm.files_no_follow(top, self.win, listdir=_entries)]
         for rel, source_file in walk:
             dest_file = self.join(dest_dir, rel)
             if not os.path.exists(dest_file):
@@ -1070,12 +1029,9 @@ class Verifier(object):
             self.check_symlink(dest, self.join(self.shared_skills, skill))
 
     def _source_rels(self, source_dir):
-        if self.win:
-            full = os.path.abspath(source_dir)
-            return [f[len(full):].lstrip("\\/").replace("\\", "/") for f, st in _ps_recurse_files(full)
-                    if not _ps_link_type(f, st) and not re.search(r"[\\/]__pycache__[\\/]", f)
-                    and not _in_skipped_dir(f[len(full):])]
-        return list(self._posix_find_files(source_dir))
+        """The / separated relpaths of the files setup copies from source_dir (deploy_model.py)."""
+        top = source_dir.rstrip("\\/")
+        return [f[len(top) + 1:].replace("\\", "/") for f in dm.files_no_follow(top, self.win, listdir=_entries)]
 
     def check_all(self):
         claude_top = self.join(self.home, ".claude")
@@ -1217,7 +1173,7 @@ class Verifier(object):
             dirs = [(n, root + "/" + n) for n in names if not n.startswith(".") and _dir_exists(root + "/" + n)]
         for name, full in dirs:
             has_skill = os.path.isfile(self.join(full, "SKILL.md"))
-            has_ov = os.path.isfile(self.join(full, "OVERLAY.md")) or bool(self._aux_overlays(full))
+            has_ov = dm.has_any_overlay(full)
             if has_skill and has_ov:
                 self.emit("AMBIGUOUS_SKILL", full, AMBIG_BOTH)
             elif not has_skill and has_ov and not _dir_exists(self.join(self.repo, "shared/skills/" + name)):

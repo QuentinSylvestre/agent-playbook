@@ -13,7 +13,7 @@ verify-mass.py reads the manifest through it. It owns:
 Stdlib only, Python 3.8+. Callers run under `-I`, which keeps this folder off sys.path, so they load
 this file by path (importlib), never by `import deploy_model`.
 
-Byte contract (merge and render; it was setup.ps1's, Q5 of plan 261114):
+Byte contract (merge and render; the retired setup.ps1's, kept on every platform):
   - a source is read as [IO.File]::ReadAllText reads it: a BOM is detected and dropped, the rest is
     decoded as UTF-8 (invalid bytes become U+FFFD);
   - trailing CR and LF characters are stripped, interior line endings are kept;
@@ -49,7 +49,6 @@ KIND_TEMPLATE_FILE = "template-file"
 KIND_SEED_FILE = "seed-file"
 VALID_KINDS = (KIND_SYMLINK_FILE, KIND_SYMLINK_DIR, KIND_COPY_FILE, KIND_COPY_DIR_RECURSIVE,
                KIND_MERGE_FILE, KIND_TEMPLATE_FILE, KIND_SEED_FILE)
-MODES = ("claude", "codex", "gemini", "kiro-always", "kiro")
 KIRO_IDE_TOKEN = "<KIRO_IDE_USER>"
 
 
@@ -80,7 +79,11 @@ def read_manifest(path):
     if not os.path.isfile(path):
         raise ManifestError("ERROR: manifest not found: %s" % path)
     with open(path, "rb") as fh:
-        text = decode_net(fh.read())
+        return parse_manifest(decode_net(fh.read()))
+
+
+def parse_manifest(text):
+    """read_manifest's rules on the decoded text of an inventory.tsv."""
     lines = re.split(r"\r\n|\n|\r", text)
     if lines and lines[-1] == "":
         lines.pop()
@@ -211,16 +214,9 @@ COPY_SKIP_DIRS = ("__pycache__",)   # skipped in any letter case on Windows, as 
 COPY_SKIP_DIR_EXACT = "fixtures"   # selftest data, read only from the repo (case-sensitive)
 
 
-def is_reparse(path):
-    """A symlink or a junction (any reparse point on Windows), never followed."""
-    try:
-        st = os.lstat(path)
-    except OSError:
-        return False
-    if stat.S_ISLNK(st.st_mode):
-        return True
-    attrs = getattr(st, "st_file_attributes", 0)
-    return bool(attrs & 0x400)
+def _name_key(name):
+    """An overlay file name in its comparison form: case folded on Windows only."""
+    return name.lower() if os.name == "nt" else name
 
 
 def _scandir_sorted(path):
@@ -238,14 +234,15 @@ def _entry_is_reparse(e):
     return bool(attrs & 0x400)
 
 
-def files_no_follow(root, windows):
+def files_no_follow(root, windows, listdir=None):
     """The regular files under root, recursively, never entering a link, a __pycache__ folder or a
-    fixtures folder. Paths are built from root as given (an 8.3 short name stays short)."""
+    fixtures folder. Paths are built from root as given (an 8.3 short name stays short). listdir(path)
+    -> scandir entries lists a folder (default os.scandir); its OSError propagates."""
     out = []
     stack = [root]
     while stack:
         d = stack.pop()
-        for e in _scandir_sorted(d):
+        for e in (listdir or _scandir_sorted)(d):
             if _entry_is_reparse(e):
                 continue
             full = native_join(d, e.name, windows) if windows else d.rstrip("/") + "/" + e.name
@@ -266,8 +263,9 @@ def has_any_overlay(overlay_dir):
     if os.path.exists(os.path.join(overlay_dir, OVERLAY_NAME)):
         return True
     for e in _scandir_sorted(overlay_dir):
-        if (e.is_file() and e.name.lower().endswith(AUX_SUFFIX.lower())
-                and e.name.lower() not in (OVERLAY_NAME.lower(), RESERVED_OVERLAY.lower())):
+        n = _name_key(e.name)
+        if (e.is_file() and n.endswith(_name_key(AUX_SUFFIX))
+                and n not in (_name_key(OVERLAY_NAME), _name_key(RESERVED_OVERLAY))):
             return True
     return False
 
@@ -278,13 +276,14 @@ def aux_overlay_targets(overlay_dir, source_dir, warn=None):
     out = []
     if not os.path.isdir(overlay_dir):
         return out
-    for e in sorted(_scandir_sorted(overlay_dir), key=lambda x: x.name.lower()):
-        if not e.is_file() or not e.name.lower().endswith(AUX_SUFFIX.lower()):
+    for e in sorted(_scandir_sorted(overlay_dir), key=lambda x: _name_key(x.name)):
+        n = _name_key(e.name)
+        if not e.is_file() or not n.endswith(_name_key(AUX_SUFFIX)):
             continue
-        if e.name.lower() == OVERLAY_NAME.lower():
+        if n == _name_key(OVERLAY_NAME):
             continue
         full = os.path.join(overlay_dir, e.name)
-        if e.name.lower() == RESERVED_OVERLAY.lower():
+        if n == _name_key(RESERVED_OVERLAY):
             if warn:
                 warn("  SKIPPED RESERVED: %s (SKILL.md uses bare OVERLAY.md; SKILL.OVERLAY.md is forbidden)" % full)
             continue
@@ -610,7 +609,8 @@ def selftest():
     bad = [l for ok, l in results if not ok]
     for ok, label in results:
         print("%s: %s" % ("PASS" if ok else "FAIL", label))
-    print("real overlay pairs still at their golden inputs: %d of %d" % (checked, total))
+    print("real overlay pairs still at their golden inputs: %d of %d (pinned when the setup twins retired; a pair"
+          " whose inputs changed since is covered by the synthetic cases only)" % (checked, total))
     print("deploy_model selftest: %d checks, %d failed" % (len(results), len(bad)))
     return 1 if bad else 0
 
@@ -623,6 +623,22 @@ def check_golden_history(repo, since):
     import subprocess
     rel_mod = "shared/skills/qconfig-sync/scripts/deploy_model.py"
     rel_gold = "shared/skills/qconfig-sync/scripts/fixtures/deploy-model/"
+    try:
+        shallow = subprocess.run(["git", "-C", repo, "rev-parse", "--is-shallow-repository"], stdout=subprocess.PIPE,
+                                 stderr=subprocess.DEVNULL).stdout.decode("utf-8", "replace").strip() == "true"
+    except OSError:
+        shallow = False
+    if shallow:
+        # the oldest commit of a shallow clone lists every file as changed, so its verdict would be noise
+        print("SKIP: deploy_model golden history: a shallow clone (CI's checkout) has no history to check")
+        return 0
+    acknowledged = set()
+    ack = os.path.join(repo, rel_gold, "acknowledged.tsv")
+    if os.path.isfile(ack):
+        with open(ack, "r", encoding="utf-8") as fh:
+            for line in fh:
+                if line.strip() and not line.startswith("#"):
+                    acknowledged.add(line.split("\t")[0].strip())
     rng = ["%s..HEAD" % since] if since else ["HEAD"]
     try:
         out = subprocess.run(["git", "-C", repo, "log", "--format=%x00%H%x00%B%x00", "--name-only"] + rng
@@ -638,10 +654,12 @@ def check_golden_history(repo, since):
         sha, body = parts[i], parts[i + 1]
         names = parts[i + 2] if i + 2 < len(parts) else ""
         files = [n for n in names.split("\n") if n]
-        if rel_mod in files and any(f.startswith(rel_gold) for f in files) and GOLDEN_MARKER not in body:
+        if (rel_mod in files and any(f.startswith(rel_gold) for f in files) and GOLDEN_MARKER not in body
+                and not any(sha.startswith(a) for a in acknowledged if len(a) >= 7)):
             bad.append(sha[:12])
     for sha in bad:
-        print("FAIL: commit %s changes deploy_model.py and a golden file without a '%s' line" % (sha, GOLDEN_MARKER))
+        print("FAIL: commit %s changes deploy_model.py and a golden file without a '%s' line (after reviewing it,"
+              " add '<sha><TAB><why>' to fixtures/deploy-model/acknowledged.tsv)" % (sha, GOLDEN_MARKER))
     print("deploy_model golden history: %d commit(s) without a review marker" % len(bad))
     return 1 if bad else 0
 
