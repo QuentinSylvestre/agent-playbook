@@ -342,6 +342,31 @@ elif command -v powershell >/dev/null 2>&1; then
     PS_BIN="powershell"
 fi
 
+# ps_setup <setup.ps1 flags...>: the Windows twin's leg. PARITY_PS_RUNNER=py runs the Python setup
+# (setup/setup.py, flags translated) in setup.ps1's place: the switch-over oracle of plan 261114, where
+# every comparison and scenario below holds the Python setup to setup.sh's and setup.ps1's results.
+ps_setup() {
+    if [ "${PARITY_PS_RUNNER:-}" = py ]; then
+        local args=()
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                -Yes) args+=(--yes) ;;
+                -DryRun) args+=(--dry-run) ;;
+                -Uninstall) args+=(--uninstall) ;;
+                -Purge) args+=(--purge) ;;
+                -NoStores) args+=(--no-stores) ;;
+                -Providers) args+=(--providers "$2"); shift ;;
+                -StoresUrl) args+=(--stores-url "$2"); shift ;;
+                *) args+=("$1") ;;
+            esac
+            shift
+        done
+        AGENT_PLAYBOOK_SETUP_NAME=setup.ps1 py -3 -I "$(cygpath -w "$REPO_ROOT/setup/setup.py")" "${args[@]}"
+    else
+        "$PS_BIN" -NoProfile -NonInteractive -File "$(cygpath -w "$SETUP_PS1_SCRIPT")" "$@"
+    fi
+}
+
 # The playbook's one interpreter (plan 261016 SC-13): the venv's, in isolated mode, never one from PATH.
 python_resolves() {
     [ -x "$VERIFY_PY" ]
@@ -1267,11 +1292,11 @@ own_run_ps() {
     if [ -f "$sb.stub/use" ]; then
         env -u AGENT_PLAYBOOK_SKIP_KIRO_CLI USERPROFILE="$(cygpath -w "$sb")" APPDATA="$(cygpath -w "$sb/AppData/Roaming")" \
             KIRO_STUB_DIR="$(cygpath -w "$sb.stub")" PATH="$sb.stub/bin-ps:$(own_path_without_kiro)" \
-            "$PS_BIN" -NoProfile -NonInteractive -File "$(cygpath -w "$SETUP_PS1_SCRIPT")" "$@" \
+            ps_setup "$@" \
             < /dev/null > "$TMPDIR_PARITY/$log.log" 2>&1 || rc=$?
     else
         USERPROFILE="$(cygpath -w "$sb")" APPDATA="$(cygpath -w "$sb/AppData/Roaming")" AGENT_PLAYBOOK_SKIP_KIRO_CLI=1 \
-            "$PS_BIN" -NoProfile -NonInteractive -File "$(cygpath -w "$SETUP_PS1_SCRIPT")" "$@" \
+            ps_setup "$@" \
             < /dev/null > "$TMPDIR_PARITY/$log.log" 2>&1 || rc=$?
     fi
     echo "$rc" > "$TMPDIR_PARITY/$log.rc"
@@ -2227,15 +2252,14 @@ parity_step() {
 # the rest.
 parity_setup_ps1_deploy() {
     local sb="$TMPDIR_PARITY/setup-parity-sandbox2" code
-    local profile_w="$sb" appdata_w="$sb/AppData/Roaming" ps1_w="$SETUP_PS1_SCRIPT"
+    local profile_w="$sb" appdata_w="$sb/AppData/Roaming"
     mkdir -p "$sb"
     if command -v cygpath >/dev/null 2>&1; then
         profile_w="$(cygpath -w "$profile_w")"
         appdata_w="$(cygpath -w "$appdata_w")"
-        ps1_w="$(cygpath -w "$ps1_w")"
     fi
     if USERPROFILE="$profile_w" APPDATA="$appdata_w" AGENT_PLAYBOOK_SKIP_KIRO_CLI=1 \
-        "$PS_BIN" -NoProfile -NonInteractive -File "$ps1_w" > "$sb.log" 2>&1; then
+        ps_setup > "$sb.log" 2>&1; then
         code=0
     else
         code=$?
