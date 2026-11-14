@@ -3837,8 +3837,15 @@ def need_git():
 
 def git_env():
     """The environment of every write-side git call (P6): a credential helper
-    or a hook that would prompt fails at once instead of waiting for input."""
-    return dict(os.environ, GIT_TERMINAL_PROMPT="0", GCM_INTERACTIVE="never")
+    or a hook that would prompt fails at once instead of waiting for input.
+    An inherited GIT_DIR, GIT_WORK_TREE or GIT_INDEX_FILE would override `-C`
+    and point the commit at another repository or index, so they are dropped.
+    Pathspecs are literal: every path passed here is a file name, and a name
+    such as `a[1].md` must not also match `a1.md`."""
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE")}
+    env.update(GIT_TERMINAL_PROMPT="0", GCM_INTERACTIVE="never", GIT_LITERAL_PATHSPECS="1")
+    return env
 
 
 def git_run(repo, *args):

@@ -198,10 +198,14 @@ def _clock():
 
 def _git(root, *args):
     """-> (exit code, stdout text, stderr text) of `git -c core.quotepath=off -C <root> <args>`. A missing
-    git binary stops the run: no call site can stand in for it."""
+    git binary stops the run: no call site can stand in for it. An inherited GIT_DIR, GIT_WORK_TREE or
+    GIT_INDEX_FILE would override `-C`, so they are dropped; pathspecs are literal, because every path
+    passed here is a file name."""
+    env = {k: v for k, v in os.environ.items() if k not in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE")}
+    env["GIT_LITERAL_PATHSPECS"] = "1"
     try:
         r = subprocess.run(["git", "-c", "core.quotepath=off", "-C", root] + list(args), stdin=subprocess.DEVNULL,
-                           stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+                           stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
     except FileNotFoundError:
         raise Stop(2, ["guard did not run: git not found"])
     except OSError as exc:
