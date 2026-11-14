@@ -156,6 +156,8 @@ def build_checks(repo, jobs):
     python("verify-dream-journal-selftest", "selftest", qd + "verify-dream-journal.py", "--selftest")
     python("verify-dream-state-selftest", "selftest", qd + "verify-dream-state.py", "--selftest")
     python("verify-deployment-selftest", "selftest", qs + "verify-deployment.py", "--selftest")
+    python("deploy-model-selftest", "selftest", qs + "deploy_model.py", "--selftest")
+    python("deploy-model-golden-history", "guard", qs + "deploy_model.py", "--check-golden-history", "--repo", str(repo))
     python("qvalidate-selftest", "selftest", "shared/skills/qvalidate/scripts/qvalidate.py", "--selftest")
     python("close-plan-selftest", "selftest", "shared/skills/qclose/scripts/close-plan.py", "--selftest")
     python("scan-selftest", "selftest", "providers/kiro/skills/qwire-governance/scripts/scan.py", "--selftest")

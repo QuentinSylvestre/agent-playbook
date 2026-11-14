@@ -211,16 +211,20 @@ def _always_loaded(client, dest):
     return (dest.startswith("~/.kiro/steering/") and dest.endswith(".md")) or dest == AGENT_TEMPLATE_DEST
 
 
+def _load_deploy_model():
+    """deploy_model.py beside this script, loaded by path (-I keeps this folder off sys.path)."""
+    import importlib.util
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deploy_model.py")
+    spec = importlib.util.spec_from_file_location("deploy_model_for_verify_mass", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
 def _manifest(repo):
-    """-> [(dest, source, mode)] from inventory.tsv: four tab-separated columns, no comment or blank line."""
-    rows = []
-    for line in _read(os.path.join(repo, "inventory.tsv")).splitlines():
-        if not line.strip() or line.lstrip().startswith("#"):
-            continue
-        cols = line.split("\t")
-        if len(cols) == 4:
-            rows.append((cols[1], cols[2], cols[3]))
-    return rows
+    """-> [(dest, source, mode)] from inventory.tsv, read by deploy_model.py (the parser setup uses)."""
+    dm = _load_deploy_model()
+    return [(e.dest, e.source, e.mode) for e in dm.read_manifest(os.path.join(repo, "inventory.tsv"))]
 
 
 def _skill_folders(repo, root_rel, standalone_only):
@@ -405,7 +409,7 @@ def selftest():
         r2 = repo("totals-noinv", {"shared/AGENTS.md": b"a b c"})
         rc, out, err = run([r2], (("shared/AGENTS.md", 99),))
         chk("a failure computing TOTAL is a WARN line, never an error",
-            rc == 0 and not err and len(out) == 3 and out[2].startswith("WARN\tTOTAL not computed (FileNotFoundError"), repr(out))
+            rc == 0 and not err and len(out) == 3 and out[2].startswith("WARN\tTOTAL not computed (ManifestError: ERROR: manifest not found"), repr(out))
         r3 = repo("totals-crlf", {"shared/AGENTS.md": b"a b c", "inventory.tsv": b"symlink-file\t~/.codex/AGENTS.md\tshared/AGENTS.md\tcodex\r\n",
                                   "shared/skills/qa/SKILL.md": b"---\r\ndescription: one two\r\n---\r\n"})
         t3 = total_lines(r3)

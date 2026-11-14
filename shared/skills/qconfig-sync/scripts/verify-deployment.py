@@ -63,8 +63,8 @@ Overlay-merge awareness (lockstep with setup.sh / setup.ps1):
   setup MERGES a kiro overlay (`OVERLAY.md` for SKILL.md, `<stem>.OVERLAY.md`
   for an aux file) into the deployed target rather than copying the overlay
   standalone. This verifier mirrors that model: for an overlay-bearing skill it
-  recomputes the expected merged content (see _merged_bytes / _has_any_overlay,
-  which duplicate setup's merge_overlay / has_any_overlay byte-for-byte) and
+  recomputes the expected merged content (deploy_model.py's merge_overlay_bytes, the
+  module setup writes from, and _has_any_overlay) and
   byte-compares the DEPLOYED file against the COMPUTED merge -- so a correct merge
   verifies OK and a stale/corrupt merge still reports DRIFTED. The overlay fragments
   themselves are merge INPUTS, never standalone deploy targets, so they are never
@@ -72,9 +72,8 @@ Overlay-merge awareness (lockstep with setup.sh / setup.ps1):
   (copy on Windows, generated-copy on Linux symlink profile); plain skills stay
   symlink/copy as before. Merge byte contract (must match setup): strip trailing
   newlines, join shared + "\\n\\n" + overlay + single "\\n" (empty/whitespace-only
-  overlay -> shared + single "\\n"); no BOM. POSIX (setup.sh, `cat`): bytes as read,
-  only trailing LF stripped (interior CRLF preserved). Windows (setup.ps1,
-  ReadAllText): BOM dropped, trailing CR/LF stripped, re-encoded as no-BOM UTF-8.
+  overlay -> shared + single "\\n"); no BOM; on every platform a BOM is dropped, trailing
+  CR/LF stripped, and the result encoded as no-BOM UTF-8 (deploy_model.py's docstring).
   Correctness depends on the repo's `.gitattributes eol=lf` (sources are LF; the
   merge emits LF seam/trailing). The former source-driven-walk blind spot is
   now covered: a destination-side walk reports ORPHAN for a deployed file or
@@ -89,9 +88,7 @@ Platform model:
   That order is the directory listing's own (os.scandir, as Get-ChildItem used): NTFS
   returns names sorted, so a walk is name-ordered there, files before subdirectories;
   another filesystem (FAT, a network share) may return a different order.
-  Both twins render C:/... roots; a template-file also verifies OK when it equals the
-  render an older setup.sh produced under Git Bash (/c/... roots), so a deploy made
-  before that change is not reported DRIFTED.
+  Setup renders C:/... roots.
   POSIX: home = $HOME; the Kiro IDE dir = $APPDATA via cygpath when both exist,
   else ${XDG_CONFIG_HOME:-$HOME/.config}/Kiro/User; targets compared after
   realpath (readlink -f); walks follow find order.
@@ -154,6 +151,7 @@ Stdlib only, Python 3.8+. Runs only under the playbook venv (see the venv guard 
 """
 import filecmp
 import hashlib
+import importlib.util
 import json
 import os
 import re
@@ -190,17 +188,28 @@ def _require_venv(script):
 
 NAME = "verify-deployment.py"
 
-# --list wire-protocol kind vocabulary: the string VALUES are shared with setup.sh,
-# setup.ps1 and test-parity.sh and must stay byte-identical.
-KIND_SYMLINK_FILE = "symlink-file"
-KIND_SYMLINK_DIR = "symlink-dir"
-KIND_COPY_FILE = "copy-file"
-KIND_COPY_DIR_RECURSIVE = "copy-dir-recursive"
-KIND_MERGE_FILE = "merge-file"
-KIND_TEMPLATE_FILE = "template-file"
-KIND_SEED_FILE = "seed-file"
-VALID_KINDS = (KIND_SYMLINK_FILE, KIND_SYMLINK_DIR, KIND_COPY_FILE, KIND_COPY_DIR_RECURSIVE,
-               KIND_MERGE_FILE, KIND_TEMPLATE_FILE, KIND_SEED_FILE)
+
+def _load_deploy_model():
+    """deploy_model.py beside this script, loaded by path (-I keeps this folder off sys.path)."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deploy_model.py")
+    spec = importlib.util.spec_from_file_location("deploy_model", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+# The deploy model setup writes from: manifest, merge, render, lock grammar.
+dm = _load_deploy_model()
+
+# --list wire-protocol kind vocabulary (owned by deploy_model.py).
+KIND_SYMLINK_FILE = dm.KIND_SYMLINK_FILE
+KIND_SYMLINK_DIR = dm.KIND_SYMLINK_DIR
+KIND_COPY_FILE = dm.KIND_COPY_FILE
+KIND_COPY_DIR_RECURSIVE = dm.KIND_COPY_DIR_RECURSIVE
+KIND_MERGE_FILE = dm.KIND_MERGE_FILE
+KIND_TEMPLATE_FILE = dm.KIND_TEMPLATE_FILE
+KIND_SEED_FILE = dm.KIND_SEED_FILE
+VALID_KINDS = dm.VALID_KINDS
 FILE_KINDS = (KIND_COPY_FILE, KIND_SYMLINK_FILE, KIND_TEMPLATE_FILE, KIND_SEED_FILE, KIND_MERGE_FILE)
 DIR_KINDS = (KIND_COPY_DIR_RECURSIVE, KIND_SYMLINK_DIR)
 
@@ -214,11 +223,8 @@ def _in_skipped_dir(rel):
     """True when a relative path (/ or \\ separated) lies under a fixtures/ folder."""
     return COPY_SKIP_DIR in re.split(r"[\\/]", rel)[:-1]
 
-# The deploy lock setup writes (setup.sh "Deploy lock" section): read only for the ORPHAN owner field.
-LOCK_HEADER = "# agent-playbook deploy lock v1 (written by setup; kind<TAB>path<TAB>sha256)"
-LOCK_FILE_KINDS = ("copy-dir-recursive", "merge-file", "copy-file", "template-file")
-LOCK_SETTING_KEY = "kiro-cli/chat.defaultAgent"
-LOCK_GEMINI_KEY = "gemini/context.fileName"
+# The deploy lock setup writes (deploy_model.py owns its grammar): read only for the ORPHAN owner field.
+LOCK_HEADER = dm.LOCK_HEADER
 OWNED, FOREIGN, MIXED = "owned-by-setup", "foreign", "mixed"
 USER_FOLDER_KEPT = ("user-folder-kept", "playbook-skill-not-deployed")
 
@@ -226,34 +232,10 @@ USER_FOLDER_KEPT = ("user-folder-kept", "playbook-skill-not-deployed")
 def read_lock_keys(path):
     """-> the set of path keys of the lock's file rows, or an empty set for a missing or invalid lock.
     Untrusted input, read exactly as setup reads it: one bad row means no lock."""
-    try:
-        with open(path, "rb") as fh:
-            text = fh.read().decode("utf-8")
-    except (OSError, UnicodeDecodeError):
+    rows = dm.read_lock_rows(path)
+    if rows is None:
         return set()
-    lines = text.split("\n")
-    if text.endswith("\n"):
-        lines = lines[:-1]
-    if not lines or lines[0] != LOCK_HEADER:
-        return set()
-    keys = set()
-    for line in lines[1:]:
-        c = line.split("\t")
-        if len(c) != 3:
-            return set()
-        kind, key, val = c
-        if kind == "setting":
-            if key not in (LOCK_SETTING_KEY, LOCK_GEMINI_KEY) or not val:
-                return set()
-            continue
-        if (kind not in LOCK_FILE_KINDS + ("backup",) or not key.startswith("~/") or "/../" in "/" + key + "/"
-                or "\\" in key or ":" in key):
-            return set()
-        if not (kind == "backup" and val == "-") and not re.match(r"^[0-9a-f]{64}$", val):
-            return set()
-        if kind != "backup":
-            keys.add(key)
-    return keys
+    return set(key for kind, key, _val in rows if kind not in ("setting", "backup"))
 
 
 # Co-existence: the instruction file (manifest dest) -> the side link setup makes beside a user's own file.
@@ -293,12 +275,6 @@ _ATTR_REPARSE = 0x400
 _TAG_SYMLINK = 0xA000000C
 _TAG_MOUNT_POINT = 0xA0000003
 
-# .NET Char.IsWhiteSpace -- what String.Trim() strips (setup.ps1's blank-overlay test).
-_NET_WS = ("\t\n\x0b\x0c\r \x85\xa0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007"
-           "\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000")
-_POSIX_SPACE = b" \t\n\r\x0b\x0c"   # tr -d '[:space:]'
-
-
 class Precondition(Exception):
     """Exit 2 with these stderr lines (a twin's `exit 2` precondition)."""
 
@@ -312,51 +288,6 @@ class Precondition(Exception):
 def _read_bytes(path):
     with open(path, "rb") as fh:
         return fh.read()
-
-
-def _net_read_text(path):
-    """[IO.File]::ReadAllText: BOM-detected decode (UTF-8 without BOM by default)."""
-    data = _read_bytes(path)
-    if data[:3] == b"\xef\xbb\xbf":
-        return data[3:].decode("utf-8", "replace")
-    if data[:4] == b"\xff\xfe\x00\x00":
-        return data[4:].decode("utf-32-le", "replace")
-    if data[:2] == b"\xff\xfe":
-        return data[2:].decode("utf-16-le", "replace")
-    if data[:2] == b"\xfe\xff":
-        return data[2:].decode("utf-16-be", "replace")
-    if data[:4] == b"\x00\x00\xfe\xff":
-        return data[4:].decode("utf-32-be", "replace")
-    return data.decode("utf-8", "replace")
-
-
-def _bash_cat(path):
-    """"$(cat path)": the bytes, NULs dropped, trailing newlines (LF only) stripped."""
-    return _read_bytes(path).replace(b"\0", b"").rstrip(b"\n")
-
-
-def _merged_bytes(shared_file, overlay_file, windows):
-    """The bytes setup writes for a merged target (setup.ps1 Merge-Overlay on Windows,
-    setup.sh merge_overlay elsewhere). LOCKSTEP with both setup twins."""
-    if windows:
-        shared = _net_read_text(shared_file).rstrip("\r\n")
-        overlay = _net_read_text(overlay_file)
-        if overlay.strip(_NET_WS):
-            return (shared + "\n\n" + overlay.rstrip("\r\n") + "\n").encode("utf-8")
-        return (shared + "\n").encode("utf-8")
-    shared = _bash_cat(shared_file)
-    overlay = _bash_cat(overlay_file)
-    if any(b not in _POSIX_SPACE for b in overlay):
-        return shared + b"\n\n" + overlay + b"\n"
-    return shared + b"\n"
-
-
-def _msys_path(path):
-    """C:\\Users\\X -> /c/Users/X (the form $HOME / $REPO_ROOT take under Git Bash)."""
-    p = path.replace("\\", "/")
-    if re.match(r"^[A-Za-z]:", p):
-        p = "/" + p[0].lower() + p[2:]
-    return p
 
 
 def _files_equal(a, b):
@@ -714,39 +645,15 @@ class Verifier(object):
 
     def read_manifest(self):
         path = self.join(self.repo, "inventory.tsv")
-        if not os.path.isfile(path):
-            raise Precondition("ERROR: manifest not found: %s" % path)
-        with open(path, "r", encoding="utf-8-sig", errors="replace", newline="") as fh:
-            text = fh.read()
-        if self.win:
-            lines = re.split(r"\r\n|\n|\r", text)
-            if lines and lines[-1] == "":
-                lines.pop()
-        else:
-            # `while read -r line` never processes a final line without a newline.
-            lines = text.split("\n")[:-1]
-        entries = []
-        for num, line in enumerate(lines, 1):
-            if re.match(r"^\s*#", line) or re.match(r"^\s*$", line):
-                continue
-            cols = line.split("\t")
-            if len(cols) != 4:
-                raise Precondition("ERROR: manifest line %d has %d columns (expected 4): %s"
-                                   % (num, len(cols), line))
-            if cols[0] not in VALID_KINDS:
-                raise Precondition("ERROR: manifest line %d has unknown kind '%s': %s" % (num, cols[0], line))
-            entries.append(tuple(cols))
+        try:
+            entries = [tuple(e) for e in dm.read_manifest(path)]
+        except dm.ManifestError as exc:
+            raise Precondition(str(exc))
         self.err("  Manifest: %d entries loaded" % len(entries))
         self.manifest = entries
 
     def expand_dest(self, dest):
-        prefixes = ("<KIRO_IDE_USER>/", "<KIRO_IDE_USER>\\") if self.win else ("<KIRO_IDE_USER>/",)
-        if dest.startswith(prefixes):
-            return self.join(self.kiro_ide, dest[16:])
-        home_prefixes = ("~/", "~\\") if self.win else ("~/",)
-        if dest.startswith(home_prefixes):
-            return self.join(self.home, dest[2:])
-        return dest
+        return dm.expand_dest(dest, self.home, self.kiro_ide, self.win)
 
     def expand_source(self, source):
         return self.join(self.repo, source)
@@ -924,58 +831,13 @@ class Verifier(object):
         if not os.path.exists(source):
             self.emit("DRIFTED", path, "expected=" + source)
             return
-        if self.win:
-            body = _net_read_text(source).rstrip("\r\n")
-            body = body.replace("{{USER_HOME}}", self.render_home.replace("\\", "/"))
-            body = body.replace("{{PLAYBOOK_ROOT}}", self.repo.replace("\\", "/"))
-            if _file_is(path, (body + "\n").encode("utf-8")) or self._is_git_bash_render(path, source):
-                self.emit("OK", path)
-            else:
-                self.emit("DRIFTED", path, "expected=" + source)
-            return
-        body = _bash_cat(source)
-        body = body.replace(b"{{USER_HOME}}", self.home.encode("utf-8", "surrogateescape"))
-        body = body.replace(b"{{PLAYBOOK_ROOT}}", self.repo.encode("utf-8", "surrogateescape"))
-        try:
-            same = _bash_cat(path) == body.rstrip(b"\n")
-        except OSError:
-            same = False
-        if same:
+        home = self.render_home if self.win else self.home
+        if _file_is(path, dm.render_template_bytes(source, home, self.repo)):
             self.emit("OK", path)
-        elif _is_msys_host():
+        elif not self.win and _is_msys_host():
             self.emit("SKIP", path, TEMPLATE_SKIP_REASON)
         else:
             self.emit("DRIFTED", path, "expected=" + source)
-
-    def _is_git_bash_render(self, path, source):
-        """Windows only: is `path` the render setup.sh writes under Git Bash on this machine?
-        Its $HOME / $REPO_ROOT are MSYS paths: /c/... or, under a mount such as /tmp, the
-        `cygpath -u` spelling. Every spelling we can derive is tried."""
-        def spellings(p):
-            found = [_msys_path(p)]
-            cyg = shutil.which("cygpath")
-            if cyg:
-                try:
-                    conv = subprocess.run([cyg, "-u", p], stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-                                          check=True, timeout=30)
-                    alt = conv.stdout.decode("utf-8", "replace").rstrip("\r\n")
-                    if alt and alt not in found:
-                        found.append(alt)
-                except (OSError, subprocess.SubprocessError):
-                    pass
-            return found
-        try:
-            raw = _bash_cat(source)
-            deployed = _read_bytes(path)
-        except OSError:
-            return False
-        for home in spellings(self.home):
-            for repo in spellings(self.repo):
-                body = raw.replace(b"{{USER_HOME}}", home.encode("utf-8"))
-                body = body.replace(b"{{PLAYBOOK_ROOT}}", repo.encode("utf-8"))
-                if deployed == body + b"\n":
-                    return True
-        return False
 
     def check_seed_file(self, path, source):
         if not os.path.exists(source):
@@ -1028,7 +890,7 @@ class Verifier(object):
             key = rel.lower() if self.win else rel
             if key in merge:
                 shared_file, ov_file = merge[key]
-                if _file_is(dest_file, _merged_bytes(shared_file, ov_file, self.win)):
+                if _file_is(dest_file, dm.merge_overlay_bytes(shared_file, ov_file)):
                     self.emit("OK", dest_file)
                 else:
                     self.emit("DRIFTED", dest_file, "expected=merge(%s)" % source_file)
@@ -1464,7 +1326,7 @@ def _symlinks_available(tmp):
 
 _ST_SHARED_SKILL = b"# Beta\n\nshared body\n"
 _ST_OVERLAY = b"kiro-only delta\n\n"
-_ST_MERGED = b"# Beta\n\nshared body\n\nkiro-only delta\n"     # written by hand, never by _merged_bytes
+_ST_MERGED = b"# Beta\n\nshared body\n\nkiro-only delta\n"     # written by hand, never by deploy_model.py
 _ST_AUX_SHARED = b"aux shared\n"
 _ST_AUX_OVERLAY = b"aux overlay\n"
 _ST_AUX_MERGED = b"aux shared\n\naux overlay\n"
@@ -1634,13 +1496,6 @@ def _st_cases(tmp, links, skip_reason):
         check(rc == 1 and has(out, "DRIFTED", ".kiro/agents/def.md"), "stale template render -> DRIFTED")
     else:
         check(has(out, "SKIP", ".kiro/agents/def.md", "reason="), "stale template under MSYS -> SKIP")
-    if os.name == "nt":
-        repo, home, env = fresh()
-        _w(os.path.join(home, ".kiro", "agents", "def.md"),
-           ("home=%s\nroot=%s\n" % (_msys_path(home), _msys_path(repo))).encode("utf-8"))
-        rc, out, _ = _st_run(repo, env)
-        check(rc == 0 and has(out, "OK", ".kiro/agents/def.md"), "a setup.sh (Git Bash) render verifies OK on Windows")
-
     if links:
         # WRONG_TARGET, NOT_SYMLINK, dangling link.
         repo, home, env = fresh()
@@ -2028,8 +1883,8 @@ def selftest():
             return False
         g = globals()
         mutations = [
-            ("merge recompute returns the bare shared file", g, "_merged_bytes",
-             lambda shared, overlay, windows: _read_bytes(shared)),
+            ("merge recompute returns the bare shared file", dm, "merge_overlay_bytes",
+             lambda shared, overlay: _read_bytes(shared)),
             ("orphan walk disabled", Verifier, "orphan_walk", lambda self: None),
             ("the ORPHAN owner field ignores the deploy lock", Verifier, "lock_owner", lambda self, full: FOREIGN),
             ("a listing failure reads as an empty directory", g, "_entries", swallow),
