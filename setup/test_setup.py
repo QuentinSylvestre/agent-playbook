@@ -1419,7 +1419,8 @@ def scenario_coexist_i(c):
 
 # --- scenarios: the bootstraps ---------------------------------------------------------------------------------
 
-PWSH = shutil.which("pwsh")
+# setup.ps1 is the Windows bootstrap: its cases run on Windows only, even where a pwsh exists (CI Linux)
+PWSH = shutil.which("pwsh") if WIN else None
 if WIN:
     BASH = r"C:\Program Files\Git\bin\bash.exe"
     if not os.path.isfile(BASH):
@@ -1454,7 +1455,7 @@ def boot_scenario(shell, case):
 
     def run(c):
         if not shell_ok:
-            c.skip(case, "no %s here" % ("pwsh" if shell == "ps1" else "Git Bash"))
+            c.skip(case, ("setup.ps1 is the Windows bootstrap" if not WIN else "no pwsh here") if shell == "ps1" else "no Git Bash here")
             return
         sp = SPELL[shell]
         box = Box(c)
