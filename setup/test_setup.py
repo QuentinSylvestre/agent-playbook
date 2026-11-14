@@ -4,10 +4,11 @@
 Run from the repo root with the playbook venv's Python, in isolated mode:
 
     .venv-agent-playbook/Scripts/python.exe -I setup/test_setup.py [--jobs N] [--setup PATH] [--only NAME]
-                                                   [--bootstraps DIR]
+                                                   [--bootstraps DIR] [--venv DIR]
 
 --jobs N     scenarios run in parallel (default 6).
 --setup PATH the setup script to test (default setup/setup.py beside this file); a mutant copy.
+--venv DIR   the playbook venv folder (default: .venv-agent-playbook in the repo).
 --bootstraps DIR  the folder holding the setup.ps1 and setup.sh to test (default: the repo root).
 --only NAME  run only the scenarios whose name is NAME or starts with NAME (e.g. coexist, ownership).
 
@@ -48,8 +49,20 @@ checks) are not ported: deploy_model.py's golden files replace merge and render.
                run, --help without Python, and the no-Python case (setup.sh / setup.ps1 only once it is a
                bootstrap, i.e. holds `setup/setup.py`).
 
-Not ported: see the report of the porting run (parity_sec_setup_parity, parity_sec_merge,
-parity_sec_render, TWIN-OWNERSHIP, TWIN-COEXIST and the twin byte-equality assertions).
+  behaviors    cases for rules added after the bash suite (no bash counterpart): a dry run over conflicting
+               files, --uninstall never creating a missing venv folder, a decoy HOME (Windows), a read-only
+               deploy lock (Windows), a .bak edited after setup made it, a folder .bak never replaced, an
+               existing deploy-lock.tsv.bak kept, a dangling seed link not written through, a sandboxed
+               --purge never touching the repo's memory link, an existing <stores>/.gitignore kept, and a
+               journal with one garbage line.
+
+Not ported from test-parity.sh, on purpose:
+  - parity_sec_setup_parity, TWIN-OWNERSHIP, TWIN-COEXIST and every byte-equal lock or settings.json
+    comparison between the two shells: they compared setup.sh with setup.ps1, and there is one setup now.
+  - parity_sec_merge and parity_sec_render: the shells' merge and render shapes no longer exist twice;
+    deploy_model.py's golden files pin the merge and the render.
+  - the inventory diff against a bash re-implementation of the deploy model: replaced by the `deploy`
+    checks that every path `verify-deployment.py --list` names exists and that nothing unnamed is deployed.
 """
 
 import argparse
@@ -347,10 +360,6 @@ def lock_has(home, kind, path, value=None):
     return rx(lock_text(home), pat)
 
 
-def lock_contains(home, s):
-    return any(s in line for line in lock_text(home).split("\n"))
-
-
 def lock_add(home, kind, key, value):
     ab(lock_path(home), ("%s\t%s\t%s\n" % (kind, key, value)).encode("utf-8"))
 
@@ -479,7 +488,7 @@ class Stub(object):
 class Box(object):
     """One scenario's sandbox: root/home is the home; setup runs against it."""
 
-    def __init__(self, c, keep_venv=True):
+    def __init__(self, c):
         self.c = c
         self.root = tempfile.mkdtemp(prefix="apb-setup-test-")
         self.home = os.path.join(self.root, "home")
@@ -495,7 +504,7 @@ class Box(object):
     def aux(self, name):
         return os.path.join(self.root, name)
 
-    def env(self, venv=None, helper=None, use_stub=False, path=None):
+    def env(self, venv=None, helper=None, use_stub=False, path=None, extra=None):
         env = dict((k, v) for k, v in os.environ.items() if not k.upper().startswith("AGENT_PLAYBOOK_"))
         env.update({
             "HOME": self.home, "USERPROFILE": self.home,
@@ -514,6 +523,8 @@ class Box(object):
             env["AGENT_PLAYBOOK_SKIP_KIRO_CLI"] = "1"
             if path is not None:
                 env["PATH"] = path
+        if extra:
+            env.update(extra)
         return env
 
     def _go(self, argv, env, what):
@@ -527,7 +538,8 @@ class Box(object):
     def run(self, *args, **kw):
         """setup.py with the flags, in the sandbox. kw: setup (script path), venv, helper, use_stub."""
         setup = kw.pop("setup", None) or SETUP
-        env = self.env(venv=kw.pop("venv", None), helper=kw.pop("helper", None), use_stub=kw.pop("use_stub", False))
+        env = self.env(venv=kw.pop("venv", None), helper=kw.pop("helper", None), use_stub=kw.pop("use_stub", False),
+                       extra=kw.pop("extra", None))
         assert not kw, kw
         return self._go([sys.executable, "-X", "utf8", "-I", setup] + list(args), env, "setup " + " ".join(args))
 
@@ -537,6 +549,20 @@ class Box(object):
 
     def raw(self, argv, path=None):
         return self._go(argv, self.env(path=path), " ".join(argv[:3]))
+
+    def no_python_path(self):
+        """A PATH with no Python. Off Windows: a shim folder holding links to only the tools the
+        bootstraps call (bash, dirname, cat, env, uname), so nothing else on the host is found. On
+        Windows: the host PATH minus every folder that holds a python or py launcher."""
+        if WIN:
+            return no_python_path()
+        shim = self.aux("no-python-shim")
+        os.makedirs(shim, exist_ok=True)
+        for tool in ("bash", "dirname", "cat", "env", "uname"):
+            real = shutil.which(tool)
+            if real and not os.path.lexists(os.path.join(shim, tool)):
+                os.symlink(real, os.path.join(shim, tool))
+        return shim
 
 
 # --- scenario: deploy (SETUP-VERIFY, NO-REWRITE, inventory) ------------------------------------------------------
@@ -1436,6 +1462,9 @@ def boot_scenario(shell, case):
             def go(args, path=None):
                 return box.raw(boot_cmd(shell, args), path=path)
 
+            def nopy():
+                return box.no_python_path() if shell == "sh" else no_python_path()
+
             def untouched():
                 return not snapshot(box.home)
             if case == "dry-run":
@@ -1462,17 +1491,282 @@ def boot_scenario(shell, case):
                 c.check(case, R.rc == 0 and R.has(r"=== Uninstall: ") and not R.has(r"KEPT: .*the memory link and the store repo")
                         and untouched(), R.tail)
             elif case == "help":
-                R = go(sp["help"], path=no_python_path())
+                R = go(sp["help"], path=nopy())
                 c.check(case, R.rc == 0 and R.has(r"Usage:") and R.has(re.escape("-Providers" if shell == "ps1" else "--providers")), R.tail)
             elif case == "no-python":
                 if not is_bootstrap("setup.ps1" if shell == "ps1" else "setup.sh"):
                     c.skip(case, "%s is not a bootstrap yet (it does not run setup/setup.py)" % ("setup.ps1" if shell == "ps1" else "setup.sh"))
                 else:
-                    R = go(sp["dry"], path=no_python_path())
+                    R = go(sp["dry"], path=nopy())
                     c.check(case, R.rc == 2 and R.has(r"needs Python 3\.8\+"), R.tail)
+                    c.check(case + "-names-the-deploy-lock", R.has(r"\.agent-playbook[\\/]deploy-lock\.tsv")
+                            and os.path.basename(box.root) in R.out, R.tail)
+                    c.check(case + "-names-the-readme-uninstall-section", R.has(r"README\.md \(Uninstall\) says how to remove it by hand"), R.tail)
         finally:
             box.close()
     return run
+
+
+# --- scenarios: behaviors added after the bash suite -----------------------------------------------------------
+
+def tree_digest(home):
+    """Every entry under home with its content (a file's sha, a link's text) and mtime: a byte-for-byte
+    picture of the tree."""
+    out = []
+    for d, dirs, files in os.walk(home):
+        for n in dirs + files:
+            p = os.path.join(d, n)
+            rel = os.path.relpath(p, home).replace(os.sep, "/")
+            st = os.lstat(p)
+            if os.path.islink(p):
+                what = "link:" + (link_text(p) or "")
+            elif os.path.isdir(p):
+                what = "dir"
+            else:
+                what = "file:" + (sha(p) or "")
+            out.append((rel, what, st.st_mtime_ns))
+    return sorted(out)
+
+
+def find_baks(home):
+    out = []
+    for d, dirs, files in os.walk(home):
+        for n in dirs + files:
+            if n.endswith(".bak"):
+                out.append(os.path.relpath(os.path.join(d, n), home))
+    return out
+
+
+def scenario_beh_uninstall_no_venv(c):
+    """--uninstall never builds the venv: a venv folder that does not exist yet stays absent."""
+    box = Box(c)
+    try:
+        venv = box.aux("nv.venv")
+        R = box.run("--uninstall", venv=venv)
+        c.check("uninstall-exit0", R.rc == 0, R.tail)
+        c.check("uninstall-leaves-missing-venv-absent", absent(venv), "--uninstall created the venv folder %s" % venv)
+        R = box.run("--dry-run", venv=venv)
+        c.check("dry-run-leaves-missing-venv-absent", R.rc == 0 and absent(venv), "--dry-run created the venv folder")
+    finally:
+        box.close()
+
+
+def scenario_beh_dry_run_conflicts(c):
+    """A --dry-run over files of yours in the way moves nothing, makes no .bak and writes no lock."""
+    box = Box(c)
+    try:
+        sb = box.home
+        steer = os.path.join(sb, ".kiro", "steering", "agents.md")
+        codex = os.path.join(sb, ".codex", "AGENTS.md")
+        wt(steer, "mine steering\n")
+        wt(codex, "mine codex\n")
+        before, snap_before = tree_digest(sb), snapshot(sb)
+        R = box.run("--dry-run")
+        c.check("fresh-dry-run-exit0", R.rc == 0 and R.has(r"BACKUP: "), R.tail)
+        c.check("fresh-dry-run-moves-nothing", tree_digest(sb) == before and snapshot(sb) == snap_before and not find_baks(sb),
+                lambda: "changed: %s; baks: %s" % ([d[0] for d in sorted(set(tree_digest(sb)) ^ set(before))[:6]], find_baks(sb)))
+        c.check("fresh-dry-run-writes-no-lock", absent(lock_path(sb)) and absent(journal_path(sb)), "a lock or journal was written")
+        # the same over a deployed home (a lock exists) with the conflicts planted afterwards
+        R = box.run()
+        c.check("deploy-exit0", R.rc == 0, R.tail)
+        for p in (steer, codex):
+            os.unlink(p)
+            wt(p, "mine again\n")
+        lock_before = rb(lock_path(sb))
+        baks_before = find_baks(sb)
+        before, snap_before = tree_digest(sb), snapshot(sb)
+        R = box.run("--dry-run")
+        c.check("deployed-dry-run-exit0", R.rc == 0 and R.has(r"BACKUP: "), R.tail)
+        c.check("deployed-dry-run-moves-nothing", tree_digest(sb) == before and snapshot(sb) == snap_before and find_baks(sb) == baks_before,
+                lambda: "changed: %s; baks: %s" % ([d[0] for d in sorted(set(tree_digest(sb)) ^ set(before))[:6]], find_baks(sb)))
+        c.check("deployed-dry-run-lock-and-journal-unchanged", rb(lock_path(sb)) == lock_before and absent(journal_path(sb)),
+                "the lock changed or a journal appeared")
+    finally:
+        box.close()
+
+
+def scenario_beh_decoy_home(c):
+    """Windows: HOME names a decoy folder, USERPROFILE the sandbox; setup reads USERPROFILE."""
+    if not WIN:
+        c.skip("decoy-home", "Windows only: elsewhere setup reads HOME")
+        return
+    box = Box(c)
+    try:
+        decoy = box.aux("decoy-home")
+        os.makedirs(decoy)
+        R = box.run("--providers", "claude,codex", extra={"HOME": decoy})
+        c.check("deploy-exit0", R.rc == 0, R.tail)
+        c.check("deploy-landed-in-userprofile", os.path.isdir(os.path.join(box.home, ".claude")) and bool(os.listdir(os.path.join(box.home, ".claude"))),
+                "nothing deployed under USERPROFILE")
+        c.check("decoy-home-stays-empty", os.listdir(decoy) == [], lambda: "written into HOME: %s" % os.listdir(decoy))
+    finally:
+        box.close()
+
+
+def scenario_beh_readonly_lock(c):
+    """Windows: a read-only deploy lock ends the run with exit 1, the backup row waits in the journal, the
+    next run merges it and treats the .bak as setup's."""
+    if not WIN:
+        c.skip("readonly-lock", "Windows only: elsewhere a read-only file is replaced by a rename")
+        return
+    box = Box(c)
+    try:
+        sb = box.home
+        k = os.path.join(sb, ".kiro")
+        R = box.run("--providers", "kiro")
+        c.check("deploy-exit0", R.rc == 0, R.tail)
+        wt(os.path.join(k, "AUTHORING.md"), "mine one\n")
+        os.chmod(lock_path(sb), stat.S_IREAD)
+        try:
+            R = box.run("--providers", "kiro")
+        finally:
+            os.chmod(lock_path(sb), stat.S_IREAD | stat.S_IWRITE)
+        c.check("readonly-lock-exit1-could-not-write", R.rc == 1 and R.has(r"could not write .*deploy-lock\.tsv"), R.tail)
+        c.check("journal-holds-the-backup-row", rx(rt(journal_path(sb)), r"^backup\t~/\.kiro/AUTHORING\.md\t[0-9a-f]{64}$")
+                and own_is(os.path.join(k, "AUTHORING.md.bak"), "mine one"), "the journal lacks the backup row")
+        R = box.run("--providers", "kiro")
+        c.check("next-run-merges-the-journal", R.rc == 0 and R.has(r"NOTE: merged the rows an interrupted run recorded in ")
+                and lock_has(sb, "backup", "~/.kiro/AUTHORING.md") and absent(journal_path(sb)), R.tail)
+        wt(os.path.join(k, "AUTHORING.md"), "mine two\n")
+        R = box.run("--providers", "kiro")
+        c.check("the-bak-is-treated-as-setups", R.rc == 0 and not R.has(r"is not a backup setup made")
+                and own_is(os.path.join(k, "AUTHORING.md.bak"), "mine two"), R.tail)
+    finally:
+        box.close()
+
+
+def scenario_beh_edited_bak(c):
+    """A .bak edited after setup made it is not replaced: a WARN, the file beside it unchanged."""
+    box = Box(c)
+    try:
+        sb = box.home
+        k = os.path.join(sb, ".kiro")
+        a = os.path.join(k, "AUTHORING.md")
+        c.check("deploy-exit0", box.run("--providers", "kiro").rc == 0, "deploy failed")
+        wt(a, "mine one\n")
+        R = box.run("--providers", "kiro")
+        c.check("first-backup", R.rc == 0 and own_is(a + ".bak", "mine one") and lock_has(sb, "backup", "~/.kiro/AUTHORING.md", sha(a + ".bak")),
+                R.tail)
+        ab(a + ".bak", b"edited after setup made it\n")
+        wt(a, "mine two\n")
+        R = box.run("--providers", "kiro")
+        c.check("edited-bak-left-alone-with-warn", R.rc == 0 and R.has(r"WARN: .*AUTHORING\.md\.bak is not a backup setup made")
+                and "edited after setup made it" in (rt(a + ".bak") or "") and own_is(a, "mine two"), R.tail)
+    finally:
+        box.close()
+
+
+def scenario_beh_folder_bak(c):
+    """A folder .bak setup made earlier (lock value -) is never replaced."""
+    box = Box(c)
+    try:
+        sb = box.home
+        p = os.path.join(sb, ".claude", "AUTHORING.md")
+        c.check("deploy-exit0", box.run("--providers", "claude").rc == 0, "deploy failed")
+        os.unlink(p)
+        wt(os.path.join(p, "inside.txt"), "folder one\n")
+        R = box.run("--providers", "claude")
+        c.check("folder-backed-up-with-dash-row", R.rc == 0 and own_is(os.path.join(p + ".bak", "inside.txt"), "folder one")
+                and lock_has(sb, "backup", "~/.claude/AUTHORING.md", "-") and is_link(p), R.tail)
+        os.unlink(p)
+        wt(os.path.join(p, "inside.txt"), "folder two\n")
+        R = box.run("--providers", "claude")
+        c.check("folder-bak-not-replaced", R.rc == 0 and R.has(r"WARN: .*AUTHORING\.md\.bak is a folder setup moved there earlier")
+                and own_is(os.path.join(p + ".bak", "inside.txt"), "folder one")
+                and own_is(os.path.join(p, "inside.txt"), "folder two"), R.tail)
+    finally:
+        box.close()
+
+
+def scenario_beh_lock_bak_kept(c):
+    """An unreadable lock goes to <lock>.bak-<pid> when a .bak is already there; that .bak is kept."""
+    box = Box(c)
+    try:
+        sb = box.home
+        wt(lock_path(sb), "not a lock\n")
+        wt(lock_path(sb) + ".bak", "keep me\n")
+        R = box.run("--providers", "claude")
+        extra = [n for n in os.listdir(os.path.dirname(lock_path(sb))) if n.startswith("deploy-lock.tsv.bak-")]
+        c.check("existing-lock-bak-kept", R.rc == 0 and own_is(lock_path(sb) + ".bak", "keep me"), R.tail)
+        c.check("unreadable-lock-kept-as-bak-pid", len(extra) == 1
+                and own_is(os.path.join(os.path.dirname(lock_path(sb)), extra[0]), "not a lock") if extra else False,
+                lambda: "files: %s" % os.listdir(os.path.dirname(lock_path(sb))))
+    finally:
+        box.close()
+
+
+def scenario_beh_dangling_seed(c):
+    """A dangling link at a seed path is not written through."""
+    box = Box(c)
+    try:
+        seed = os.path.join(box.home, ".kiro", "settings", "mcp.json")
+        nowhere = box.aux("nowhere.json")
+        make_link(nowhere, seed, False)
+        R = box.run("--providers", "kiro")
+        c.check("dangling-seed-link-not-written-through", R.rc == 0 and absent(nowhere) and is_link(seed)
+                and R.has(r"NOTE: .*mcp\.json is a link to a missing file; it is not seeded"), R.tail)
+    finally:
+        box.close()
+
+
+def scenario_beh_purge_sandbox(c):
+    """--purge from a sandboxed home never touches the repo's memory link (a dry run only, always)."""
+    box = Box(c)
+    try:
+        R = box.run("--dry-run", "--uninstall", "--purge")
+        mem = os.path.join(REPO, "memory")
+        c.check("purge-prints-skipped-memory-link-line", R.rc == 0
+                and R.has(re.escape("SKIPPED: " + mem + " (HOME is sandboxed; the repo's memory link is never removed from a sandbox)")), R.tail)
+        c.check("purge-plans-no-rmdir-of-memory", not R.has(r"rmdir .*[\\/]memory$") and not R.has(r"REMOVED: .*memory \(link"), R.tail)
+    finally:
+        box.close()
+
+
+def scenario_beh_stores_gitignore(c):
+    """An existing <stores>/.gitignore is KEPT when --yes creates the store repo."""
+    br = subprocess.run(["git", "-C", REPO, "symbolic-ref", "-q", "--short", "HEAD"], stdin=subprocess.DEVNULL,
+                        stdout=subprocess.PIPE, stderr=subprocess.DEVNULL)
+    if br.stdout.decode("utf-8", "replace").strip() != "local-improvements":
+        c.skip("stores-gitignore-kept", "--yes would switch the repo's branch: the checkout is not on local-improvements")
+        return
+    box = Box(c)
+    try:
+        stores = os.path.join(box.root, "stores")
+        wt(os.path.join(stores, ".gitignore"), "mine\n")
+        R = box.run("--yes", "--providers", "claude")
+        c.check("stores-gitignore-kept", R.rc == 0 and R.has(r"CREATE: ") and R.has(r"KEPT: .*\.gitignore")
+                and own_is(os.path.join(stores, ".gitignore"), "mine"), R.tail)
+    finally:
+        box.close()
+
+
+def scenario_beh_journal_garbage(c):
+    """A journal with one valid backup row and one garbage line merges the valid row."""
+    box = Box(c)
+    try:
+        sb = box.home
+        p = os.path.join(sb, ".claude", "AUTHORING.md")
+        c.check("deploy-exit0", box.run("--providers", "claude").rc == 0, "deploy failed")
+        wt(p + ".bak", "an old file of yours\n")
+        wt(journal_path(sb), "backup\t~/.claude/AUTHORING.md\t%s\ngarbage line\n" % sha(p + ".bak"))
+        R = box.run("--providers", "claude")
+        c.check("journal-valid-row-merged-garbage-dropped", R.rc == 0 and R.has(r"NOTE: merged the rows an interrupted run recorded in ")
+                and lock_has(sb, "backup", "~/.claude/AUTHORING.md", sha(p + ".bak")) and absent(journal_path(sb)), R.tail)
+    finally:
+        box.close()
+
+
+BEHAVIORS = [("behaviors-uninstall-no-venv", scenario_beh_uninstall_no_venv),
+             ("behaviors-dry-run-conflicts", scenario_beh_dry_run_conflicts),
+             ("behaviors-decoy-home", scenario_beh_decoy_home),
+             ("behaviors-readonly-lock", scenario_beh_readonly_lock),
+             ("behaviors-edited-bak", scenario_beh_edited_bak),
+             ("behaviors-folder-bak", scenario_beh_folder_bak),
+             ("behaviors-lock-bak-kept", scenario_beh_lock_bak_kept),
+             ("behaviors-dangling-seed", scenario_beh_dangling_seed),
+             ("behaviors-purge-sandbox", scenario_beh_purge_sandbox),
+             ("behaviors-stores-gitignore", scenario_beh_stores_gitignore),
+             ("behaviors-journal-garbage", scenario_beh_journal_garbage)]
 
 
 # --- main -------------------------------------------------------------------------------------------------
@@ -1487,7 +1781,7 @@ def scenarios():
     for shell in ("ps1", "sh"):
         for case in ("dry-run", "providers-kiro", "no-stores", "stores-url", "yes", "uninstall-purge", "help", "no-python"):
             out.append(("boot-%s-%s" % (shell, case), boot_scenario(shell, case)))
-    return out
+    return out + BEHAVIORS
 
 
 def run_scenario(name, fn):
@@ -1507,7 +1801,7 @@ def run_scenario(name, fn):
 
 
 def main(argv=None):
-    global SETUP, BOOT_DIR, _BASELINE
+    global SETUP, BOOT_DIR, VENV_DIR, VENV_PY, _BASELINE
     for stream in (sys.stdout, sys.stderr):
         try:
             stream.reconfigure(errors="replace")
@@ -1517,10 +1811,14 @@ def main(argv=None):
     ap.add_argument("--jobs", type=int, default=6)
     ap.add_argument("--setup", default=None, help="the setup script to test (default: setup/setup.py beside this file)")
     ap.add_argument("--bootstraps", default=None, help="the folder holding setup.ps1 and setup.sh (default: the repo root)")
+    ap.add_argument("--venv", default=None, help="the playbook venv folder (default: .venv-agent-playbook in the repo)")
     ap.add_argument("--only", default=None, help="run only the scenarios named NAME or starting with NAME")
     ns = ap.parse_args(argv)
     if ns.setup:
         SETUP = os.path.abspath(ns.setup)
+    if ns.venv:
+        VENV_DIR = os.path.abspath(ns.venv)
+        VENV_PY = os.path.join(VENV_DIR, "Scripts", "python.exe") if WIN else os.path.join(VENV_DIR, "bin", "python")
     if ns.bootstraps:
         BOOT_DIR = os.path.abspath(ns.bootstraps)
     if not os.path.isfile(SETUP):
