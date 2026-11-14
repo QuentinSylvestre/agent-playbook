@@ -4,7 +4,7 @@ Project-scoped governance for the agent-playbook repo itself. Everything here
 describes how *this* repository is laid out and edited, so it applies only when
 the working project is the config repo.
 
-Deliberately **not** listed in `inventory.tsv` — `setup.sh` / `setup.ps1` are
+Deliberately **not** listed in `inventory.tsv` — setup is
 manifest-driven, so this file is never deployed to any provider and never loads
 during work on an unrelated project. Cross-project rules live in
 `shared/AGENTS.md`, which is deployed globally; authoring-time conventions live
@@ -25,6 +25,7 @@ The config repo has two content directories:
 
 **Authoring boundary**: shared `SKILL.md` = lean, harness-neutral content (what frontier models need). `providers/kiro/skills/<name>/OVERLAY.md` = kiro-only discipline delta (what the kiro-cli model additionally needs). `providers/kiro/steering/` = kiro environment/host rules; it now also includes `kiro-governance-discipline.md`, which carries AGENTS.md-level anti-rationalization discipline demoted from shared (kept lean for frontier harnesses, restated firmly for the weaker kiro-cli model). Overlays cite shared anchors by **section name or stable step ID, not raw step number** (desync guard — shared may be reorganized without breaking overlays).
 - **`memory/`** (config repo root) -- User memory: persistent cross-project learnings. Not tracked here: it is a gitignored link, made by setup, to the store repo's reserved `user/memory/`, so memory commits land in the store repo. See `shared/AGENTS.md § Memory Management` for format and rules. This repo's own project memory, like every workspace's, lives in its store in the store repo (`~/.agent-playbook/stores`, outside this repo; `shared/skills/qdream/memory-rules.md § Workspace Store`). There is no `workspaces/` directory and no `plans/` directory: this repo's project files (plans, `ROADMAP.md`, `ROADMAP-REJECTED.md`) live in its workspace store too, like every workspace's.
+- **`setup/`** -- the installer: `setup.py` (one implementation for every platform; `setup.sh` and `setup.ps1` at the root only find Python 3.8+ and run it) and `test_setup.py`, its sandbox scenario test. The deploy model it writes from is `shared/skills/qconfig-sync/scripts/deploy_model.py`, shared with `verify-deployment.py`.
 - **`templates/`**, **`docs/`** and the root contributor files (`README.md`, `CONTRIBUTING.md`, `ROADMAP.md`, `CHANGELOG.md`, `SECURITY.md`, `.github/`) -- setup's starting files (empty user memory) and the public documentation. A change to setup, the layout or the contribution flow updates them in the same commit.
 - **Archived project files** -- `plans/done/` in this repo's workspace store. Pruned periodically: an archive older than about three months that no live governance file, `ROADMAP-REJECTED.md` entry, memory entry or `memory/.dream-state.json` record names is deleted. The store repo's git history keeps them; recover one with `git -C <store repo> log --all --diff-filter=D -- '<store>/plans/done/<name>.md'` then `git show <sha>^:<path>`. Never prune an archive that a live file cites.
 
