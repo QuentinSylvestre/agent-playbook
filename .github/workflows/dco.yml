@@ -16,7 +16,11 @@ jobs:
 
       # Every non-merge commit of the pull request carries `Signed-off-by:` naming its author
       # (git commit -s), per CONTRIBUTING.md. Only commit SHAs come from the event payload.
+      # A pull request from a branch of this repository is the maintainer's own (only someone with
+      # write access can push one): the sign-off certifies a contribution, so only pull requests
+      # from forks are checked.
       - name: Every commit is signed off by its author
+        if: github.event.pull_request.head.repo.full_name != github.repository
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
           HEAD: ${{ github.event.pull_request.head.sha }}
