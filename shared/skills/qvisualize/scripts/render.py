@@ -460,7 +460,9 @@ def _export_png(source: Path, out_dir: Path) -> int:
             command = [
                 str(browser), "--headless=new", "--disable-gpu", "--hide-scrollbars",
                 "--no-first-run", "--no-default-browser-check", "--blink-settings=preferredColorScheme=1",
-                f"--user-data-dir={work_dir / 'profile'}",
+                # a fresh profile per figure: a browser still holding a shared profile makes the next
+                # headless launch hand off to it and hang (the second figure timed out on CI's Windows)
+                f"--user-data-dir={work_dir / ('profile-' + name)}",
                 f"--screenshot={png}", f"--window-size={width + 2 * _EXPORT_PAD},{height + 2 * _EXPORT_PAD}",
                 "--force-device-scale-factor=2", "--virtual-time-budget=6000", page.as_uri(),
             ]

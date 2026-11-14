@@ -920,15 +920,25 @@ def _run_selftest() -> int:
 
         # --- transient read errors: retried 3 times, then failed ---
         tr = w.repo(w.area("trans") / "r", url="https://github.com/o/trans.git")
-        t0 = time.monotonic()
-        with flaky_open(w.root, tr / ".git" / "config", 3) as st3:
-            i3 = identity(tr)
-        with flaky_open(w.root, tr / ".git" / "config", 4) as st4:
-            i4 = identity(tr)
-        dt = time.monotonic() - t0
+        # The retry budget is the time the resolver chooses to sleep, not the wall clock: a loaded CI runner
+        # made two whole identity() calls take 1.99 s while the retries themselves slept 0.3 s.
+        real_sleep, slept = time.sleep, []
+
+        def counted_sleep(secs):
+            slept.append(secs)
+            real_sleep(secs)
+        time.sleep = counted_sleep
+        try:
+            with flaky_open(w.root, tr / ".git" / "config", 3) as st3:
+                i3 = identity(tr)
+            with flaky_open(w.root, tr / ".git" / "config", 4) as st4:
+                i4 = identity(tr)
+        finally:
+            time.sleep = real_sleep
         chk("transient-read:three-failures-then-success-is-found", i3.status == "found" and i3.path.value == "github.com/o/trans" and st3["n"] == 3, repr(i3))
         chk("transient-read:four-failures-is-failed", i4.status == "failed" and st4["n"] == 4, repr(i4))
-        chk("transient-read:bounded-well-under-the-hook-cap", dt < 1.0, "%.2f s" % dt)
+        chk("transient-read:bounded-well-under-the-hook-cap", 6 <= len(slept) and sum(slept) < 1.0,
+            "%d sleeps, %.2f s slept" % (len(slept), sum(slept)))
         d_tr = w.store("trans-1", "remote github.com/o/trans\n")
         with flaky_open(w.root, d_tr / "STORE", 2) as st2:
             rs_ = find(tr)
@@ -1160,14 +1170,22 @@ def _run_selftest() -> int:
                 raise PermissionError(13, "sharing violation (selftest)")
             return real_open7(file, *a, **k)
         builtins.open = deny_every_store
-        t0 = time.monotonic()
+        # bounded by the time the resolver chooses to sleep, not the wall clock (a loaded runner is slow)
+        real_sleep7, slept7 = time.sleep, []
+
+        def counted_sleep7(secs):
+            slept7.append(secs)
+            real_sleep7(secs)
+        time.sleep = counted_sleep7
         try:
             r7 = find(mn)
             r7b = find_or_create(mn)
         finally:
             builtins.open = real_open7
-        dt = time.monotonic() - t0
-        chk("scan-bound:all-stores-denied-is-failed-within-a-fraction-of-a-second", r7.status == "failed" and r7b.status == "failed" and dt < 1.5, "%.2f s %r" % (dt, r7))
+            time.sleep = real_sleep7
+        chk("scan-bound:all-stores-denied-is-failed-within-a-fraction-of-a-second",
+            r7.status == "failed" and r7b.status == "failed" and sum(slept7) < 1.0,
+            "%d sleeps, %.2f s slept %r" % (len(slept7), sum(slept7), r7))
         chk("scan-bound:only-the-first-entry-is-retried", denied7[0] == 2 * (READ_RETRIES + 1), "%d reads" % denied7[0])
 
         # at= is validated only on the creation path; a found store wins whatever `at` holds
