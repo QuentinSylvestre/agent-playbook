@@ -520,14 +520,15 @@ parity_sec_merge() {
 # pwsh/powershell is present; run+assert only when one is available.
 # (PS_BIN is resolved once in the preamble.)
 
-# bash merge_overlay (mirrors setup.sh / verify-deployment.py; LF seam/trailing,
+# bash merge_overlay (mirrors setup.sh byte for byte; LF seam/trailing,
 # interior bytes preserved, no BOM).
 parity_merge_overlay() {
     local shared_file="$1" overlay_file="$2"
     local shared_body overlay_body
-    shared_body="$(cat "$shared_file")"
-    overlay_body="$(cat "$overlay_file")"
-    if [ -n "$(printf '%s' "$overlay_body" | tr -d '[:space:]')" ]; then
+    shared_body="$(<"$shared_file")"
+    overlay_body="$(<"$overlay_file")"
+    # Same emptiness test as setup.sh's has_non_space: Unicode spaces count as white space.
+    if [[ "$overlay_body" == *[![:space:]]* ]]; then
         printf '%s\n\n%s\n' "$shared_body" "$overlay_body"
     else
         printf '%s\n' "$shared_body"

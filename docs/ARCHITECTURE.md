@@ -54,9 +54,10 @@ Entries are typed (feedback, decision, pattern), carry a source and a `Verified`
 five write-time gates before they are saved
 (`shared/skills/qdream/memory-rules.md § Memory File Format`).
 
-At session start, Claude Code's `SessionStart` hook (`providers/claude/memory-load-hook.py`)
-injects a heading index of the user and higher-order tiers plus the project tier. Kiro loads them
-through steering resources.
+At session start, Claude Code loads the user and higher-order tiers in full through links in
+`~/.claude/rules`, and its `SessionStart` hook (`providers/claude/memory-load-hook.py`) injects
+the Topics index, the project tier (in full when it fits, else its heading index), and a heading
+index for any tier its rules link does not deliver. Kiro loads them through steering resources.
 
 ## Stores and the resolver
 

@@ -69,7 +69,7 @@ Skip individual sections when empty (no positive signals → omit "What's workin
    - a **Cross-validation-gate-verified** `improvement_signal` (confirmed/plausible) or a demoted memory entry flags it as **contradicted** by current practice, or superseded by a newer rule;
    - a prior applied edit's `outcome_tags` record came back **`recurred`** (from the Outcome tagging step) — the rule did not prevent the friction it targeted, so it is low-utility.
 
-   (A third trigger — retiring rules that show *no observed reliance* — is deliberately **excluded**: nothing currently measures which governance rules a session actually consulted, so such a proposal could not be evidence-grounded and would invite confabulated retirement rationales. It is deferred to the `/qmemory-eval` harness (`plans/ROADMAP.md`), which would give reliance a measurement basis.)
+   (A third trigger — retiring rules that show *no observed reliance* — is deliberately **excluded**: nothing currently measures which governance rules a session actually consulted, so such a proposal could not be evidence-grounded and would invite confabulated retirement rationales. It stays excluded until something measures reliance; `/qmemory-eval` does not.)
 
    **Evidence grounding (same discipline as additions)**: every retirement proposal's Rationale must cite the evidence that grounds it — the gate-verified signal's verbatim `evidence_quote` (or the demoted entry's contradicting provenance) for the contradiction/supersession case, or the `outcome_tags` record (`target` + `applied` + `checked` dates) for the recurred case. A retirement candidate whose grounding cannot be cited is not presented.
 
