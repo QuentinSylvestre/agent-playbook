@@ -29,7 +29,8 @@ conventions). Read both before a non-trivial change.
 | `providers/<name>/` | Provider-specific deployables: Claude Code hooks and statusline, Kiro agents, steering and overlays, reference notes. |
 | `providers/kiro/skills/<name>/OVERLAY.md` | Kiro-only additions appended to a shared `SKILL.md` at deploy time (`<stem>.OVERLAY.md` for an auxiliary file). |
 | `inventory.tsv` | The deployment manifest every setup and verify script reads. |
-| `setup.sh` / `setup.ps1` | Twin installers. A change to one needs the same change to the other. |
+| `setup/setup.py` | The installer, one implementation for every platform. `setup.sh` and `setup.ps1` are thin starters that find Python 3.8+ and run it. |
+| `shared/skills/qconfig-sync/scripts/deploy_model.py` | The deploy model setup writes from and `verify-deployment.py` checks against: manifest, overlay merge, template render, deploy lock. |
 | `templates/` | Starting files setup copies (empty user memory). |
 | `docs/` | Architecture and glossary. |
 
@@ -54,15 +55,13 @@ Your own memory, plans and artifacts are never part of this repo: they live in y
 ### Running the checks
 
 ```bash
-./setup.sh --dry-run --no-stores        # once, so the venv exists (or ./setup.sh)
+./setup.sh                              # once, if you have not yet: it builds the venv (a dry run does not)
 .venv-agent-playbook/bin/python -I shared/skills/qconfig-sync/scripts/run-checks.py .
-bash shared/skills/qconfig-sync/scripts/test-parity.sh
 ```
 
-On Windows, use `.venv-agent-playbook\Scripts\python.exe`, and run `test-parity.sh` from **Git
-Bash**: `bash` typed in PowerShell is WSL's bash, and every PowerShell parity assertion silently
-skips there. Checks that need a live deployment or your memory print `SKIP`, not a failure, in a
-fresh clone.
+On Windows, use `.venv-agent-playbook\Scripts\python.exe`. The runner includes the setup scenario
+test (`setup/test_setup.py`), which deploys into throwaway sandbox homes. Checks that need a live
+deployment or your memory print `SKIP`, not a failure, in a fresh clone.
 
 ## What a good change looks like
 
@@ -83,8 +82,8 @@ fresh clone.
 
 ## Provider parity
 
-Test the providers you use; you do not need all of them. Kiro overlays, Windows-specific code and
-the PowerShell twin are maintained by the maintainer when a contributor cannot test them. Say in
+Test the providers you use; you do not need all of them. Kiro overlays and Windows-specific code
+are maintained by the maintainer when a contributor cannot test them. Say in
 the pull request which providers and platforms you tested, and CI covers the rest of the
 platform matrix.
 

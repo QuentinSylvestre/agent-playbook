@@ -82,8 +82,7 @@ strings stay strings, NaN/Infinity parse as numbers, and lenient syntax
 twin (ConvertFrom-Json) differed, this script keeps the Python behaviour.
 
 --selftest runs every row of fixtures/dream-state/expected.tsv in process
-(exit code and must_contain substring, the consumer test-parity.sh also
-asserts on the twins), the missing-file SKIP, the not-a-regular-file SKIP of
+(exit code and must_contain substring), the missing-file SKIP, the not-a-regular-file SKIP of
 a directory (in process and as a subprocess), the exact summary line of the
 valid fixture, an injected unreadable file (exit 1, stderr reason), an
 injected deep-nesting file (parse FAIL, exit 1), an injected unexpected

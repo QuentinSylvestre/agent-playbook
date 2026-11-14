@@ -60,8 +60,8 @@ jobs:
           .\setup.ps1 -Yes
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
 
-      # Every guard and selftest, the leak scan and test-parity (both setup twins in sandboxes),
-      # against the deployment above. PARTIAL (a platform-specific case skipped) passes under --ci.
+      # Every guard and selftest, the leak scan and the setup scenario test (setup/test_setup.py,
+      # in sandbox homes), against the deployment above. PARTIAL (a platform-specific case skipped) passes under --ci.
       - name: Checks (Linux)
         if: runner.os != 'Windows'
         shell: bash

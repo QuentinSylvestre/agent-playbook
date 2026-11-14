@@ -422,8 +422,8 @@ def lock_bytes(lines):
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GOLDEN_DIR = os.path.join(HERE, "fixtures", "deploy-model")
-GOLDEN_HOME = "C:\\Users\\Golden"
-GOLDEN_ROOT = "C:\\Users\\Golden\\agent-playbook"
+GOLDEN_HOME = "C:\\Users\\example"     # a leak-scan placeholder name
+GOLDEN_ROOT = "C:\\Users\\example\\agent-playbook"
 GOLDEN_MARKER = "Golden-reviewed:"
 
 

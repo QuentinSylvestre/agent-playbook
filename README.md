@@ -35,6 +35,10 @@ On Windows, clone with long paths on, or checkout fails with "Filename too long"
 fixture paths pass 260 characters): `git config --global core.longpaths true` before cloning, or
 `git clone -c core.longpaths=true ...`. Then, in PowerShell: `.\setup.ps1 -DryRun`, then `.\setup.ps1`.
 
+`setup.sh` and `setup.ps1` take the same options and do the same thing: each finds Python 3.8+ and
+runs `setup/setup.py`, the one implementation, on every platform. Without Python they stop and say
+what to install.
+
 Interactive setup:
 
 1. Detects which providers you have and asks which ones to deploy to.
@@ -77,10 +81,28 @@ be made (another program holds the file open), setup leaves that path as it is, 
 and ends with a non-zero exit code; close the program and run setup again. A skill folder of yours
 with a playbook skill's name is never replaced; rename or remove it to get the playbook's skill.
 
-Non-interactive: `./setup.sh --yes --providers claude,codex`. Remove everything again with
-`./setup.sh --uninstall` (add `--purge` to drop the pointer file too). See `./setup.sh --help`.
+Non-interactive: `./setup.sh --yes --providers claude,codex`. See `./setup.sh --help`.
 
 Then, in any project, ask your agent to `/qexplore` a change.
+
+### Uninstall
+
+`./setup.sh --uninstall` (or `.\setup.ps1 -Uninstall`) removes what setup deployed and puts back
+each `.bak` it made; add `--purge` (`-Purge`) to drop the pointer file and the repo's memory link
+too. The store repo is never touched.
+
+Uninstall needs Python, like setup. Without it, remove the deployment by hand:
+
+1. In `~/.claude`, `~/.codex`, `~/.gemini` and `~/.kiro`, delete every link that points into this
+   repo (instruction files, `skills/<name>`, `~/.claude/rules/agent-playbook.md`,
+   `~/.gemini/AGENT-PLAYBOOK.md`, Kiro steering files).
+2. `~/.agent-playbook/deploy-lock.tsv` lists every regular file setup wrote (the Kiro skill copies
+   and agent files), one per line after the header: delete the ones you did not edit. Its `backup`
+   rows name the files setup moved to `<file>.bak`; rename each back.
+3. Remove `AGENT-PLAYBOOK.md` from `context.fileName` in `~/.gemini/settings.json`, and the
+   playbook's hook and status line entries from `~/.claude/settings.json`
+   (`providers/claude/README.md` lists them). A `setting` row for `kiro-cli/chat.defaultAgent`
+   holds the value setup replaced (`-` for none): put it back with `kiro-cli settings --global`.
 
 ### Install with your agent
 
@@ -170,7 +192,7 @@ More: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and the vocabulary in
 | Gemini CLI | `~/.gemini/GEMINI.md` | `~/.gemini/skills/` | |
 | Kiro (CLI and IDE) | steering in `~/.kiro/steering/` | `~/.kiro/skills/` (with Kiro overlays) | `kiro_default` agent, settings seeds ([providers/kiro/README.md](providers/kiro/README.md)) |
 
-Windows is the main platform and Linux is supported. The scripts and their selftests run on both in CI, but a full `/qdream` sweep has been exercised on Windows only. macOS is untested: `setup.sh` should work there, but expect rough edges. Kiro and Windows get the most day-to-day use.
+Windows is the main platform and Linux is supported. The scripts and their selftests run on both in CI, but a full `/qdream` sweep has been exercised on Windows only. macOS is untested: setup should work there, but expect rough edges. Kiro and Windows get the most day-to-day use.
 
 ## Contributing
 

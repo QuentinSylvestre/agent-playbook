@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """context-filename.py -- add or remove one name in Gemini CLI's `context.fileName` setting.
 
-Both setup twins call this when a file of the user's own sits at ~/.gemini/GEMINI.md. The user's file stays,
+Setup calls this when a file of the user's own sits at ~/.gemini/GEMINI.md. The user's file stays,
 setup links ~/.gemini/AGENT-PLAYBOOK.md to shared/AGENTS.md, and this script adds "AGENT-PLAYBOOK.md" to
 `context.fileName` in ~/.gemini/settings.json so Gemini CLI loads both files.
 
@@ -14,8 +14,8 @@ Usage:
   context-filename.py remove --settings PATH --name NAME [--prior VALUE] [--dry-run]
   context-filename.py --selftest
 
-The settings path is always given explicitly, so a sandboxed setup can never reach the real home. The
-setup twins pass the prior value in the environment variable CONTEXT_FILENAME_PRIOR instead of --prior, as
+The settings path is always given explicitly, so a sandboxed setup can never reach the real home. Setup
+passes the prior value in the environment variable CONTEXT_FILENAME_PRIOR instead of --prior, as
 Windows PowerShell 5.1 strips the quotes inside a native argument.
 
 add: a string value becomes a list that keeps the existing name first; an absent value means Gemini's default

@@ -19,15 +19,15 @@
 # - dest: deployment target path. `~` expands to the user home; `<KIRO_IDE_USER>`
 #   expands to the Kiro IDE per-user config dir, which is platform-divergent:
 #   %APPDATA%\Kiro\User on Windows, ${XDG_CONFIG_HOME:-~/.config}/Kiro/User on POSIX.
-#   Each setup/verify twin resolves it for its own platform.
+#   deploy_model.py (kiro_ide_user_dir) resolves it for the platform it runs on.
 # - source: repo-relative path to the source file/dir
 # - mode: claude | codex | gemini | kiro-always | kiro
-# Consumers: setup.ps1, setup.sh, verify-deployment.py, test-parity.sh
+# Consumers: deploy_model.py (read by setup/setup.py, verify-deployment.py and verify-mass.py)
 # Dynamic entries (per-skill symlinks/copies, overlay merges) are NOT listed here: every
 # provider gets one link per shared skill inside its own skills/ folder (never a link of
 # the whole folder), so its other skills stay.
 # They remain auto-discovered at runtime from the filesystem.
-# Mode `kiro` rows are symlinked by BOTH setup twins (Windows copy mode was retired
+# Mode `kiro` rows are symlinked on every platform (Windows copy mode was retired
 # 2026-09-20). Overlay-bearing Kiro skills are the only generated copies, and they are
 # dynamic entries, not manifest rows.
 

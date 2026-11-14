@@ -59,7 +59,7 @@ a link. For Kiro it is a folder that holds a file and of which the deploy lock n
 file; at an overlay-bearing skill it must also hold a file at a path setup does not write
 there (a folder holding only such paths is an older copy of setup's, checked as usual).
 
-Overlay-merge awareness (lockstep with setup.sh / setup.ps1):
+Overlay-merge awareness (the model setup/setup.py writes from):
   setup MERGES a kiro overlay (`OVERLAY.md` for SKILL.md, `<stem>.OVERLAY.md`
   for an aux file) into the deployed target rather than copying the overlay
   standalone. This verifier mirrors that model: for an overlay-bearing skill it
@@ -100,9 +100,9 @@ Platform model:
 
 Reference: shared/skills/qconfig-sync/SKILL.md Step 3 mirrors this
 inventory in human-readable form. The script is authoritative for
-verification; setup.sh / setup.ps1 are authoritative for provisioning.
-`test-parity.sh` cross-checks `verify-deployment.py --list` against the
-entries created by `setup.sh`.
+verification; setup/setup.py is authoritative for provisioning. Both take the
+deploy model from deploy_model.py, and setup/test_setup.py checks that a fresh
+deployment holds every path `--list` names and verifies clean.
 
 Output schema (tab-separated):
   <STATUS>\\t<path>\\t[target=<resolved>]\\t[expected=<expected>]
@@ -213,8 +213,7 @@ VALID_KINDS = dm.VALID_KINDS
 FILE_KINDS = (KIND_COPY_FILE, KIND_SYMLINK_FILE, KIND_TEMPLATE_FILE, KIND_SEED_FILE, KIND_MERGE_FILE)
 DIR_KINDS = (KIND_COPY_DIR_RECURSIVE, KIND_SYMLINK_DIR)
 
-# A folder never copied into a generated Kiro copy, like __pycache__ (setup.sh gen_expected and
-# deploy_generated_copy, setup.ps1 Get-FilesNoFollow): fixtures/ holds selftest data, which the
+# A folder never copied into a generated Kiro copy, like __pycache__ (deploy_model.py files_no_follow): fixtures/ holds selftest data, which the
 # selftests read only from the repo. The orphan walk still reports a leftover one in a copy.
 COPY_SKIP_DIR = "fixtures"
 

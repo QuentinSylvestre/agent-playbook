@@ -13,7 +13,7 @@
 ## Checklist
 
 - [ ] Every commit is signed off (`git commit -s`)
-- [ ] `run-checks.py` and `test-parity.sh` pass locally (or the failures are explained below)
+- [ ] `run-checks.py` passes locally (or the failures are explained below)
 - [ ] Self-tests cover the change (a fixture or a selftest case for script changes)
 - [ ] Renamed or removed sections, steps or files: every citation updated
 - [ ] `setup.sh` and `setup.ps1` changed together (if either changed)

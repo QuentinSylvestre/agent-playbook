@@ -235,9 +235,9 @@ the interpreter of `.venv-agent-playbook` (`shared/AGENTS.md § Config Repo Loca
 #### Interpreter and launcher
 
 Every playbook Python script runs one interpreter: `.venv-agent-playbook` at the
-config repo root (gitignored, stdlib only). `setup.ps1` creates it from the system
-Python 3.8+ (`py -3`, then `python`) and stops with a message when it finds none;
-it never installs Python. Running `setup.ps1` again leaves a working venv alone and
+config repo root (gitignored, stdlib only). Setup creates it from the Python 3.8+ it
+runs on (`setup.ps1` tries `py -3`, then `python`) and stops with a message when it finds
+none; it never installs Python. Running setup again leaves a working venv alone and
 rebuilds a broken one. A missing venv is reported as "guard did not run", never
 replaced by a Python found on `PATH`.
 
@@ -288,8 +288,8 @@ An older entry that runs `python.exe` on `memory-load-hook.py` works until the v
 self-check lands, but it has no launcher notice and no venv: switch to the form
 above by hand: setup leaves an existing entry as it is.
 
-Linux and macOS are unsupported for the venv rule: `setup.sh` has no venv step
-yet, and the launcher needs PowerShell. A plain `python3` `command` + `args` entry
+Linux and macOS are unsupported for the launcher: setup builds the venv there too,
+but the launcher needs PowerShell. A plain `python3` `command` + `args` entry
 on the absolute path of `memory-load-hook.py` (`args` runs no shell, so `~` is not
 expanded) still runs the hook there, outside the venv rule and without the
 notice.
@@ -316,6 +316,6 @@ the refusal message.
 
 Claude Code owns this file and rewrites it while it runs, and the sounds and the
 status line are personal choices, so nothing merges into it unattended. The merge
-lives in one Python script that both setup twins call, so it needs no twin logic,
-no `verify-deployment.py` kind and no `test-parity.sh` guard. A person at a terminal
+lives in one Python script that setup calls, so it needs no `verify-deployment.py`
+kind of its own. A person at a terminal
 can consent; a setup run by an agent cannot, so it writes nothing.

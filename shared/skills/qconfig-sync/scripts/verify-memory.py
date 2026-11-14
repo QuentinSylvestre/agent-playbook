@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """verify-memory.py -- deterministic guard for the structure of every memory file.
 
-Plan 261016 Phase 12 (SC-11). Python only, no sh/ps1 twin, so it is outside test-parity.sh's tally. It
+Plan 261016 Phase 12 (SC-11). Python only, no sh/ps1 twin. It
 absorbs verify-topics.{sh,ps1}: the topic-citation check below is a port of it. Run with the playbook venv
 (<repo>/.venv-agent-playbook); any other interpreter exits 2 ("guard did not run: venv missing"). Stdlib
 only, Python 3.8+. It reads memory files and inventory.tsv, writes nothing, runs no git and touches no

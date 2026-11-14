@@ -2,7 +2,7 @@
 """verify-stores.py -- deterministic guard for the workspace store layout.
 
 The store repo's guard since plan 261016 (it took over from the old in-repo workspaces/ check). Python
-only, no sh/ps1 twin, so it is outside test-parity.sh's tally. Run with the playbook venv
+only, no sh/ps1 twin. Run with the playbook venv
 (<repo>/.venv-agent-playbook); any other interpreter exits 2 ("guard did not run: venv missing"). Stdlib
 only, Python 3.8+. It reads the store repo, .dream-state.json and the session stores' cwd metadata; it
 writes nothing, runs only read-only git (status, log, rev-parse) and touches no network.
