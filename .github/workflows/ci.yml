@@ -31,8 +31,10 @@ jobs:
           python-version: "3.12"
 
       # Setup runs for real into a throwaway home: --yes creates a local store repo seeded with
-      # empty user memory, links the repo's memory to it, switches the checkout to the engine
-      # branch and deploys every provider. The dry run before it must succeed and change nothing.
+      # empty user memory, switches the checkout to the engine branch and deploys every provider.
+      # The dry run before it must succeed and change nothing. Setup never links the repo's memory
+      # from a sandboxed home, so CI makes that link itself and runs setup again, which then links
+      # the Claude memory rules (and checks a re-run).
       - name: Setup (Linux)
         if: runner.os != 'Windows'
         shell: bash
@@ -43,6 +45,8 @@ jobs:
           mkdir -p "$HOME"
           ./setup.sh --dry-run --yes
           test ! -e "$HOME/.agent-playbook/config"
+          ./setup.sh --yes
+          ln -s "$HOME/.agent-playbook/stores/user/memory" memory
           ./setup.sh --yes
 
       - name: Setup (Windows)
@@ -59,9 +63,13 @@ jobs:
           if (Test-Path (Join-Path $env:USERPROFILE '.agent-playbook\config')) { throw "the dry run wrote the pointer file" }
           .\setup.ps1 -Yes
           if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          New-Item -ItemType SymbolicLink -Path memory -Target (Join-Path $env:USERPROFILE '.agent-playbook\stores\user\memory') | Out-Null
+          .\setup.ps1 -Yes
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
 
       # Every guard and selftest, the leak scan and the setup scenario test (setup/test_setup.py,
-      # in sandbox homes), against the deployment above. PARTIAL (a platform-specific case skipped) passes under --ci.
+      # in sandbox homes), against the deployment above. PARTIAL (a platform-specific case
+      # skipped) passes under --ci.
       - name: Checks (Linux)
         if: runner.os != 'Windows'
         shell: bash
