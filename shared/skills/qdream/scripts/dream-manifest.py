@@ -177,7 +177,10 @@ Subcommands:
       never a full sum.
       --by-role adds, after the usual lines, one `role <name>: files N,
       tokens: T` line for each of orchestrator, task4, verifier, drafter,
-      other, then one `peak context <name>: P` line per role: the largest
+      other, then `weighted tokens: W, phase agents: P` (USAGE_WEIGHTS over
+      every file, and over the phase-agent files alone: the sub-agent files
+      of the orchestrator role, the session file left out), then one `peak
+      context <name>: P` line per role: the largest
       input_tokens + cache_creation_input_tokens + cache_read_input_tokens
       of one model call among that role's files -- the largest `message`
       iteration of a message that has iterations, never their sum (output
@@ -3833,6 +3836,8 @@ def cmd_baseline(args, ctx):
             peak_file[key_file[key]] = max(peak_file[key_file[key]], ctx_size)
         for r in BASELINE_ROLES:
             print("role %s: files %d, tokens: %d" % (r, files[r], tokens[r]))
+        w_total, w_phase = weighted_split(u, session)
+        print("weighted tokens: %d, phase agents: %d" % (w_total, w_phase))
         for r in BASELINE_ROLES:
             print("peak context %s: %d" % (r, peak[r]))
         # D13: the session's own peak, then each phase agent's and drafter's.
@@ -3973,14 +3978,16 @@ def usage_iterations(usage):
             sum(size(i, USAGE_FIELDS) for i in advisor), model)
 
 
-def usage_by_message(loaded, session, until_line=None):
+def usage_by_message(loaded, session, until_line=None, roles=None):
     """The `baseline` count: message.usage per message.id (a record without
     one counts once), each field the maximum over the records that repeat
     it, with the role of the file it first appears in (the session is
     orchestrator; a sub-agent file's role is baseline_role). Per key also
     its context (usage_iterations, the largest over the records) and, under
     ADVISOR_FIELD, the advisor iterations' tokens; tokens are the sum of a
-    key's values, so the advisor's count under the role that called it."""
+    key's values, so the advisor's count under the role that called it. `roles`, when given, maps
+    a sub-agent file to the role decided on all its records (session_weighted filters records by
+    time, which can drop the brief record that names the role)."""
     per_id, models, records, anon = {}, {}, 0, 0
     key_role, key_file, file_role = {}, {}, {}
     context, advisor_models = {}, {}
@@ -3988,7 +3995,7 @@ def usage_by_message(loaded, session, until_line=None):
         if f == session:
             role = "orchestrator"
         else:
-            file_role[f] = baseline_role(recs)
+            file_role[f] = (roles[f], "") if roles and f in roles else baseline_role(recs)
             role = file_role[f][0]
         for ln, rec in recs:
             if f == session and until_line is not None and ln > until_line:
@@ -4093,25 +4100,43 @@ USAGE_WEIGHTS = {"input_tokens": 1, "output_tokens": 5, "cache_creation_input_to
                  "cache_read_input_tokens": 0.1}
 
 
+def weighted_split(u, session):
+    """-> (weighted tokens, weighted tokens of the phase agents) over a usage_by_message result. A
+    phase agent is a sub-agent file of the orchestrator role (the phase brief marker); the
+    session's own records are the orchestrator's and are not counted as phase-agent tokens. An
+    advisor's tokens (ADVISOR_FIELD, one sum over its iterations) weigh 1, an approximation: their
+    split into input, output and cache fields is not kept."""
+    total = phase = 0.0
+    for key, v in u["per_id"].items():
+        w = sum(USAGE_WEIGHTS.get(k, 1) * n for k, n in v.items())
+        total += w
+        if u["key_role"][key] == "orchestrator" and u["key_file"][key] != session:
+            phase += w
+    return int(round(total)), int(round(phase))
+
+
 def session_weighted(session, since=None):
-    """-> (weighted tokens, problem) for one transcript and its sub-agents, counting only records at
-    or after `since` (a transcript can hold work from before the sweep). A record with no timestamp
-    counts. dream-write.py `state apply` fills the cost record's weighted_tokens with it."""
+    """-> (weighted tokens, weighted phase-agent tokens, problem) for one transcript and its
+    sub-agents, counting only records at or after `since` (a transcript can hold work from before
+    the sweep). A record with no timestamp counts. dream-write.py `state apply` fills the cost
+    record's weighted_tokens and phase_weighted_tokens with it."""
     session = Path(session)
     if not session.is_file():
-        return None, "no transcript at %s" % session
+        return None, None, "no transcript at %s" % session
     _subs, loaded, errors = load_session_files(session)
     if not loaded or loaded[0][0] != session:
-        return None, "transcript unreadable: %s" % "; ".join(errors)
+        return None, None, "transcript unreadable: %s" % "; ".join(errors)
+    # roles on every record: the time cut below could drop the brief record that names a file's role
+    roles = {f: baseline_role(recs)[0] for f, recs in loaded if f != session}
     cut = parse_time(since) if since else None
     if cut is not None:
         def kept(rec):
             ts = parse_time(rec.get("timestamp"))
             return ts is None or ts >= cut
         loaded = [(f, [(ln, r) for ln, r in recs if kept(r)]) for f, recs in loaded]
-    u = usage_by_message(loaded, session)
-    total = sum(USAGE_WEIGHTS.get(k, 1) * n for v in u["per_id"].values() for k, n in v.items())
-    return int(round(total)), None
+    u = usage_by_message(loaded, session, roles=roles)
+    total, phase = weighted_split(u, session)
+    return total, phase, None
 
 
 BASELINE_ROLES =("orchestrator", "task4", "verifier", "drafter", "other")

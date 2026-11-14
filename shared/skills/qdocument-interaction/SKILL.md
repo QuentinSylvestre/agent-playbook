@@ -63,7 +63,7 @@ When creating or revising a deliverable that follows a house style (setup guide,
 
 All scripts in `scripts/` follow these conventions:
 
-- **Exit codes**: 0 = success, 1 = general failure, 2 = required tool not found (LibreOffice/poppler), 3 = input file encrypted
+- **Exit codes**: 0 = success, 1 = general failure, 2 = required tool not found (LibreOffice/poppler), 3 = input file encrypted, 4 = the Office application the script needs is already running with the user's work (refused, nothing touched)
 - **Stdout**: JSON when returning structured data; otherwise silent on success
 - **Stderr**: human-readable error messages
 - **Standalone**: no cross-script imports; each script is a self-contained CLI tool

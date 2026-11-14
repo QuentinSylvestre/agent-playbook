@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """run-checks.py -- run every /qconfig-sync Step 3 guard and selftest, in parallel, and print one table.
 
-Python only, no sh/ps1 twin (like verify-stores.py), so it is outside test-parity.sh's tally. Stdlib only,
+Python only, no sh/ps1 twin (like verify-stores.py). Stdlib only,
 Python 3.8+. It may run under any interpreter: every Python check it starts runs under the playbook venv
 (<repo>/.venv-agent-playbook, with -I), never a `python` from PATH, and a venv that is missing or fails to
 start makes each Python check COULD-NOT-RUN (exit 2), never a pass. A check still running after 15 minutes
@@ -16,27 +16,27 @@ Usage:
   --only NAME  Run only the named check (repeatable); `--only verify-deployment` is Step 5's re-verify.
   --jobs N     Worker processes for the dream-write and dream-sweep selftests (default 8).
   --list       Print the check names and exit.
-  --ci         CI's exit rule: PARTIAL (a platform-specific case or parity assertion skipped on this OS)
+  --ci         CI's exit rule: PARTIAL (a platform-specific case skipped on this OS)
                counts as passing; FAIL, COULD-NOT-RUN and TIMEOUT still fail. The verdicts printed are
                unchanged. A human sync never passes --ci: there PARTIAL stays never-green.
 
 What it runs: the checks SKILL.md Step 3 lists, with the invocations it documents, from the repo root.
-Every guard and selftest runs under the venv python. On Windows the launcher test runs first and alone, through `pwsh` (never `powershell`)
-(its cases wait on wall-clock timeouts, which a loaded machine could trip), and test-parity.sh runs through
-Git Bash, found from git.exe's install folder and accepted only when `uname -o` prints Msys -- the `bash`
-on PATH can be WSL's, where every PowerShell assertion SKIPs. Every other check runs in parallel. Exit codes are read from the child process itself, never through a
+Every guard and selftest runs under the venv python, the setup scenario test (setup/test_setup.py)
+included. On Windows the launcher test runs first and alone, through `pwsh` (never `powershell`)
+(its cases wait on wall-clock timeouts, which a loaded machine could trip). Every other check runs in
+parallel. Exit codes are read from the child process itself, never through a
 shell wrapper, so the `2>&1` false-exit trap cannot occur.
 
 Output: one line per check, in a fixed order --
   <name>  <exit>  <seconds>  <flagged>  <verdict>
 <flagged> counts output lines (stdout and stderr) carrying a status token the skill says to surface:
 FAIL, FAILED, SKIP, SKIPPED, DRIFT, DRIFTED, MISSING, MISSING_PATH, MISSING_ANCHOR, OVER, WARN, WARNING,
-ORPHAN, WRONG_TARGET, NOT_SYMLINK, AMBIGUOUS_SKILL (upper case, as whole words), except a line that starts
+INACTIVE, ORPHAN, WRONG_TARGET, NOT_SYMLINK, AMBIGUOUS_SKILL (upper case, as whole words), except a line that starts
 with its own pass status (OK, ok, PASS), such as an OK line naming a step ID. A non-zero count on a
 passing check is still to be read: SKIP, WARN and ORPHAN lines never change an exit code.
 <verdict> is PASS (exit 0), FAIL (exit 1, or any other non-zero exit), COULD-NOT-RUN (exit 2: the check
-did not run, which is not the same as finding nothing), TIMEOUT, or PARTIAL: test-parity.sh exited 0 but
-printed its "N of M parity assertions SKIPPED" warning, or a selftest exited 0 with a SKIP case line.
+did not run, which is not the same as finding nothing), TIMEOUT, or PARTIAL: a selftest (the setup
+scenario test included) exited 0 with a SKIP case line.
 PARTIAL is never green. Then the claude-settings check's own lines, whatever its verdict, because that check
 always exits 0 and is always reported. Then the work folder, and the wall time.
 
@@ -58,12 +58,11 @@ HERE = Path(os.path.realpath(__file__)).parent
 DEFAULT_REPO = HERE.parents[3]  # scripts -> qconfig-sync -> skills -> shared -> repo
 WINDOWS = os.name == "nt"
 TIMEOUT_S = 900
-FLAG_RE = re.compile(r"\b(FAIL(ED)?|SKIP(PED)?|DRIFT(ED)?|MISSING(_PATH|_ANCHOR)?|OVER|WARN(ING)?|ORPHAN"
+FLAG_RE = re.compile(r"\b(FAIL(ED)?|SKIP(PED)?|DRIFT(ED)?|MISSING(_PATH|_ANCHOR)?|OVER|WARN(ING)?|INACTIVE|ORPHAN"
                      r"|WRONG_TARGET|NOT_SYMLINK|AMBIGUOUS_SKILL)\b")
 # A line whose own status is a pass is never flagged, whatever it names: verify-citations prints
 # "OK<TAB>GAT-DRIFT<TAB>..." for the stable step ID GAT-DRIFT.
 PASS_LINE_RE = re.compile(r"^\s*(OK|ok|PASS)\b")
-PARITY_SKIPPED_RE = re.compile(r"^WARNING: \d+ of \d+ parity assertions SKIPPED", re.M)
 # A selftest SKIP case: SKIP as a word on a line that is not itself a pass line, wherever it sits
 # ("SKIP name -- why", "SKIP: why", "verify-stores selftest: SKIP: git cannot run").
 SELFTEST_SKIP_RE = re.compile(r"\bSKIP\b")
@@ -74,32 +73,8 @@ def venv_python(repo):
     return repo.joinpath(".venv-agent-playbook", *rel)
 
 
-def git_bash():
-    """-> (path to Git Bash, None) or (None, why). Never the WSL bash."""
-    if not WINDOWS:
-        b = shutil.which("bash")
-        return (b, None) if b else (None, "no bash on PATH")
-    git = shutil.which("git")
-    if not git:
-        return None, "no git.exe on PATH, so Git Bash cannot be located"
-    root = Path(os.path.realpath(git)).parent
-    for _ in range(3):  # <root>\cmd\git.exe, <root>\bin\git.exe or <root>\mingw64\bin\git.exe
-        for cand in (root / "bin" / "bash.exe", root / "usr" / "bin" / "bash.exe"):
-            if cand.is_file():
-                try:
-                    out = subprocess.run([str(cand), "-c", "uname -o"], capture_output=True, text=True,
-                                         timeout=60).stdout.strip()
-                except (OSError, subprocess.SubprocessError) as exc:
-                    return None, "%s did not start (%s)" % (cand, exc)
-                if out == "Msys":
-                    return str(cand), None
-                return None, "%s reports `uname -o` = %r, not Msys" % (cand, out)
-        root = root.parent
-    return None, "no bash.exe beside git.exe (%s)" % git
-
-
 def build_checks(repo, jobs):
-    """-> ordered list of (name, argv or None, kind, why-not). kind: guard | selftest | parity | launcher."""
+    """-> ordered list of (name, argv or None, kind, why-not). kind: guard | selftest | launcher."""
     py = venv_python(repo)
     qs = "shared/skills/qconfig-sync/scripts/"
     qd = "shared/skills/qdream/scripts/"
@@ -127,6 +102,8 @@ def build_checks(repo, jobs):
     python("verify-citations", "guard", qs + "verify-citations.py")
     python("verify-mass", "guard", qs + "verify-mass.py", str(repo))
     python("verify-links", "guard", qs + "verify-links.py")
+    python("verify-skills", "guard", qs + "verify-skills.py", str(repo))
+    python("verify-client-load", "guard", qs + "verify-client-load.py", str(repo))
     python("leak-scan", "guard", qs + "leak-scan.py", str(repo))
     python("leak-scan-selftest", "selftest", qs + "leak-scan.py", "--selftest")
     python("verify-stores", "guard", qs + "verify-stores.py", str(repo))
@@ -145,14 +122,21 @@ def build_checks(repo, jobs):
     python("verify-citations-selftest", "selftest", qs + "verify-citations.py", "--selftest")
     python("verify-mass-selftest", "selftest", qs + "verify-mass.py", "--selftest")
     python("verify-links-selftest", "selftest", qs + "verify-links.py", "--selftest")
+    python("verify-skills-selftest", "selftest", qs + "verify-skills.py", "--selftest")
+    python("verify-client-load-selftest", "selftest", qs + "verify-client-load.py", "--selftest")
     python("verify-dream-journal-selftest", "selftest", qd + "verify-dream-journal.py", "--selftest")
     python("verify-dream-state-selftest", "selftest", qd + "verify-dream-state.py", "--selftest")
     python("verify-deployment-selftest", "selftest", qs + "verify-deployment.py", "--selftest")
+    python("setup-scenarios", "selftest", "setup/test_setup.py")
+    python("deploy-model-selftest", "selftest", qs + "deploy_model.py", "--selftest")
+    python("deploy-model-golden-history", "guard", qs + "deploy_model.py", "--check-golden-history", "--repo", str(repo))
     python("qvalidate-selftest", "selftest", "shared/skills/qvalidate/scripts/qvalidate.py", "--selftest")
     python("close-plan-selftest", "selftest", "shared/skills/qclose/scripts/close-plan.py", "--selftest")
     python("scan-selftest", "selftest", "providers/kiro/skills/qwire-governance/scripts/scan.py", "--selftest")
     python("qmigrate-store-rewrite-selftest", "selftest", "shared/skills/qmigrate-workspace/scripts/test_store_rewrite.py")
     python("memory-load-hook-selftest", "selftest", "providers/claude/memory-load-hook.py", "--selftest")
+    python("qdream-phase-hook-selftest", "selftest", "providers/claude/qdream-phase-hook.py", "--selftest")
+    python("context-filename-selftest", "selftest", "providers/gemini/context-filename.py", "--selftest")
     python("claude-settings", "guard", "providers/claude/settings-entries.py", "check")
     python("claude-settings-selftest", "selftest", "providers/claude/settings-entries.py", "--selftest")
     python("render-selftest", "selftest", "shared/skills/qvisualize/scripts/render.py", "--selftest")
@@ -165,8 +149,6 @@ def build_checks(repo, jobs):
                                              "providers/claude/memory-load-hook.launcher-test.ps1"],
                            "launcher", None))
 
-    bash, why = git_bash()
-    checks.append(("test-parity", [bash, qs + "test-parity.sh"] if bash else None, "parity", why))
     return checks
 
 
@@ -251,8 +233,8 @@ def run_one(repo, work, name, argv):
     start = time.monotonic()
     with open(out_path, "wb") as out, open(err_path, "wb") as err:
         try:
-            # Own process group (POSIX) so a timeout can stop the check's whole tree: test-parity's
-            # section jobs and the selftests' worker pools outlive a kill of the direct child alone.
+            # Own process group (POSIX) so a timeout can stop the check's whole tree: the selftests'
+            # worker pools and setup runs outlive a kill of the direct child alone.
             proc = subprocess.Popen(argv, cwd=str(repo), stdout=out, stderr=err, stdin=subprocess.DEVNULL,
                                     start_new_session=not WINDOWS)
         except OSError as exc:
@@ -282,8 +264,6 @@ def verdict(kind, code, text):
         return "COULD-NOT-RUN"
     if code != 0:
         return "FAIL"
-    if kind == "parity" and PARITY_SKIPPED_RE.search(text):
-        return "PARTIAL"
     if kind in ("selftest", "launcher") and any(
             SELFTEST_SKIP_RE.search(line) and not PASS_LINE_RE.match(line) for line in text.splitlines()):
         return "PARTIAL"
@@ -330,10 +310,12 @@ def main(argv=None):
             code, secs, text = run_one(repo, work, name, argv)
             results[name] = (code, secs, text, kind)
     rest = [c for c in checks if c[1] is not None and c[2] != "launcher"]
-    longest_first = {"test-parity": 0, "dream-write-selftest": 1, "dream-sweep-selftest": 2,
-                     "dream-manifest-selftest": 3}
+    longest_first = {"dream-write-selftest": 1, "dream-sweep-selftest": 2, "dream-manifest-selftest": 3,
+                     "setup-scenarios": 4}
     rest.sort(key=lambda c: longest_first.get(c[0], 9))
     if rest:
+        # All at once: capping at 6 or 12 checks made the wall time longer, not shorter
+        # (2026-11-12, same machine state: 1020 s uncapped, 1069 s at 12, 1375 s at 6).
         with concurrent.futures.ThreadPoolExecutor(max_workers=len(rest)) as pool:
             futs = {pool.submit(run_one, repo, work, name, argv): (name, kind) for name, argv, kind, _ in rest}
             for fut in concurrent.futures.as_completed(futs):

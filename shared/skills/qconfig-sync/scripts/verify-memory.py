@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """verify-memory.py -- deterministic guard for the structure of every memory file.
 
-Plan 261016 Phase 12 (SC-11). Python only, no sh/ps1 twin, so it is outside test-parity.sh's tally. It
+Plan 261016 Phase 12 (SC-11). Python only, no sh/ps1 twin. It
 absorbs verify-topics.{sh,ps1}: the topic-citation check below is a port of it. Run with the playbook venv
 (<repo>/.venv-agent-playbook); any other interpreter exits 2 ("guard did not run: venv missing"). Stdlib
 only, Python 3.8+. It reads memory files and inventory.tsv, writes nothing, runs no git and touches no
@@ -163,6 +163,8 @@ PROVIDER_SKILL_RE = re.compile(r"providers/[^/]+/skills/[^/]+/SKILL\.md")
 SEPARATOR_RE = re.compile(r":?-+:?")
 FIRST_CELL_RE = re.compile(r"`([^`]+)`")
 SPAN_RE = re.compile(r"`([^`]*)`")
+# The instruction files, and the co-existence links setup makes beside a user's own CLAUDE.md or GEMINI.md
+# (setup.sh "Co-existence"): those load in every session too.
 ACCEPTED_DESTS = ("~/.claude/CLAUDE.md", "~/.codex/AGENTS.md", "~/.gemini/GEMINI.md")
 KIRO_STEERING = "~/.kiro/steering/"
 
@@ -548,16 +550,29 @@ def bad_path(p):
     return any(seg.endswith(".") for seg in p.split("/"))
 
 
+def _deploy_model():
+    """deploy_model.py beside this script (the manifest parser setup uses), loaded by path."""
+    path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "deploy_model.py")
+    try:
+        spec = importlib.util.spec_from_file_location("deploy_model_for_verify_memory", path)
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+    except Exception as exc:
+        raise CouldNotRun("cannot load %s (%s: %s)" % (path, type(exc).__name__, exc))
+    return mod
+
+
 def accepted_sources(inv_lines):
+    """The sources of the inventory rows whose destination loads at session start. A malformed row
+    stops the check (exit 2), as it stops setup."""
+    dm = _deploy_model()
+    try:
+        entries = dm.parse_manifest("\n".join(inv_lines))
+    except dm.ManifestError as exc:
+        raise CouldNotRun("inventory.tsv: " + str(exc))
     out = []
-    for l in inv_lines:
-        t = trim(l)
-        if not t or t.startswith("#"):
-            continue
-        parts = l.split("\t")
-        if len(parts) != 4:
-            continue
-        dest, src = trim(parts[1]), trim(parts[2])
+    for e in entries:
+        dest, src = e.dest, e.source
         if not src:
             continue
         if dest in ACCEPTED_DESTS or (dest.startswith(KIRO_STEERING) and len(dest) > len(KIRO_STEERING)):

@@ -17,6 +17,7 @@
       "role verifier: files 2, tokens: 64\n",
       "role drafter: files 0, tokens: 0\n",
       "role other: files 1, tokens: 62\n",
+      "weighted tokens: 313, phase agents: 155\n",
       "other: agent-a0000000000000004.jsonl: Review the open plans. You are the Dream Phase Agent Brief for Orient;"
     ],
     "stdout_not_contains": [

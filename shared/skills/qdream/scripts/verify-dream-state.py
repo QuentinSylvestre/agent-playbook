@@ -82,8 +82,7 @@ strings stay strings, NaN/Infinity parse as numbers, and lenient syntax
 twin (ConvertFrom-Json) differed, this script keeps the Python behaviour.
 
 --selftest runs every row of fixtures/dream-state/expected.tsv in process
-(exit code and must_contain substring, the consumer test-parity.sh also
-asserts on the twins), the missing-file SKIP, the not-a-regular-file SKIP of
+(exit code and must_contain substring), the missing-file SKIP, the not-a-regular-file SKIP of
 a directory (in process and as a subprocess), the exact summary line of the
 valid fixture, an injected unreadable file (exit 1, stderr reason), an
 injected deep-nesting file (parse FAIL, exit 1), an injected unexpected
@@ -380,6 +379,12 @@ class _Checker(object):
         if "weighted_tokens" in el and not nonneg_int(el["weighted_tokens"]):
             self.fail("%s[%d] -- weighted_tokens must be a non-negative integer" % (name, i))
             good = False
+        if "phase_weighted_tokens" in el and not (
+                nonneg_int(el["phase_weighted_tokens"]) and nonneg_int(el.get("weighted_tokens"))
+                and el["phase_weighted_tokens"] <= el["weighted_tokens"]):
+            self.fail("%s[%d] -- phase_weighted_tokens must be a non-negative integer no larger "
+                      "than weighted_tokens, which it requires" % (name, i))
+            good = False
         # tokens_by_role (plan 261006 Phase 9): optional, accepted on any kind.
         # Its presence on a kind-sweep record also opts the record into the
         # findings invariants, so records written before the field existed stay
@@ -474,7 +479,7 @@ class _Checker(object):
                 section_ok = False
             allowed = {"date", "kind", "projects_analyzed", "sessions_read", "bytes_read",
                        "agents", "models", "findings", "proposals", "tokens", "tokens_by_role",
-                       "weighted_tokens"}
+                       "weighted_tokens", "phase_weighted_tokens"}
             if not self.check_elements("cost_records", cr, allowed, self.check_cost_record):
                 section_ok = False
             if section_ok:

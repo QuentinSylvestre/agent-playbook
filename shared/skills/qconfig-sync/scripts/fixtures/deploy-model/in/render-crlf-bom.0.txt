@@ -1,0 +1,3 @@
+﻿{
+  "p": "{{PLAYBOOK_ROOT}}/a"
+}

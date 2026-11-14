@@ -33,11 +33,15 @@ generated copy: shared `SKILL.md` + `OVERLAY.md`.
 
 Three scripts keep the deployment honest:
 
-- `setup.sh` / `setup.ps1` are twins: they deploy the same tree on their platforms.
-- `verify-deployment.py` checks a deployment against the manifest.
-- `test-parity.sh` checks that the twins agree with each other and with the verifier.
+- `setup/setup.py` deploys, on every platform (`setup.sh` and `setup.ps1` only find Python and run
+  it). It writes from `deploy_model.py`, which owns the manifest, the overlay merge, the template
+  render and the deploy lock.
+- `verify-deployment.py` checks a deployment against the manifest, through the same module. Golden
+  files written by the old shell installers pin the module's merge and render bytes.
+- `setup/test_setup.py` deploys into sandbox homes and checks the ownership, co-existence, re-run
+  and uninstall rules, and that a fresh deployment verifies clean.
 
-`/qconfig-sync` runs all of them.
+`/qconfig-sync` runs the last two.
 
 ## The memory tiers
 
@@ -54,9 +58,10 @@ Entries are typed (feedback, decision, pattern), carry a source and a `Verified`
 five write-time gates before they are saved
 (`shared/skills/qdream/memory-rules.md § Memory File Format`).
 
-At session start, Claude Code's `SessionStart` hook (`providers/claude/memory-load-hook.py`)
-injects a heading index of the user and higher-order tiers plus the project tier. Kiro loads them
-through steering resources.
+At session start, Claude Code loads the user and higher-order tiers in full through links in
+`~/.claude/rules`, and its `SessionStart` hook (`providers/claude/memory-load-hook.py`) injects
+the Topics index, the project tier (in full when it fits, else its heading index), and a heading
+index for any tier its rules link does not deliver. Kiro loads them through steering resources.
 
 ## Stores and the resolver
 

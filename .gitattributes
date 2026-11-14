@@ -1,3 +1,6 @@
 * text=auto eol=lf
 # Byte-exact journal fixtures (CRLF, lone CR, BOM cases): never normalize line endings.
 shared/skills/qdream/scripts/fixtures/verify-dream-journal/*.jsonl -text
+# Byte-exact deploy-model goldens (CRLF, BOM, NUL inputs and the bytes the setup twins wrote).
+shared/skills/qconfig-sync/scripts/fixtures/deploy-model/in/* -text
+shared/skills/qconfig-sync/scripts/fixtures/deploy-model/out/* -text

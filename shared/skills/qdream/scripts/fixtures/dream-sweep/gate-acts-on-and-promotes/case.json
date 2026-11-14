@@ -302,7 +302,7 @@
       ],
       "exit": 0,
       "stdout_contains": [
-        "S1\tstale\t{ROOT}/repo/memory/MEMORY.md\tReal Acts on: forged target\tno recommendation\n"
+        "S1\tstale\t{ROOT}/repo/memory/MEMORY.md\tReal Acts on: forged target\tno recommendation\task\n"
       ]
     },
     {
@@ -589,7 +589,7 @@
       ],
       "exit": 0,
       "stdout_contains": [
-        "S1 S9\tstale\t{ROOT}/repo/memory/MEMORY.md\ta b\tno recommendation\n"
+        "S1 S9\tstale\t{ROOT}/repo/memory/MEMORY.md\ta b\tno recommendation\task\n"
       ],
       "stdout_not_contains": [
         "...",

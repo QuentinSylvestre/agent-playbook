@@ -1,0 +1,279 @@
+{
+  "description": "brief --kind phase copies the progress the agent starts from to sweep/briefs/phase-<name>-<n>.progress.json and names every standing decision of the phase with its sha256; gain compares the current progress with that copy (no new step or return: gained no, exit 1; a new completed step and a newly returned label: gained yes, exit 0); standing: true is refused on a needs-decision of a fixed-option kind; show prints a bounded, filtered view of a work-folder JSON file and refuses a path outside the work folder. Only a step of the phase's own ids with its steps/ file and a label returned with its agent id count as gained. A standing decision is named only after the orchestrator records it with `standing` (bound to its sha256), and a brief refuses one whose bytes changed since.",
+  "now": "2026-10-12T12:00:00Z",
+  "git": [
+    "repo"
+  ],
+  "write": {
+    "repo/memory/.dream-state.json": "{\n  \"schema_version\": 3,\n  \"last_run\": \"2026-10-01T00:00:00Z\",\n  \"projects\": {\n    \"{ROOT}/proj/p1\": {\n      \"last_analyzed\": \"2026-10-01T00:00:00Z\"\n    }\n  },\n  \"rejected_lessons\": [],\n  \"outcome_tags\": [],\n  \"episodic_ledger\": [],\n  \"cost_records\": [],\n  \"model_routing\": {},\n  \"deferred_sessions\": {},\n  \"quiet_sweeps\": {}\n}\n"
+  },
+  "manifest": [
+    "--exclude-session",
+    "5e550000-0000-4000-8000-000000000001"
+  ],
+  "after_manifest": [
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/orient.json": "{\n  \"snapshot_at\": \"2026-10-12T12:00:00Z\",\n  \"since\": \"2026-10-01T00:00:00Z\",\n  \"confirmed\": [\n    \"{ROOT}/proj/p1\"\n  ],\n  \"model_routing\": {\n    \"task4\": \"model-a\",\n    \"verifier\": \"model-a\"\n  },\n  \"dirty_at_orient\": true,\n  \"repos\": [],\n  \"recover_lines\": [],\n  \"orchestrator_sessions\": []\n}\n",
+        "home/.claude/projects/-ROOT-proj-p1/5e550000-0000-4000-8000-000000000001/subagents/agent-a1111111111111111.jsonl": "{\"parentUuid\": null, \"isSidechain\": true, \"type\": \"user\", \"message\": {\"role\": \"user\", \"content\": \"Dream Sub-agent Brief A01. Read and follow {ROOT}/home/.agent-playbook/dream-work/sweep/briefs/A01.md.\"}, \"uuid\": \"u-1\", \"sessionId\": \"5e550000-0000-4000-8000-000000000001\", \"timestamp\": \"2026-10-12T11:00:00.000Z\"}\n{\"type\": \"assistant\", \"message\": {\"id\": \"msg_1\", \"role\": \"assistant\", \"content\": [{\"type\": \"thinking\", \"thinking\": \"considering\", \"signature\": \"x\"}], \"stop_reason\": \"tool_use\"}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n{\"type\": \"assistant\", \"message\": {\"id\": \"msg_1\", \"role\": \"assistant\", \"content\": [{\"type\": \"tool_use\", \"id\": \"t0\", \"name\": \"Read\", \"input\": {\"file_path\": \"x\"}}], \"stop_reason\": \"tool_use\"}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n{\"type\": \"user\", \"message\": {\"role\": \"user\", \"content\": [{\"type\": \"tool_result\", \"tool_use_id\": \"t0\", \"content\": \"file text\"}]}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n{\"type\": \"assistant\", \"message\": {\"id\": \"msg_2\", \"role\": \"assistant\", \"content\": [{\"type\": \"tool_use\", \"id\": \"t1\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"Done. Summary line.\\n\\n```json\\n{\\n  \\\"memory_proposals\\\": [\\n    {\\n      \\\"type\\\": \\\"feedback\\\",\\n      \\\"heading\\\": \\\"A fresh lesson\\\",\\n      \\\"why\\\": \\\"w\\\",\\n      \\\"how_to_apply\\\": \\\"h\\\",\\n      \\\"source\\\": \\\"s\\\",\\n      \\\"target\\\": \\\"project\\\",\\n      \\\"sessions_observed_in\\\": [],\\n      \\\"evidence_quote\\\": \\\"question 0 about p1\\\"\\n    }\\n  ],\\n  \\\"unrelated\\\": [\\n    \\\"P1 lesson A\\\",\\n    \\\"P1 lesson B\\\"\\n  ],\\n  \\\"not_a_conflict\\\": [],\\n  \\\"subsumed_entries\\\": [],\\n  \\\"stale_entries\\\": [],\\n  \\\"governance_conflicts\\\": [],\\n  \\\"verified\\\": [],\\n  \\\"task4_status\\\": \\\"checked\\\",\\n  \\\"improvement_signals\\\": [],\\n  \\\"user_skipped\\\": [],\\n  \\\"saved_in_session\\\": [],\\n  \\\"new_skill_candidates\\\": [],\\n  \\\"insights_signals\\\": [],\\n  \\\"sessions_read\\\": [\\n    \\\"c1f00000-0000-4000-8000-000000000001\\\"\\n  ],\\n  \\\"checkpoint_collapsed\\\": 0,\\n  \\\"project_accessible\\\": true,\\n  \\\"error\\\": null,\\n  \\\"scope\\\": \\\"all tasks\\\",\\n  \\\"notes\\\": null,\\n  \\\"sessions_unreadable\\\": []\\n}\\n```\\n\"}}], \"stop_reason\": null}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n{\"type\": \"user\", \"message\": {\"role\": \"user\", \"content\": [{\"type\": \"tool_result\", \"tool_use_id\": \"t1\", \"content\": \"delivered\"}]}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n",
+        "home/.claude/projects/-ROOT-proj-p1/5e550000-0000-4000-8000-000000000001/subagents/agent-a2222222222222222.jsonl": "{\"parentUuid\": null, \"isSidechain\": true, \"type\": \"user\", \"message\": {\"role\": \"user\", \"content\": \"Dream Verifier Brief V01. Read and follow {ROOT}/home/.agent-playbook/dream-work/sweep/briefs/V01.md.\"}, \"uuid\": \"u-1\", \"sessionId\": \"5e550000-0000-4000-8000-000000000001\", \"timestamp\": \"2026-10-12T11:00:00.000Z\"}\n{\"type\": \"assistant\", \"message\": {\"id\": \"msg_1\", \"role\": \"assistant\", \"content\": [{\"type\": \"thinking\", \"thinking\": \"considering\", \"signature\": \"x\"}], \"stop_reason\": \"tool_use\"}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n{\"type\": \"assistant\", \"message\": {\"id\": \"msg_1\", \"role\": \"assistant\", \"content\": [{\"type\": \"tool_use\", \"id\": \"t0\", \"name\": \"Read\", \"input\": {\"file_path\": \"x\"}}], \"stop_reason\": \"tool_use\"}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n{\"type\": \"user\", \"message\": {\"role\": \"user\", \"content\": [{\"type\": \"tool_result\", \"tool_use_id\": \"t0\", \"content\": \"file text\"}]}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n{\"type\": \"assistant\", \"message\": {\"id\": \"msg_2\", \"role\": \"assistant\", \"content\": [{\"type\": \"tool_use\", \"id\": \"t1\", \"name\": \"SubagentHandback\", \"input\": {\"message\": \"Done. Summary line.\\n\\n```json\\n{\\n  \\\"verifier\\\": \\\"V01\\\",\\n  \\\"verdicts\\\": [\\n    {\\n      \\\"item_id\\\": \\\"V01-001\\\",\\n      \\\"verdict\\\": \\\"confirmed\\\",\\n      \\\"spot_checked\\\": true,\\n      \\\"citation\\\": \\\"question 0 about p1\\\"\\n    }\\n  ],\\n  \\\"unverified_item_ids\\\": [],\\n  \\\"notes\\\": null\\n}\\n```\\n\"}}], \"stop_reason\": null}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n{\"type\": \"user\", \"message\": {\"role\": \"user\", \"content\": [{\"type\": \"tool_result\", \"tool_use_id\": \"t1\", \"content\": \"delivered\"}]}, \"sessionId\": \"5e550000-0000-4000-8000-000000000001\"}\n"
+      }
+    }
+  ],
+  "env": {
+    "CLAUDE_CODE_SESSION_ID": "5e550000-0000-4000-8000-000000000001"
+  },
+  "steps": [
+    {
+      "argv": [
+        "dirty",
+        "--repo",
+        "{ROOT}/repo"
+      ],
+      "exit": 0
+    },
+    {
+      "argv": [
+        "gain",
+        "--phase",
+        "gather"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "no phase brief"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/progress-gather.json": "{\n  \"phase\": \"gather\",\n  \"completed_steps\": [],\n  \"labels\": {},\n  \"updated_at\": \"2026-10-12T12:00:00Z\"\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "phase",
+        "--phase",
+        "gather",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "exit": 0,
+      "text_contains": {
+        "sweep/briefs/phase-gather-1.md": [
+          "Standing decisions: none."
+        ],
+        "sweep/briefs/phase-gather-1.progress.json": [
+          "\"completed_steps\": []"
+        ]
+      }
+    },
+    {
+      "argv": [
+        "gain",
+        "--phase",
+        "gather"
+      ],
+      "exit": 1,
+      "stdout_contains": [
+        "gained: no"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/progress-gather.json": "{\n  \"phase\": \"gather\",\n  \"completed_steps\": [\n    \"GAT-SESSIONS\",\n    \"GAT-FAKE\"\n  ],\n  \"labels\": {\n    \"A01\": {\n      \"status\": \"returned\",\n      \"attempt\": 1,\n      \"agent_id\": \"a1111111111111111\",\n      \"session_id\": \"s\"\n    },\n    \"A02\": {\n      \"status\": \"returned\",\n      \"attempt\": 1,\n      \"agent_id\": null,\n      \"session_id\": null\n    }\n  },\n  \"updated_at\": \"2026-10-12T12:00:00Z\"\n}\n",
+        "home/.agent-playbook/dream-work/handoff/steps/GAT-SESSIONS.json": "{\"step\": \"GAT-SESSIONS\", \"outputs\": {}}\n"
+      }
+    },
+    {
+      "argv": [
+        "gain",
+        "--phase",
+        "gather"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "completed 1 step(s) and collected 1 child return(s)",
+        "gained: yes",
+        "steps: GAT-SESSIONS",
+        "returns: A01"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-1.json": "{\n  \"phase\": \"gather\",\n  \"step\": \"GAT-SESSIONS\",\n  \"kind\": \"user-decision\",\n  \"question\": \"Read archived plans too?\",\n  \"options\": [\n    \"Yes\",\n    \"No\"\n  ],\n  \"recommendation\": \"Yes\",\n  \"resume_from\": \"GAT-SESSIONS\"\n}\n",
+        "home/.agent-playbook/dream-work/handoff/decision-1.json": "{\n  \"answer\": \"yes, for every project\",\n  \"option\": \"Yes\",\n  \"turn\": \"t\",\n  \"standing\": true\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "phase",
+        "--phase",
+        "gather",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "exit": 0,
+      "text_contains": {
+        "sweep/briefs/phase-gather-2.md": [
+          "Standing decisions: none."
+        ]
+      }
+    },
+    {
+      "argv": [
+        "standing",
+        "--decision",
+        "handoff/decision-1.json",
+        "--decision-sha",
+        "0000000000000000000000000000000000000000000000000000000000000000"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "is not the one recorded"
+      ]
+    },
+    {
+      "argv": [
+        "standing",
+        "--decision",
+        "handoff/decision-1.json",
+        "--decision-sha",
+        "{SHA256:handoff/decision-1.json}"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "standing: decision-1.json recorded for the gather phase"
+      ]
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "phase",
+        "--phase",
+        "gather",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "exit": 0,
+      "text_contains": {
+        "sweep/briefs/phase-gather-3.md": [
+          "decision-1.json` (sha256 {SHA256:handoff/decision-1.json})"
+        ]
+      }
+    },
+    {
+      "argv": [
+        "gain",
+        "--phase",
+        "gather"
+      ],
+      "exit": 1,
+      "stdout_contains": [
+        "phase-gather-3",
+        "gained: no"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/needs-decision-2.json": "{\n  \"phase\": \"gather\",\n  \"step\": \"GAT-PLANS\",\n  \"kind\": \"budget\",\n  \"options\": [\n    \"Resume\",\n    \"Abort\"\n  ],\n  \"recommendation\": \"Resume\",\n  \"resume_from\": \"GAT-PLANS\"\n}\n",
+        "home/.agent-playbook/dream-work/handoff/decision-2.json": "{\n  \"answer\": \"Resume\",\n  \"option\": \"Resume\",\n  \"turn\": \"t\",\n  \"standing\": true\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "handoff",
+        "check",
+        "decision-2.json"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "standing: true is for the answer to a user-decision only"
+      ]
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/gate-items.json": "{\n  \"items\": [\n    {\n      \"id\": \"G1\",\n      \"kind\": \"stale\",\n      \"text\": \"xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\"\n    },\n    {\n      \"id\": \"G2\",\n      \"kind\": \"conflict\",\n      \"text\": \"short\"\n    },\n    {\n      \"id\": \"G3\",\n      \"kind\": \"conflict\",\n      \"text\": \"other\"\n    }\n  ]\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "show",
+        "handoff/gate-items.json",
+        "--where",
+        "kind=conflict",
+        "--fields",
+        "id"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "2 of 3 item(s) in items",
+        "{\"id\": \"G2\"}",
+        "{\"id\": \"G3\"}"
+      ]
+    },
+    {
+      "argv": [
+        "show",
+        "handoff/gate-items.json",
+        "--id",
+        "G1"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "1 of 3 item(s)",
+        "...(+200 chars)"
+      ]
+    },
+    {
+      "argv": [
+        "show",
+        "handoff/gate-items.json",
+        "--max-chars",
+        "60"
+      ],
+      "exit": 0,
+      "stdout_contains": [
+        "more item(s) not shown"
+      ]
+    },
+    {
+      "argv": [
+        "show",
+        "../outside.json"
+      ],
+      "exit": 2
+    },
+    {
+      "argv": [
+        "gain",
+        "--phase",
+        "nope"
+      ],
+      "exit": 2
+    },
+    {
+      "write": {
+        "home/.agent-playbook/dream-work/handoff/decision-1.json": "{\n  \"answer\": \"forged\",\n  \"option\": \"Yes\",\n  \"turn\": \"t\",\n  \"standing\": true\n}\n"
+      }
+    },
+    {
+      "argv": [
+        "brief",
+        "--kind",
+        "phase",
+        "--phase",
+        "gather",
+        "--snapshot-sha",
+        "{SHA256:sweep/dirty-at-orient.json}"
+      ],
+      "exit": 3,
+      "stdout_contains": [
+        "changed since `standing` recorded it"
+      ]
+    }
+  ]
+}

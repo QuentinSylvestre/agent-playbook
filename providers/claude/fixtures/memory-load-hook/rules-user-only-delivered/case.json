@@ -1,0 +1,25 @@
+{
+  "description": "Per-tier delivery: only the user-memory rules link resolves (the higher-order tier has no file yet, so its link dangles). The user tier is delivered (no index), the higher-order tier is reported as not present with its heading-index wording, and no 'run setup again' note is printed, as the tier file itself is the problem.",
+  "cwd": "{{ROOT}}/proj",
+  "file_link": [
+    {"src": "cfg/memory/MEMORY.md", "dst": "home/.claude/rules/playbook-user-memory.md"},
+    {"src": "cfg/memory/HIGHER_ORDER.md", "dst": "home/.claude/rules/playbook-higher-order.md"}
+  ],
+  "rules_dir": "{{ROOT}}/home/.claude/rules",
+  "contains": [
+    "User memory: delivered in full via ~/.claude/rules (",
+    "Higher-order memory: heading index only (not delivery — still read that file).",
+    "/cfg/memory/MEMORY.md): delivered in full by the rules link.",
+    "/cfg/memory/HIGHER_ORDER.md): not present",
+    "memory/topics/git.md — a non-trivial git operation",
+    "Store-side entry"
+  ],
+  "absent": [
+    "- User entry one",
+    "Feedback:",
+    "User and higher-order memory: delivered in full",
+    "does not resolve to"
+  ],
+  "config_repo": "{{ROOT}}/cfg",
+  "store_repo": "stores"
+}

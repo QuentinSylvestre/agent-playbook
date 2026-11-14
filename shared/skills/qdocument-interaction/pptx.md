@@ -37,6 +37,9 @@ python scripts/pptx/export_slide_images.py deck.pptx out/ --slides 5 --full --hi
 
 Text placeholders and master graphics are left out and each image is cropped to the remaining
 shapes, so a screenshot-per-slide deck becomes document-ready images. The deck is opened read-only.
+It refuses to run while PowerPoint is already running (exit 4): automation would join the user's
+PowerPoint and could close their open presentations. Ask the user to close PowerPoint, or pass
+`--allow-running` only with their agreement; the script then closes only its own copy and never quits.
 Use it when converting a deck into a Word guide (docx.md, "Converting a slide deck into a Word guide").
 
 ### Raw XML access

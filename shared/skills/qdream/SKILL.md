@@ -24,7 +24,7 @@ Otherwise: run the full 5-phase sweep, loading each sweep file per the **Phase i
 
 ### Interpreter
 
-The qdream scripts (`scripts/*.py` beside this file) run in the playbook's dedicated venv and nowhere else. Wherever these skill files write `<python>`, use `<config-repo>/.venv-agent-playbook/Scripts/python.exe` with `-I`. If that file is missing, or a script exits 2 printing `guard did not run: venv missing — run setup.ps1`, report that message as could-not-run and stop. Never try `python`, `py` or `python3` from PATH. A full sweep stops before Phase 2 — Rule 4 makes session access optional, not tooling. Lightweight mode without the venv reads the sections named in its Load step by their headings instead. Windows only; Linux and macOS are unsupported until `setup.sh` gains the venv step.
+The qdream scripts (`scripts/*.py` beside this file) run in the playbook's dedicated venv and nowhere else. Wherever these skill files write `<python>`, use the interpreter of `<config-repo>/.venv-agent-playbook` with `-I` (`shared/AGENTS.md § Config Repo Locations`). If that file is missing, or a script exits 2 printing `guard did not run: venv missing — run setup.ps1 or setup.sh`, report that message as could-not-run and stop. Never try `python`, `py` or `python3` from PATH. A full sweep stops before Phase 2 — Rule 4 makes session access optional, not tooling. Lightweight mode without the venv reads the sections named in its Load step by their headings instead. The scripts and their selftests run on Windows and Linux in CI. A full sweep has been exercised on Windows only, and macOS is untested.
 
 ### Step-ID convention
 

@@ -26,6 +26,19 @@ Kiro has the same gap and a different fix: it needs a `.kiro/steering/` referenc
 with `inclusion: always`, written by `/qwire-governance`. Codex and Cursor read
 `AGENTS.md` directly.
 
+## Your own ~/.claude/CLAUDE.md
+
+Setup links `~/.claude/CLAUDE.md` to `shared/AGENTS.md`. When a file of yours
+already sits there (a regular file, or a link to a file outside this repo, such
+as one from your dotfiles), setup leaves it in place and links
+`~/.claude/rules/agent-playbook.md` to `shared/AGENTS.md` instead, so both load.
+Once `~/.claude/CLAUDE.md` is the playbook's link again, setup removes that rules
+link, so the playbook never loads twice; `/qconfig-sync` reports a rules link
+left beside the playbook's `CLAUDE.md` link as `DRIFTED`. Uninstall removes the
+rules link, and the `~/.claude/rules/` folder when nothing else is in it, and
+never touches your file. The same `~/.claude/rules/` folder carries the memory
+links described under § SessionStart memory hook.
+
 ## Store repo on a new machine
 
 Workspace memory, plans and artifacts, and your user memory (`user/memory/`), live in
@@ -181,31 +194,50 @@ Claude Code snapshots hooks at session start, so restart after editing, then run
 ### SessionStart memory hook
 
 `memory-load-hook.py` gives every session a memory floor without relying on the
-agent to read files. At each start, resume, `/clear` and compaction it injects:
+agent to read files. User memory and the higher-order tier reach Claude Code in
+full through two links setup makes (`inventory.tsv`):
+`~/.claude/rules/playbook-user-memory.md` to `memory/MEMORY.md` and
+`~/.claude/rules/playbook-higher-order.md` to `memory/HIGHER_ORDER.md`. Claude
+Code loads every `~/.claude/rules/*.md` file whole at session start, links
+included (measured on Claude Code 2.1.322, 2026-11-12, with a 74 KB file). While
+the store repo holds no user memory yet, setup makes no link and says so, and it
+removes a link it made earlier that has nothing to point to any more.
 
-- a heading index of user `memory/MEMORY.md` and `memory/HIGHER_ORDER.md`, with
-  ⚠ on an entry whose `Source` line cites a file that changed in git after its
+At each start, resume, `/clear` and compaction the hook injects:
+
+- a two-line header whose second line says which mode applied;
+- each tier's absolute path;
+- the user and higher-order entries marked ⚠, one line each with their file:
+  an entry whose `Source` line cites a file that changed in git after its
   `Verified` date (a path named only in prose is not checked);
-- the `## Topics` rows and each tier's absolute path;
+- the `## Topics` rows;
 - the project memory tier in full when it fits, otherwise its heading index.
+  The project tier gets the rest of the cap.
+
+The decision is made per tier, because setup links each tier on its own. A
+tier is delivered when its link resolves to the file the hook reads. A tier
+that is not delivered (setup not re-run, a link that resolves elsewhere, no file
+yet) falls back to its heading index, with the marks inline, and the header's
+second line says, tier by tier, which are delivered and which still need a read.
+With both tiers delivered that is rules mode; with neither, index mode. A
+heading index is not delivery (`shared/AGENTS.md § Memory Management`,
+Read-time behavior).
 
 The injection is capped at 9,500 characters; Claude Code saves larger hook
-output to a file instead of injecting it. A heading index is not delivery, so
-the agent still reads the user and higher-order files
-(`shared/AGENTS.md § Memory Management`, Read-time behavior). The hook
+output to a file instead of injecting it. The hook
 resolves the project tier through the store resolver, so it also works for a
 project with no `CLAUDE.md` and for a session opened in a subfolder. It writes
 nothing, and on any error it injects a one-line notice and exits 0. The script
 header has the full contract. Its fixtures under
 `providers/claude/fixtures/memory-load-hook/` run with
-`.venv-agent-playbook\Scripts\python.exe -I providers\claude\memory-load-hook.py --selftest`.
+the interpreter of `.venv-agent-playbook` (`shared/AGENTS.md § Config Repo Locations`) as `<python> -I providers/claude/memory-load-hook.py --selftest`.
 
 #### Interpreter and launcher
 
 Every playbook Python script runs one interpreter: `.venv-agent-playbook` at the
-config repo root (gitignored, stdlib only). `setup.ps1` creates it from the system
-Python 3.8+ (`py -3`, then `python`) and stops with a message when it finds none;
-it never installs Python. Running `setup.ps1` again leaves a working venv alone and
+config repo root (gitignored, stdlib only). Setup creates it from the Python 3.8+ it
+runs on (`setup.ps1` tries `py -3`, then `python`) and stops with a message when it finds
+none; it never installs Python. Running setup again leaves a working venv alone and
 rebuilds a broken one. A missing venv is reported as "guard did not run", never
 replaced by a Python found on `PATH`.
 
@@ -256,8 +288,8 @@ An older entry that runs `python.exe` on `memory-load-hook.py` works until the v
 self-check lands, but it has no launcher notice and no venv: switch to the form
 above by hand: setup leaves an existing entry as it is.
 
-Linux and macOS are unsupported for the venv rule: `setup.sh` has no venv step
-yet, and the launcher needs PowerShell. A plain `python3` `command` + `args` entry
+Linux and macOS are unsupported for the launcher: setup builds the venv there too,
+but the launcher needs PowerShell. A plain `python3` `command` + `args` entry
 on the absolute path of `memory-load-hook.py` (`args` runs no shell, so `~` is not
 expanded) still runs the hook there, outside the venv rule and without the
 notice.
@@ -269,10 +301,21 @@ the entry is listed. Then open a new session in a project with memory and ask
 for one of its memory entry headings; the agent should quote it without reading
 a file.
 
+## qdream phase-agent guard
+
+Setup links `agents/qdream-phase.md` and the launcher `~/.claude/qdream-phase-hook.sh`; the hook command is
+`bash "$HOME/.claude/qdream-phase-hook.sh" || exit 2`, which Claude Code runs in Git Bash on Windows. The hook is declared in the agent's frontmatter and runs
+only while a `/qdream` phase agent runs, so it needs no `settings.json` entry. It refuses every Bash command but
+one venv-python call of a qdream script subcommand a phase runs, every write outside the sweep's
+`dream-work/handoff/`, and every child but `qdream-reader`. Its tests: `<python> -I
+providers/claude/qdream-phase-hook.py --selftest` (also in `/qconfig-sync`'s check runner). To see it enforce,
+launch one `qdream-phase` agent that tries a refused call (for example `sed -i` on a scratch file) and confirm
+the refusal message.
+
 ## Why setup asks
 
 Claude Code owns this file and rewrites it while it runs, and the sounds and the
 status line are personal choices, so nothing merges into it unattended. The merge
-lives in one Python script that both setup twins call, so it needs no twin logic,
-no `verify-deployment.py` kind and no `test-parity.sh` guard. A person at a terminal
+lives in one Python script that setup calls, so it needs no `verify-deployment.py`
+kind of its own. A person at a terminal
 can consent; a setup run by an agent cannot, so it writes nothing.

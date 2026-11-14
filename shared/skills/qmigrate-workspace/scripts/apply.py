@@ -478,7 +478,7 @@ def _slug_taken(new_name, old_name):
 for d in sorted(os.listdir(proj)) if os.path.isdir(proj) else []:
     if d.lower() == o or d.lower().startswith(o + "-"):
         src = os.path.join(proj, d)
-        # Slugs are lossy: a sibling `Perso-old` or `Perso old` slugs to `<old slug>-old` too. Rename a
+        # Slugs are lossy: a sibling `Repo-old` or `Repo old` slugs to `<old slug>-old` too. Rename a
         # folder only when one of its transcripts shows it belongs to OLD.
         owned = [p for p in glob.glob(os.path.join(src, "*.jsonl")) if (c := first_cwd(p)) and pm.search(c)]
         if not owned:

@@ -1,0 +1,28 @@
+{
+  "description": "Rules mode keeps the warning marks: each user or higher-order entry whose Source-cited file changed after its Verified date is listed once with its file path; unmarked entries are not listed.",
+  "git": [
+    "cfg"
+  ],
+  "git_date": "2026-09-15T12:00:00",
+  "time_cap": 20,
+  "cwd": "{{ROOT}}/empty",
+  "file_link": [
+    {"src": "cfg/memory/MEMORY.md", "dst": "home/.claude/rules/playbook-user-memory.md"},
+    {"src": "cfg/memory/HIGHER_ORDER.md", "dst": "home/.claude/rules/playbook-higher-order.md"}
+  ],
+  "rules_dir": "{{ROOT}}/home/.claude/rules",
+  "contains": [
+    "no read needed",
+    "⚠ entries in user and higher-order memory:",
+    "- Changed after verify (",
+    "/cfg/memory/MEMORY.md)"
+  ],
+  "absent": [
+    "Verified after change",
+    "Cites a missing file",
+    "Path only in Why",
+    "marks omitted",
+    "heading index only"
+  ],
+  "config_repo": "{{ROOT}}/cfg"
+}

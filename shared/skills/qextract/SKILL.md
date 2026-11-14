@@ -2,6 +2,7 @@
 name: qextract
 description: Extract improvement concepts from external content (articles, repos, videos, docs) and map them to specific playbook governance files. Use when you find high-potential content and want to systematically mine it for playbook improvements, even for large multi-file sources. Chat-only — produces no project file.
 argument-hint: "<URL, file path, or inline content>"
+requires: "qexplore, qreview"
 ---
 
 # Extract

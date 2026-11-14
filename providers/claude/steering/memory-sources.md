@@ -310,6 +310,11 @@ and Glob; the role's model is still set per dispatch through `model`. A child la
 can follow the auto-mode advice to read files with `sed` or `cat`, and `extract` then refuses its return
 (observed 2026-10-21: 4 refusals in one Gather phase).
 
+Every phase agent runs as agent type `qdream-phase` (`providers/claude/agents/qdream-phase.md`), whose tools
+are Read, Grep, Glob, Bash, Write and Agent; its frontmatter hook refuses any Bash command but one qdream
+script call, any write outside the work folder's `handoff/`, and any child type but `qdream-reader`
+(`providers/claude/reference/claude-code-local-data.md`, Native agent store).
+
 ### Deep format reference
 
 Fuller detail — the complete message-type table, the live-session/status files under `~/.claude/sessions/`,

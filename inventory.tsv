@@ -4,14 +4,13 @@
 # - kind: symlink-file | symlink-dir | copy-file | copy-dir-recursive | merge-file
 #         | template-file | seed-file
 # - template-file: copied with {{USER_HOME}} / {{PLAYBOOK_ROOT}} substituted at deploy
-#   time. Tokens expand to the platform-native root; authors MUST use forward slashes
-#   for everything after the token (Windows tolerates the mixed form, POSIX needs it).
-#   setup.ps1 JSON-escapes the backslashes a Windows root carries; setup.sh does not,
-#   because a POSIX root has none -- see setup.sh render_template. Consumers are JSON
-#   files, or YAML values written in DOUBLE QUOTES (YAML double-quoted scalars use the
-#   same backslash escapes as JSON, so the rendered `C:\\Users\\X` reads back as
-#   `C:\Users\X`). A bare (unquoted) YAML scalar would keep the doubled backslashes:
-#   never template one.
+#   time. Tokens expand to the platform-native root written with forward slashes
+#   (C:/Users/X on Windows, from setup.sh under Git Bash as from setup.ps1, so both write
+#   the same bytes; {{PLAYBOOK_ROOT}} with no 8.3 short names), so no consumer needs a
+#   backslash escape; authors MUST use
+#   forward slashes for everything after the token too (Windows tolerates the mixed
+#   form, POSIX needs it). Consumers are JSON, markdown, and YAML values written in
+#   double quotes.
 # - seed-file: a template-file that is written ONLY when the destination is absent,
 #   and verified for PRESENCE rather than content. For config the app itself rewrites
 #   at runtime (mcp.json) the repo copy is a restore seed, not a managed artifact --
@@ -20,15 +19,15 @@
 # - dest: deployment target path. `~` expands to the user home; `<KIRO_IDE_USER>`
 #   expands to the Kiro IDE per-user config dir, which is platform-divergent:
 #   %APPDATA%\Kiro\User on Windows, ${XDG_CONFIG_HOME:-~/.config}/Kiro/User on POSIX.
-#   Each setup/verify twin resolves it for its own platform.
+#   deploy_model.py (kiro_ide_user_dir) resolves it for the platform it runs on.
 # - source: repo-relative path to the source file/dir
 # - mode: claude | codex | gemini | kiro-always | kiro
-# Consumers: setup.ps1, setup.sh, verify-deployment.py, test-parity.sh
+# Consumers: deploy_model.py (read by setup/setup.py, verify-deployment.py and verify-mass.py)
 # Dynamic entries (per-skill symlinks/copies, overlay merges) are NOT listed here: every
 # provider gets one link per shared skill inside its own skills/ folder (never a link of
 # the whole folder), so its other skills stay.
 # They remain auto-discovered at runtime from the filesystem.
-# Mode `kiro` rows are symlinked by BOTH setup twins (Windows copy mode was retired
+# Mode `kiro` rows are symlinked on every platform (Windows copy mode was retired
 # 2026-09-20). Overlay-bearing Kiro skills are the only generated copies, and they are
 # dynamic entries, not manifest rows.
 
@@ -40,6 +39,15 @@ symlink-file	~/.claude/notify-command.ps1	providers/claude/notify-command.ps1	cl
 symlink-file	~/.claude/memory-load-hook.py	providers/claude/memory-load-hook.py	claude
 symlink-file	~/.claude/memory-load-hook.ps1	providers/claude/memory-load-hook.ps1	claude
 symlink-file	~/.claude/agents/qdream-reader.md	providers/claude/agents/qdream-reader.md	claude
+symlink-file	~/.claude/agents/qdream-phase.md	providers/claude/agents/qdream-phase.md	claude
+symlink-file	~/.claude/qdream-phase-hook.sh	providers/claude/qdream-phase-hook.sh	claude
+# User memory and the higher-order tier, delivered in full at every session start: Claude Code
+# loads every ~/.claude/rules/*.md file whole, links included. The sources sit behind the repo's
+# gitignored memory link (the store repo's user/memory/); while it holds no user memory yet, setup
+# makes no link and verify-deployment reports SKIP. A user's own ~/.claude/CLAUDE.md is kept and
+# the playbook links ~/.claude/rules/agent-playbook.md beside it instead (setup's "Co-existence").
+symlink-file	~/.claude/rules/playbook-user-memory.md	memory/MEMORY.md	claude
+symlink-file	~/.claude/rules/playbook-higher-order.md	memory/HIGHER_ORDER.md	claude
 
 # --- Codex ---
 symlink-file	~/.codex/AGENTS.md	shared/AGENTS.md	codex

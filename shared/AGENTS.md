@@ -39,7 +39,7 @@ Provider-specific config (settings.json, config.toml) lives outside this repo, i
 
 - For runtime work on browser-accessible content (local files, localhost servers, web UIs), pick by intent: **have a specific claim/change to confirm? → `/qqa`** (structured verification, PASS/FAIL/BLOCKED/SKIP). **Want lifecycle testing? → `/qtest`** (plan mode for research-driven test planning, run mode for structured execution with findings report). **Need to drive a browser? → `/qbrowser-test`** — the execution leaf that `/qqa` and `/qtest` route to; also directly invokable for ad-hoc browser tasks (screenshots, form fills, exploration).
 - When a task's exit criteria are primarily verification items (visual, behavioral, layout), runtime verification IS the core work — not an optional supplement to code-level inspection.
-- During `/qdev` execution, `/qqa` runs automatically: per-phase on `[QA]`-annotated phases (Step 5b, light verification) and exhaustively at Step 9b (full probe mandate, all surfaces). Manual `/qqa` invocation remains available for ad-hoc verification outside the `/qdev` lifecycle.
+- During `/qdev`, `/qqa` runs automatically: on `[QA]`-annotated phases (Step 5b) and exhaustively at Step 9b. Outside `/qdev`, verify an ad-hoc fix to browser-visible behaviour yourself with `/qqa` in the user's app, restart included, before reporting it done.
 
 ## Documentation Organization
 
@@ -53,7 +53,7 @@ These are cross-project defaults; per-project overrides live in the project's `#
 
 ## Doc & Test Guidelines
 
-**Canonical text.** These bullets are the default `/qplan` Step 2 proposes when a project lacks the section. `shared/skills/qplan/TEMPLATES.md § Doc & Test Guidelines` owns the schema — detection, bootstrap, waiver, subfolder scoping — and cites this text rather than restating it.
+**Canonical text.** These bullets are the default `/qplan` Step 2 proposes when a project lacks the section. `shared/skills/qplan/TEMPLATES.md § Doc & Test Guidelines` owns the schema and cites this text rather than restating it.
 
 - Update existing documentation files when implementing user-visible changes.
 - Do not create new documentation files unless the user requests them.
@@ -146,8 +146,8 @@ The following git commands are forbidden **except where a documented exception e
 
 ## Continuous Improvement
 
-- Proactively suggest adding recurring patterns as rules **or automation** to the project's AGENTS.md or CLAUDE.md. Repeated manual invocation of the same operation is the user hand-rolling a loop — catch it in the session where they feel the pain, not in a sweep weeks later.
-- **Your own capability-gap admission is a governance signal — the only trigger that keys on the agent rather than the user.** "I couldn't find a documented convention for X" or "there's no test command I can find" *is* the gap, self-identified, with the need freshly demonstrated. Do not work around it silently: surface it and propose the durable fix (a governance line, a `## Doc & Test Guidelines` entry, a memory entry — routed per `## Memory Management`). Every other trigger waits for the *user* to repeat themselves; this one fires the first time the absence bites.
+- Proactively suggest adding recurring patterns as rules **or automation** (strongest carrier first: a test, guard script or hook, else a code comment, else a line in the project's AGENTS.md or CLAUDE.md). Repeated manual invocation of the same operation is the user hand-rolling a loop — catch it in the session where they feel the pain, not in a sweep weeks later.
+- **Your own capability-gap admission is a governance signal — the only trigger that keys on the agent rather than the user.** "I couldn't find a documented convention for X" or "there's no test command I can find" *is* the gap, self-identified, with the need freshly demonstrated. Do not work around it silently: surface it and propose the durable fix (a test or script, a governance line, a `## Doc & Test Guidelines` entry, a memory entry — routed per `## Memory Management`). Every other trigger waits for the *user* to repeat themselves; this one fires the first time the absence bites.
 - When the user overrides a rule-driven default (plan tier, persona, route), note the (default, override) pair in the project file — recurring overrides mean the default is wrong.
 
 ## Memory Management
@@ -202,7 +202,7 @@ Full detail — promotion path, bootstrap and the staleness nudge: `shared/skill
 
 ## SKILL.md Authoring
 
-Conventions for writing a `SKILL.md`: quoted `argument-hint` values (never bare `[...]`), repo-relative cross-file paths, curly-brace `{token}` markers in verbatim sub-agent briefs, a named first action for behavior-overriding skills, an explicit when-NOT-to-use note, a named fallback for closed-set choices, and deviation-not-tutorial skill bodies. Full rules and rationale: `shared/AUTHORING.md § SKILL.md Authoring`.
+Conventions for writing a `SKILL.md`: quoted `argument-hint` values (never bare `[...]`), repo-relative cross-file paths, curly-brace `{token}` markers in verbatim sub-agent briefs, a named first action for behavior-overriding skills, an explicit when-NOT-to-use note, a neighbour-disambiguating `description`, a named fallback for closed-set choices, and deviation-not-tutorial skill bodies. Full rules and rationale: `shared/AUTHORING.md § SKILL.md Authoring`.
 
 ## Structure Requires a Consumer
 
@@ -240,7 +240,7 @@ Skills that produce or consume project files SHOULD include the **Harness Improv
 | Planning | `/qplan` | Tier selection (Trivial / Light / Standard / Major) at Step 2 | Plan sections appended to project file; committed |
 | Execution | `/qdev` | Per-phase review (Step 5); auto-continue gate (Step 8) | Implementation + review log entries in project file |
 | Review | `/qreview` | Persona selection; severity-based stop/continue | Findings table; used by `/qplan` Step 4 and `/qdev` Steps 5/9 |
-| Archival | `/qclose` | Cleanup scan (Step 2 Pass 1: project, Pass 2: harness governance, Pass 3: REVISIT markers, Pass 4: documentation-ripple) | Archived project file in `plans/done/` |
+| Archival | `/qclose` | Cleanup scan (Step 2, four passes) | Archived project file in `plans/done/` |
 
 Entry points: most work starts with `/qexplore`. `/qdev` can be invoked directly on an existing plan. `/qreview` is a shared library called by `/qplan` and `/qdev`, or invoked standalone.
 
@@ -252,20 +252,7 @@ Entry points: most work starts with `/qexplore`. `/qdev` can be invoked directly
 
 ### Standalone skills
 
-- `/qauto-research` — autonomous iterative optimization experiments in a dedicated git worktree on `research/*` branches.
-- `/qcouncil` — multi-perspective decision support, stakes-tiered (`shared/skills/qcouncil/SKILL.md § Stakes tier`). Called automatically on trade-off escalations per `§ Council-Enriched Escalation`; user-invokable standalone.
-- `/qexplain` — explain a code change for comprehension, not judgement: a validated, size-tiered HTML walkthrough plus a chat quiz. Manual invocation only (`disable-model-invocation`); no skill calls it and it calls none. Use `/qreview` to judge a change and `/qqa` to verify it at runtime.
-- `/qextract` — mine external content (articles, repos, videos) for playbook-improvement concepts. Chat-only; applies atomic changes directly or hands off to `/qexplore`/`/qplan`.
-- `/qhandoff` — export a Previously/Parked/Current handoff snapshot for cross-session continuation, into the project file or a standalone location.
-- `/qmigrate-workspace` — move or rename a workspace folder without losing any provider's session history or the playbook's tracking. Windows only; the cutover is user-run.
-- `/qmemory-eval` — read-only memory-health metrics over `.dream-state.json` and the memory files; also emitted in each full `/qdream` sweep Report.
-- `/qtest` — lifecycle testing orchestrator (plan | run): research-driven persistent test plans, parallel per-component runs, prioritized findings, `/qexplore`→`/qplan` handoff.
-- `/qutilities-disk-cleanup` — risk-categorized, user-gated disk space recovery.
-- `/qvalidate` — deterministic plan-file validator. Library called by the lifecycle skills at their checkpoints and user-invocable as `/qvalidate <plan-path>`; halts on FAIL per its `## Failure semantics`. The check list lives in that skill — do not re-enumerate it here.
-- `/qprototype` — throwaway prototype (logic or UI) that answers one design question before implementation; produces prototype code and a `PROTOTYPE_VERDICT.md`.
-- `/qicon-design` — app icons, logo marks, wordmarks, favicons and identity asset packs through adaptive questioning and visual concepting.
-- `/qvisualize` — standalone interactive HTML visualizations: charts, maps, calendars, mockups, simulations, system maps, PNG export.
-- `/qwait-what` — a user-typed nudge ("that last message did not land — re-pitch it in plain terms"). Never model-invoked.
+Every other skill is standalone; its description says when to use it. `/qexplain-change` and `/qwait-what` run only when the user types them, never on the model's own initiative.
 
 ## Harness Improvement Capture
 

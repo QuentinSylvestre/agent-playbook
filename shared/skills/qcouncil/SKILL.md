@@ -303,10 +303,12 @@ Invoke `/qcouncil` in library mode per `shared/skills/qcouncil/SKILL.md § Libra
 ### Presentation format
 
 After council returns, present to the user in this order:
-1. **Summary** — one paragraph synthesizing the council's lean (e.g., "Council favors Option B (2-1), primarily on maintainability grounds").
-2. **Agent recommendation** (pre-escalation mode only) — the agent's own recommendation informed by the council output, prefixed with "**Recommendation:**" on its own line. Omitted in oscillation mode per `/qcouncil`'s no-orchestrator-recommendation rule for that context.
-3. **Full council output** — per-juror reasoning verbatim (one subsection per persona) + tally table, as returned by `/qcouncil`. (This shape holds in both stakes tiers — composition per `§ Stakes tier`.)
-4. **Decision prompt** — ask the user to decide.
+1. **Decision** — what the choice settles and why it matters (the cost of getting it wrong or leaving it open), in one or two sentences a cold reader can follow.
+2. **Options** — each option the council weighed, one plain line each in the user's terms (what it does, what it costs), before any tally or verdict.
+3. **Summary** — one paragraph synthesizing the council's lean (e.g., "Council favors Option B (2-1), primarily on maintainability grounds").
+4. **Agent recommendation** (pre-escalation mode only) — the agent's own recommendation informed by the council output, prefixed with "**Recommendation:**" on its own line. Omitted in oscillation mode per `/qcouncil`'s no-orchestrator-recommendation rule for that context.
+5. **Full council output** — per-juror reasoning verbatim (one subsection per persona) + tally table, as returned by `/qcouncil`. (This shape holds in both stakes tiers — composition per `§ Stakes tier`.)
+6. **Decision prompt** — ask the user to decide.
 
 The summary must lead with and faithfully represent the juror tally direction, regardless of the orchestrator's prior lean. The orchestrator's own view is confined to the "Agent recommendation" line (where permitted), never the summary framing.
 

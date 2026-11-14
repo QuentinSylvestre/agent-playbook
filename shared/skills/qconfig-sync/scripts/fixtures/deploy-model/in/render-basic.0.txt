@@ -1,0 +1,5 @@
+home={{USER_HOME}}
+root={{PLAYBOOK_ROOT}}/x
+again {{USER_HOME}}/.kiro
+
+

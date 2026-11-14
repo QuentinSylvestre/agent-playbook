@@ -44,7 +44,7 @@ Copy-paste invocation (repo-relative):
 <python> shared/skills/qvalidate/scripts/qvalidate.py [--project-root <dir>] [--plan-root <dir>] [--phase N --expect-ticked K|auto] [--check-commits] [--base <ref>] [--doc-updates-since <ref>] [--help] <plan-path>
 ```
 
-`<python>` is the playbook venv's interpreter with `-I`: `<config-repo>/.venv-agent-playbook/Scripts/python.exe -I` (`shared/AGENTS.md § Config Repo Locations`), never a `python` from PATH. Run elsewhere, the script exits 2 with `guard did not run: venv missing`. `--selftest` runs its fixture suite. If flag syntax is unclear, read the script's own header rather than guessing at it.
+`<python>` is the interpreter of `<config-repo>/.venv-agent-playbook` with `-I` (`shared/AGENTS.md § Config Repo Locations`), never a `python` from PATH. Run elsewhere, the script exits 2 with `guard did not run: venv missing`. `--selftest` runs its fixture suite. If flag syntax is unclear, read the script's own header rather than guessing at it.
 
 **Flags**:
 

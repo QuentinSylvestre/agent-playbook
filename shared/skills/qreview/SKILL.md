@@ -24,7 +24,7 @@ Apply the playbook's canonical review personas, persona-selection rules, sub-age
 | Reliability engineer | Failure modes, error handling (silent swallowing), recovery (timeouts, retries, circuit-breakers), observability, resource leaks |
 | Maintainability reviewer | Code clarity, naming, coupling (leaky abstractions), test coverage, future extensibility (redundant state, reuse) |
 | Domain expert | Business logic correctness, domain terminology, regulatory compliance |
-| Senior engineer | Cross-cutting integration health, plan/intent compliance, code completeness (no dead code or dangling wiring, cleanup paths), test adequacy (failure-mode coverage), broad pragmatism |
+| Senior engineer | Cross-cutting integration health, plan/intent compliance, code completeness (no dead code or dangling wiring, cleanup paths), test adequacy (failure-mode coverage; a negative or acceptance check that could not fail), broad pragmatism |
 | Architect | System structure, component boundaries (SRP), dependency direction, abstraction layering, interface contracts (caller coordination), scaling readiness, over-engineering detection (YAGNI), scope creep, wrapper/proxy delegation correctness |
 
 Add project-specific personas as needed.

@@ -16,4 +16,4 @@ Before using Edit or Write on any file under `data/` in this project, check its 
 
 ## Declined
 
-<!-- Declination records: the user's Skip of an agent-initiated memory proposal. A live row suppresses re-proposal of that subject for 60 days. Sessions append rows only; the /qdream sweep prunes expired rows. Row format: - "<proposed heading>" — declined <YYYY-MM-DD> (<reason, if given>) -->
+<!-- Declination records: the user's Skip of an agent-initiated memory proposal. A live row suppresses re-proposal of that subject for 60 days. Sessions append rows only; nothing prunes them, and an expired row stays. Row format: - "<proposed heading>" — declined <YYYY-MM-DD> (<reason, if given>) -->

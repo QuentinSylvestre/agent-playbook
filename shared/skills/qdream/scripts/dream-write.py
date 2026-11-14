@@ -248,14 +248,13 @@ heading match) and `decision_id`):
   inside a type section, exactly one match). ## Declined is preserved byte
   for byte except by declined_add; BOM and line endings are preserved.
   User-gated ops carry `decision_id` and need --decisions/--decisions-sha:
-  declined_add, every delete of class USER_GATED_CLASSES, `pruned` in the
-  config repo's memory/MEMORY.md, a HIGHER_ORDER.md node delete, any op but
-  usage_bump on an entry whose Verified names a `human:` actor, and any op
-  whose new text adds a `human:` Verified actor. An op without decision_id
-  (autonomous) is refused in each of those cases, with two exceptions for an
-  entry whose Verified names a `human:` actor: the `pruned` delete of a
-  project memory file's entry (the Size check, outside <config repo>/memory/)
-  and a `replace` that only sets or changes the entry's `Outcome:` field (a
+  declined_add, every delete of class USER_GATED_CLASSES (a `subsumption
+  removal` of an entry the verifier confirmed for that heading is autonomous),
+  a HIGHER_ORDER.md node delete, any op but usage_bump on an entry whose
+  Verified names a `human:` actor, and any op whose new text adds a `human:`
+  Verified actor. An op without decision_id (autonomous) is refused in each of
+  those cases, with one exception for an entry whose Verified names a `human:`
+  actor: a `replace` that only sets or changes the entry's `Outcome:` field (a
   field is `**Outcome**: recurred|not-recurred <YYYY-MM-DD>` and nothing more,
   alone on its line or after a `|` on its own metadata line, as in
   `**Usage**: 3 | **Outcome**: ...`; never on the Source/Verified line, which
@@ -1021,6 +1020,10 @@ def check_target(run, path, want=None):
         mapped = Path(ds.via_memory_link(path))
         if real is not None and mapped != probe:
             probe, where = mapped, real
+        elif real is not None and dm.is_inside(str(probe), str(real)):
+            # The same file spelled under the link's target, as a store-repo commit records it
+            # (commits.json, push --plan): check it there, still refusing any other link.
+            where = real
     link = ds._link_on_path(where, probe)
     if link is not None:
         raise Precond("refused: %s is reached through a link (%s)" % (path, link))
@@ -2119,6 +2122,64 @@ def apply_op(doc, op):
     return e
 
 
+def entry_view(text):
+    """The type-section entries of a memory file as memory-entries.py reads them (the parser
+    independent of walk()): [(section, heading, body lines)], trailing blank lines dropped."""
+    view = []
+    for sec, heading, body, _n in dm.memory_entries().entries(text):
+        if "## " + sec not in dm.TYPE_SECTIONS:
+            continue
+        lines = list(body)
+        while lines and not lines[-1].strip():
+            lines.pop()
+        view.append(("## " + sec, heading, tuple(lines)))
+    return view
+
+
+def parse_back(pre, post, op, target):
+    """-> None when `post`, the entry view of the edited text, is `pre` changed exactly as `op`
+    says (the entry count moves by the op's delta, the touched entry sits under its intended
+    heading and section, every other entry is unchanged), else the reason it is not."""
+    kind = op["op"]
+    delta = {"delete": -1, "insert": 1}.get(kind, 0)
+    if len(post) - len(pre) != delta:
+        return "the entry count went from %d to %d, expected %+d" % (len(pre), len(post), delta)
+    if kind == "declined_add":
+        return None if post == pre else "an entry changed"
+    if kind == "insert":
+        want = entry_view(norm_section(op["section"]) + "\n\n" + op["text"])
+        hits = [i for i, x in enumerate(post) if want and x[:2] == want[0][:2]]
+        if len(hits) != 1:
+            return "the new entry is not present once under its heading and section"
+        i = hits[0]
+        if post[:i] + post[i + 1:] != pre:
+            return "an entry other than the new one changed"
+        return None if post[i] == want[0] else "the new entry's text does not read back as given"
+    i = [k for k, x in enumerate(pre) if x[:2] == (target["section"], target["heading"])]
+    if len(i) != 1:
+        return "the target entry is not one entry of the file before the edit"
+    i = i[0]
+    if kind == "delete":
+        return None if post == pre[:i] + pre[i + 1:] else "an entry other than the deleted one changed"
+    if post[:i] != pre[:i] or post[i + 1:] != pre[i + 1:]:
+        return "an entry other than the target changed"
+    sec, heading, body = pre[i]
+    got = post[i]
+    if kind == "replace":
+        want = entry_view(sec + "\n\n" + op["text"])
+        if len(want) != 1 or got != want[0]:
+            return "the replaced entry does not read back as given, under the same section"
+    elif kind == "append_lines":
+        tail = list(body) + list(op["lines"])
+        while tail and not tail[-1].strip():
+            tail.pop()
+        if got != (sec, heading, tuple(tail)):
+            return "the appended lines do not read back at the end of the entry"
+    elif got[:2] != (sec, heading) or not 0 <= len(got[2]) - len(body) <= 1:
+        return "the usage bump changed more than the Usage line"
+    return None
+
+
 def op_texts(op):
     parts = [op.get("heading"), op.get("text"), op.get("row")]
     if isinstance(op.get("lines"), list):
@@ -2304,7 +2365,6 @@ def needs_decision(run, op, entry_body):
     if op["op"] == "declined_add":
         return True
     ho = _real(node_file(run))
-    prune = False
     if op["op"] == "delete":
         if op["class"] == "subsumption removal" and confirmed_subsumption(run, op.get("heading"), op["file"]):
             pass
@@ -2318,8 +2378,8 @@ def needs_decision(run, op, entry_body):
             return True
     stamp = (op["op"] == "replace" and entry_body is not None
              and outcome_stamp_only(entry_body, op["text"]))
-    # The two exemptions bypass only this refusal of a human-attested entry.
-    if not stamp and not prune:
+    # The Outcome stamp bypasses only this refusal of a human-attested entry.
+    if not stamp:
         if op["op"] != "usage_bump" and entry_body is not None and HUMAN_RE.search(entry_body):
             return True
     # New text that adds a human: actor needs a decision that showed it (S2),
@@ -2787,12 +2847,17 @@ def plan_file(run, fops, applied, dec, dsha, over):
                 elif getattr(run, "expect_bodies", {}).get(o["id"]) not in (None, bsha):
                     raise OpError("op %s: the entry changed after the op was queued" % o["id"])
             decision_gate(run, o, body, dec, over)
+            pre_view = entry_view(new.text())
             try:
                 apply_op(new, o)
             except OpError as e:
                 raise OpError("op %s: %s" % (o["id"], e))
             if o["op"] != "declined_add" and declined_blocks(new) != before_declined:
                 raise OpError("op %s would change ## Declined" % o["id"])
+            why = parse_back(pre_view, entry_view(new.text()), o, target)
+            if why:
+                raise OpError("op %s: the edited file does not read back as the op intended: %s"
+                              % (o["id"], why))
             if o["op"] == "delete" and o["class"] != NODE_CLASS:
                 fq = fq_target(run, path, target["heading"])
                 if fq is None:
@@ -3504,7 +3569,11 @@ def fill_tokens(run, cost, orient):
     readable transcript: the script's totals replace whatever the inputs
     file holds. An entry that is not a readable transcript: tokens null.
     No transcript path at all (an empty list, or session ids only): the
-    inputs file's values stay. Each outcome adds a line to the summary."""
+    inputs file's values stay. weighted_tokens and phase_weighted_tokens come
+    from the transcripts only, never from the inputs file. Each outcome adds a
+    line to the summary."""
+    cost.pop("weighted_tokens", None)
+    cost.pop("phase_weighted_tokens", None)
     sess = orient.get("orchestrator_sessions") or []
     paths = [s for s in sess if isinstance(s, str) and s.lower().endswith(".jsonl")]
     if not paths:
@@ -3533,15 +3602,18 @@ def fill_tokens(run, cost, orient):
     run.notes.append("tokens: %d from %d transcript(s), by role %s (a lower bound: the "
                      "running transcripts are still being written)"
                      % (total, len(paths), ", ".join("%s=%d" % kv for kv in roles.items())))
-    weighted = 0
+    weighted = phase = 0
     for p in paths:
-        n, why = dm.session_weighted(p, orient.get("snapshot_at"))
+        n, ph, why = dm.session_weighted(p, orient.get("snapshot_at"))
         if why:
             run.notes.append("weighted tokens: not recorded -- %s" % ascii_safe(why, 200))
             return
         weighted += n
+        phase += ph
     cost["weighted_tokens"] = weighted
-    run.notes.append("weighted tokens: %d since %s" % (weighted, orient.get("snapshot_at")))
+    cost["phase_weighted_tokens"] = phase
+    run.notes.append("weighted tokens: %d since %s, phase agents %d"
+                     % (weighted, orient.get("snapshot_at"), phase))
 
 
 def compute_apply(run, obj, inp, dec):
@@ -3765,8 +3837,15 @@ def need_git():
 
 def git_env():
     """The environment of every write-side git call (P6): a credential helper
-    or a hook that would prompt fails at once instead of waiting for input."""
-    return dict(os.environ, GIT_TERMINAL_PROMPT="0", GCM_INTERACTIVE="never")
+    or a hook that would prompt fails at once instead of waiting for input.
+    An inherited GIT_DIR, GIT_WORK_TREE or GIT_INDEX_FILE would override `-C`
+    and point the commit at another repository or index, so they are dropped.
+    Pathspecs are literal: every path passed here is a file name, and a name
+    such as `a[1].md` must not also match `a1.md`."""
+    env = {k: v for k, v in os.environ.items()
+           if k not in ("GIT_DIR", "GIT_WORK_TREE", "GIT_INDEX_FILE")}
+    env.update(GIT_TERMINAL_PROMPT="0", GCM_INTERACTIVE="never", GIT_LITERAL_PATHSPECS="1")
+    return env
 
 
 def git_run(repo, *args):
@@ -4802,6 +4881,11 @@ def prune_plan(run):
     topic file: ENTRY_PIN entries, signals and excluded entries not counted."""
     cands = {i.get("heading") for i in synth_items(run)
              if i.get("class") in ("subsumed_entries", "stale_entries")}
+    # An entry a gate item of this sweep acts on is the user's to decide (memory-rules.md, the sixth
+    # Prune-set exclusion): the prune never deletes it ahead of, or against, the answer.
+    gi = ds.load_json(run.work / "handoff" / "gate-items.json")
+    if isinstance(gi, dict) and isinstance(gi.get("items"), list):
+        cands |= {e["heading"] for e in gi["items"] if isinstance(e, dict) and isinstance(e.get("heading"), str)}
     fresh = queued_new_headings(run, load_rec(run, QUEUE, {"version": 1, "entries": []}))
     ops, lines = [], []
     user_md = run.repo / "memory" / "MEMORY.md"
@@ -4813,7 +4897,8 @@ def prune_plan(run):
             if over <= 0:
                 break
             over -= len(e["body"].split())
-            ops.append({"file": str(user_md), "heading": e["heading"]})
+            ops.append({"file": str(user_md), "heading": e["heading"],
+                        "why": "user tier %d words over its %d-word pin; %s" % (words - pin, pin, value_words(e))})
         if over > 0:
             lines.append("prune: user tier still %d words over its pin: no entry left to prune" % over)
     disp = ds.load_sweep(run.work, ds.DISPATCH, "run dream-sweep.py dispatch first")
@@ -4828,8 +4913,60 @@ def prune_plan(run):
         pool, _n = prune_candidates(run, mf, cands, fresh)
         excess = len(pool) - ENTRY_PIN
         for e in sorted(pool, key=entry_value)[:max(excess, 0)]:
-            ops.append({"file": mf, "heading": e["heading"]})
+            ops.append({"file": mf, "heading": e["heading"],
+                        "why": "file %d entries over its %d-entry pin; %s" % (excess, ENTRY_PIN, value_words(e))})
     return ops, lines
+
+
+def value_words(e):
+    """entry_value in words, for the gate's prune rows."""
+    rec, usage, verified, fb = entry_value(e)
+    return "%sUsage %d, Verified %s, %s" % ("Outcome recurred, " if rec == 0 else "", usage,
+                                            verified or "none", "feedback" if fb == 0 else (e.get("section") or "?"))
+
+
+PRUNE_PREVIEW = "sweep/prune-preview.json"
+
+
+def previewed_ops(ops, preview):
+    """(ops to run, ops held back): only an op the gate showed and the user did not veto runs."""
+    shown = {(ds.nk(r["file"]), r["heading"]) for r in preview.get("rows", []) if not r.get("vetoed")}
+    run_ops = [o for o in ops if (ds.nk(o["file"]), o["heading"]) in shown]
+    return run_ops, [o for o in ops if (ds.nk(o["file"]), o["heading"]) not in shown]
+
+
+def cmd_prune(args, ctx):
+    """The gate-time prune preview, and the user's vetoes of its rows."""
+    run = Run(ctx, args)
+    guard_check(run)
+    dest = run.work / PRUNE_PREVIEW
+    if args.preview == bool(args.veto):
+        raise Usage("prune takes --preview or --veto <P01,P02,...>")
+    if args.preview:
+        if dest.is_file():
+            raise Precond("refused: %s exists: the gate showed it; --veto marks its rows" % PRUNE_PREVIEW)
+        ops, lines = prune_plan(run)
+        rows = [{"id": "P%02d" % n, "file": o["file"], "heading": o["heading"], "why": o["why"], "vetoed": False}
+                for n, o in enumerate(ops, 1)]
+        ds.put(run.work, PRUNE_PREVIEW, ds.dumps({"rows": rows, "lines": lines}))
+        print("prune preview: %d entr(ies) the budget would prune, in %s; show every row at the gate "
+              "(dream-sweep.py show %s)" % (len(rows), PRUNE_PREVIEW, PRUNE_PREVIEW))
+        for ln in lines:
+            print(ln)
+        return EXIT_OK
+    prev = ds.load_json(dest)
+    if not isinstance(prev, dict) or not isinstance(prev.get("rows"), list):
+        raise Precond("refused: no prune preview: run prune --preview at the gate first")
+    want = [x.strip() for x in args.veto.split(",") if x.strip()]
+    ids = {r["id"] for r in prev["rows"]}
+    bad = [x for x in want if x not in ids]
+    if bad:
+        raise Precond("refused: no preview row %s" % ", ".join(bad))
+    rows = [dict(r, vetoed=bool(r.get("vetoed")) or r["id"] in want) for r in prev["rows"]]
+    ds.put(run.work, PRUNE_PREVIEW, ds.dumps({"rows": rows, "lines": prev.get("lines", [])}))
+    print("prune preview: %d row(s) vetoed: %s" % (sum(r["vetoed"] for r in rows),
+                                                    ", ".join(r["id"] for r in rows if r["vetoed"]) or "none"))
+    return EXIT_OK
 
 
 # A concurrent session changed or removed the entry: the only refusals apply-all drops and goes past.
@@ -4888,6 +5025,17 @@ def cmd_apply_all(args, ctx):
         ops, lines = prune_plan(run)
         for ln in lines:
             print(ln)
+        prev = ds.load_json(run.work / PRUNE_PREVIEW)
+        if not isinstance(prev, dict):
+            if ops:
+                print("prune: %d entr(ies) over budget not pruned: the gate showed no prune preview "
+                      "(dream-write.py prune --preview); the next sweep shows them" % len(ops))
+            ops = []
+        else:
+            ops, held = previewed_ops(ops, prev)
+            if held:
+                print("prune: %d entr(ies) over budget not pruned: not on the gate's preview, or vetoed; "
+                      "the next sweep shows them: %s" % (len(held), "; ".join(o["heading"] for o in held)[:600]))
         put = [{"id": "app-prune-%03d" % n, "op": "delete", "file": o["file"], "heading": o["heading"],
                 "class": "pruned"} for n, o in enumerate(ops, 1)]
         if put:
@@ -4994,9 +5142,12 @@ def parse_args(argv):
     p = sp.add_parser("apply-all")
     p.add_argument("--decisions", required=True)
     p.add_argument("--decisions-sha", required=True)
+    p = sp.add_parser("prune")
+    p.add_argument("--preview", action="store_true")
+    p.add_argument("--veto")
     # Every write-side subcommand: the Orient snapshot's sha (required, D27;
     # missing is exit 3) and, after a guard --rebaseline, the new digest.
-    for name in ("memedit", "hash", "state", "commit", "push", "ops", "queue", "apply-all"):
+    for name in ("memedit", "hash", "state", "commit", "push", "ops", "queue", "apply-all", "prune"):
         sp.choices[name].add_argument("--snapshot-sha")
         sp.choices[name].add_argument("--guard-digest")
     args = ap.parse_args(argv)
@@ -5010,7 +5161,7 @@ def parse_args(argv):
 
 COMMANDS = {"memedit": cmd_memedit, "hash": cmd_hash, "state": cmd_state,
             "commit": cmd_commit, "push": cmd_push, "ops": cmd_ops, "queue": cmd_queue,
-            "apply-all": cmd_apply_all}
+            "apply-all": cmd_apply_all, "prune": cmd_prune}
 
 
 def main(argv=None, ctx=None):
@@ -5104,7 +5255,8 @@ REQUIRED_CASES = [
     "hash-dirty-at-orient-refused", "memedit-fence-swallows-declined-refused",
     "memedit-foreign-edit-between-runs", "memedit-journal-changed-refused",
     "memedit-journal-validation-rerun", "memedit-journal-validator-fail-rerun",
-    "memedit-needs-decision-pruned-node", "memedit-pending-neither-sha-refused",
+    "memedit-needs-decision-pruned-node", "memedit-parse-back-refused",
+    "memedit-pending-neither-sha-refused",
     "memedit-span-disagreement-refused", "push-plan-credential-textconv-marked",
     "push-plan-recorded-op-refused", "push-plan-sweep-commit-outside-window",
     "push-remote-name-refused", "push-repos-head-moved-refused",
@@ -5952,6 +6104,15 @@ def _unit_prune_and_subsumption(root, home, ctx):
     got = [e["heading"] for e in sorted(pool, key=entry_value)]
     if got != ["recurs", "plain"]:
         fails.append("prune pool or order: %r" % got)
+    ops = [{"file": str(f), "heading": "recurs"}, {"file": str(f), "heading": "plain"},
+           {"file": str(f), "heading": "late"}]
+    prev = {"rows": [{"file": str(f), "heading": "recurs", "vetoed": False},
+                     {"file": str(f), "heading": "plain", "vetoed": True}]}
+    go, held = previewed_ops(ops, prev)
+    if [o["heading"] for o in go] != ["recurs"] or [o["heading"] for o in held] != ["plain", "late"]:
+        fails.append("previewed_ops: ran %r, held %r" % (go, held))
+    if "Usage 9" not in value_words(sorted(pool, key=entry_value)[0]):
+        fails.append("value_words: %r" % value_words(sorted(pool, key=entry_value)[0]))
     a, b = str(root / "a.md"), str(root / "b.md")
     (run.work / "sweep" / "dispatch.json").write_text(json.dumps({"agents": [
         {"project": "/a", "memory_file": a}, {"project": "/b", "memory_file": b}]}), encoding="utf-8")

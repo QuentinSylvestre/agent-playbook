@@ -1,0 +1,16 @@
+# name	kind	inputs (relative to this folder)	expected output (written by the twins' code)
+merge-basic	merge	in/merge-basic.0.txt,in/merge-basic.1.txt	out/merge-basic.out
+merge-crlf	merge	in/merge-crlf.0.txt,in/merge-crlf.1.txt	out/merge-crlf.out
+merge-bom	merge	in/merge-bom.0.txt,in/merge-bom.1.txt	out/merge-bom.out
+merge-nul	merge	in/merge-nul.0.txt,in/merge-nul.1.txt	out/merge-nul.out
+merge-blank-ascii	merge	in/merge-blank-ascii.0.txt,in/merge-blank-ascii.1.txt	out/merge-blank-ascii.out
+merge-blank-nbsp	merge	in/merge-blank-nbsp.0.txt,in/merge-blank-nbsp.1.txt	out/merge-blank-nbsp.out
+merge-fs-chars	merge	in/merge-fs-chars.0.txt,in/merge-fs-chars.1.txt	out/merge-fs-chars.out
+merge-empty-overlay	merge	in/merge-empty-overlay.0.txt,in/merge-empty-overlay.1.txt	out/merge-empty-overlay.out
+merge-no-newlines	merge	in/merge-no-newlines.0.txt,in/merge-no-newlines.1.txt	out/merge-no-newlines.out
+merge-trailing-cr	merge	in/merge-trailing-cr.0.txt,in/merge-trailing-cr.1.txt	out/merge-trailing-cr.out
+merge-unicode	merge	in/merge-unicode.0.txt,in/merge-unicode.1.txt	out/merge-unicode.out
+merge-leading-blank-lines	merge	in/merge-leading-blank-lines.0.txt,in/merge-leading-blank-lines.1.txt	out/merge-leading-blank-lines.out
+render-basic	render	in/render-basic.0.txt	out/render-basic.out
+render-crlf-bom	render	in/render-crlf-bom.0.txt	out/render-crlf-bom.out
+render-no-tokens	render	in/render-no-tokens.0.txt	out/render-no-tokens.out

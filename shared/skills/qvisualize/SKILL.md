@@ -57,7 +57,7 @@ Key tokens: `--background`, `--foreground`, `--card`, `--card-foreground`, `--po
 
 Build in small steps. Each response has its own output limit that your reasoning shares; at high effort, reasoning plus one large write can use all of it and end the turn with no file and no error. So the first action is always a tool call, and nothing is planned at length before it.
 
-`<python>` below is `"<config-repo>\.venv-agent-playbook\Scripts\python.exe" -I` (`<config-repo>`: `shared/AGENTS.md § Config Repo Locations`), the playbook's one interpreter. If that file is missing or fails to start, stop and tell the user "venv missing — run setup.ps1"; never use a Python from `PATH`.
+`<python>` below is the interpreter of `<config-repo>/.venv-agent-playbook` with `-I`, quoted (`<config-repo>` and the interpreter path: `shared/AGENTS.md § Config Repo Locations`), the playbook's one interpreter. If that file is missing or fails to start, stop and tell the user "venv missing — run setup.ps1 or setup.sh"; never use a Python from `PATH`.
 
 1. **Scaffold first, before any other reasoning.** Create the skeleton in the folder the user named. If the user named none, use the folder this prints, and fall back to the session working directory only if it fails:
    ```powershell
