@@ -1290,9 +1290,11 @@ own_run_sh() {
 own_run_ps() {
     local sb="$1" log="$2" rc=0; shift 2
     if [ -f "$sb.stub/use" ]; then
-        env -u AGENT_PLAYBOOK_SKIP_KIRO_CLI USERPROFILE="$(cygpath -w "$sb")" APPDATA="$(cygpath -w "$sb/AppData/Roaming")" \
-            KIRO_STUB_DIR="$(cygpath -w "$sb.stub")" PATH="$sb.stub/bin-ps:$(own_path_without_kiro)" \
-            ps_setup "$@" \
+        # a subshell, not env: ps_setup is a shell function
+        ( unset AGENT_PLAYBOOK_SKIP_KIRO_CLI
+          export USERPROFILE="$(cygpath -w "$sb")" APPDATA="$(cygpath -w "$sb/AppData/Roaming")" \
+              KIRO_STUB_DIR="$(cygpath -w "$sb.stub")" PATH="$sb.stub/bin-ps:$(own_path_without_kiro)"
+          ps_setup "$@" ) \
             < /dev/null > "$TMPDIR_PARITY/$log.log" 2>&1 || rc=$?
     else
         USERPROFILE="$(cygpath -w "$sb")" APPDATA="$(cygpath -w "$sb/AppData/Roaming")" AGENT_PLAYBOOK_SKIP_KIRO_CLI=1 \
