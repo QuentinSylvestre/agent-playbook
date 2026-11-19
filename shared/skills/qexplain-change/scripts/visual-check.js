@@ -18,7 +18,7 @@
  * Needs Node and the `playwright` package (set PLAYWRIGHT_MODULE to its path if it is
  * not resolvable). Without them, run the same checklist by hand in a browser (Claude in
  * Chrome on a localhost copy works):
- *   1. Provenance strip is on every part present. Brief loads; every Mermaid diagram in
+ *   1. The Info menu opens from every part present and shows the provenance and the page's path. Brief loads; every Mermaid diagram in
  *      it (a gantt, a fallback flowchart) has an SVG and no syntax error.
  *   2. Maps: each view shows a diagram (D2: the visible variant has an SVG; Mermaid: an
  *      SVG with no syntax error). Every tour step changes the caption and lights at least
@@ -31,12 +31,20 @@
  *   5. The theme toggle re-themes the page, persists, and redraws Mermaid diagrams with
  *      the new theme.
  *   6. Diff review: sidebar lists every file; Mark reviewed collapses the card and
- *      counts; state survives a reload under qexplain-change-diff-<slug>; j and m work; a
+ *      counts; state survives a reload under qexplain-change-diff-<explanation id>; j and m work; a
  *      type filter narrows the list; added rows are coloured; clicking a cell wraps
  *      and unwraps it; tree view shows directories; the sidebar resizes, persists,
- *      and resets on double-click; both hash pills copy; Copy feedback replaces the note box, with
- *      its file path; every file left out is named. A summary row opens its file here.
+ *      and resets on double-click; both hash pills copy; there is no note box, and
+ *      Copy feedback stands in the header; every file left out is named. A summary row opens its file here.
  *   7. At 390px wide no part scrolls the page sideways. No page errors.
+ *   8. Comments: selecting prose copies it with a location line and offers a Comment button; Enter
+ *      saves, Shift+Enter adds a line, Escape keeps a box that holds text. A saved comment is
+ *      highlighted and numbered, survives a reload, and reopens from its marker or its text. The
+ *      pointer offers a button on a paragraph, a table cell, a table and a diff line; a file header
+ *      and the tab that is showing have one too, and "/" comments on that tab. The panel lists the
+ *      comments in page order; a click goes to the target; edit, resolve, reopen and delete work
+ *      there, and a general comment is written there. Copy feedback copies the text the preview
+ *      shows, and a save copies it too. The Annotate switch hides all of it and keeps the comments.
  *
  * Exit codes: 0 every check OK, 1 at least one BAD, 2 could not run.
  */

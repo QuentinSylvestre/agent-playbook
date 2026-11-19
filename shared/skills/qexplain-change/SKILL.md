@@ -204,9 +204,9 @@ Tour ids for D2 are D2 object ids: `site.mistap` for a node, `(site.bl -> gw.htt
 
 ### Change summary and Diff review
 
-The build generates both from `rationales.json`, `roles.json` and the diff; you write nothing else. The summary is a file inventory grouped by subsystem, each row linking to the file's card in Diff review. Diff review keeps its sidebar, split-pane diff, rationale per file, reviewed tracking and notes (stored under `qexplain-change-diff-<slug>`, `<slug>` being the file name stem lowercased with underscores turned to hyphens, so renaming the file starts a fresh review), Copy notes, left-out list, keyboard navigation and base and head pills.
+The build generates both from `rationales.json`, `roles.json` and the diff; you write nothing else. The summary is a file inventory grouped by subsystem, each row linking to the file's card in Diff review. Diff review keeps its sidebar, split-pane diff, rationale per file, reviewed tracking (stored under `qexplain-change-diff-<slug>`), left-out list, keyboard navigation and base and head pills. `<slug>` is the explanation id the build writes: the repo name, two hyphens, then the output file name without its date prefix and `_vN` suffix, all lowercased with every run of other characters turned to one hyphen (`gwadapter--liveness-explanation` for `261119_LIVENESS_EXPLANATION_v2.html` in repo `gwadapter`). A rebuild under the same name, or under a new date or version, therefore keeps the reader's state; pass `--id` to set the slug yourself.
 
-The page also keeps the theme (`qexplain-change-theme`) and the sketch or classic style (`qexplain-change-sketch`) across visits.
+The page also keeps the theme (`qexplain-change-theme`) and the sketch or classic style (`qexplain-change-sketch`) across visits. The reader's comments are kept under `qexplain-change-comments-<slug>`, and survive a rebuild in the same way.
 
 ### Format rules
 
@@ -233,7 +233,7 @@ Twelve checks, each looking only at the parts present: `document-shape`, `title-
 node <config-repo>/shared/skills/qexplain-change/scripts/visual-check.js <path-to-html> --out <screenshot dir>
 ```
 
-It checks only the parts present: provenance, Mermaid, D2 variants, every tour step, sub-tabs, the sketch and Show changes switches, theme redraw, the summary link, every diff-review control, phone width. **Look at the screenshots.** A `BAD` line or a visible defect is a blocker. Without Node and Playwright, run the checklist in the script's header by hand through a browser tool. Only when no browser can run at all, report the artifact as **statically validated but not visually confirmed** and name the checks skipped. Building needs Python 3; without it, stop and tell the user rather than writing the page by hand.
+It checks only the parts present: provenance, Mermaid, D2 variants, every tour step, sub-tabs, the sketch and Show changes switches, theme redraw, the summary link, every diff-review control, comments on every kind of target, the comments panel, Copy feedback, the Annotate switch, phone width. **Look at the screenshots.** A `BAD` line or a visible defect is a blocker. Without Node and Playwright, run the checklist in the script's header by hand through a browser tool. Only when no browser can run at all, report the artifact as **statically validated but not visually confirmed** and name the checks skipped. Building needs Python 3; without it, stop and tell the user rather than writing the page by hand.
 
 ## Step 5: Offer the quiz
 
@@ -245,6 +245,18 @@ Give the user the path and offer a quiz in chat; the user decides. The quiz neve
 - **One question at a time, waiting for the answer.** Never post all questions at once. Never reveal the answer in the question.
 
 On a correct answer, confirm and add one sentence the reader did not have. On a wrong answer, do not give the answer: give one hint pointing at the page section and invite one more try; after a second miss give the answer and say why the chosen option tempted and fails. On a hedged answer, ask them to commit first. Two misses on one concept: stop, re-teach it with a fresh example, offer to amend that section, and if accepted amend, rebuild and re-run Step 4. Stay in the teacher's chair throughout: no score-keeping tone.
+
+## Feedback on the page
+
+The reader can comment on the page itself: on selected text, a paragraph, a list item, a table cell or a whole table, a diff line or a range of lines, a file, a whole part, or the explanation as a whole. A panel lists the comments, and "Copy feedback" copies them as one text. You do not write any of this; the template provides it.
+
+**When the user gives feedback on a page you built.** Feedback comes in two forms, and both count the same.
+
+*Copied from the page.* The text starts with "Feedback on the change explanation" and lists numbered comments, each with its location and, for some, a label. Act on every open comment, then reply with each number and one of: addressed, deferred, rejected, and one line on what you changed or why.
+
+*Typed in the chat.* The user describes what to change in their own words, with or without a screenshot. Find the part of the page they mean from what they say. If two places could match, ask which one before changing either. Then reply in the same way: one line per point, saying what you changed or why not.
+
+In both cases, rebuild the page when anything changed, with the same output name, so that comments already on the page carry over and show as still in place, moved or not found. Re-run Step 4 on the rebuilt page. Never ask the user to use the comment tools; they are a convenience.
 
 ## Step 6: Close
 
