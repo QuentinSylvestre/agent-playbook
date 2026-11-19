@@ -251,7 +251,7 @@ async function routeLibs(target) {
     await page.click('#' + d2dg + ' .cm-dgbtn'); await wait(200);
     await page.mouse.move(n0.x - 3, n0.y); await page.mouse.move(n0.x, n0.y); await wait(250);
     log(await page.evaluate(id => { const dg = document.getElementById(id); const tip = dg.querySelector('.cm-dgtip'); return dg.classList.contains('cm-mode') && dg.querySelectorAll('.cm-ring.cm-hot').length === 1 && getComputedStyle(tip).display !== 'none'
-      && tip.textContent.startsWith('Click a node or a connection') && tip.getBoundingClientRect().bottom <= cmDgBox(dg).getBoundingClientRect().top + 1; }, d2dg),
+      && tip.textContent.startsWith('Click a part of the diagram') && tip.getBoundingClientRect().bottom <= cmDgBox(dg).getBoundingClientRect().top + 1; }, d2dg),
       'the diagram button turns on comment mode, and the pointer rings the part under it');
     await page.mouse.click(n0.x, n0.y); await wait(300);
     const nt = await page.evaluate(() => (document.querySelector('.cm-card .cm-k') || {}).textContent || '');
@@ -284,6 +284,13 @@ async function routeLibs(target) {
       await page.click('#sketch-toggle'); await wait(400);
       log(fitsOther && await ringFits(), 'the ring follows its node when the diagram switches between sketch and classic');
     }
+    const outside = await page.evaluate(id => { const b = document.getElementById(id).getBoundingClientRect(); return { x: b.left + 200, y: b.bottom + 40 }; }, d2dg);
+    await page.mouse.click(outside.x, outside.y); await wait(200);
+    const leftByClick = await page.evaluate(id => !document.getElementById(id).classList.contains('cm-mode') && !document.querySelector('.cm-card'), d2dg);
+    await page.click('#' + d2dg + ' .cm-dgbtn'); await wait(200);
+    await page.click('#cm-panel-btn'); await wait(250); await page.click('#cm-panel .cm-ph strong'); await wait(150);
+    log(leftByClick && await page.evaluate(id => document.getElementById(id).classList.contains('cm-mode'), d2dg), 'a click outside the diagram leaves comment mode; a click in the panel does not');
+    await page.evaluate(() => cmPanel(false)); await wait(250);
     await page.keyboard.press('Escape'); await wait(200);
     await page.mouse.click(n0.x, n0.y); await wait(300);
     log(await page.evaluate(id => !document.getElementById(id).classList.contains('cm-mode') && !document.getElementById('dg-overlay').hidden && !document.querySelector('.cm-card'), d2dg),
@@ -298,6 +305,59 @@ async function routeLibs(target) {
     await page.evaluate(() => { const c = CM.items.find(x => x.kind === 'dg' && x.tk === 'node'); c.did = 'gone.id'; cmResolve(); window.__st1 = c._state + ':' + c._did; c.dlabel = 'no such label'; cmResolve(); window.__st2 = c._state; });
     log(await page.evaluate(() => window.__st1.startsWith('moved:') && window.__st1 !== 'moved:gone.id' && window.__st2 === 'notfound'), 'a node whose id changed is taken up again by its label, and is not found when the label is gone too');
     await page.evaluate(() => { switchPart(PART_KEYS[0], true); CM.items = []; cmChanged(); }); await wait(300);
+  }
+  // Comments on the parts of Mermaid diagrams: a sequence message, then a flowchart node and connection
+  const mmPart = (sel, what) => page.evaluate(([sel, what]) => { const dg = [...document.querySelectorAll(sel)].find(d => d.offsetParent !== null && cmDgParts(d).some(p => p.what === what)); if (!dg) return null;
+    dg.scrollIntoView({ block: 'center' }); const p = cmDgParts(dg).find(x => x.what === what); let x, y;
+    if (p.edge) { const pts = cmEdgePts(p.g), m = pts[Math.floor(pts.length / 2)]; x = m[0]; y = m[1]; } else { const b = p.g.getBoundingClientRect(); x = b.left + b.width / 2; y = b.top + b.height / 2; }
+    return { dg: dg.id, id: p.id, label: p.label, x, y }; }, [sel, what]);
+  const mmComment = async (sel, what, text) => {
+    let p = await mmPart(sel, what); if (!p) return null; await wait(300); p = await mmPart(sel, what);
+    if (await page.evaluate(id => !document.getElementById(id).classList.contains('cm-mode'), p.dg)) { await page.click('#' + p.dg + ' .cm-dgbtn'); await wait(200); }
+    await page.mouse.click(p.x, p.y); await wait(300);
+    p.title = await page.evaluate(() => (document.querySelector('.cm-card .cm-k') || {}).textContent || '');
+    await page.keyboard.type(text); await page.keyboard.press('Enter'); await wait(300); return p;
+  };
+  if (await page.evaluate(() => PART_KEYS.includes('walkthrough') && !!document.querySelector('#part-walkthrough .dg[data-kind="mermaid"]'))) {
+    await page.evaluate(() => switchPart('walkthrough', true)); await wait(1800);
+    const msg = await mmComment('#part-walkthrough .dg[data-kind="mermaid"]', 'message', 'message comment');
+    if (msg) {
+      log(msg.title === 'Message "' + msg.label + '" in diagram "' + await page.evaluate(id => document.getElementById(id).dataset.name, msg.dg) + '"'
+        && await page.evaluate(() => { const c = CM.items.find(x => x.kind === 'dg'); return !!c && c.dwhat === 'message' && c._state === 'anchored' && !!c.dsrc && /^   Source line \d+: .+/m.test(cmFeedback()); }),
+        `a sequence message is commented by its text, and the copied text gives its source line: ${msg.title}`);
+      const fits = () => page.evaluate(id => { const dg = document.getElementById(id), c = CM.items.find(x => x.kind === 'dg'), r = dg.querySelector('.cm-ring:not(.cm-whole):not(.cm-hot)'), g = cmDgGroup(dg, c._did, true);
+        if (!r || !g) return false; const a = r.getBoundingClientRect(), b = g.getBoundingClientRect(); return Math.abs(a.left - (b.left - 4)) < 2 && Math.abs(a.top - (b.top - 4)) < 2; }, msg.dg);
+      const before = await fits();
+      await page.keyboard.press('Escape'); await page.click('#theme-toggle'); await wait(2600);
+      const after = await fits() && await page.evaluate(() => CM.items.find(x => x.kind === 'dg')._state === 'anchored');
+      await page.click('#theme-toggle'); await wait(2600);
+      log(before && after, 'the ring is drawn again on its message after the diagram is redrawn for another theme');
+      await page.evaluate(() => switchPart(PART_KEYS[0], true)); await wait(300); await page.reload(); await wait(1500);
+      log(await page.evaluate(() => { const c = CM.items.find(x => x.kind === 'dg'); return document.querySelector('.part-btn.active').dataset.part === PART_KEYS[0] && c._state === 'anchored' && c._n === 1; }),
+        'after a reload on another part a Mermaid comment is still in place');
+      // The same comment while its diagram is not drawn: the drawing is emptied for the length of the check.
+      log(await page.evaluate(() => { const c = CM.items.find(x => x.kind === 'dg'), mm = cmDgOf(c).querySelector('.mmd'), kept = mm.innerHTML, src = c.dsrc, lab = c.dlabel; mm.innerHTML = '';
+        cmResolve(); const same = c._state; c.dsrc = 'changed'; cmResolve(); const inSrc = c._state; c.dlabel = 'text that is in no diagram'; cmResolve(); const gone = c._state;
+        c.dsrc = src; c.dlabel = lab; mm.innerHTML = kept; cmResolve(); return same === 'anchored' && inSrc === 'anchored' && gone === 'notfound' && c._state === 'anchored'; }),
+        'while its diagram is not drawn, a Mermaid comment is checked against the source: unchanged source, then the part in a changed source, else not found');
+    }
+    await page.evaluate(() => { CM.items = []; cmChanged(); });
+  }
+  if (await page.evaluate(() => PART_KEYS.includes('maps'))) {
+    await page.evaluate(() => switchPart('maps', true)); await wait(1500);
+    for (const v of await page.evaluate(() => [...document.querySelectorAll('#part-maps .map-btn')].map(b => b.dataset.view))) {
+      await page.evaluate(v => switchMap(v, false), v); await wait(1500);
+      if (await page.evaluate(() => [...document.querySelectorAll('#part-maps .dg[data-kind="mermaid"]')].some(d => d.offsetParent !== null && cmDgParts(d).some(p => p.edge)))) {
+        const nd = await mmComment('#part-maps .dg[data-kind="mermaid"]', 'node', 'flow node'), ed = await mmComment('#part-maps .dg[data-kind="mermaid"]', 'connection', 'flow edge');
+        log(!!nd && nd.title.startsWith('Node "' + nd.label + '" (' + nd.id + ') in diagram "') && !!ed && ed.title.startsWith('Connection "') && ed.title.includes(' -> ')
+          && await page.evaluate(() => { const n = CM.items.find(x => x.dwhat === 'node'), e = CM.items.find(x => x.dwhat === 'connection'), f = cmFeedback();
+            return !!n && !!e && n._state === 'anchored' && e._state === 'anchored' && Array.isArray(e.dends) && (f.match(/^   Source line \d+: /mg) || []).length === 2 && !!e._dg.querySelector('.mmd .cm-eg'); }),
+          `a flowchart node and a connection are commented by their Mermaid ids: ${nd && nd.title} / ${ed && ed.title}`);
+        await page.keyboard.press('Escape');
+        break;
+      }
+    }
+    await page.evaluate(() => { CM.items = []; cmChanged(); switchPart(PART_KEYS[0], true); }); await wait(400);
   }
   const looks = await page.evaluate(() => { const css = e => { const s = getComputedStyle(e); return [s.width, s.height, s.borderTopColor, s.borderTopLeftRadius, s.color].join(); };
     const mm = [...document.querySelectorAll('.dg[data-kind="mermaid"]')].find(d => !cmDgParts(d).length); let hint = null;

@@ -295,9 +295,9 @@
   .cm-ring.cm-hot, .cm-ring.cm-pending, .cm-ring.cm-active { border-color: #0969da; box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.22); }
   .cm-ring.cm-whole.cm-hot, .cm-ring.cm-whole.cm-pending, .cm-ring.cm-whole.cm-active { box-shadow: none; }
   .cm-ring.cm-flash { animation: cm-flash 0.5s 3; }
-  .dg g.cm-eg { filter: drop-shadow(0 0 2px #d68f00) drop-shadow(0 0 1px #d68f00); }
-  .dg g.cm-eg.cm-eg-on { filter: drop-shadow(0 0 2px #0969da) drop-shadow(0 0 1px #0969da); }
-  body.cm-off .dg g.cm-eg { filter: none; }
+  .dg .cm-eg { filter: drop-shadow(0 0 2px #d68f00) drop-shadow(0 0 1px #d68f00); }
+  .dg .cm-eg.cm-eg-on { filter: drop-shadow(0 0 2px #0969da) drop-shadow(0 0 1px #0969da); }
+  body.cm-off .dg .cm-eg { filter: none; }
   .cm-labs { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
   .cm-lab { padding: 1px 8px; border: 1px solid var(--border-strong); border-radius: 10px; background: transparent; color: var(--text-light); font-size: 11px; cursor: pointer; }
   .cm-lab:hover { border-color: #0969da; }
@@ -546,7 +546,7 @@ function renderMermaid(root, done) {
   if (!nodes.length) { if (done) done(); return; }
   nodes.forEach(el => { el.removeAttribute('data-processed'); el.textContent = QX.mermaid[el.dataset.mid]; el.dataset.theme = theme; });
   mermaid.initialize({ startOnLoad: false, theme, sequence: { mirrorActors: false } });
-  mermaid.run({ nodes }).catch(() => {}).then(() => { nodes.forEach(fixMermaidNotes); document.querySelectorAll('.dg.plain').forEach(mermaidPlain); if (done) done(); if (cmReady) cmRefresh(); });
+  mermaid.run({ nodes }).catch(() => {}).then(() => { nodes.forEach(fixMermaidNotes); document.querySelectorAll('.dg.plain').forEach(mermaidPlain); if (done) done(); if (cmReady) { cmResolve(); cmDraw(); cmDrawPanel(); } });
 }
 
 // ---------------- Guided tours ----------------
@@ -1232,20 +1232,65 @@ function cmDgOf(c) {
 function cmDgBox(dg) { return Array.from(dg.querySelectorAll('.dgv, .mmd')).find(x => x.offsetParent !== null) || dg; }
 // The group of one D2 object: in the variant that is showing (for geometry), or in the light classic one (for its text).
 function cmDgGroup(dg, id, shown) {
+  if (cmDgInfo(dg).kind === 'mermaid') { const p = cmMmParts(dg).find(x => x.id === id); return p ? p.g : null; }
   const tok = (cmDgInfo(dg).ids || {})[id]; if (!tok) return null;
   const vs = Array.from(dg.querySelectorAll('.dgv')), v = shown ? vs.find(x => x.offsetParent !== null) : dg.querySelector('.dgv.v-light.v-classic') || vs[0];
   return v ? v.querySelector('g[class="' + tok + '"], g[class^="' + tok + ' "]') : null;
 }
 function cmDgLabel(dg, id) {
+  if (cmDgInfo(dg).kind === 'mermaid') { const p = cmMmParts(dg).find(x => x.id === id); return p ? p.label : id; }
   const g = cmDgGroup(dg, id, false);
   const t = g ? Array.from(g.querySelectorAll('text')).map(x => x.textContent.trim()).filter(Boolean).join(' ').replace(/\s+/g, ' ') : '';
   return t || id;
 }
+// --- Mermaid diagrams are drawn in the browser, so their parts exist only once the diagram has been shown. A
+// flowchart node or connection is known by its Mermaid id; a sequence message, participant or note has no id and is
+// known by its text. Until a diagram is drawn, a comment on it is checked against the diagram's source text.
+function cmHash(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
+function cmMmParts(dg) {
+  const svg = dg.querySelector('.mmd svg'); if (!svg) return [];
+  const out = [], seen = {}, txt = e => e.textContent.replace(/\s+/g, ' ').trim();
+  const key = (kind, t) => { const k = kind + ':' + t; seen[k] = (seen[k] || 0) + 1; return seen[k] > 1 ? k + ' #' + seen[k] : k; };
+  svg.querySelectorAll('g.node').forEach(g => { const m = /-flowchart-(.+)-\d+$/.exec(g.id || ''); if (m) out.push({ id: m[1], g, edge: false, what: 'node', label: txt(g) || m[1] }); });
+  const nodes = out.slice();
+  svg.querySelectorAll('path[data-id^="L_"]').forEach(p => {
+    const id = p.getAttribute('data-id'); let ends = null;
+    nodes.forEach(a => nodes.forEach(b => { const pre = 'L_' + a.id + '_' + b.id + '_'; if (!ends && id.indexOf(pre) === 0 && /^\d+$/.test(id.slice(pre.length))) ends = [a, b]; }));
+    out.push({ id, g: p, edge: true, what: 'connection', label: ends ? ends[0].label + ' -> ' + ends[1].label : id, ends: ends ? [ends[0].id, ends[1].id] : null });
+  });
+  svg.querySelectorAll('text.actor').forEach(t => {
+    const k = 'participant:' + txt(t); if (seen[k]) return; seen[k] = 1;
+    const par = t.parentNode, box = par && par.querySelectorAll && par.querySelectorAll('text.actor').length === 1 ? par.querySelector('rect.actor') : null;
+    out.push({ id: k, g: box || t, edge: false, what: 'participant', label: txt(t) });
+  });
+  svg.querySelectorAll('text.messageText').forEach(t => out.push({ id: key('message', txt(t)), g: t, edge: false, what: 'message', label: txt(t) }));
+  svg.querySelectorAll('text.noteText').forEach(t => out.push({ id: key('note', txt(t)), g: t, edge: false, what: 'note', label: txt(t) }));
+  return out;
+}
+function cmMmRe(id) { return new RegExp('(^|[^\\w-])' + String(id).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^\\w-]|$)'); }
+function cmMmInSrc(src, c) {
+  if (c.dwhat === 'node') return cmMmRe(c.did).test(src);
+  if (c.dwhat === 'connection') return !!c.dends && cmMmRe(c.dends[0]).test(src) && cmMmRe(c.dends[1]).test(src);
+  return !!c.dlabel && src.includes(c.dlabel);
+}
+// The line of the Mermaid source a comment's part comes from, for the copied feedback.
+function cmMmLine(c) {
+  const dg = c._dg; if (!dg || c.tk === 'whole') return '';
+  const info = cmDgInfo(dg); if (info.kind !== 'mermaid') return '';
+  const lines = (QX.mermaid[info.mid] || '').split('\n');
+  let i = -1;
+  if (c.dwhat === 'node') i = lines.findIndex(l => cmMmRe(c._did || c.did).test(l));
+  else if (c.dwhat === 'connection') i = c.dends ? lines.findIndex(l => cmMmRe(c.dends[0]).test(l) && cmMmRe(c.dends[1]).test(l)) : -1;
+  else i = lines.findIndex(l => l.includes(c.dlabel));
+  return i < 0 ? '' : 'Source line ' + (i + 1) + ': ' + lines[i].trim();
+}
 function cmDgTitle(s) {
   const d = 'diagram "' + s.dname + '"';
   if (s.tk === 'whole') return 'The whole ' + d;
-  const id = s._did || s.did, lab = s.dlabel && s.dlabel !== id ? '"' + s.dlabel + '" (' + id + ')' : id;
-  return (s.tk === 'edge' ? 'Connection ' : 'Node ') + lab + ' in ' + d;
+  const id = s._did || s.did, what = s.dwhat || (s.tk === 'edge' ? 'connection' : 'node');
+  // A part known by its text is named by that text alone; a part with an id is named by its label and its id.
+  const lab = /^(message|participant|note)$/.test(what) ? '"' + s.dlabel + '"' : s.dlabel && s.dlabel !== id ? '"' + s.dlabel + '" (' + id + ')' : id;
+  return what.charAt(0).toUpperCase() + what.slice(1) + ' ' + lab + ' in ' + d;
 }
 function cmResolveDg(c) {
   const dg = cmDgOf(c); if (!dg) return;
@@ -1253,20 +1298,33 @@ function cmResolveDg(c) {
   // Diagrams are not part of the indexed text, so a diagram comment takes its place from the first text after its diagram.
   const place = state => { c._pieces = []; c._dg = dg; c._state = state; c._at = nx ? nx.start - 0.5 : (e ? e.ix.text.length : 0); };
   if (c.tk === 'whole') { place('anchored'); return; }
-  const ids = cmDgInfo(dg).ids; if (!ids) return;
+  const info = cmDgInfo(dg);
+  if (info.kind === 'mermaid') {
+    const parts = cmMmParts(dg), src = QX.mermaid[info.mid] || '';
+    if (!parts.length) {       // not drawn yet: an unchanged source has the same parts, a changed one is searched for the part
+      if (cmHash(src) === c.dsrc || cmMmInSrc(src, c)) { c._did = c.did; place('anchored'); }
+      return;
+    }
+    if (parts.some(p => p.id === c.did)) { c._did = c.did; place('anchored'); return; }
+    const like = parts.filter(p => p.what === c.dwhat && p.label === c.dlabel);
+    if (c.dlabel && like.length === 1) { c._did = like[0].id; place('moved'); }
+    return;
+  }
+  const ids = info.ids; if (!ids) return;
   if (ids[c.did]) { c._did = c.did; place('anchored'); return; }
   // The id is gone: the part is taken up again only where one part of the same kind carries the same label.
   const same = Object.keys(ids).filter(i => CM_EDGE.test(i) === (c.tk === 'edge') && cmDgLabel(dg, i) === c.dlabel);
   if (c.dlabel && c.dlabel !== c.did && same.length === 1) { c._did = same[0]; place('moved'); }
 }
 function cmDgParts(dg) {
+  if (cmDgInfo(dg).kind === 'mermaid') return cmMmParts(dg);
   const ids = cmDgInfo(dg).ids || {};
-  return Object.keys(ids).map(id => { const g = cmDgGroup(dg, id, true); return g ? { id, g, edge: CM_EDGE.test(id) } : null; }).filter(Boolean);
+  return Object.keys(ids).map(id => { const g = cmDgGroup(dg, id, true), edge = CM_EDGE.test(id); return g ? { id, g, edge, what: edge ? 'connection' : 'node' } : null; }).filter(Boolean);
 }
 // Points along a connection, on the screen. A connection is tested by its line: its box would cover the nodes it bends around.
 function cmEdgePts(g) {
   const out = [];
-  g.querySelectorAll('path').forEach(p => {
+  (g.tagName.toLowerCase() === 'path' ? [g] : Array.from(g.querySelectorAll('path'))).forEach(p => {
     if (p.closest('marker, mask, defs') || !p.getTotalLength) return;
     let len = 0; try { len = p.getTotalLength(); } catch (e) { return; }
     const m = p.getScreenCTM(); if (!m || !len) return;
@@ -1292,7 +1350,8 @@ function cmDgHit(dg, x, y) {
 function cmDgSel(dg, part) {
   const root = dg.closest('.part-panel'), same = Array.from(root.querySelectorAll('.dg')).filter(d => d.dataset.name === dg.dataset.name);
   return { part: root.id.slice(5), kind: 'dg', dname: dg.dataset.name, dn: same.indexOf(dg), tk: part ? (part.edge ? 'edge' : 'node') : 'whole', did: part ? part.id : '',
-    dlabel: part ? cmDgLabel(dg, part.id) : '', quote: '', pieces: [], el: [part ? part.g : cmDgBox(dg)], dgEl: dg };
+    dlabel: part ? cmDgLabel(dg, part.id) : '', dwhat: part ? part.what : '', dends: (part && part.ends) || null,
+    dsrc: cmDgInfo(dg).kind === 'mermaid' ? cmHash(QX.mermaid[cmDgInfo(dg).mid] || '') : '', quote: '', pieces: [], el: [part ? part.g : cmDgBox(dg)], dgEl: dg };
 }
 function cmDgSetMode(dg) {
   if (cmDgMode) { cmDgMode.classList.remove('cm-mode'); const b = cmDgMode.querySelector('.cm-dgbtn'); if (b) b.setAttribute('aria-pressed', 'false'); }
@@ -1301,7 +1360,7 @@ function cmDgSetMode(dg) {
     dg.classList.add('cm-mode'); dg.querySelector('.cm-dgbtn').setAttribute('aria-pressed', 'true');
     // The hint says what this diagram allows: parts can be picked only where the page knows them.
     dg.querySelector(':scope > .cm-dgtip').textContent = cmDgParts(dg).length
-      ? 'Click a node or a connection, or the background for the whole diagram. Esc to stop.' : 'Click the diagram to comment on it as a whole. Esc to stop.';
+      ? 'Click a part of the diagram, or its background for the whole diagram. Esc or a click outside to stop.' : 'Click the diagram to comment on it as a whole. Esc or a click outside to stop.';
   }
   cmDraw();
 }
@@ -1323,7 +1382,7 @@ function cmDgMove(e) {
 }
 function cmDrawDg() {
   document.querySelectorAll('.cm-dgl').forEach(l => l.remove());
-  document.querySelectorAll('.dg g.cm-eg').forEach(g => g.classList.remove('cm-eg', 'cm-eg-on'));
+  document.querySelectorAll('.dg .cm-eg').forEach(g => g.classList.remove('cm-eg', 'cm-eg-on'));
   document.querySelectorAll('.dg').forEach(dg => {
     cmDgBar(dg);
     if (dg.offsetParent === null) return;         // not on screen: nothing can be measured
@@ -1337,7 +1396,7 @@ function cmDrawDg() {
       else {
         const g = cmDgGroup(dg, id, true); if (!g) return;
         if (c) c._el = [g];
-        if (tk === 'edge') { g.classList.add('cm-eg'); if (cls) g.classList.add('cm-eg-on'); const pts = cmEdgePts(g); at = pts[Math.floor(pts.length / 2)] || null; if (at) at = [at[0] - 9, at[1] - 9]; }
+        if (tk === 'edge') { g.classList.add('cm-eg'); if (cls) g.classList.add('cm-eg-on'); const pts = cmEdgePts(g); at = pts[Math.floor(pts.length / 2)] || null; if (at) at = [at[0] - 9, at[1] - 27]; }   // above the line: a label often sits on its middle
         else { const b = g.getBoundingClientRect(); ring(b, 4, cls); at = [b.left - 13, b.top - 13]; }
       }
       if (!c || !at) return;
@@ -1449,6 +1508,7 @@ function cmFeedback() {
     const lab = cmLabel(c.label); if (lab && !used.includes(lab)) used.push(lab);
     L.push(c._n + '. ' + (lab ? '[' + lab[1] + '] ' : '') + cmWhere(c, true)
       + (!c._pieces ? ' (not found on the page as it is now; what it was about follows)' : c._state === 'moved' ? ' (this has moved since the comment was written)' : ''));
+    if (c.kind === 'dg' && cmMmLine(c)) L.push('   ' + cmMmLine(c));
     if (c.part === 'diff' && c.kind === 'line') {
       if (c.quote) L.push('   Selected: "' + cmExcerpt(c.quote, 400) + '"');
       c.lines.slice(0, 12).forEach(t => L.push('   | ' + t));
@@ -1890,7 +1950,7 @@ function cmOpen(target) {
     if (c) { c.text = text; c.label = lab(); }
     else {
       const s = target.sel, base = { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text, label: lab(), t: Date.now(), state: 'open' };
-      CM.items.push(Object.assign(base, s.kind === 'dg' ? { kind: 'dg', part: s.part, dname: s.dname, dn: s.dn, tk: s.tk, did: s.did, dlabel: s.dlabel, quote: '' }
+      CM.items.push(Object.assign(base, s.kind === 'dg' ? { kind: 'dg', part: s.part, dname: s.dname, dn: s.dn, tk: s.tk, did: s.did, dlabel: s.dlabel, dwhat: s.dwhat, dends: s.dends, dsrc: s.dsrc, quote: '' }
         : s.kind === 'part' ? { kind: 'part', part: s.part, quote: '' } : s.part === 'diff'
         ? { kind: s.kind, part: 'diff', path: s.path, side: s.side, ln: s.ln, ln2: s.ln2, lines: s.lines, quote: s.quote }
         : { kind: s.el ? 'block' : 'text', tag: s.el && s.el.tagName === 'TABLE' ? 'table' : undefined, part: s.part, section: s.section, quote: s.quote, prefix: s.prefix, suffix: s.suffix }));
@@ -1932,6 +1992,9 @@ function cmInit() {
   window.addEventListener('popstate', cmRefresh);
   document.addEventListener('click', e => {
     const m = e.target.closest ? e.target.closest('.cm-mark') : null;
+    // A click outside the diagram leaves comment mode, as Escape does. The comment box, the panel and the tools of
+    // the top bar (panel, light and dark, sketch) are not "outside": the reader uses them while commenting.
+    if (cmDgMode && !cmCard && e.target.closest && e.target.closest('.dg') !== cmDgMode && !e.target.closest('.cm-card, #cm-panel, .top-tools')) cmDgSetMode(null);
     if (!m && cmDgMode && !cmOff() && e.target.closest && e.target.closest('.dg') === cmDgMode && !e.target.closest('.cm-dgbar')) {
       cmOpen({ sel: cmDgSel(cmDgMode, cmDgHit(cmDgMode, e.clientX, e.clientY)) }); return;
     }
