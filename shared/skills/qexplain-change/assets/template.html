@@ -40,13 +40,17 @@
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     font-size: 16px; line-height: 1.6; color: var(--text); background: var(--bg); margin: 0; padding: 0;
   }
+  /* Top-right tools: Info, sketch or classic, theme. The part bar keeps room for them (fitTools). */
+  .top-tools { position: fixed; top: 0.5rem; right: 1rem; z-index: 200; display: flex; gap: 0.4rem; align-items: center; }
   .theme-toggle {
-    position: fixed; top: 0.5rem; right: 1rem; z-index: 200;
     padding: 0.25rem 0.6rem; border-radius: 4px; border: 1px solid var(--border-strong);
     background: var(--toggle-bg); color: var(--toggle-text); font-size: 0.82rem; cursor: pointer; user-select: none;
   }
   .theme-toggle:hover { opacity: 0.8; }
-  .sketch-toggle { right: 7.5rem; }
+  .theme-toggle[aria-expanded="true"] { border-color: var(--link); color: var(--link); }
+  #info-pop { position: fixed; top: calc(var(--part-bar-h, 43px) + 4px); right: 1rem; z-index: 300; width: min(560px, calc(100vw - 2rem)); max-height: calc(100vh - var(--part-bar-h, 43px) - 24px); overflow: auto; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 6px; box-shadow: 0 8px 28px rgba(0,0,0,0.22); padding: 0.2rem 0.6rem; }
+  #info-pop[hidden] { display: none; }
+  #info-pop .prov { border: none; background: none; margin: 0.4rem 0; padding: 0.2rem; font-size: 0.82rem; }
   .page { max-width: 780px; margin: 0 auto; padding: 0 1.5rem 4rem; }
   body.wide-part .page { max-width: min(1700px, 96vw); }
   h1 { font-size: 1.5rem; margin-top: 2rem; margin-bottom: 0.25rem; }
@@ -72,6 +76,19 @@
   .prov { border: 1px solid var(--border); border-radius: 4px; background: var(--btn-bg); padding: 0.5rem 0.8rem; margin: 1rem 0; font-size: 0.78rem; line-height: 1.5; color: var(--text-light); }
   .prov b { color: var(--text); font-weight: 600; }
   .prov span.prov-row { display: block; }
+  .prov span.prov-row[hidden] { display: none; }
+  .pagepath .pp-text { font-family: "SFMono-Regular", Consolas, monospace; font-size: 0.92em; overflow-wrap: anywhere; user-select: all; }
+  .pp-copy { margin-left: 0.4rem; padding: 0 0.45rem; font-size: 0.78rem; line-height: 1.5; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--toggle-bg); color: var(--toggle-text); cursor: pointer; }
+  .pp-copy:hover { opacity: 0.8; } .pp-copy.copied { border-color: #2da44e; color: #2da44e; }
+  /* Last step of the copy chain: the text, selected, for a manual Ctrl+C. */
+  #copybox { position: fixed; inset: 0; z-index: 9000; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; padding: 16px; }
+  #copybox[hidden] { display: none; }
+  #copybox .cb-card { background: #fff; color: #1a1a1a; border: 1px solid #ccc; border-radius: 8px; padding: 14px 16px; width: min(640px, 100%); box-shadow: 0 8px 30px rgba(0,0,0,0.3); font-size: 14px; }
+  [data-theme="dark"] #copybox .cb-card { background: #1e2228; color: #e6edf3; border-color: #444c56; }
+  #copybox p { margin: 0 0 8px; }
+  #copybox textarea { width: 100%; height: 180px; font: 12px/1.45 "SFMono-Regular", Consolas, monospace; padding: 8px; border: 1px solid #999; border-radius: 4px; background: inherit; color: inherit; resize: vertical; }
+  #copybox .cb-row { display: flex; justify-content: flex-end; margin-top: 8px; }
+  #copybox button { padding: 4px 14px; border: 1px solid #999; border-radius: 4px; background: transparent; color: inherit; cursor: pointer; font-size: 13px; }
   #part-diff .prov { margin: 0 0 16px; }
   /* Sub-tabs (one per subsystem) and map tabs */
   .sub-bar, .map-bar { display: flex; gap: 0.4rem; flex-wrap: wrap; margin-bottom: 1rem; padding-top: 1rem; }
@@ -211,7 +228,8 @@
   #toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
   @media (max-width: 760px) {
     .page { padding: 0 1rem 3rem; }
-    .part-bar { padding: 0 10.5rem 0 0.5rem; }
+    .part-bar { padding: 0 0.5rem; }
+    .top-tools { position: static; width: 100%; justify-content: flex-end; padding-top: 0.35rem; }
     .part-btn { padding: 0.5rem 0.6rem; }
     #header { position: static; }
     #nav, #nav-resizer { display: none; }
@@ -224,8 +242,11 @@
 <body>
 
 <div class="part-bar" id="top-bar">
-  <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light mode">Theme</button>
-  <button class="theme-toggle sketch-toggle" id="sketch-toggle" onclick="toggleSketch()" title="Switch the diagrams between sketch and classic style" hidden>Classic style</button>
+  <div class="top-tools" id="top-tools">
+    <button class="theme-toggle" id="info-toggle" type="button" onclick="toggleInfo()" aria-expanded="false" aria-controls="info-pop" title="Repository, range, build and the path of this page">Info</button>
+    <button class="theme-toggle sketch-toggle" id="sketch-toggle" onclick="toggleSketch()" title="Switch the diagrams between sketch and classic style" hidden>Classic style</button>
+    <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light mode">Theme</button>
+  </div>
 <!--@PART:brief--><button class="part-btn active" data-part="brief" onclick="switchPart('brief')">Brief</button><!--@/PART:brief-->
 <!--@PART:walkthrough--><button class="part-btn" data-part="walkthrough" onclick="switchPart('walkthrough')">Walkthrough</button><!--@/PART:walkthrough-->
 <!--@PART:maps--><button class="part-btn" data-part="maps" onclick="switchPart('maps')">Maps</button><!--@/PART:maps-->
@@ -234,22 +255,18 @@
 </div>
 
 <!--@PART:brief--><div id="part-brief" class="part-panel active"><div class="page">
-<!--@PROVENANCE-->
 <!--@BRIEF-->
 </div></div><!--@/PART:brief-->
 
 <!--@PART:walkthrough--><div id="part-walkthrough" class="part-panel"><div class="page">
-<!--@PROVENANCE-->
 <!--@WALKTHROUGH-->
 </div></div><!--@/PART:walkthrough-->
 
 <!--@PART:maps--><div id="part-maps" class="part-panel"><div class="page">
-<!--@PROVENANCE-->
 <!--@MAPS-->
 </div></div><!--@/PART:maps-->
 
 <!--@PART:summary--><div id="part-summary" class="part-panel"><div class="page">
-<!--@PROVENANCE-->
 <!--@SUMMARY-->
 </div></div><!--@/PART:summary-->
 
@@ -271,9 +288,15 @@
   </div>
   <div id="nav"><div id="nav-inner"></div></div>
   <div id="nav-resizer" title="Drag to resize, double-click to reset"></div>
-  <div id="main"><!--@PROVENANCE--><div id="excluded-note"></div><div id="fc"></div></div>
+  <div id="main"><div id="excluded-note"></div><div id="fc"></div></div>
 </div><!--@/PART:diff-->
 <div id="dg-overlay" hidden><button id="dg-close" type="button">Close</button><div id="dg-ov-body"></div></div>
+<div id="info-pop" hidden role="dialog" aria-label="About this page"><!--@PROVENANCE--></div>
+<div id="copybox" hidden role="dialog" aria-modal="true" aria-label="Copy by hand"><div class="cb-card">
+  <p>The browser refused to copy. The text is selected below: press Ctrl+C (Cmd+C on a Mac), then close.</p>
+  <textarea id="copybox-text" readonly spellcheck="false"></textarea>
+  <div class="cb-row"><button type="button" id="copybox-close">Close</button></div>
+</div></div>
 <div id="toast"></div>
 
 <script>
@@ -508,9 +531,11 @@ function toggleSketch() {
 }
 
 // ---------------- Diff review ----------------
-// Reviewed state lives under qexplain-change-diff-<slug>, the slug being the file name stem lowercased with _ as -.
-const FILE_STEM = decodeURIComponent(location.pathname.split('/').pop() || 'explanation').replace(/\.html?$/i, '');
-const STORE_KEY = 'qexplain-change-diff-' + FILE_STEM.toLowerCase().replace(/_/g, '-');
+// Reviewed state lives under qexplain-change-diff-<explanation id>. The build writes the id (repo name plus the file
+// name without its date and _vN), so a rebuild keeps the state; local pages share one storage area, hence the repo.
+function fileStem() { let n = location.pathname.split('/').pop() || 'explanation'; try { n = decodeURIComponent(n); } catch (e) {} return n.replace(/\.html?$/i, ''); }
+const PAGE_ID = QX.id || fileStem().toLowerCase().replace(/_/g, '-');
+const STORE_KEY = 'qexplain-change-diff-' + PAGE_ID;
 const TYPE_ORDER = [['src', 'Source'], ['test', 'Tests'], ['config', 'Configuration'], ['doc', 'Documentation'], ['generated', 'Generated'], ['other', 'Other']];
 function fileType(p) {
   // Keep in step with file_type() in scripts/qexplain_change_diff.py.
@@ -794,12 +819,69 @@ function showToast(msg) {
   t.textContent = msg; t.classList.add('show');
   clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
 }
+// Copy chain: the clipboard API, then the older copy command, then a box with the text selected for a manual copy.
+// A copy never fails silently.
+function copyLegacy(text) {
+  const t = document.createElement('textarea');
+  t.value = text; t.setAttribute('readonly', ''); t.style.cssText = 'position:fixed;top:0;left:-9999px;opacity:0';
+  document.body.appendChild(t);
+  const sel = document.getSelection(), kept = [];
+  for (let i = 0; sel && i < sel.rangeCount; i++) kept.push(sel.getRangeAt(i));
+  t.select(); t.setSelectionRange(0, text.length);
+  let ok = false; try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+  t.remove();
+  if (sel) { sel.removeAllRanges(); kept.forEach(r => sel.addRange(r)); }
+  return ok;
+}
+function showCopyBox(text) {
+  const box = document.getElementById('copybox'), t = document.getElementById('copybox-text');
+  t.value = text; box.hidden = false; t.focus(); t.select();
+}
+function closeCopyBox() { document.getElementById('copybox').hidden = true; }
 function copyText(text, msg, btn) {
-  navigator.clipboard.writeText(text).then(() => {
+  const done = () => {
     if (btn) { btn.classList.add('copied'); setTimeout(() => btn.classList.remove('copied'), 1500); }
     showToast(msg);
-  }).catch(() => showToast('Copy failed'));
+  };
+  const fallback = () => { if (copyLegacy(text)) done(); else showCopyBox(text); };
+  let p = null;
+  try { p = navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(text) : null; } catch (e) { p = null; }
+  if (p && p.then) p.then(done, fallback); else fallback();
 }
+document.getElementById('copybox-close').addEventListener('click', closeCopyBox);
+document.getElementById('copybox').addEventListener('click', e => { if (e.target.id === 'copybox') closeCopyBox(); });
+// The page shows where it lives on disk, so the reader can tell an agent which file the feedback is about.
+function pagePath() {
+  if (location.protocol !== 'file:') return location.href.split('#')[0];
+  let p = location.pathname; try { p = decodeURIComponent(p); } catch (e) {}
+  if (location.host) return '\\\\' + location.host + p.replace(/\//g, '\\');
+  return /^\/[A-Za-z]:\//.test(p) ? p.slice(1).replace(/\//g, '\\') : p;
+}
+function showPagePath() {
+  document.querySelectorAll('.pagepath').forEach(row => { row.querySelector('.pp-text').textContent = pagePath(); row.hidden = false; });
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest ? e.target.closest('.pp-copy') : null;
+  if (b) copyText(pagePath(), 'Copied the page path', b);
+});
+// Info menu: what the page was built from and where it lives, out of the way until asked for.
+function setInfo(open) {
+  document.getElementById('info-pop').hidden = !open;
+  document.getElementById('info-toggle').setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+function toggleInfo() { setInfo(document.getElementById('info-pop').hidden); }
+document.addEventListener('click', e => {
+  const pop = document.getElementById('info-pop');
+  if (!pop.hidden && !pop.contains(e.target) && !(e.target.closest && e.target.closest('#info-toggle'))) setInfo(false);
+});
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && document.getElementById('copybox').hidden) setInfo(false); });
+// The part bar leaves room on its right for however many tools are showing.
+function fitTools() {
+  const bar = document.getElementById('top-bar'), tools = document.getElementById('top-tools');
+  bar.style.paddingRight = getComputedStyle(tools).position === 'fixed' ? (tools.offsetWidth + 28) + 'px' : '';
+  document.documentElement.style.setProperty('--part-bar-h', bar.offsetHeight + 'px');
+}
+window.addEventListener('resize', fitTools);
 function copyRef(which) { const v = which === 'base' ? QX.base : QX.head; copyText(v, 'Copied: ' + v, document.getElementById('hcp-' + which)); }
 // Click a diff cell to toggle the row between truncated and wrapped.
 document.addEventListener('click', e => {
@@ -818,6 +900,7 @@ document.addEventListener('mouseup', () => {
   copyText('// ' + ref + '\n' + txt, 'Copied (' + ref + ')');
 });
 // Keys act only on the Diff review part, and never while typing or with a modifier held (Ctrl+C stays copy).
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !document.getElementById('copybox').hidden) closeCopyBox(); });
 document.addEventListener('keydown', e => {
   if (!diffActive() || e.ctrlKey || e.metaKey || e.altKey || /^(TEXTAREA|INPUT)$/.test(e.target.tagName)) return;
   const cur = ordered[curIdx];
@@ -866,6 +949,8 @@ window.addEventListener('DOMContentLoaded', () => {
   applyTheme(isDark());
   applySketch(document.documentElement.getAttribute('data-sketch') === 'classic');
   if (QX.hasD2) document.getElementById('sketch-toggle').hidden = false;
+  showPagePath();
+  fitTools();
   switchPart(PART_KEYS[0], false);
   restoreFromHash();
 });

@@ -53,8 +53,7 @@ const out = opt('--out') || fs.mkdtempSync(path.join(os.tmpdir(), 'qexplain-chan
 fs.mkdirSync(out, { recursive: true });
 const libs = opt('--libs');
 const url = require('url').pathToFileURL(path.resolve(file)).href;
-const stem = path.basename(file).replace(/\.html?$/i, '');
-const storeKey = 'qexplain-change-diff-' + stem.toLowerCase().replace(/_/g, '-');
+let storeKey = '';   // 'qexplain-change-diff-' + the explanation id the build wrote into the page
 
 let bad = 0;
 const log = (ok, msg) => { if (!ok) bad++; console.log((ok ? 'OK\t' : 'BAD\t') + msg); };
@@ -86,12 +85,37 @@ async function routeLibs(target) {
     files: (QX.rawDiff.match(/^diff --git /gm) || []).length,
   }));
   const has = p => info.parts.includes(p);
+  storeKey = await page.evaluate(() => STORE_KEY);
+  log(await page.evaluate(() => typeof QX.id === 'string' && QX.id.length > 0 && STORE_KEY === 'qexplain-change-diff-' + QX.id), 'state is stored under the explanation id: ' + storeKey);
+  // The page path, and the copy chain down to the manual box
+  await page.evaluate(() => switchPart('brief')); await wait(200);
+  await page.click('#info-toggle'); await wait(150);
+  const shown = await page.evaluate(() => { const r = document.querySelector('#info-pop .pagepath'); return r && !r.hidden ? r.querySelector('.pp-text').textContent : ''; });
+  log(shown.length > 0 && path.resolve(shown) === path.resolve(file), 'the page shows its own path: ' + shown);
+  await page.click('#info-pop .pp-copy'); await wait(300);
+  log(await page.evaluate(() => navigator.clipboard.readText().catch(() => '')) === shown, 'copy path puts the path on the clipboard');
+  await page.evaluate(() => { window.__w = navigator.clipboard.writeText.bind(navigator.clipboard); navigator.clipboard.writeText = () => Promise.reject(new Error('refused')); });
+  await page.evaluate(() => navigator.clipboard.readText().catch(() => '')).catch(() => {});
+  await page.evaluate(() => window.__w('cleared'));
+  await page.click('#info-pop .pp-copy'); await wait(300);
+  log(await page.evaluate(() => navigator.clipboard.readText().catch(() => '')) === shown, 'with the clipboard API refusing, the older copy command still copies');
+  await page.evaluate(() => { window.__x = document.execCommand; document.execCommand = () => false; });
+  await page.click('#info-pop .pp-copy'); await wait(300);
+  log(await page.evaluate(v => !document.getElementById('copybox').hidden && document.getElementById('copybox-text').value === v, shown), 'with both refusing, a box shows the text selected for a manual copy');
+  await page.keyboard.press('Escape'); await wait(150);
+  log(await page.evaluate(() => document.getElementById('copybox').hidden && !document.getElementById('info-pop').hidden), 'Escape closes that box and leaves the Info menu open');
+  await page.mouse.click(300, 400); await wait(150);
+  log(await page.evaluate(() => document.getElementById('info-pop').hidden), 'a click outside closes the Info menu');
+  await page.evaluate(() => { navigator.clipboard.writeText = window.__w; document.execCommand = window.__x; });
   log(has('brief'), `parts present: ${info.parts.join(', ')}`);
 
   // 1. Provenance on every part, and Mermaid in the brief
   for (const p of info.parts) {
     await page.evaluate(k => switchPart(k), p); await wait(400);
-    log(await page.$(`#part-${p} .prov`) !== null, `provenance strip on ${p}`);
+    await page.click('#info-toggle'); await wait(150);
+    log(await page.evaluate(() => { const p = document.querySelector('#info-pop .prov'); return !!p && p.getBoundingClientRect().height > 20 && document.querySelectorAll('.prov').length === 1; }), `Info menu shows the provenance on ${p}`);
+    await page.keyboard.press('Escape'); await wait(100);
+    log(await page.evaluate(() => document.getElementById('info-pop').hidden), `Escape closes the Info menu on ${p}`);
   }
   await page.evaluate(() => switchPart('brief')); await wait(1500);
   const briefMermaid = await page.$$eval('#part-brief .mmd', ns => ns.map(n => !!n.querySelector('svg') && !/Syntax error/i.test(n.textContent)));

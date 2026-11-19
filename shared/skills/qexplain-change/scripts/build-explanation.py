@@ -246,6 +246,25 @@ def repo_provenance(label, repo, diff_args):
     }
 
 
+def explanation_id(out, repo_names, override=None):
+    """The identity of one explanation across rebuilds: the reader's comments and review state are stored under it.
+
+    Local pages share one storage area in the browser, so the id names the repo as well as the explanation. The
+    date prefix and a _vN suffix are dropped from the file name, so a rebuild on another day or as _v2 keeps the id.
+    """
+    if override and override.strip():
+        return slug(override)
+    stem = re.sub(r"\.html?$", "", os.path.basename(out), flags=re.I)
+    stem = re.sub(r"^\d{6}(?:-\d{4})?[_-]+", "", stem)
+    stem = re.sub(r"[_-]+v\d+$", "", stem, flags=re.I)
+    return slug("+".join(repo_names)) + "--" + slug(stem)
+
+
+def repo_name(repo):
+    top = git_out(repo, "rev-parse", "--show-toplevel")
+    return os.path.basename(os.path.normpath(top or os.path.abspath(repo)))
+
+
 def provenance_html(repos, plans, d2_version, tickets, links, left_out, show_left_out):
     esc = html.escape
     rows = []
@@ -259,6 +278,8 @@ def provenance_html(repos, plans, d2_version, tickets, links, left_out, show_lef
     if show_left_out and left_out:
         rows.append('<span class="prov-row">Left out of this page: '
                     + esc(", ".join(f'{qd.safe_path(x["path"])} ({x["reason"]})' for x in left_out)) + ".</span>")
+    rows.append('<span class="prov-row pagepath" hidden>File: <span class="pp-text"></span> '
+                '<button type="button" class="pp-copy" title="Copy this page\'s path">copy path</button></span>')
     return '<div class="prov">' + "".join(rows) + "</div>"
 
 
@@ -624,6 +645,8 @@ def main(argv=None):
     ap.add_argument("--user-confirmed-credential", action="append", default=[],
                     help="<path>:<side>:<line> of one match the user has said is not a live credential")
     ap.add_argument("--repo", default=".")
+    ap.add_argument("--id", help="explanation id that keeps the reader's comments and review state across rebuilds; "
+                                 "default: the repo name plus the --out file name without its date and _vN")
     ap.add_argument("--parts", default="brief,diff", help="comma list of brief, walkthrough, maps, summary, diff (brief is always emitted)")
     ap.add_argument("--brief")
     ap.add_argument("--walkthrough")
@@ -699,9 +722,11 @@ def main(argv=None):
     if args.diff_file:
         repos, plans = [{"label": "diff file", "branch": "not recorded", "base": args.base, "head": args.head, "commits": "not recorded"}], []
         base_text, head_text = args.base, args.head
+        repo_names = ["diff-file"]
     else:
         targets = [qd.parse_target(t) for t in args.target] if args.target else [(None, args.repo, args.diff_args)]
         repos, plans = [], []
+        repo_names = [label or repo_name(repo) for label, repo, _ in targets]
         for label, repo, diff_args in targets:
             repos.append(repo_provenance(label, repo, diff_args))
             plans += [s for s in qd.plans_in_range(repo, diff_args)[0] if s not in plans]
@@ -759,7 +784,7 @@ def main(argv=None):
         "<!--@MAPS-->": maps_out,
         "<!--@SUMMARY-->": summary_out,
         "/*@DATA*/": "const QX = " + script_json({
-            "base": base_text, "head": head_text, "views": view_data, "mermaid": diagrams.mermaid,
+            "id": explanation_id(args.out, repo_names, args.id), "base": base_text, "head": head_text, "views": view_data, "mermaid": diagrams.mermaid,
             "hasD2": any(r["kind"] == "d2" for r in diagrams.rendered.values()),
             "rationales": rationales, "rawDiff": raw if "diff" in selected else "", "excluded": left_out,
             "paths": [path for path, _ in kept],
@@ -884,6 +909,17 @@ def selftest():
         case("brief-only page builds and validates", rc == 0 and 'id="part-diff"' not in page and 'data-part="diff"' not in page and '"rawDiff": ""' in page, log[-300:])
         rc, log, page = run("brief-diff", std)
         case("brief and diff page", rc == 0 and 'id="part-diff"' in page and "diff --git" in page, log[-300:])
+        case("the page carries an explanation id made of the repo and the file name", '"id": "repo--brief-diff"' in page, page[page.find("const QX"):][:120])
+        case("the Info menu holds the provenance once, with the page path row and no id", page.count('class="prov-row pagepath"') == 1 and 'id="pagepath' not in page, "")
+        eid = explanation_id
+        case("explanation id drops the date prefix and a _vN suffix, so a rebuild keeps it",
+             eid("x/260819_ARUBA_LIVENESS_EXPLANATION.html", ["gwadapter"]) == eid("y/260901-1530_ARUBA_LIVENESS_EXPLANATION_v3.html", ["gwadapter"])
+             == "gwadapter--aruba-liveness-explanation", eid("x/260819_ARUBA_LIVENESS_EXPLANATION.html", ["gwadapter"]))
+        case("explanation id differs between repos and joins several", eid("a.html", ["one"]) != eid("a.html", ["two"])
+             and eid("a.html", ["gw", "se"]) == "gw-se--a", eid("a.html", ["gw", "se"]))
+        case("--id overrides the explanation id", eid("a.html", ["one"], "My Review 7") == "my-review-7", "")
+        rc, log, page = run("with-id", std + ["--id", "Chosen ID"])
+        case("--id reaches the page", rc == 0 and '"id": "chosen-id"' in page, log[-200:])
         case("provenance shows branch, both SHAs, plan and commit count", "260101_DEMO_PLAN" in page and "branch main" in page and f"base {first}" in page
              and f"head {second}" in page and "1 commits" in page and "not recorded" in page, "")
         # Mermaid-only, all parts
