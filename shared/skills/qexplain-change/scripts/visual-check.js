@@ -118,15 +118,15 @@ async function routeLibs(target) {
   const cmKey = await page.evaluate(() => CM_KEY);
   await page.evaluate(k => localStorage.removeItem(k), cmKey);
   await page.reload(); await wait(1200);
-  const selectProse = () => page.evaluate(() => {
-    const w = document.createTreeWalker(document.querySelector('#part-brief .page'), NodeFilter.SHOW_TEXT);
-    let t; while ((t = w.nextNode())) { if (t.nodeValue.trim().length > 60 && t.parentElement.closest('p')) break; }
-    const r = document.createRange(); r.setStart(t, 2); r.setEnd(t, 40);
-    t.parentElement.scrollIntoView({ block: 'center' });
-    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
-    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
-    return s.toString();
-  });
+  // Scrolls first and selects afterwards: a scroll hides the Comment button, as it should for a reader.
+  const selectProse = async () => {
+    const find = `const w = document.createTreeWalker(document.querySelector('#part-brief .page'), NodeFilter.SHOW_TEXT);
+      let t; while ((t = w.nextNode())) { if (t.nodeValue.trim().length > 60 && t.parentElement.closest('p')) break; }`;
+    await page.evaluate(find + ` t.parentElement.scrollIntoView({ block: 'center' });`); await wait(200);
+    return page.evaluate(find + ` const r = document.createRange(); r.setStart(t, 2); r.setEnd(t, 40);
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+      document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); s.toString();`);
+  };
   const quoted = await selectProse(); await wait(350);
   const selCopy = (await page.evaluate(() => navigator.clipboard.readText().catch(() => ''))).replace(/\r\n/g, '\n');
   log(selCopy.startsWith('// ' + await page.evaluate(() => cmPartName(PART_KEYS[0]))) && selCopy.split('\n').length === 2 && selCopy.endsWith('\n' + quoted), `selecting prose copies it with a line saying where it is from: ${selCopy.split('\n')[0]}`);
@@ -233,6 +233,79 @@ async function routeLibs(target) {
   await page.evaluate(() => { document.querySelector('.cm-card .cm-cancel').click(); CM.items = []; cmChanged(); cmPanel(false); });
   log(await page.evaluate(() => { const tools = document.getElementById('top-tools').getBoundingClientRect(), last = [...document.querySelectorAll('.part-btn')].pop().getBoundingClientRect();
     return getComputedStyle(document.getElementById('top-tools')).position !== 'fixed' || last.right <= tools.left; }), 'the part buttons stay clear of the tools with the comment button added');
+  // Comments on a D2 diagram: a node, a connection, the whole diagram; one decision path for a click
+  const d2dg = await page.evaluate(() => { const dg = document.querySelector('#part-brief .dg[data-kind="d2"]'); if (!dg) return null; dg.scrollIntoView({ block: 'center' }); return dg.id; });
+  if (d2dg) {
+    await wait(300);
+    const partAt = (edge, nth) => page.evaluate(([id, edge, nth]) => { const dg = document.getElementById(id), all = cmDgParts(dg), ps = all.filter(p => p.edge === edge);
+      const p = (edge ? ps : ps.filter(q => !all.some(o => o.id.startsWith(q.id + '.'))))[nth]; if (!p) return null;
+      if (edge) { const pts = cmEdgePts(p.g), m = pts[Math.floor(pts.length / 2)]; return { id: p.id, x: m[0], y: m[1] }; }
+      const b = p.g.getBoundingClientRect(); return { id: p.id, x: b.left + b.width / 2, y: b.top + b.height / 2 }; }, [d2dg, edge, nth]);
+    const ringFits = () => page.evaluate(id => { const dg = document.getElementById(id), c = CM.items.find(x => x.kind === 'dg' && x.tk === 'node'), r = dg.querySelector('.cm-ring:not(.cm-whole):not(.cm-hot)');
+      if (!c || !r) return false; const a = r.getBoundingClientRect(), g = cmDgGroup(dg, c._did, true).getBoundingClientRect();
+      return Math.abs(a.left - (g.left - 4)) < 2 && Math.abs(a.top - (g.top - 4)) < 2 && Math.abs(a.width - (g.width + 8)) < 2; }, d2dg);
+    const n0 = await partAt(false, 0);
+    await page.mouse.click(n0.x, n0.y); await wait(300);
+    log(await page.evaluate(() => !document.getElementById('dg-overlay').hidden && !document.querySelector('.cm-card')), 'outside comment mode a click on a diagram opens it full window, and no comment box');
+    await page.evaluate(() => closeOverlay());
+    await page.click('#' + d2dg + ' .cm-dgbtn'); await wait(200);
+    await page.mouse.move(n0.x - 3, n0.y); await page.mouse.move(n0.x, n0.y); await wait(250);
+    log(await page.evaluate(id => { const dg = document.getElementById(id); const tip = dg.querySelector('.cm-dgtip'); return dg.classList.contains('cm-mode') && dg.querySelectorAll('.cm-ring.cm-hot').length === 1 && getComputedStyle(tip).display !== 'none'
+      && tip.textContent.startsWith('Click a node or a connection') && tip.getBoundingClientRect().bottom <= cmDgBox(dg).getBoundingClientRect().top + 1; }, d2dg),
+      'the diagram button turns on comment mode, and the pointer rings the part under it');
+    await page.mouse.click(n0.x, n0.y); await wait(300);
+    const nt = await page.evaluate(() => (document.querySelector('.cm-card .cm-k') || {}).textContent || '');
+    log(await page.evaluate(() => document.getElementById('dg-overlay').hidden && !!document.querySelector('.cm-card')) && nt.startsWith('Node ') && nt.includes(n0.id) && nt.includes(' in diagram "'),
+      `in comment mode a click on a node opens a comment on it, and not the full-window view: ${nt}`);
+    await page.keyboard.type('node comment'); await page.keyboard.press('Enter'); await wait(300);
+    log(await page.evaluate(([id, did]) => { const c = CM.items.find(x => x.kind === 'dg'), dg = document.getElementById(id);
+      return !!c && c.tk === 'node' && c.did === did && c.dname === dg.dataset.name && c._state === 'anchored' && dg.querySelectorAll('.cm-dgl .cm-mark').length === 1; }, [d2dg, n0.id]) && await ringFits(),
+      'a node comment stores the diagram name and the D2 id, and rings the node with a numbered marker');
+    const e0 = await partAt(true, 0);
+    if (e0) {
+      await page.mouse.click(e0.x, e0.y); await wait(300);
+      const et = await page.evaluate(() => (document.querySelector('.cm-card .cm-k') || {}).textContent || '');
+      await page.keyboard.type('edge comment'); await page.keyboard.press('Enter'); await wait(300);
+      log(et.startsWith('Connection ') && await page.evaluate(([id, did]) => { const c = CM.items.find(x => x.kind === 'dg' && x.tk === 'edge'), dg = document.getElementById(id);
+        return !!c && c.did === did && !!cmDgGroup(dg, did, true) && cmDgGroup(dg, did, true).classList.contains('cm-eg') && dg.querySelectorAll('.cm-dgl .cm-mark').length === 2; }, [d2dg, e0.id]),
+        `a click on a connection's line comments on that connection: ${et}`);
+    }
+    const bg = await page.evaluate(id => { const dg = document.getElementById(id), b = cmDgBox(dg).getBoundingClientRect();
+      for (let y = b.top + 4; y < b.bottom - 4; y += 6) for (let x = b.left + 4; x < Math.min(b.right, window.innerWidth) - 40; x += 6) if (!cmDgHit(dg, x, y) && document.elementFromPoint(x, y) && document.elementFromPoint(x, y).closest('.dgv')) return { x, y };
+      return null; }, d2dg);
+    if (bg) {
+      await page.mouse.click(bg.x, bg.y); await wait(300);
+      log(await page.evaluate(id => (document.querySelector('.cm-card .cm-k') || {}).textContent === 'The whole diagram "' + document.getElementById(id).dataset.name + '"' && !!document.querySelector('#' + id + ' .cm-ring.cm-whole.cm-pending'), d2dg),
+        'a click on the background comments on the whole diagram');
+      await page.keyboard.press('Escape'); await wait(150);
+    }
+    if (await page.evaluate(() => !document.getElementById('sketch-toggle').hidden)) {
+      await page.click('#sketch-toggle'); await wait(400); const fitsOther = await ringFits();
+      await page.click('#sketch-toggle'); await wait(400);
+      log(fitsOther && await ringFits(), 'the ring follows its node when the diagram switches between sketch and classic');
+    }
+    await page.keyboard.press('Escape'); await wait(200);
+    await page.mouse.click(n0.x, n0.y); await wait(300);
+    log(await page.evaluate(id => !document.getElementById(id).classList.contains('cm-mode') && !document.getElementById('dg-overlay').hidden && !document.querySelector('.cm-card'), d2dg),
+      'Escape leaves comment mode; a click on a commented node then opens the full-window view again');
+    await page.evaluate(() => closeOverlay());
+    const dgFb = await page.evaluate(() => cmFeedback());
+    log(dgFb.includes(' > Node ') && dgFb.includes(n0.id) && dgFb.includes(' in diagram "') && (!e0 || dgFb.includes(' > Connection ')), 'the copied text names the diagram and the node or connection, with its id');
+    await page.evaluate(() => { if (PART_KEYS.length > 1) switchPart(PART_KEYS[1], true); }); await wait(300);
+    await page.reload(); await wait(1500);
+    log(await page.evaluate(() => { const cs = CM.items.filter(x => x.kind === 'dg'); return document.querySelector('.part-btn.active').dataset.part !== PART_KEYS[0] && cs.length >= 1 && cs.every(c => c._state === 'anchored' && c._n > 0)
+      && !cmFeedback().includes('not found'); }), 'after a reload on another part the diagram comments are still in place, before their diagram is shown');
+    await page.evaluate(() => { const c = CM.items.find(x => x.kind === 'dg' && x.tk === 'node'); c.did = 'gone.id'; cmResolve(); window.__st1 = c._state + ':' + c._did; c.dlabel = 'no such label'; cmResolve(); window.__st2 = c._state; });
+    log(await page.evaluate(() => window.__st1.startsWith('moved:') && window.__st1 !== 'moved:gone.id' && window.__st2 === 'notfound'), 'a node whose id changed is taken up again by its label, and is not found when the label is gone too');
+    await page.evaluate(() => { switchPart(PART_KEYS[0], true); CM.items = []; cmChanged(); }); await wait(300);
+  }
+  const looks = await page.evaluate(() => { const css = e => { const s = getComputedStyle(e); return [s.width, s.height, s.borderTopColor, s.borderTopLeftRadius, s.color].join(); };
+    const mm = [...document.querySelectorAll('.dg[data-kind="mermaid"]')].find(d => !cmDgParts(d).length); let hint = null;
+    if (mm) { cmDgSetMode(mm); hint = mm.querySelector(':scope > .cm-dgtip').textContent; cmDgSetMode(null); }
+    const all = ['.cm-dgbtn', '.cm-tadd', '#cm-blk-add', '#cm-tbl-add'].map(s => document.querySelector(s)).filter(Boolean).map(css);
+    return { hint, same: all.length >= 3 && all.every(x => x === all[0]), add: !!document.querySelector('#cm-add svg') }; });
+  if (looks.hint !== null) log(looks.hint.startsWith('Click the diagram to comment on it as a whole'), 'the comment-mode hint says what the diagram allows: a diagram with no known parts is commented as a whole');
+  log(looks.same && looks.add, 'every comment button on the page has the same size, border and colour, and the speech bubble');
   // The Annotate switch hides every comment button, marker and highlight, and keeps the comments
   await selectProse(); await wait(250); await page.click('#cm-add'); await page.keyboard.type('kept'); await page.keyboard.press('Enter'); await wait(250);
   await page.click('#cm-toggle'); await wait(250);

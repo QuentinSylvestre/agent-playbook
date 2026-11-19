@@ -454,25 +454,30 @@ class Diagrams:
         if kind == "d2":
             variants = render_d2(self.d2_exe, name, text)
             ids = d2_ids(variants[("light", "classic")])
-            rec = {"kind": "d2", "variants": variants, "ids": ids, "tokens": sorted(ids.values()), "seq": False}
+            rec = {"kind": "d2", "name": name, "variants": variants, "ids": ids, "tokens": sorted(ids.values()), "seq": False}
         else:
             mid = f"m{self.counter}"
             self.mermaid[mid] = text
-            rec = {"kind": "mermaid", "html": f'<div class="mermaid mmd" data-mid="{mid}" title="Click to enlarge"></div>',
+            rec = {"kind": "mermaid", "name": name, "mid": mid, "html": f'<div class="mermaid mmd" data-mid="{mid}" title="Click to enlarge"></div>',
                    "ids": {}, "tokens": [], "seq": bool(SEQ_MMD.search(text))}
         self.rendered[name] = rec
         return rec
 
     def unit(self, name):
-        """Return (html, wrapper id) for one use of a diagram. Each use gets its own wrapper id."""
+        """Return (html, wrapper id) for one use of a diagram. Each use gets its own wrapper id.
+
+        The wrapper id is a counter and changes when a diagram is added earlier in the page, so the wrapper also
+        carries the diagram's own name: a reader's comment finds its diagram by that name after a rebuild.
+        """
         rec = self.render(name)
         self.instances += 1
         dg = f"dg-{self.instances}"
+        who = f'data-name="{html.escape(name, quote=True)}" data-kind="{rec["kind"]}"'
         if rec["kind"] == "d2":
             inner = "".join(f'<div class="dgv v-{theme} v-{style}" title="Click to enlarge">{uniquify_ids(rec["variants"][(theme, style)], f"u{self.instances}-{theme[0]}{style[0]}-")}</div>'
                             for theme in ("light", "dark") for style in ("sketch", "classic"))
-            return f'<div class="dg" id="{dg}">{inner}</div>', dg
-        return f'<div class="dg" id="{dg}">{rec["html"]}</div>', dg
+            return f'<div class="dg" id="{dg}" {who}>{inner}</div>', dg
+        return f'<div class="dg" id="{dg}" {who}>{rec["html"]}</div>', dg
 
 
 def fill_placeholders(text, diagrams, where):
@@ -786,6 +791,9 @@ def main(argv=None):
         "/*@DATA*/": "const QX = " + script_json({
             "id": explanation_id(args.out, repo_names, args.id), "base": base_text, "head": head_text, "views": view_data, "mermaid": diagrams.mermaid,
             "hasD2": any(r["kind"] == "d2" for r in diagrams.rendered.values()),
+            # Per diagram name: its kind, and for D2 the id of every object with its class token, and the source.
+            "dg": {n: ({"kind": "d2", "ids": r["ids"], "src": diagrams.sources[n][1]} if r["kind"] == "d2" else {"kind": "mermaid", "mid": r["mid"]})
+                   for n, r in diagrams.rendered.items()},
             "rationales": rationales, "rawDiff": raw if "diff" in selected else "", "excluded": left_out,
             "paths": [path for path, _ in kept],
         }) + ";",
@@ -1009,6 +1017,8 @@ def selftest():
                     "--parts", "brief,walkthrough,maps,summary,diff", "--walkthrough", os.path.join(content, "walkthrough.html"), "--maps", os.path.join(content, "maps-d2.json"), "--diagrams", good]
             rc, log, page = run("all-d2", args)
             case("all parts with D2 architecture and sequence diagrams", rc == 0 and "D2: v" in page, log[-500:], d2=True)
+            case("each diagram names itself on its wrapper and in the page data", bool(re.search(r'<div class="dg" id="dg-\d+" data-name="arch" data-kind="d2">', page))
+                 and bool(re.search(r'"dg": \{', page)) and bool(re.search(r'"arch": \{\s*"kind": "d2",\s*"ids": \{', page)) and '"src": ' in page, page[page.find('"dg"'):][:160], d2=True)
             case("each D2 diagram is inlined in four variants", all(page.count(f'class="dgv v-{t} v-{s}"') >= 3 for t in ("light", "dark") for s in ("sketch", "classic")), "", d2=True)
             import collections
             ids = re.findall(r'\sid="([^"]+)"', page)

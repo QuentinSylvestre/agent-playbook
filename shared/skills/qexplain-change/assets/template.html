@@ -281,6 +281,23 @@
   .cm-it-a .cm-save, .cm-pf .cm-save { background: #b26a00; border-color: #8a5200; color: #fff; }
   .cm-it textarea { display: block; width: 100%; min-height: 70px; resize: vertical; font: inherit; margin: 6px 0; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface); color: var(--text); }
   .cm-it textarea:focus { outline: 2px solid #d68f00; outline-offset: 0; }
+  /* Diagram comments: a button on each diagram turns on a comment mode; rings and markers stand in a layer beside the drawing. */
+  .cm-dgbar { position: absolute; top: 6px; right: 6px; z-index: 4; display: flex; align-items: center; gap: 6px; }
+  .cm-dgbtn { display: flex; align-items: center; justify-content: center; width: 26px; height: 22px; padding: 0; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface); color: var(--text-light); cursor: pointer; }
+  .cm-dgbtn:hover { border-color: #b26a00; color: #b26a00; }
+  .cm-dgbtn[aria-pressed="true"] { background: #0969da; border-color: #0969da; color: #fff; }
+  .cm-dgtip { display: none; position: absolute; right: 0; bottom: 100%; margin-bottom: 4px; padding: 1px 9px; border-radius: 10px; background: #0969da; color: #fff; font-size: 11px; line-height: 1.6; white-space: nowrap; }
+  .dg.cm-mode > .cm-dgtip { display: block; }
+  .dg.cm-mode .dgv, .dg.cm-mode .mmd { cursor: crosshair; outline: 2px dashed rgba(9, 105, 218, 0.6); outline-offset: -2px; }
+  .cm-dgl { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 3; }
+  .cm-ring { position: absolute; border: 2px solid #d68f00; border-radius: 7px; box-shadow: 0 0 0 3px rgba(214, 143, 0, 0.22); }
+  .cm-ring.cm-whole { border-style: dashed; border-radius: 4px; box-shadow: none; }
+  .cm-ring.cm-hot, .cm-ring.cm-pending, .cm-ring.cm-active { border-color: #0969da; box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.22); }
+  .cm-ring.cm-whole.cm-hot, .cm-ring.cm-whole.cm-pending, .cm-ring.cm-whole.cm-active { box-shadow: none; }
+  .cm-ring.cm-flash { animation: cm-flash 0.5s 3; }
+  .dg g.cm-eg { filter: drop-shadow(0 0 2px #d68f00) drop-shadow(0 0 1px #d68f00); }
+  .dg g.cm-eg.cm-eg-on { filter: drop-shadow(0 0 2px #0969da) drop-shadow(0 0 1px #0969da); }
+  body.cm-off .dg g.cm-eg { filter: none; }
   .cm-labs { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
   .cm-lab { padding: 1px 8px; border: 1px solid var(--border-strong); border-radius: 10px; background: transparent; color: var(--text-light); font-size: 11px; cursor: pointer; }
   .cm-lab:hover { border-color: #0969da; }
@@ -321,7 +338,7 @@
   .cm-sw:focus-visible { outline: 2px solid #ffd166; outline-offset: 2px; }
   #theme-toggle { display: inline-flex; align-items: center; justify-content: center; height: 1.65rem; padding: 0 0.5rem; }
   body.cm-off .cm-layer, body.cm-off #cm-add, body.cm-off .cm-badd, body.cm-off #cm-hint, body.cm-off .cm-tadd, body.cm-off .cm-tmark, body.cm-off .cbtn, body.cm-off .cm-fmark,
-  body.cm-off .cm-dmark, body.cm-off #cm-panel-btn, body.cm-off #cm-panel, body.cm-off #copy-feedback { display: none !important; }
+  body.cm-off .cm-dgbar, body.cm-off .cm-dgl, body.cm-off .cm-dmark, body.cm-off #cm-panel-btn, body.cm-off #cm-panel, body.cm-off #copy-feedback { display: none !important; }
   body.cm-off tr.cm-dl td, body.cm-off tr.cm-dl td.ln { box-shadow: none; }
   .part-btn.cm-on { box-shadow: inset 0 0 0 2px rgba(9, 105, 218, 0.55); border-radius: 4px 4px 0 0; }
   .fh.cm-fh-on { box-shadow: inset 3px 0 0 rgba(9, 105, 218, 0.9); }
@@ -351,6 +368,13 @@
   @keyframes cm-nudge { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
   @media (max-width: 760px) { .cm-mark { width: 15px; height: 15px; line-height: 15px; font-size: 9.5px; left: 0 !important; }
     .cm-card { left: 0 !important; top: auto !important; bottom: 0; width: 100%; border-radius: 10px 10px 0 0; } }
+  /* One look for every comment button on the page: an amber speech bubble, filled on hover, blue while its mode is on. */
+  .cm-badd, .cbtn, .cm-tadd, .cm-dgbtn { width: 24px; height: 20px; padding: 0; border: 1px solid #b26a00; border-radius: 5px; background: var(--surface); color: #b26a00; cursor: pointer; }
+  .cm-badd:hover, .cm-badd:focus-visible, .cbtn:hover, .cbtn:focus-visible, .cm-tadd:hover, .cm-dgbtn:hover, .cm-dgbtn:focus-visible { background: #b26a00; border-color: #b26a00; color: #fff; }
+  .cm-dgbtn[aria-pressed="true"], .cm-dgbtn[aria-pressed="true"]:hover { background: #0969da; border-color: #0969da; color: #fff; }
+  #cm-add { display: inline-flex; align-items: center; gap: 5px; }
+  /* One look for the text buttons of the comment box and the panel. */
+  .cm-acts button, .cm-it-a button, .cm-ph button, .cm-pf button { padding: 3px 10px; border-radius: 4px; font-size: 12px; line-height: 1.4; }
 </style>
 </head>
 <body>
@@ -522,7 +546,7 @@ function renderMermaid(root, done) {
   if (!nodes.length) { if (done) done(); return; }
   nodes.forEach(el => { el.removeAttribute('data-processed'); el.textContent = QX.mermaid[el.dataset.mid]; el.dataset.theme = theme; });
   mermaid.initialize({ startOnLoad: false, theme, sequence: { mirrorActors: false } });
-  mermaid.run({ nodes }).catch(() => {}).then(() => { nodes.forEach(fixMermaidNotes); document.querySelectorAll('.dg.plain').forEach(mermaidPlain); if (done) done(); });
+  mermaid.run({ nodes }).catch(() => {}).then(() => { nodes.forEach(fixMermaidNotes); document.querySelectorAll('.dg.plain').forEach(mermaidPlain); if (done) done(); if (cmReady) cmRefresh(); });
 }
 
 // ---------------- Guided tours ----------------
@@ -1044,6 +1068,7 @@ function closeOverlay() { document.getElementById('dg-overlay').hidden = true; d
 document.addEventListener('click', e => {
   if (e.target.closest('#dg-overlay')) { if (e.target.id === 'dg-overlay' || e.target.id === 'dg-close') closeOverlay(); return; }
   if ((window.getSelection() || '').toString()) return;
+  if (cmDgMode && e.target.closest('.dg') === cmDgMode) return;   // comment mode owns the click
   const dgv = e.target.closest('.dgv'), mm = e.target.closest('.dg .mmd');
   const svg = dgv ? dgv.querySelector(':scope > svg') : (mm ? mm.querySelector('svg') : null);
   if (svg) openOverlay(svg);
@@ -1128,6 +1153,7 @@ function cmResolve() {
     c._pieces = null; c._el = null; c._at = -1; c._state = 'notfound';
     if (c.state === 'resolved') return;
     if (c.part === 'page') { c._pieces = []; c._state = 'anchored'; c._at = c.t; return; }
+    if (c.kind === 'dg') { cmResolveDg(c); return; }
     if (c.kind === 'part') { if (PART_KEYS.includes(c.part)) { c._pieces = []; c._state = 'anchored'; c._at = -1; } return; }
     if (c.part === 'diff') { cmResolveDiff(c); return; }
     const e = CMX[c.part]; if (!e) return;
@@ -1151,7 +1177,7 @@ function cmDraw() {
     if (root.offsetParent === null) return;   // the part is not on screen: nothing can be measured
     const layer = document.createElement('div'); layer.className = 'cm-layer';
     const base = root.getBoundingClientRect(), taken = [];
-    CM.items.filter(c => c.part === part && c._pieces && c.kind !== 'part').sort((x, y) => x._n - y._n).forEach(c => {
+    CM.items.filter(c => c.part === part && c._pieces && c.kind !== 'part' && c.kind !== 'dg').sort((x, y) => x._n - y._n).forEach(c => {
       const rects = cmRectsOf(c._el, c._pieces);
       if (!rects.length) return;              // inside a sub-tab that is not showing
       rects.forEach(b => {
@@ -1169,7 +1195,7 @@ function cmDraw() {
       layer.appendChild(m);
     });
     // The text being commented on stays marked while the box is open: the box takes the focus, and with it the selection.
-    if (cmDraft && cmDraft.part === part && cmDraft.kind !== 'part') cmRectsOf(cmDraft.el, cmDraft.pieces).forEach(b => {
+    if (cmDraft && cmDraft.part === part && cmDraft.kind !== 'part' && cmDraft.kind !== 'dg') cmRectsOf(cmDraft.el, cmDraft.pieces).forEach(b => {
       const d = document.createElement('div'); d.className = 'cm-hl cm-pending' + (cmDraft.el ? ' cm-blk' : '');
       d.style.cssText = 'left:' + (b.left - base.left) + 'px;top:' + (b.top - base.top) + 'px;width:' + b.width + 'px;height:' + b.height + 'px';
       layer.appendChild(d);
@@ -1177,6 +1203,7 @@ function cmDraw() {
     root.appendChild(layer);
   });
   cmDrawDiff();
+  cmDrawDg();
   cmDrawParts();
   cmPanelMark();
 }
@@ -1189,6 +1216,142 @@ function cmBoxes(pieces) {
   const out = [];
   pieces.forEach(r => Array.from(r.getClientRects()).forEach(b => { if (b.width > 0.5 && b.height > 0.5) out.push(b); }));
   return out;
+}
+// --- Comments on diagrams. A button on each diagram turns on a comment mode: a click on a node or a connection
+// comments on it, a click on the background comments on the whole diagram. Outside the mode a click still opens the
+// diagram full window. A comment names its diagram by the diagram's own name and its part by the D2 id, never by a
+// counter, so it survives a rebuild; whether it is still in place is read from the page data, not from what is drawn.
+const CM_EDGE = /\(.+ (?:->|<->|<-|--) .+\)\[\d+\]$/;
+let cmDgMode = null, cmDgHot = null;
+function cmDgInfo(dg) { return (QX.dg || {})[dg.dataset.name] || { kind: dg.dataset.kind || '' }; }
+// The diagram a comment is on: by name, and by its place among the uses of that name in the part.
+function cmDgOf(c) {
+  const root = document.getElementById('part-' + c.part); if (!root) return null;
+  return Array.from(root.querySelectorAll('.dg')).filter(d => d.dataset.name === c.dname)[c.dn || 0] || null;
+}
+function cmDgBox(dg) { return Array.from(dg.querySelectorAll('.dgv, .mmd')).find(x => x.offsetParent !== null) || dg; }
+// The group of one D2 object: in the variant that is showing (for geometry), or in the light classic one (for its text).
+function cmDgGroup(dg, id, shown) {
+  const tok = (cmDgInfo(dg).ids || {})[id]; if (!tok) return null;
+  const vs = Array.from(dg.querySelectorAll('.dgv')), v = shown ? vs.find(x => x.offsetParent !== null) : dg.querySelector('.dgv.v-light.v-classic') || vs[0];
+  return v ? v.querySelector('g[class="' + tok + '"], g[class^="' + tok + ' "]') : null;
+}
+function cmDgLabel(dg, id) {
+  const g = cmDgGroup(dg, id, false);
+  const t = g ? Array.from(g.querySelectorAll('text')).map(x => x.textContent.trim()).filter(Boolean).join(' ').replace(/\s+/g, ' ') : '';
+  return t || id;
+}
+function cmDgTitle(s) {
+  const d = 'diagram "' + s.dname + '"';
+  if (s.tk === 'whole') return 'The whole ' + d;
+  const id = s._did || s.did, lab = s.dlabel && s.dlabel !== id ? '"' + s.dlabel + '" (' + id + ')' : id;
+  return (s.tk === 'edge' ? 'Connection ' : 'Node ') + lab + ' in ' + d;
+}
+function cmResolveDg(c) {
+  const dg = cmDgOf(c); if (!dg) return;
+  const e = CMX[c.part], nx = e ? e.ix.nodes.find(n => dg.compareDocumentPosition(n.node) & Node.DOCUMENT_POSITION_FOLLOWING) : null;
+  // Diagrams are not part of the indexed text, so a diagram comment takes its place from the first text after its diagram.
+  const place = state => { c._pieces = []; c._dg = dg; c._state = state; c._at = nx ? nx.start - 0.5 : (e ? e.ix.text.length : 0); };
+  if (c.tk === 'whole') { place('anchored'); return; }
+  const ids = cmDgInfo(dg).ids; if (!ids) return;
+  if (ids[c.did]) { c._did = c.did; place('anchored'); return; }
+  // The id is gone: the part is taken up again only where one part of the same kind carries the same label.
+  const same = Object.keys(ids).filter(i => CM_EDGE.test(i) === (c.tk === 'edge') && cmDgLabel(dg, i) === c.dlabel);
+  if (c.dlabel && c.dlabel !== c.did && same.length === 1) { c._did = same[0]; place('moved'); }
+}
+function cmDgParts(dg) {
+  const ids = cmDgInfo(dg).ids || {};
+  return Object.keys(ids).map(id => { const g = cmDgGroup(dg, id, true); return g ? { id, g, edge: CM_EDGE.test(id) } : null; }).filter(Boolean);
+}
+// Points along a connection, on the screen. A connection is tested by its line: its box would cover the nodes it bends around.
+function cmEdgePts(g) {
+  const out = [];
+  g.querySelectorAll('path').forEach(p => {
+    if (p.closest('marker, mask, defs') || !p.getTotalLength) return;
+    let len = 0; try { len = p.getTotalLength(); } catch (e) { return; }
+    const m = p.getScreenCTM(); if (!m || !len) return;
+    const n = Math.min(160, Math.max(2, Math.ceil(len / 6)));
+    for (let i = 0; i <= n; i++) { const q = p.getPointAtLength(len * i / n); out.push([q.x * m.a + q.y * m.c + m.e, q.x * m.b + q.y * m.d + m.f]); }
+  });
+  return out;
+}
+// What is under a point: a connection within reach of its line or on its label, else the smallest node box (a
+// container holds its children), else nothing, which means the whole diagram.
+function cmDgHit(dg, x, y) {
+  const parts = cmDgParts(dg), inBox = b => x >= b.left && x <= b.right && y >= b.top && y <= b.bottom;
+  let best = null, d = 9;
+  parts.filter(p => p.edge).forEach(p => {
+    cmEdgePts(p.g).forEach(q => { const k = Math.hypot(q[0] - x, q[1] - y); if (k < d) { d = k; best = p; } });
+    if (!best && Array.from(p.g.querySelectorAll('text')).some(t => inBox(t.getBoundingClientRect()))) best = p;
+  });
+  if (best) return best;
+  let area = Infinity;
+  parts.filter(p => !p.edge).forEach(p => { const b = p.g.getBoundingClientRect(); if (inBox(b) && b.width * b.height < area) { area = b.width * b.height; best = p; } });
+  return best;
+}
+function cmDgSel(dg, part) {
+  const root = dg.closest('.part-panel'), same = Array.from(root.querySelectorAll('.dg')).filter(d => d.dataset.name === dg.dataset.name);
+  return { part: root.id.slice(5), kind: 'dg', dname: dg.dataset.name, dn: same.indexOf(dg), tk: part ? (part.edge ? 'edge' : 'node') : 'whole', did: part ? part.id : '',
+    dlabel: part ? cmDgLabel(dg, part.id) : '', quote: '', pieces: [], el: [part ? part.g : cmDgBox(dg)], dgEl: dg };
+}
+function cmDgSetMode(dg) {
+  if (cmDgMode) { cmDgMode.classList.remove('cm-mode'); const b = cmDgMode.querySelector('.cm-dgbtn'); if (b) b.setAttribute('aria-pressed', 'false'); }
+  cmDgMode = dg; cmDgHot = null;
+  if (dg) {
+    dg.classList.add('cm-mode'); dg.querySelector('.cm-dgbtn').setAttribute('aria-pressed', 'true');
+    // The hint says what this diagram allows: parts can be picked only where the page knows them.
+    dg.querySelector(':scope > .cm-dgtip').textContent = cmDgParts(dg).length
+      ? 'Click a node or a connection, or the background for the whole diagram. Esc to stop.' : 'Click the diagram to comment on it as a whole. Esc to stop.';
+  }
+  cmDraw();
+}
+function cmDgBar(dg) {
+  if (dg.querySelector(':scope > .cm-dgbar')) return;
+  const bar = document.createElement('div'); bar.className = 'cm-dgbar';
+  const tip = document.createElement('div'); tip.className = 'cm-dgtip'; dg.appendChild(tip);   // above the frame, so it hides nothing
+  bar.innerHTML = '<button type="button" class="cm-dgbtn" title="Comment on this diagram or on one of its parts" aria-label="Comment on this diagram" aria-pressed="false">' + CM_ICON + '</button>';
+  bar.querySelector('button').addEventListener('click', e => { e.stopPropagation(); cmDgSetMode(cmDgMode === dg ? null : dg); });
+  dg.appendChild(bar);
+}
+function cmDgMove(e) {
+  if (!cmDgMode || cmCard || cmOff()) return;
+  const t = e.target, inside = !!(t && t.closest) && t.closest('.dg') === cmDgMode && !t.closest('.cm-dgbar, .cm-mark');
+  const p = inside ? cmDgHit(cmDgMode, e.clientX, e.clientY) : null;
+  const hot = inside ? { dg: cmDgMode, tk: p ? (p.edge ? 'edge' : 'node') : 'whole', id: p ? p.id : '' } : null;
+  if ((hot ? hot.tk + hot.id : '') === (cmDgHot ? cmDgHot.tk + cmDgHot.id : '')) return;
+  cmDgHot = hot; cmDraw();
+}
+function cmDrawDg() {
+  document.querySelectorAll('.cm-dgl').forEach(l => l.remove());
+  document.querySelectorAll('.dg g.cm-eg').forEach(g => g.classList.remove('cm-eg', 'cm-eg-on'));
+  document.querySelectorAll('.dg').forEach(dg => {
+    cmDgBar(dg);
+    if (dg.offsetParent === null) return;         // not on screen: nothing can be measured
+    const layer = document.createElement('div'); layer.className = 'cm-dgl';
+    const base = dg.getBoundingClientRect();
+    const ring = (b, pad, cls) => { const d = document.createElement('div'); d.className = 'cm-ring' + cls;
+      d.style.cssText = 'left:' + (b.left - base.left - pad) + 'px;top:' + (b.top - base.top - pad) + 'px;width:' + (b.width + 2 * pad) + 'px;height:' + (b.height + 2 * pad) + 'px'; layer.appendChild(d); };
+    const show = (tk, id, cls, c) => {
+      let at = null;
+      if (tk === 'whole') { const box = cmDgBox(dg), b = box.getBoundingClientRect(); ring(b, -3, ' cm-whole' + cls); at = [b.left + 6, b.top + 6]; if (c) c._el = [box]; }
+      else {
+        const g = cmDgGroup(dg, id, true); if (!g) return;
+        if (c) c._el = [g];
+        if (tk === 'edge') { g.classList.add('cm-eg'); if (cls) g.classList.add('cm-eg-on'); const pts = cmEdgePts(g); at = pts[Math.floor(pts.length / 2)] || null; if (at) at = [at[0] - 9, at[1] - 9]; }
+        else { const b = g.getBoundingClientRect(); ring(b, 4, cls); at = [b.left - 13, b.top - 13]; }
+      }
+      if (!c || !at) return;
+      const m = document.createElement('button'); m.type = 'button'; m.dataset.cid = c.id; m.textContent = c._n; m.title = 'Comment ' + c._n + ': ' + c.text.slice(0, 120);
+      m.className = 'cm-mark' + (c.id === cmActive ? ' cm-active' : '') + (c.id === cmFlash ? ' cm-flash' : '');
+      m.style.cssText = 'left:' + Math.max(0, at[0] - base.left) + 'px;top:' + Math.max(0, at[1] - base.top) + 'px';
+      layer.appendChild(m);
+    };
+    CM.items.filter(c => c.kind === 'dg' && c._pieces && c._dg === dg).sort((x, y) => x._n - y._n)
+      .forEach(c => show(c.tk, c._did, (c.id === cmActive ? ' cm-active' : '') + (c.id === cmFlash ? ' cm-flash' : ''), c));
+    if (cmDraft && cmDraft.kind === 'dg' && cmDraft.sel.dgEl === dg) show(cmDraft.sel.tk, cmDraft.sel.did, ' cm-pending');
+    else if (cmDgHot && cmDgHot.dg === dg && !cmCard) show(cmDgHot.tk, cmDgHot.id, ' cm-hot');
+    dg.appendChild(layer);
+  });
 }
 // --- A comment on one part as a whole: the "/" key comments on the part that is showing. Its marker stands in the
 // part's own button, so it is visible from every part.
@@ -1244,6 +1407,7 @@ function cmWhere(c, bare) {
   if (c.part === 'page') return 'The whole explanation';
   if (c.kind === 'part') return cmPartName(c.part) + ', the whole part';
   if (c.part === 'diff') return cmDiffTitle(c);
+  if (c.kind === 'dg') return cmPartName(c.part) + ' > ' + cmDgTitle(c);
   const el = c._el && !Array.isArray(c._el) ? c._el : null;
   const what = el ? cmBlockName(el).replace(/^./, m => m.toLowerCase()) + ' ' : '';
   const sec = c._pieces ? c._section : c.section;
@@ -1408,7 +1572,7 @@ function cmJump(c) {
       if (cd.classList.contains('iscol')) toggleC(c.path, false);
     }
   } else {
-    const node = c._el && !Array.isArray(c._el) ? c._el : c._pieces[0] ? c._pieces[0].startContainer.parentElement : null;
+    const node = c.kind === 'dg' ? c._dg : c._el && !Array.isArray(c._el) ? c._el : c._pieces[0] ? c._pieces[0].startContainer.parentElement : null;
     const sub = node && node.closest('.sub-panel'), map = node && node.closest('.map-panel');
     if (sub && !sub.classList.contains('active')) switchSub(sub.dataset.group, sub.id.slice(4));
     if (map && !map.classList.contains('active')) switchMap(map.id.slice(5), false);
@@ -1634,7 +1798,7 @@ function cmSpan(bs) {
 }
 // The comment whose highlight is under a point; the shortest quote wins where two overlap.
 function cmAt(x, y) {
-  const hits = CM.items.filter(c => c._pieces && c.kind !== 'part' && cmRectsOf(c._el, c._pieces).some(b => x >= b.left && x <= b.right && y >= b.top && y <= b.bottom));
+  const hits = CM.items.filter(c => c._pieces && c.kind !== 'part' && c.kind !== 'dg' && cmRectsOf(c._el, c._pieces).some(b => x >= b.left && x <= b.right && y >= b.top && y <= b.bottom));
   return hits.sort((a, b) => a.quote.length - b.quote.length)[0] || null;
 }
 function cmOverText(e) {
@@ -1661,7 +1825,7 @@ function cmReadSelection() {
 function cmAddButton() {
   let b = document.getElementById('cm-add');
   if (!b) {
-    b = document.createElement('button'); b.id = 'cm-add'; b.type = 'button'; b.textContent = 'Comment'; b.hidden = true;
+    b = document.createElement('button'); b.id = 'cm-add'; b.type = 'button'; b.innerHTML = CM_ICON + '<span>Comment</span>'; b.hidden = true;
     b.title = 'Comment on the selected text';
     b.addEventListener('mousedown', e => e.preventDefault());   // keeps the selection
     b.addEventListener('click', () => { if (cmPending) cmOpen({ sel: cmPending }); });
@@ -1681,6 +1845,7 @@ function cmOff() { return document.body.classList.contains('cm-off'); }
 function cmSetOff(off) {
   if (off && cmCard) { if (cmCard._dirty()) { cmNudge(); return; } cmClose(); }
   if (off && cmPanelOpen()) cmPanel(false);
+  if (off && cmDgMode) cmDgSetMode(null);
   document.body.classList.toggle('cm-off', off);
   const b = document.getElementById('cm-toggle'); b.setAttribute('aria-checked', off ? 'false' : 'true'); b.classList.toggle('cm-on', !off);
   lsSet(CM_OFF_KEY, off ? 'off' : 'on');
@@ -1715,7 +1880,7 @@ function cmOpen(target) {
     + (c ? '<button type="button" class="cm-del">Delete</button>' : '') + '<button type="button" class="cm-cancel">Cancel</button><button type="button" class="cm-save">Save</button></span></div>';
   card.querySelector('.cm-q').textContent = quote.length > 160 ? quote.slice(0, 157) + '...' : quote;
   const el = (c ? c._el : target.sel.el) || null;
-  card.querySelector('.cm-k').textContent = src.kind === 'part' ? cmPartTitle(src.part) : src.part === 'diff' ? cmDiffTitle(src) : el ? cmBlockName(el) : '';
+  card.querySelector('.cm-k').textContent = src.kind === 'dg' ? cmDgTitle(src) : src.kind === 'part' ? cmPartTitle(src.part) : src.part === 'diff' ? cmDiffTitle(src) : el ? cmBlockName(el) : '';
   const ta = card.querySelector('.cm-text'); ta.value = first;
   ta.insertAdjacentHTML('afterend', cmLabsHtml(c ? c.label || '' : '')); cmLabsWire(card);
   const lab = () => cmLabOf(card), dirty = () => ta.value.trim() !== first.trim() || lab() !== (c ? c.label || '' : '');
@@ -1725,7 +1890,8 @@ function cmOpen(target) {
     if (c) { c.text = text; c.label = lab(); }
     else {
       const s = target.sel, base = { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text, label: lab(), t: Date.now(), state: 'open' };
-      CM.items.push(Object.assign(base, s.kind === 'part' ? { kind: 'part', part: s.part, quote: '' } : s.part === 'diff'
+      CM.items.push(Object.assign(base, s.kind === 'dg' ? { kind: 'dg', part: s.part, dname: s.dname, dn: s.dn, tk: s.tk, did: s.did, dlabel: s.dlabel, quote: '' }
+        : s.kind === 'part' ? { kind: 'part', part: s.part, quote: '' } : s.part === 'diff'
         ? { kind: s.kind, part: 'diff', path: s.path, side: s.side, ln: s.ln, ln2: s.ln2, lines: s.lines, quote: s.quote }
         : { kind: s.el ? 'block' : 'text', tag: s.el && s.el.tagName === 'TABLE' ? 'table' : undefined, part: s.part, section: s.section, quote: s.quote, prefix: s.prefix, suffix: s.suffix }));
     }
@@ -1743,7 +1909,7 @@ function cmOpen(target) {
   card._dirty = dirty;
   document.body.appendChild(card); cmCard = card;
   const pieces = c ? c._pieces : target.sel.pieces;
-  if (c) cmActive = c.id; else cmDraft = { part: target.sel.part, kind: target.sel.kind, pieces, el };
+  if (c) cmActive = c.id; else cmDraft = { part: target.sel.part, kind: target.sel.kind, pieces, el, sel: target.sel };
   cmDraw();
   const h = card.offsetHeight, w = card.offsetWidth;
   let box = cmSpan(cmRectsOf(el, pieces)) || { left: 8, top: 8, bottom: 8 };
@@ -1766,6 +1932,9 @@ function cmInit() {
   window.addEventListener('popstate', cmRefresh);
   document.addEventListener('click', e => {
     const m = e.target.closest ? e.target.closest('.cm-mark') : null;
+    if (!m && cmDgMode && !cmOff() && e.target.closest && e.target.closest('.dg') === cmDgMode && !e.target.closest('.cm-dgbar')) {
+      cmOpen({ sel: cmDgSel(cmDgMode, cmDgHit(cmDgMode, e.clientX, e.clientY)) }); return;
+    }
     const sel = document.getSelection();
     const c = m ? CM.items.find(x => x.id === m.dataset.cid) : (!sel || sel.isCollapsed ? cmOverText(e) : null);
     if (c) { if (cmCard && cmCard._dirty()) cmNudge(); else if (cmActive !== c.id) cmOpen({ c }); return; }
@@ -1777,10 +1946,13 @@ function cmInit() {
   document.addEventListener('mouseup', e => { if (!(e.target.closest && e.target.closest('.cm-card, #cm-add, .cm-badd'))) setTimeout(cmOffer, 0); });
   document.addEventListener('selectionchange', () => { const s = document.getSelection(); if ((!s || s.isCollapsed) && !cmCard) cmAddButton().hidden = true; });
   window.addEventListener('scroll', () => { if (!cmCard) cmAddButton().hidden = true; cmHideBlockAdd(); }, { passive: true });
+  // A wide diagram scrolls sideways inside its own frame; that scroll does not reach the window.
+  document.addEventListener('scroll', e => { if (e.target.classList && e.target.classList.contains('dgv')) cmRefresh(); }, true);
+  document.addEventListener('keydown', e => { if (e.key === 'Escape' && cmDgMode && !cmCard) cmDgSetMode(null); });
   let overRaf = 0;
   document.addEventListener('mousemove', e => {
     if (overRaf) return;
-    overRaf = requestAnimationFrame(() => { overRaf = 0; document.documentElement.classList.toggle('cm-over', !!cmOverText(e)); cmHoverBlock(e); });
+    overRaf = requestAnimationFrame(() => { overRaf = 0; document.documentElement.classList.toggle('cm-over', !!cmOverText(e)); cmHoverBlock(e); cmDgMove(e); });
   }, { passive: true });
 }
 
