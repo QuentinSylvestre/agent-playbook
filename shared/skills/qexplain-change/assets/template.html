@@ -193,6 +193,11 @@
   .bn { background: rgba(88,166,255,.15); color: var(--accent); }
   .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
   .rv .dot { background: var(--add-fg); }
+  .ni.stale .dot { background: #d68f00; }      /* reviewed once, and its changes are no longer the same */
+  .bs { background: rgba(214,143,0,.16); color: #b26a00; font-family: inherit; }
+  .ncm { flex: none; min-width: 15px; height: 15px; padding: 0 4px; border-radius: 8px; background: #b26a00; color: #fff; font: 600 9.5px/15px -apple-system, "Segoe UI", sans-serif; text-align: center; }
+  .ncm[hidden] { display: none; }
+  body.cm-off .ncm { display: none; }
   .tdir { display: flex; align-items: center; gap: 4px; padding: 4px 8px 4px 12px; cursor: pointer; font-size: 11px; color: var(--muted); user-select: none; }
   .tdir-name { font-family: monospace; color: var(--text); }
   .tdir-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--border); }
@@ -802,11 +807,17 @@ const GROUPS = TYPE_ORDER.map(([f, label]) => ({ f, label, files: allFiles.filte
 const ordered = GROUPS.flatMap(g => g.files);
 let ST = {};
 try { ST = JSON.parse(lsGet(STORE_KEY) || '{}'); } catch (e) {}
+// A reviewed mark holds the hash of the patch it was made on (QX.patch, written by the build). After a rebuild the
+// mark counts only while the file's patch is the same; otherwise the file is unreviewed again and says why.
+const PATCH = QX.patch || {};
+const isRv = p => !!ST[p] && (!PATCH[p] || ST[p] === PATCH[p]);
+const rvStale = p => typeof ST[p] === 'string' && !!PATCH[p] && ST[p] !== PATCH[p];
+const RV_STALE = 'The changes in this file are not the ones you marked as reviewed';
 let activeF = 'all', curIdx = -1, navMode = 'group', navLocked = false, navLockTimer = null;
 const baseTitle = document.title;
 function saveS() { lsSet(STORE_KEY, JSON.stringify(ST)); upProg(); }
 function upProg() {
-  const r = ordered.filter(p => ST[p]).length;
+  const r = ordered.filter(isRv).length;
   document.getElementById('rc').textContent = r;
   document.getElementById('tc').textContent = ordered.length;
   document.title = '[' + r + '/' + ordered.length + '] ' + baseTitle;
@@ -841,8 +852,8 @@ function setNavView(v, btn) {
 }
 function navItem(p, label) {
   const f = fmap[p];
-  return '<a class="ni' + (ST[p] ? ' rv' : '') + '" data-p="' + esc(p) + '" href="#" onclick="event.preventDefault();jumpTo(\'' + jsq(p) + '\')">'
-    + '<div class="dot"></div><span class="nfn" title="' + esc(p) + '">' + esc(label) + '</span><div class="nbadge">'
+  return '<a class="ni' + (isRv(p) ? ' rv' : rvStale(p) ? ' stale' : '') + '" data-p="' + esc(p) + '" href="#" onclick="event.preventDefault();jumpTo(\'' + jsq(p) + '\')">'
+    + '<div class="dot"' + (rvStale(p) ? ' title="' + RV_STALE + '"' : '') + '></div><span class="nfn" title="' + esc(p) + '">' + esc(label) + '</span><span class="ncm" hidden></span><div class="nbadge">'
     + (f.add ? '<span class="b ba">+' + f.add + '</span>' : '') + (f.del ? '<span class="b bd">-' + f.del + '</span>' : '') + '</div></a>';
 }
 function buildNav() {
@@ -870,24 +881,33 @@ function buildNav() {
     h = walk(root);
   }
   document.getElementById('nav-inner').innerHTML = h;
-  refreshTreeDots();
+  refreshTreeDots(); navMarks();
+}
+// The number of open comments on each file, beside its name in the list.
+function navMarks() {
+  if (!cmReady) return;
+  document.querySelectorAll('.ni').forEach(n => {
+    const m = n.querySelector('.ncm'), k = CM.items.filter(c => c.part === 'diff' && c.path === n.dataset.p && c.state !== 'resolved').length;
+    m.hidden = !k; m.textContent = k || ''; m.title = k ? k + ' open comment' + (k === 1 ? '' : 's') + ' on this file' : '';
+  });
 }
 // A directory dot is green only when every file beneath it, at any depth, is reviewed.
 function refreshTreeDots() {
   document.querySelectorAll('.tdir').forEach(d => {
     const paths = JSON.parse(d.dataset.paths);
-    d.querySelector('.tdir-dot').classList.toggle('all-rv', paths.length > 0 && paths.every(p => ST[p]));
+    d.querySelector('.tdir-dot').classList.toggle('all-rv', paths.length > 0 && paths.every(isRv));
   });
 }
 function buildFiles() {
   let h = '';
   GROUPS.forEach(g => g.files.forEach(p => {
-    const f = fmap[p], rv = !!ST[p], col = !!(ST[p] || ST[p + '__col']), q = jsq(p);
+    const f = fmap[p], rv = isRv(p), stale = rvStale(p), col = rv || (!stale && !!ST[p + '__col']), q = jsq(p);      // a file whose changes are new to the reader opens
     h += '<div class="fc' + (rv ? ' rv' : '') + (col ? ' iscol' : '') + '" data-p="' + esc(p) + '" data-g="' + g.f + '">'
       + '<div class="fh" onclick="if(!event.target.closest(\'.cm-mark\'))toggleC(\'' + q + '\')"><button class="colbtn" title="Collapse">&#9660;</button>'
       + '<span class="ft" title="' + esc(p) + '">' + esc(p) + '</span><div class="fstats">'
       + (f.add ? '<span class="b ba">+' + f.add + '</span>' : '') + (f.del ? '<span class="b bd">-' + f.del + '</span>' : '')
-      + (f.isNew ? '<span class="b bn">NEW</span>' : '') + (f.isDel ? '<span class="b bd">DEL</span>' : '') + '</div>'
+      + (f.isNew ? '<span class="b bn">NEW</span>' : '') + (f.isDel ? '<span class="b bd">DEL</span>' : '')
+      + (stale ? '<span class="b bs" title="' + RV_STALE + '">changed since your review</span>' : '') + '</div>'
       + '<button class="cbtn" type="button" title="Comment on this file" aria-label="Comment on this file" onclick="event.stopPropagation();cmFile(\'' + q + '\')">' + CM_ICON + '</button>'
       + '<button class="rbtn" onclick="event.stopPropagation();toggleR(\'' + q + '\')">' + (rv ? 'Reviewed' : 'Mark reviewed') + '</button></div>'
       + '<div class="rat">' + esc(QX.rationales[p] || 'No rationale recorded.') + '</div>'
@@ -910,11 +930,13 @@ function buildFiles() {
 const card = p => document.querySelector('.fc[data-p="' + CSS.escape(p) + '"]');
 const navEl = p => document.querySelector('.ni[data-p="' + CSS.escape(p) + '"]');
 function toggleR(p) {
-  ST[p] = !ST[p];
-  const c = card(p), n = navEl(p);
-  c.classList.toggle('rv', ST[p]); if (n) n.classList.toggle('rv', ST[p]);
-  c.querySelector('.rbtn').textContent = ST[p] ? 'Reviewed' : 'Mark reviewed';
-  toggleC(p, ST[p]);   // marking reviewed collapses; un-marking expands
+  const on = !isRv(p);
+  ST[p] = on ? (PATCH[p] || true) : false;
+  const c = card(p), n = navEl(p), tag = c.querySelector('.bs');
+  c.classList.toggle('rv', on); if (n) { n.classList.toggle('rv', on); n.classList.remove('stale'); n.querySelector('.dot').removeAttribute('title'); }
+  if (tag) tag.remove();
+  c.querySelector('.rbtn').textContent = on ? 'Reviewed' : 'Mark reviewed';
+  toggleC(p, on);   // marking reviewed collapses; un-marking expands
   saveS();
   if (activeF === 'ur') filterFiles();
   refreshTreeDots();
@@ -934,7 +956,7 @@ function filterFiles() {
   const q = document.getElementById('search').value.toLowerCase();
   document.querySelectorAll('.fc').forEach(c => {
     const p = c.dataset.p;
-    const mf = activeF === 'all' || (activeF === 'ur' ? !ST[p] : c.dataset.g === activeF);
+    const mf = activeF === 'all' || (activeF === 'ur' ? !isRv(p) : c.dataset.g === activeF);
     c.classList.toggle('hide', !(mf && (!q || p.toLowerCase().includes(q))));
   });
   document.querySelectorAll('.ni').forEach(n => { const c = card(n.dataset.p); n.style.display = c && c.classList.contains('hide') ? 'none' : ''; });
@@ -2371,6 +2393,7 @@ function cmDiffTitle(s) {
 }
 function cmDrawDiff() {
   const main = document.getElementById('main'); if (!main) return;
+  navMarks();
   main.querySelectorAll('.cm-dmark, .cm-fmark').forEach(m => m.remove());
   main.querySelectorAll('.cm-dl').forEach(r => r.classList.remove('cm-dl', 'cm-dl-on', 'cm-flash'));
   main.querySelectorAll('.cm-fh-on').forEach(r => r.classList.remove('cm-fh-on'));

@@ -858,6 +858,28 @@ async function routeLibs(target) {
     await page.reload(); await wait(1000);
     log(await page.$eval('.fc', c => c.classList.contains('iscol') && c.classList.contains('rv')) && (await page.textContent('#rc')) === '1', 'reviewed state survives a reload');
     log(await page.evaluate(k => localStorage.getItem(k) !== null, storeKey), 'state stored under ' + storeKey);
+    // A reviewed mark is tied to the file's patch: it holds the patch's hash, and stops counting when the hash differs
+    const rvOf = () => page.evaluate(k => { const c = document.querySelector('.fc'), p = c.dataset.p, n = document.querySelector('.ni[data-p="' + CSS.escape(p) + '"]');
+      return { stored: JSON.parse(localStorage.getItem(k) || '{}')[p], hash: (QX.patch || {})[p] || '', rv: c.classList.contains('rv'), col: c.classList.contains('iscol'), tag: (c.querySelector('.fstats .bs') || { textContent: '' }).textContent,
+        navRv: n.classList.contains('rv'), navStale: n.classList.contains('stale'), rc: document.getElementById('rc').textContent }; }, storeKey);
+    const setRv = v => page.evaluate(([k, v]) => { const s = JSON.parse(localStorage.getItem(k) || '{}'), p = document.querySelector('.fc').dataset.p; s[p] = v; localStorage.setItem(k, JSON.stringify(s)); }, [storeKey, v]);
+    let rv = await rvOf();
+    if (rv.hash) {
+      const tied = /^[0-9a-f]{16}$/.test(rv.hash) && rv.stored === rv.hash;
+      await setRv('0123456789abcdef'); await page.reload(); await wait(1000); rv = await rvOf();
+      const stale = !rv.rv && !rv.col && rv.tag === 'changed since your review' && rv.navStale && !rv.navRv && rv.rc === '0';
+      await page.click('.fc .rbtn'); await wait(200); rv = await rvOf();
+      log(tied && stale && rv.rv && rv.col && rv.tag === '' && !rv.navStale && rv.stored === rv.hash && rv.rc === '1',
+        `a reviewed mark holds the hash of the file's patch; a mark made on another patch no longer counts, the file opens and says it changed since the review; marking it again clears that (${tied}, ${stale})`);
+    }
+    // The file list counts the open comments of each file
+    const ncm = () => page.evaluate(() => { const p = document.querySelector('.fc').dataset.p, m = document.querySelector('.ni[data-p="' + CSS.escape(p) + '"] .ncm'), all = [...document.querySelectorAll('.ni .ncm')].filter(x => !x.hidden).length; return (m.hidden ? '' : m.textContent) + '/' + all; });
+    await page.evaluate(() => { const p = document.querySelector('.fc').dataset.p; ['vc count one', 'vc count two'].forEach(text => CM.items.push({ id: 'vcn' + CM.items.length, kind: 'file', part: 'diff', path: p, quote: '', text, label: '', t: Date.now(), state: 'open' })); cmChanged(); }); await wait(200);
+    const two = await ncm();
+    await page.evaluate(() => { CM.items.find(x => x.text === 'vc count two').state = 'resolved'; cmChanged(); }); await wait(200);
+    const one = await ncm();
+    await page.evaluate(() => { CM.items = CM.items.filter(x => !/^vc count/.test(x.text)); cmChanged(); }); await wait(200);
+    log(two === '2/1' && one === '1/1' && await ncm() === '/0', `the file list shows how many open comments each file has, and nothing for a file with none (${two}, ${one})`);
     await page.keyboard.press('j'); await wait(500);
     const before = await page.textContent('#rc');
     await page.keyboard.press('m'); await wait(300);

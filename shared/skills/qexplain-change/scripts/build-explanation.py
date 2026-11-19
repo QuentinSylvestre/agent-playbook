@@ -796,6 +796,8 @@ def main(argv=None):
                    for n, r in diagrams.rendered.items()},
             "rationales": rationales, "rawDiff": raw if "diff" in selected else "", "excluded": left_out,
             "paths": [path for path, _ in kept],
+            # Per file, a hash of its hunk lines: a reviewed mark holds only while the patch it was made on is the same.
+            "patch": {path: qd.patch_hash(block) for path, block in kept} if "diff" in selected else {},
         }) + ";",
     }
     for marker in ("{{TITLE}}", "<!--@PROVENANCE-->", "<!--@MERMAID-->", "<!--@BRIEF-->", "/*@DATA*/"):

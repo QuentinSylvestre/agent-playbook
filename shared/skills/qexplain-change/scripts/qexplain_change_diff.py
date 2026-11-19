@@ -11,6 +11,7 @@ Standard library only.
 """
 
 import fnmatch
+import hashlib
 import html
 import json
 import os
@@ -229,6 +230,53 @@ def counts(block):
         elif in_hunk and line.startswith("-"):
             rem += 1
     return add, rem
+
+
+HUNK_RE = re.compile(r"^@@ -(\d+)(?:,(\d+))? \+(\d+)(?:,(\d+))? @@ ?(.*)$")
+
+
+def parse_hunks(block):
+    """Return the hunks of one file's block, in order. Each is a dict: old and new are (first line, line count),
+    text is what git prints after the second @@, lines are the hunk's lines with their +, - or space prefix.
+    A hunk ends when its header's line counts are used up, so text after it is never taken for a change."""
+    hunks, cur, old_left, new_left = [], None, 0, 0
+    for line in block.split("\n"):
+        m = HUNK_RE.match(line)
+        if m and old_left <= 0 and new_left <= 0:
+            old_left = int(m.group(2)) if m.group(2) is not None else 1
+            new_left = int(m.group(4)) if m.group(4) is not None else 1
+            cur = {"old": (int(m.group(1)), old_left), "new": (int(m.group(3)), new_left), "text": m.group(5), "lines": []}
+            hunks.append(cur)
+        elif cur is None:
+            continue
+        elif line.startswith("\\"):
+            cur["lines"].append(line)  # "\ No newline at end of file" belongs to the line before it
+        elif old_left <= 0 and new_left <= 0:
+            cur = None
+        elif line.startswith("-"):
+            old_left -= 1
+            cur["lines"].append(line)
+        elif line.startswith("+"):
+            new_left -= 1
+            cur["lines"].append(line)
+        else:  # context; a tool that trims trailing spaces leaves an empty context line empty
+            old_left -= 1
+            new_left -= 1
+            cur["lines"].append(line or " ")
+    return hunks
+
+
+def patch_hash(block):
+    """A short hash of what one file's block changes. It covers the lines inside the hunks only: git's header and
+    the @@ line numbers are left out, so the same change sitting a few lines lower keeps its hash. A block with no
+    hunks (a binary file, a pure rename) is hashed on the header lines that say what happened to the file."""
+    hunks = parse_hunks(block)
+    if hunks:
+        text = "\n@@\n".join("\n".join(h["lines"]) for h in hunks)
+    else:
+        marks = ("index ", "Binary files ", "rename from ", "rename to ", "copy from ", "copy to ", "new file", "deleted file", "old mode", "new mode")
+        text = "\n".join(line for line in block.split("\n")[1:] if line.startswith(marks))
+    return hashlib.sha256(text.encode("utf-8", "replace")).hexdigest()[:16]
 
 
 def normalise(pattern):

@@ -118,6 +118,22 @@ def selftest():
     check(not qd.filter_files(qd.split_files(binary), [])[0], "a binary patch is left out")
     check(not qd.filter_files([(None, "diff --git weird")], [])[0], "an unreadable path is left out")
     check(qd.counts("diff --git a/q b/q\n--- a/q\n+++ b/q\n@@ -1 +1 @@\n--- old\n+++ new\n") == (1, 1), "counts look only inside hunks")
+    # Hunks and the hash of a file's patch
+    two = ("diff --git a/q b/q\nindex 111..222 100644\n--- a/q\n+++ b/q\n@@ -1,3 +1,3 @@ def f():\n a\n-b\n+B\n c\n"
+           "@@ -10 +10,2 @@\n-x\n+x\n+y\n\\ No newline at end of file\n")
+    hunks = qd.parse_hunks(two)
+    check(len(hunks) == 2 and hunks[0]["old"] == (1, 3) and hunks[0]["new"] == (1, 3) and hunks[0]["text"] == "def f():"
+          and hunks[0]["lines"] == [" a", "-b", "+B", " c"], "a hunk gives its ranges, git's text and its lines")
+    check(hunks[1]["old"] == (10, 1) and hunks[1]["new"] == (10, 2) and hunks[1]["lines"][-1].startswith("\\"),
+          "a missing count means one line; the no-newline note stays with its hunk")
+    check(len(qd.parse_hunks("diff --git a/q b/q\n@@ -1 +1 @@\n-@@ -5 +5 @@\n+new\n")) == 1, "a removed line that looks like a hunk header is a line, not a hunk")
+    check(qd.parse_hunks("diff --git a/q b/q\n@@ -1,2 +1,2 @@\n a\n\n")[0]["lines"] == [" a", " "], "an empty context line stays a context line")
+    moved = two.replace("index 111..222", "index 333..444").replace("@@ -1,3 +1,3 @@", "@@ -7,3 +7,3 @@").replace("@@ -10 +10,2 @@", "@@ -16 +16,2 @@")
+    check(qd.patch_hash(two) == qd.patch_hash(moved) and len(qd.patch_hash(two)) == 16, "the same change a few lines lower, on another base, keeps its patch hash")
+    check(qd.patch_hash(two) != qd.patch_hash(two.replace("+B", "+C")), "a changed line changes the patch hash")
+    check(qd.patch_hash(two) != qd.patch_hash(two.replace(" c\n", " d\n")), "a changed context line changes the patch hash")
+    bin1 = "diff --git a/i.png b/i.png\nindex aaa..bbb 100644\nBinary files a/i.png and b/i.png differ\n"
+    check(qd.patch_hash(bin1) != qd.patch_hash(bin1.replace("bbb", "ccc")), "a binary file is hashed on its index line")
     # Classification
     for name, want in (("pkg/test_foo.py", "test"), ("src/FooTest.java", "test"), ("web/__fixtures__/x.json", "test"),
                        ("go.sum", "generated"), ("dist/app.min.js", "generated"), ("src/latest.java", "src"), ("a.go", "src")):
