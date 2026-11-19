@@ -332,6 +332,36 @@ async function routeLibs(target) {
     await page.keyboard.press('Escape'); await wait(200);
     log(modeOff && await page.evaluate(id => !ovOpen() && document.querySelectorAll('#' + id + ' .cm-dgl .cm-mark').length === 3, d2dg), 'Escape leaves comment mode first and closes the view next; the new comment is marked on the page');
     await page.click('#' + d2dg + ' .cm-dgbtn'); await wait(200);
+    // Shift + drag boxes several nodes: they are named, and a picture of the area is kept
+    const bx = await page.evaluate(id => { const dg = document.getElementById(id), all = cmDgParts(dg), leaf = all.filter(p => !p.edge && !all.some(o => o.id.startsWith(p.id + '.')));
+      const rs = leaf.map(p => ({ id: p.id, b: p.g.getBoundingClientRect() })).sort((a, b) => a.b.left - b.b.left); let best = null;
+      for (let i = 0; i + 1 < rs.length; i++) { const gap = rs[i + 1].b.left - rs[i].b.right; if (gap > 0 && (!best || gap < best.gap)) best = { gap, a: rs[i], b: rs[i + 1] }; }
+      if (!best) return null; const A = best.a.b, B = best.b.b;
+      return { ids: [best.a.id, best.b.id], l: Math.min(A.left, B.left) - 6, t: Math.min(A.top, B.top) - 6, r: Math.max(A.right, B.right) + 6, b: Math.max(A.bottom, B.bottom) + 6 }; }, d2dg);
+    if (bx) {
+      await page.keyboard.down('Shift'); await page.mouse.move(bx.l, bx.b); await page.mouse.down(); await page.mouse.move((bx.l + bx.r) / 2, (bx.t + bx.b) / 2, { steps: 3 }); await wait(150);
+      const live = await page.evaluate(id => document.querySelectorAll('#' + id + ' .cm-ring.cm-boxed.cm-hot').length, d2dg);
+      await page.mouse.move(bx.r, bx.t, { steps: 3 }); await page.mouse.up(); await page.keyboard.up('Shift'); await wait(900);
+      const bt = await page.evaluate(() => { const k = document.querySelector('.cm-card'); if (!k) return null; const i = k.querySelector('.cm-pic img'); return { title: k.querySelector('.cm-k').textContent, pic: !!i && i.naturalWidth > 40 && i.naturalHeight > 20, ov: ovOpen() }; });
+      log(live === 1 && !!bt && !bt.ov && /^\d+ nodes in diagram "/.test(bt.title) && bx.ids.every(i => bt.title.includes(i)) && bt.pic, `Shift + drag draws a box and opens a comment on the nodes it covers, with a picture: ${bt && bt.title}`);
+      await page.keyboard.type('box comment'); await page.keyboard.press('Enter'); await wait(300);
+      const bs = await page.evaluate(async ([id, ids]) => { const c = CM.items.find(x => x.tk === 'box'), dg = document.getElementById(id); if (!c) return null;
+        const img = new Image(); await new Promise(r => { img.onload = r; img.onerror = r; img.src = c.pic || ''; });
+        const cv = document.createElement('canvas'); cv.width = img.naturalWidth || 1; cv.height = img.naturalHeight || 1; const g = cv.getContext('2d'); g.drawImage(img, 0, 0);
+        const px = g.getImageData(0, 0, cv.width, cv.height).data, seen = new Set(); for (let i = 0; i < px.length; i += 4 * 97) seen.add(px[i] + ',' + px[i + 1] + ',' + px[i + 2]);
+        const f = cmFeedback(); let types = '';
+        try { cmCopyPic(c.pic); await new Promise(r => setTimeout(r, 400)); types = (await navigator.clipboard.read()).map(i => i.types.join('+')).join(); } catch (e) { types = 'unreadable: ' + e.message; }
+        return { ok: ids.every(i => c.dparts.some(p => p.did === i)) && c.dbox.length === 4 && c._state === 'anchored' && String(c.pic).indexOf('data:image/png') === 0, colours: seen.size, kb: Math.round(String(c.pic).length / 1024),
+          rings: dg.querySelectorAll('.cm-ring.cm-boxed').length, fitted: (() => { const a = dg.querySelector('.cm-ring.cm-boxed').getBoundingClientRect(), u = cmUnion(c._dids.map(i => cmDgGroup(dg, i, true).getBoundingClientRect()), 9);
+            return Math.abs(a.left - u.left) < 2 && Math.abs(a.top - u.top) < 2 && Math.abs(a.width - u.width) < 3 && Math.abs(a.height - u.height) < 3; })(), fb: f.includes(' nodes in diagram "') && f.includes('A picture of the boxed area is kept'), types }; }, [d2dg, bx.ids]);
+      log(!!bs && bs.ok && bs.rings === 1 && bs.fitted && bs.colours > 3 && bs.fb, `a box comment keeps its nodes and a drawn picture, and its frame on the diagram fits those nodes (${bs && bs.colours} colours sampled, ${bs && bs.kb} KiB), and the copied text says so`);
+      log(!!bs && /image\/png/.test(bs.types), `Copy picture puts the picture on the clipboard (${bs && bs.types})`);
+      log(await page.evaluate(() => { const c = CM.items.find(x => x.tk === 'box'), keep = JSON.stringify(c.dparts); c.dparts[0].did = 'gone.id'; c.dparts[0].dlabel = 'no such label'; cmResolve();
+        const one = c._state + ':' + c._lost + ':' + cmDgTitle(c).includes('(1 no longer in the diagram)'); c.dparts.forEach(p => { p.did = 'gone.' + p.did; p.dlabel = 'none'; }); cmResolve(); const none = c._state;
+        c.dparts = JSON.parse(keep); cmResolve(); return one === 'moved:1:true' && none === 'notfound' && c._state === 'anchored'; }),
+        'a box that lost one node says so and stays; a box that lost all its nodes is not found');
+      await page.evaluate(() => { CM.items = CM.items.filter(x => x.tk !== 'box'); cmChanged(); });
+    }
     const outside = await page.evaluate(id => { const b = document.getElementById(id).getBoundingClientRect(); return { x: b.left + 200, y: b.bottom + 40 }; }, d2dg);
     await page.mouse.click(outside.x, outside.y); await wait(200);
     const leftByClick = await page.evaluate(id => !document.getElementById(id).classList.contains('cm-mode') && !document.querySelector('.cm-card'), d2dg);
