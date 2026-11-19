@@ -36,6 +36,13 @@
  *      and unwraps it; tree view shows directories; the sidebar resizes, persists,
  *      and resets on double-click; both hash pills copy; there is no note box, and
  *      Copy feedback stands in the header; every file left out is named. A summary row opens its file here.
+ *      A reviewed mark holds only while the file's patch is the same; the file list counts open
+ *      comments. A removed line stands beside its replacement with the differing words marked; the
+ *      text has syntax colours, and is plain without network. "f" searches the diff; Enter walks
+ *      the matches. Hunks name their function; a file lists its changed functions and their callers.
+ *      Hunks that are only a move, spacing or one word replaced carry a badge, and a button hides
+ *      them. A changed picture shows before and after. The agent's notes stand under their lines,
+ *      read-only.
  *   7. At 390px wide no part scrolls the page sideways. No page errors.
  *   8. Comments: selecting prose copies it with a location line and offers a Comment button; Enter
  *      saves, Shift+Enter adds a line, Escape keeps a box that holds text. A saved comment is

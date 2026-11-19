@@ -127,6 +127,7 @@ You write content files in a temporary directory outside the repository. The tem
 | `diagrams/<name>.d2` or `.mmd` | any | One diagram per file |
 | `rationales.json` | Diff, Summary | `{"<path as in the diff>": "<one sentence>"}` for every file still shown |
 | `roles.json` | Summary | Same shape: what each file does (optional) |
+| `notes.json` | Diff (optional) | Notes on lines of the diff, below |
 
 Build with the `<python>` from Step 1:
 
@@ -134,7 +135,7 @@ Build with the `<python>` from Step 1:
 <python> <config-repo>/shared/skills/qexplain-change/scripts/build-explanation.py --out <path> --title "<title>" \
   --repo <dir> --diff-args "<the git diff arguments that resolve the target>" \
   --parts brief,walkthrough,maps,summary,diff --brief <dir>/brief.html --walkthrough <dir>/walkthrough.html \
-  --maps <dir>/maps.json --diagrams <dir>/diagrams --rationales <dir>/rationales.json --roles <dir>/roles.json \
+  --maps <dir>/maps.json --diagrams <dir>/diagrams --rationales <dir>/rationales.json --roles <dir>/roles.json [--notes <dir>/notes.json] \
   [--ticket <text>]... [--link <label>=<url>]... [--exclude <glob>]... [--mask-credential <path>:<side>:<line>]... [--allow-credential <path>:<side>:<line>]... [--user-confirmed-credential <path>:<side>:<line>]...
 ```
 
@@ -204,13 +205,19 @@ Tour ids for D2 are D2 object ids: `site.mistap` for a node, `(site.bl -> gw.htt
 
 ### Change summary and Diff review
 
-The build generates both from `rationales.json`, `roles.json` and the diff; you write nothing else. The summary is a file inventory grouped by subsystem, each row linking to the file's card in Diff review. Diff review keeps its sidebar, split-pane diff, rationale per file, reviewed tracking (stored under `qexplain-change-diff-<slug>`), left-out list, keyboard navigation and base and head pills. `<slug>` is the explanation id the build writes: the repo name, two hyphens, then the output file name without its date prefix and `_vN` suffix, all lowercased with every run of other characters turned to one hyphen (`gwadapter--liveness-explanation` for `261119_LIVENESS_EXPLANATION_v2.html` in repo `gwadapter`). A rebuild under the same name, or under a new date or version, therefore keeps the reader's state; pass `--id` to set the slug yourself.
+The build generates both from `rationales.json`, `roles.json` and the diff. The only other thing you may write for them is `notes.json`. The summary is a file inventory grouped by subsystem, each row linking to the file's card in Diff review. Diff review keeps its sidebar, split-pane diff, rationale per file, reviewed tracking (stored under `qexplain-change-diff-<slug>`), left-out list, keyboard navigation and base and head pills. `<slug>` is the explanation id the build writes: the repo name, two hyphens, then the output file name without its date prefix and `_vN` suffix, all lowercased with every run of other characters turned to one hyphen (`gwadapter--liveness-explanation` for `261119_LIVENESS_EXPLANATION_v2.html` in repo `gwadapter`). A rebuild under the same name, or under a new date or version, therefore keeps the reader's state; pass `--id` to set the slug yourself.
+
+**What the build adds to Diff review on its own.** Word-level marks between a removed line and the line that replaces it; syntax colours; the function each hunk changes, the changed functions of each file and where each is called; a badge on a hunk that is only a move, only spacing, or one word replaced on every line; a changed picture before and after. Do not repeat any of this in a rationale or a note.
+
+Know the limits before you rely on them in your prose. Functions are found by keyword and indentation, for Go, Python, Rust, Kotlin, JavaScript and TypeScript. Callers are a search for the name across the repo, so a function with the same name elsewhere is listed too, and a call through a variable is not. A page built with `--diff-file` has no callers and no pictures. The page says all of this to the reader.
+
+**Notes on lines (`notes.json`, optional).** A note tells the reader something the diff cannot show at that line: why this line is the real change, what a caller must now do, that a block only moved. Write one where a reviewer would otherwise stop and wonder, and nowhere else: a note that restates the line is noise. Format: `[{"path": "<path as in the diff>", "line": 33, "note": "<text>"}]`, with `"side": "old"` to point at a removed or unchanged line on the left, and `"end": 36` to cover several lines. A note is at most 600 characters. The build stops when a note names a line the diff does not show; after the code changes, write the notes again from the new diff. Notes are read-only on the page and never come back in the reader's feedback.
 
 The page also keeps the theme (`qexplain-change-theme`) and the sketch or classic style (`qexplain-change-sketch`) across visits. The reader's comments are kept under `qexplain-change-comments-<slug>`, and survive a rebuild in the same way.
 
 ### Format rules
 
-- **No extra libraries.** The template loads one pinned UMD build of Mermaid from `cdn.jsdelivr.net`, only when a Mermaid diagram is used. D2 needs no library. Another library needs an exact version from `cdn.jsdelivr.net`, `unpkg.com` or `cdnjs.cloudflare.com`, UMD build: `<script type="module">` is blocked on `file://`. The validator fails an unpinned URL or a module script.
+- **No extra libraries.** The template loads two pinned scripts from `cdn.jsdelivr.net`: a UMD build of Mermaid, only when a Mermaid diagram is used, and highlight.js, only when the page has the Diff review part. Without network the diff is shown uncoloured. D2 needs no library. Another library needs an exact version from `cdn.jsdelivr.net`, `unpkg.com` or `cdnjs.cloudflare.com`, UMD build: `<script type="module">` is blocked on `file://`. The validator fails an unpinned URL or a module script.
 - **The artifact's own data is inlined.** No `fetch` or XHR in your fragments.
 - **No ASCII diagrams.** Everything visual is D2, Mermaid or styled HTML.
 - **No emoji** in what you write. The check does not read the diff, so never leave a file out because of one.
