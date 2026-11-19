@@ -119,7 +119,9 @@ async function routeLibs(target) {
     document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
     return s.toString();
   });
-  const quoted = await selectProse(); await wait(250);
+  const quoted = await selectProse(); await wait(350);
+  const selCopy = (await page.evaluate(() => navigator.clipboard.readText().catch(() => ''))).replace(/\r\n/g, '\n');
+  log(selCopy.startsWith('// ' + await page.evaluate(() => cmPartName(PART_KEYS[0]))) && selCopy.split('\n').length === 2 && selCopy.endsWith('\n' + quoted), `selecting prose copies it with a line saying where it is from: ${selCopy.split('\n')[0]}`);
   log(await page.evaluate(() => { const b = document.getElementById('cm-add'); return !!b && !b.hidden; }), 'selecting prose offers a Comment button');
   await page.click('#cm-add'); await wait(150);
   log(await page.evaluate(() => document.querySelectorAll('#part-brief .cm-hl.cm-pending').length > 0 && document.activeElement === document.querySelector('.cm-card textarea')), 'the Comment button opens the box, focused, and keeps the chosen text marked');
@@ -223,6 +225,27 @@ async function routeLibs(target) {
   await page.evaluate(() => { document.querySelector('.cm-card .cm-cancel').click(); CM.items = []; cmChanged(); cmPanel(false); });
   log(await page.evaluate(() => { const tools = document.getElementById('top-tools').getBoundingClientRect(), last = [...document.querySelectorAll('.part-btn')].pop().getBoundingClientRect();
     return getComputedStyle(document.getElementById('top-tools')).position !== 'fixed' || last.right <= tools.left; }), 'the part buttons stay clear of the tools with the comment button added');
+  // The Annotate switch hides every comment button, marker and highlight, and keeps the comments
+  await selectProse(); await wait(250); await page.click('#cm-add'); await page.keyboard.type('kept'); await page.keyboard.press('Enter'); await wait(250);
+  await page.click('#cm-toggle'); await wait(250);
+  const cmShown = sel => page.evaluate(sel => [...document.querySelectorAll(sel)].some(e => getComputedStyle(e).display !== 'none' && e.getClientRects().length > 0), sel);
+  log(await page.evaluate(() => document.body.classList.contains('cm-off') && document.getElementById('cm-toggle').getAttribute('aria-checked') === 'false' && CM.items.length === 1)
+    && !(await cmShown('.cm-layer, .cm-mark, .cm-hl, #cm-panel-btn, .cm-tadd, #cm-panel')), 'Annotate off hides the highlights, markers and comment buttons, and keeps the comments');
+  await page.keyboard.press('/'); await wait(150);
+  await page.evaluate(() => navigator.clipboard.writeText('x')); const offSel = await selectProse(); await wait(350);
+  const hov = await page.evaluate(() => { const p = [...document.querySelectorAll('#part-brief .page p')].find(x => cmBlockOf(x) === x); const b = p.getBoundingClientRect(); return { x: b.left + 40, y: b.top + 8 }; });
+  await page.evaluate(() => getSelection().removeAllRanges()); await page.mouse.move(hov.x - 5, hov.y); await page.mouse.move(hov.x, hov.y); await wait(200);
+  log(await page.evaluate(() => !document.querySelector('.cm-card') && document.getElementById('cm-add').hidden && document.getElementById('cm-blk-add').hidden)
+    && (await page.evaluate(() => navigator.clipboard.readText().catch(() => ''))).includes(offSel), 'with Annotate off, "/", a selection and the pointer offer no comment; a selection is still copied');
+  await page.reload(); await wait(1200);
+  log(await page.evaluate(() => document.body.classList.contains('cm-off')), 'Annotate stays off across a reload');
+  await page.click('#cm-toggle'); await wait(250);
+  log(await page.evaluate(() => !document.body.classList.contains('cm-off') && document.querySelectorAll('#part-brief .cm-mark').length === 1) && await cmShown('#part-brief .cm-hl') && await cmShown('#cm-panel-btn'),
+    'Annotate on brings the highlights, markers and buttons back');
+  log(await page.evaluate(() => { const g = document.querySelector('.cm-grp'), b = document.getElementById('cm-panel-btn'), s = document.getElementById('cm-toggle'), t = document.getElementById('theme-toggle');
+    return g.contains(b) && g.contains(s) && !!b.querySelector('svg') && s.getAttribute('role') === 'switch' && !!t.querySelector('svg') && t.textContent.trim() === '' && /^Switch to (light|dark) mode$/.test(t.title)
+      && !!b.getAttribute('aria-label') && !!s.getAttribute('aria-label'); }), 'the comments button, the Annotate switch and the light/dark button are pictures with a name for screen readers');
+  await page.evaluate(() => { CM.items = []; cmChanged(); });
   // Copy feedback: labels, the automatic copy, the preview, the button, and old notes turned into file comments
   const clip = async () => (await page.evaluate(() => navigator.clipboard.readText().catch(() => ''))).replace(/\r\n/g, '\n');   // Windows hands the clipboard back with CRLF
   const quotedF = await selectProse(); await wait(250); await page.click('#cm-add'); await wait(150);

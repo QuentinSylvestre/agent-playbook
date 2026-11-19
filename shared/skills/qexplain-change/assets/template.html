@@ -309,6 +309,20 @@
   .cm-tadd { display: none; margin-left: 7px; vertical-align: -3px; width: 22px; height: 18px; align-items: center; justify-content: center; border: 1px solid var(--border-strong); border-radius: 5px; color: var(--text-light); }
   .part-btn.active .cm-tadd { display: inline-flex; }
   .cm-tadd:hover { border-color: #b26a00; color: #b26a00; }
+  /* The comments button and the Annotate switch stand in one frame. */
+  .cm-grp { display: inline-flex; align-items: center; gap: 6px; padding: 0 6px 0 0; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--toggle-bg); color: var(--toggle-text); }
+  body.cm-off .cm-grp { padding-left: 6px; }
+  #cm-panel-btn { display: inline-flex; align-items: center; height: 1.55rem; padding: 0 0.5rem; border: none; border-right: 1px solid var(--border-strong); border-radius: 3px 0 0 3px; background: transparent; color: inherit; cursor: pointer; }
+  #cm-panel-btn:hover, #cm-panel-btn[aria-expanded="true"] { color: var(--link); }
+  .cm-sw { position: relative; flex: none; width: 28px; height: 16px; margin: 0.3rem 0; padding: 0; border: none; border-radius: 8px; background: var(--border-strong); cursor: pointer; transition: background 0.15s; }
+  .cm-sw-k { position: absolute; top: 2px; left: 2px; width: 12px; height: 12px; border-radius: 6px; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.35); transition: left 0.15s; }
+  .cm-sw.cm-on { background: #b26a00; }
+  .cm-sw.cm-on .cm-sw-k { left: 14px; }
+  .cm-sw:focus-visible { outline: 2px solid #ffd166; outline-offset: 2px; }
+  #theme-toggle { display: inline-flex; align-items: center; justify-content: center; height: 1.65rem; padding: 0 0.5rem; }
+  body.cm-off .cm-layer, body.cm-off #cm-add, body.cm-off .cm-badd, body.cm-off #cm-hint, body.cm-off .cm-tadd, body.cm-off .cm-tmark, body.cm-off .cbtn, body.cm-off .cm-fmark,
+  body.cm-off .cm-dmark, body.cm-off #cm-panel-btn, body.cm-off #cm-panel, body.cm-off #copy-feedback { display: none !important; }
+  body.cm-off tr.cm-dl td, body.cm-off tr.cm-dl td.ln { box-shadow: none; }
   .part-btn.cm-on { box-shadow: inset 0 0 0 2px rgba(9, 105, 218, 0.55); border-radius: 4px 4px 0 0; }
   .fh.cm-fh-on { box-shadow: inset 3px 0 0 rgba(9, 105, 218, 0.9); }
   .cbtn { flex: none; display: flex; align-items: center; justify-content: center; width: 26px; height: 22px; padding: 0; background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 4px; cursor: pointer; }
@@ -343,7 +357,10 @@
 
 <div class="part-bar" id="top-bar">
   <div class="top-tools" id="top-tools">
-    <button class="theme-toggle" id="cm-panel-btn" type="button" onclick="cmPanel(!cmPanelOpen())" aria-expanded="false" aria-controls="cm-panel" title="The list of all comments">Comments<span class="cm-count"></span></button>
+    <span class="cm-grp">
+      <button id="cm-panel-btn" type="button" onclick="cmPanel(!cmPanelOpen())" aria-expanded="false" aria-controls="cm-panel" aria-label="Comments" title="The list of all comments"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M2.5 2.5h11a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H7.5l-3 2.5v-2.5h-2a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg><span class="cm-count"></span></button>
+      <button class="cm-sw cm-on" id="cm-toggle" type="button" role="switch" aria-checked="true" onclick="cmSetOff(!cmOff())" aria-label="Annotate" title="Annotate: show or hide the comment buttons, markers and highlights"><span class="cm-sw-k"></span></button>
+    </span>
     <button class="theme-toggle" id="info-toggle" type="button" onclick="toggleInfo()" aria-expanded="false" aria-controls="info-pop" title="Repository, range, build and the path of this page">Info</button>
     <button class="theme-toggle sketch-toggle" id="sketch-toggle" onclick="toggleSketch()" title="Switch the diagrams between sketch and classic style" hidden>Classic style</button>
     <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light mode">Theme</button>
@@ -612,7 +629,12 @@ function fixMermaidNotes(root) {
 // ---------------- Theme and diagram style ----------------
 function applyTheme(dark) {
   document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
-  document.getElementById('theme-toggle').textContent = dark ? 'Light mode' : 'Dark mode';
+  // A sun while the page is dark, a moon while it is light: the picture shows what a click gives.
+  const tb = document.getElementById('theme-toggle');
+  tb.innerHTML = dark
+    ? '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><circle cx="8" cy="8" r="3" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.4 1.4M11.55 11.55l1.4 1.4M3.05 12.95l1.4-1.4M11.55 4.45l1.4-1.4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>'
+    : '<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M13.5 10.2A6 6 0 0 1 5.8 2.5a6 6 0 1 0 7.7 7.7z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/></svg>';
+  tb.title = dark ? 'Switch to light mode' : 'Switch to dark mode'; tb.setAttribute('aria-label', tb.title);
 }
 function toggleTheme() {
   const dark = !isDark();
@@ -1412,7 +1434,7 @@ function cmPanelInit() {
   if (lsGet(CM_PANEL_KEY) === '1') cmPanel(true); else cmDrawPanel();
 }
 document.addEventListener('keydown', e => {
-  if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+  if (e.key !== '/' || cmOff() || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
   const t = e.target;
   if (t && (/^(TEXTAREA|INPUT|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
   if (!document.getElementById('copybox').hidden || !document.getElementById('dg-overlay').hidden) return;
@@ -1579,7 +1601,7 @@ function cmPlace(b, el, what, left, top) {
 }
 function cmHoverBlock(e) {
   const b = cmBlockAdd(), tb = cmBlockBtn('cm-tbl-add'), t = e.target;
-  if (cmCard) { cmHideBlockAdd(); return; }
+  if (cmCard || cmOff()) { cmHideBlockAdd(); return; }
   if (t && t.closest && t.closest('.cm-badd')) return;
   const sel = document.getSelection();
   let blk = t && t.closest && (!sel || sel.isCollapsed) ? cmBlockOf(t) : null;
@@ -1613,6 +1635,7 @@ function cmAt(x, y) {
   return hits.sort((a, b) => a.quote.length - b.quote.length)[0] || null;
 }
 function cmOverText(e) {
+  if (cmOff()) return null;
   const t = e.target;
   if (!t || !t.closest || !t.closest('.page') || t.closest('a, button, input, textarea, select, summary, .cm-card')) return null;
   return cmAt(e.clientX, e.clientY);
@@ -1643,11 +1666,31 @@ function cmAddButton() {
   }
   return b;
 }
+// Selecting text on any part copies it with a line saying where it is from, as the Diff review part does for diff lines.
+function cmCopySel(s) {
+  const txt = (document.getSelection() || '').toString(); if (txt.trim().length < 2) return;
+  const ref = cmPartName(s.part) + (s.section ? ' > ' + s.section : '');
+  copyText('// ' + ref + '\n' + txt, 'Copied (' + ref + ')', null, 'Selection not copied');
+}
+// The Annotate switch: off hides every comment button, marker and highlight for plain reading. Comments are kept.
+const CM_OFF_KEY = 'qexplain-change-annotate';
+function cmOff() { return document.body.classList.contains('cm-off'); }
+function cmSetOff(off) {
+  if (off && cmCard) { if (cmCard._dirty()) { cmNudge(); return; } cmClose(); }
+  if (off && cmPanelOpen()) cmPanel(false);
+  document.body.classList.toggle('cm-off', off);
+  const b = document.getElementById('cm-toggle'); b.setAttribute('aria-checked', off ? 'false' : 'true'); b.classList.toggle('cm-on', !off);
+  lsSet(CM_OFF_KEY, off ? 'off' : 'on');
+  if (off) { cmAddButton().hidden = true; cmHideBlockAdd(); }
+  fitTools(); if (diffActive()) measureHeader(); cmRefresh();
+}
 function cmOffer() {
   const b = cmAddButton();
   if (cmCard) { b.hidden = true; return; }
   cmPending = cmReadSelection();
   if (!cmPending) { b.hidden = true; return; }
+  if (cmPending.part !== 'diff') cmCopySel(cmPending);        // the Diff review part copies its own selections
+  if (cmOff()) { cmPending = null; b.hidden = true; return; }
   b.hidden = false;
   const w = b.offsetWidth || 80, box = cmPending.box;
   b.style.left = Math.min(window.innerWidth - w - 8, Math.max(8, box.right + 6)) + 'px';
@@ -1714,6 +1757,7 @@ function cmInit() {
   cmReady = true;
   cmAdoptNotes();
   cmResolve(); cmDraw(); cmPanelInit();
+  cmSetOff(lsGet(CM_OFF_KEY) === 'off');
   if (window.ResizeObserver) { const ro = new ResizeObserver(cmRefresh); cmRoots().forEach(r => ro.observe(r.root)); }
   window.addEventListener('resize', cmRefresh);
   window.addEventListener('popstate', cmRefresh);
