@@ -298,7 +298,17 @@
   .dg.cm-mode .dgv, .dg.cm-mode .mmd, .dg.cm-mode .cm-ovv { cursor: crosshair; }
   .dg.cm-mode .dgv, .dg.cm-mode .mmd { cursor: crosshair; outline: 2px dashed rgba(9, 105, 218, 0.6); outline-offset: -2px; }
   .dg-zb { width: 24px; height: 20px; padding: 0; border: 1px solid var(--border-strong); border-radius: 5px; background: var(--surface); color: var(--text-light); font: 600 12px/1 -apple-system, "Segoe UI", sans-serif; cursor: pointer; opacity: 0.55; }
-  .dg-zb[data-z="fit"] { width: auto; padding: 0 7px; opacity: 1; }
+  .dg-zb[data-z="fit"], .dg-srcb { width: auto; padding: 0 7px; opacity: 1; }
+  .dg-srcb.dg-edited { border-color: #b26a00; color: #b26a00; }
+  .dg-src { position: relative; z-index: 5; margin-top: 6px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface); text-align: left; }
+  .dg-src-h { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 5px 8px; border-bottom: 1px solid var(--border); font-size: 12px; }
+  .dg-src-st { flex: 1; min-width: 12rem; color: var(--text-light); }
+  .dg-src-st.bad { color: #c0392b; }
+  .dg-src-ask { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--border); background: rgba(214, 143, 0, 0.13); font-size: 12px; }
+  .dg-src-ask[hidden] { display: none; }
+  .dg-src textarea { display: block; width: 100%; min-height: 9.5rem; resize: vertical; border: none; border-radius: 0 0 4px 4px; padding: 8px 10px; background: var(--bg); color: var(--text); font: 12px/1.55 "Cascadia Code", Consolas, monospace; white-space: pre; overflow: auto; tab-size: 2; font-variant-ligatures: none; }   /* no ligatures: "-->" must read as it is typed */
+  .dg-src textarea:focus { outline: 2px solid #d68f00; outline-offset: -2px; }
+  .dg-src button { border: 1px solid var(--border-strong); background: var(--btn-bg); color: var(--text); cursor: pointer; }
   .dg-zb[hidden] { display: none; }
   .dg:hover .dg-zb { opacity: 1; }
   .dg-zb:hover { border-color: var(--link); color: var(--link); }
@@ -393,7 +403,7 @@
   .cm-dgbtn[aria-pressed="true"], .cm-dgbtn[aria-pressed="true"]:hover { background: #0969da; border-color: #0969da; color: #fff; }
   #cm-add { display: inline-flex; align-items: center; gap: 5px; }
   /* One look for the text buttons of the comment box and the panel. */
-  .cm-acts button, .cm-it-a button, .cm-ph button, .cm-pf button, .cm-pic button { padding: 3px 10px; border-radius: 4px; font-size: 12px; line-height: 1.4; }
+  .cm-acts button, .cm-it-a button, .cm-ph button, .cm-pf button, .cm-pic button, .dg-src button { padding: 3px 10px; border-radius: 4px; font-size: 12px; line-height: 1.4; }
 </style>
 </head>
 <body>
@@ -1216,6 +1226,10 @@ const CM_SKIP = 'svg, .dg, script, style, button, textarea, input, select, .sub-
 const CM_CTX = 32, CM_MAX_QUOTE = 2000;
 let CM = { v: 1, items: [] };
 try { const saved = JSON.parse(lsGet(CM_KEY) || 'null'); if (saved && saved.v === 1 && Array.isArray(saved.items)) CM = saved; } catch (e) {}
+// Edits to diagram sources, by diagram name. A Mermaid edit that still fits its source is in place before the first drawing.
+CM.edits = CM.edits || {};
+QX.mermaid0 = Object.assign({}, QX.mermaid);
+Object.keys(CM.edits).forEach(n => { const i = (QX.dg || {})[n], ed = CM.edits[n]; if (i && i.kind === 'mermaid' && !ed.bad && ed.base === cmHash(QX.mermaid0[i.mid] || '')) QX.mermaid[i.mid] = ed.text; });
 function cmSave() {
   const text = () => JSON.stringify(CM, (k, v) => (k[0] === '_' ? undefined : v));
   let s = text(); lsSet(CM_KEY, s);
@@ -1515,16 +1529,18 @@ function cmDgBar(dg) {
   const bar = document.createElement('div'); bar.className = 'cm-dgbar';
   const tip = document.createElement('div'); tip.className = 'cm-dgtip'; dg.appendChild(tip);   // above the frame, so it hides nothing
   const zoom = dg.id === 'dg-ov-body' ? '' : '<button type="button" class="dg-zb" data-z="fit" title="Back to the whole diagram" hidden>Fit</button>'
-    + '<button type="button" class="dg-zb" data-z="out" title="Zoom out" aria-label="Zoom out">-</button><button type="button" class="dg-zb" data-z="in" title="Zoom in (or Ctrl + wheel)" aria-label="Zoom in">+</button>';
+    + '<button type="button" class="dg-zb" data-z="out" title="Zoom out" aria-label="Zoom out">-</button><button type="button" class="dg-zb" data-z="in" title="Zoom in (or Ctrl + wheel)" aria-label="Zoom in">+</button>'
+    + (dgSrcOrig(dg) ? '<button type="button" class="dg-zb dg-srcb" aria-expanded="false" title="Show and edit the source of this diagram">Source</button>' : '');
   if (zoom) dg.querySelectorAll('.dgv, .mmd').forEach(x => { x.title = 'Click to enlarge. Ctrl + wheel or the buttons zoom; drag moves a zoomed diagram.'; });
   bar.innerHTML = zoom + '<button type="button" class="cm-dgbtn" title="Comment on this diagram or on one of its parts" aria-label="Comment on this diagram" aria-pressed="false">' + CM_ICON + '</button>';
   bar.querySelector('.cm-dgbtn').addEventListener('click', e => { e.stopPropagation(); cmDgSetMode(cmDgMode === dg ? null : dg); });
-  bar.querySelectorAll('.dg-zb').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); dgZoom(dg, b.dataset.z === 'fit' ? 0 : b.dataset.z === 'in' ? 1.25 : 0.8); }));
+  bar.querySelectorAll('.dg-srcb').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); dgSrcOpen(dg, !dg.querySelector(':scope > .dg-src')); }));
+  bar.querySelectorAll('.dg-zb[data-z]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); dgZoom(dg, b.dataset.z === 'fit' ? 0 : b.dataset.z === 'in' ? 1.25 : 0.8); }));
   dg.appendChild(bar);
 }
 function cmDgMove(e) {
   if (!cmDgMode || cmCard || cmOff()) return;
-  const t = e.target, inside = !!(t && t.closest) && t.closest('.dg') === cmDgMode && !t.closest('.cm-dgbar, .cm-mark');
+  const t = e.target, inside = !!(t && t.closest) && t.closest('.dg') === cmDgMode && !t.closest('.cm-dgbar, .cm-mark, .dg-src');
   const p = inside ? cmDgHit(cmDgMode, e.clientX, e.clientY) : null;
   const hot = inside ? { dg: cmDgMode, tk: p ? (p.edge ? 'edge' : 'node') : 'whole', id: p ? p.id : '' } : null;
   if ((hot ? hot.tk + hot.id : '') === (cmDgHot ? cmDgHot.tk + cmDgHot.id : '')) return;
@@ -1603,7 +1619,7 @@ function cmCopyPic(url) {
 }
 function cmPicHtml(url) { return '<div class="cm-pic"><img src="' + url + '" alt="The boxed area of the diagram"><button type="button" data-act="pic" title="Copy this picture, to paste it beside the feedback">Copy picture</button></div>'; }
 document.addEventListener('mousedown', e => {
-  if (!cmDgMode || !e.shiftKey || e.button !== 0 || cmCard || cmOff() || !e.target.closest || e.target.closest('.dg') !== cmDgMode || e.target.closest('.cm-dgbar, .cm-mark')) return;
+  if (!cmDgMode || !e.shiftKey || e.button !== 0 || cmCard || cmOff() || !e.target.closest || e.target.closest('.dg') !== cmDgMode || e.target.closest('.cm-dgbar, .cm-mark, .dg-src')) return;
   cmBx = { dg: cmDgMode, x0: e.clientX, y0: e.clientY, x1: e.clientX, y1: e.clientY }; e.preventDefault();
 }, true);
 document.addEventListener('mousemove', e => { if (!cmBx) return; cmBx.x1 = e.clientX; cmBx.y1 = e.clientY; cmDrawDgSoon(); });
@@ -1627,7 +1643,7 @@ function cmDrawDg() {
   document.querySelectorAll('.cm-dgl').forEach(l => l.remove());
   document.querySelectorAll('.dg .cm-eg').forEach(g => g.classList.remove('cm-eg', 'cm-eg-on'));
   document.querySelectorAll('.dg').forEach(dg => {
-    cmDgBar(dg);
+    cmDgBar(dg); dgSrcMark(dg);
     if (dg._zoom) dgApply(dg);                    // a Mermaid redraw replaces the drawing and loses its zoom
     if (dg.offsetParent === null) return;         // not on screen: nothing can be measured
     const layer = document.createElement('div'); layer.className = 'cm-dgl';
@@ -1662,6 +1678,99 @@ function cmDrawDg() {
     else if (cmDgHot && cmDgHot.dg === dg && !cmCard) show(cmDgHot.tk, cmDgHot.id, ' cm-hot');
     dg.appendChild(layer);
   });
+}
+// --- The source of a diagram, as text the reader can edit. A Mermaid diagram is drawn in the browser, so an edit
+// redraws it; a text that does not parse is kept and reported, and the diagram keeps its last good drawing. A D2
+// diagram is drawn by the build, so its edit changes nothing on the page. Either way the edit is stored with the
+// comments, under the diagram's name, and goes into the copied feedback. Each edit remembers which source it was
+// written against: after a rebuild that changed that source it is not applied, and the reader keeps or discards it.
+function dgSrcOrig(dg) { const i = cmDgInfo(dg); return i.kind === 'mermaid' ? (QX.mermaid0[i.mid] || '') : (i.src || ''); }
+function dgSrcFirst(name) { return Array.from(document.querySelectorAll('.part-panel .dg')).find(d => d.dataset.name === name) || null; }
+function dgSrcStale(name) { const ed = CM.edits[name], dg = dgSrcFirst(name); return !!ed && !!dg && ed.base !== cmHash(dgSrcOrig(dg)); }
+function dgSrcNames() { return Object.keys(CM.edits || {}); }
+function dgSrcApply(mid, text) {
+  if (QX.mermaid[mid] === text) return;
+  QX.mermaid[mid] = text;
+  document.querySelectorAll('.mmd[data-mid="' + mid + '"]').forEach(el => { delete el.dataset.theme; });      // every use of the diagram is drawn again
+  const act = document.querySelector('.part-panel.active');
+  renderMermaid(act, act && act.id === 'part-maps' ? () => renderTourStep(currentVid) : null);
+}
+function dgSrcMark(dg) {
+  const b = dg.querySelector(':scope > .cm-dgbar .dg-srcb'); if (!b) return;
+  const name = dg.dataset.name, ed = CM.edits[name];
+  b.classList.toggle('dg-edited', !!ed); b.setAttribute('aria-expanded', dg.querySelector(':scope > .dg-src') ? 'true' : 'false');
+  // An edit written against an older source is shown to the reader once, not applied and not hidden.
+  if (ed && dgSrcStale(name) && !dg._asked && dg.offsetParent !== null && dgSrcFirst(name) === dg) { dg._asked = true; dgSrcOpen(dg, true); }
+}
+function dgSrcStatus(dg) {
+  const box = dg.querySelector(':scope > .dg-src'); if (!box) return;
+  const name = dg.dataset.name, ed = CM.edits[name], st = box.querySelector('.dg-src-st'), kind = cmDgInfo(dg).kind, stale = dgSrcStale(name);
+  box.querySelector('.dg-src-ask').hidden = !stale;
+  st.classList.toggle('bad', !!(ed && ed.bad));
+  st.textContent = !ed ? 'Not edited.' : stale ? 'Your edit is not applied.' : ed.bad ? 'Does not parse: ' + ed.bad + ' The diagram keeps its last good drawing.'
+    : kind === 'mermaid' ? 'Edited: the diagram is redrawn. The edit goes into the copied feedback.' : 'Edited. The diagram is not redrawn here: the agent regenerates it from the copied feedback.';
+  dgSrcMark(dg);
+}
+function dgSrcSet(dg, text, keep) {
+  const name = dg.dataset.name, info = cmDgInfo(dg), orig = dgSrcOrig(dg), seq = dg._seq = (dg._seq || 0) + 1;
+  const done = () => { if (dg._seq !== seq) return; cmSave(); dgSrcStatus(dg); cmDrawPanel(); };
+  if (text === orig) { delete CM.edits[name]; if (info.kind === 'mermaid') dgSrcApply(info.mid, orig); done(); return; }
+  const old = CM.edits[name], ed = CM.edits[name] = { text, kind: info.kind, base: old && !keep && old.base !== cmHash(orig) ? old.base : cmHash(orig), bad: '' };
+  if (info.kind !== 'mermaid' || ed.base !== cmHash(orig)) { done(); return; }      // D2, or an edit still waiting for "keep or discard"
+  Promise.resolve().then(() => mermaid.parse(text)).then(() => { if (dg._seq === seq) dgSrcApply(info.mid, text); },
+    e => { if (dg._seq === seq && CM.edits[name]) CM.edits[name].bad = String((e && e.message) || e).split('\n').filter(Boolean).slice(0, 2).join(' ').slice(0, 200); }).then(done);
+}
+function dgSrcOpen(dg, open) {
+  let box = dg.querySelector(':scope > .dg-src');
+  if (!open) {
+    if (box) { box.remove(); if (CM.edits[dg.dataset.name]) cmAutoCopy('Source edit kept'); }
+    dgSrcMark(dg); cmRefresh(); return;
+  }
+  if (!box) {
+    const kind = cmDgInfo(dg).kind === 'mermaid' ? 'Mermaid' : 'D2';
+    box = document.createElement('div'); box.className = 'dg-src';
+    box.innerHTML = '<div class="dg-src-h"><strong></strong><span class="dg-src-st"></span><button type="button" data-s="reset" title="Put the original source back">Reset</button><button type="button" data-s="close">Close</button></div>'
+      + '<div class="dg-src-ask" hidden>The source of this diagram changed after you edited it, so your edit is not applied. '
+      + '<button type="button" data-s="keep">Keep my edit</button><button type="button" data-s="reset">Discard my edit</button></div>'
+      + '<textarea spellcheck="false" aria-label="Source of the diagram"></textarea>';
+    box.querySelector('strong').textContent = 'Source of diagram "' + dg.dataset.name + '" (' + kind + ')';
+    const ta = box.querySelector('textarea'); let timer = 0;
+    ta.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => dgSrcSet(dg, ta.value, false), 350); });
+    ta.addEventListener('keydown', e => e.stopPropagation());        // the page's own keys stay out of the text
+    box.addEventListener('click', e => {
+      const b = e.target.closest('button[data-s]'); if (!b) return;
+      clearTimeout(timer);
+      if (b.dataset.s === 'close') dgSrcOpen(dg, false);
+      else if (b.dataset.s === 'reset') { ta.value = dgSrcOrig(dg); dgSrcSet(dg, ta.value, false); }
+      else if (b.dataset.s === 'keep') dgSrcSet(dg, ta.value, true);
+    });
+    dg.appendChild(box);
+  }
+  const ed = CM.edits[dg.dataset.name];
+  box.querySelector('textarea').value = ed ? ed.text : dgSrcOrig(dg);
+  dgSrcStatus(dg); cmRefresh();
+}
+function dgSrcDrop(name) {
+  const dg = dgSrcFirst(name), info = dg ? cmDgInfo(dg) : null;
+  delete CM.edits[name];
+  if (info && info.kind === 'mermaid') dgSrcApply(info.mid, dgSrcOrig(dg));
+  document.querySelectorAll('.part-panel .dg').forEach(d => { if (d.dataset.name !== name) return; const ta = d.querySelector(':scope > .dg-src textarea'); if (ta) ta.value = dgSrcOrig(d); dgSrcStatus(d); dgSrcMark(d); });
+  cmSave(); cmDrawPanel(); cmAutoCopy('Source edit discarded');
+}
+// From the panel: goes to the diagram and opens its source.
+function dgSrcJump(name) {
+  const dg = dgSrcFirst(name); if (!dg) return;
+  const key = dg.closest('.part-panel').id.slice(5), sub = dg.closest('.sub-panel'), map = dg.closest('.map-panel');
+  if ((document.querySelector('.part-btn.active') || { dataset: {} }).dataset.part !== key) switchPart(key);
+  if (sub && !sub.classList.contains('active')) switchSub(sub.dataset.group, sub.id.slice(4));
+  if (map && !map.classList.contains('active')) switchMap(map.id.slice(5), false);
+  dgSrcOpen(dg, true); dg.scrollIntoView({ block: 'center' });
+}
+function dgSrcItemHtml(name, n) {
+  const ed = CM.edits[name], gone = !dgSrcFirst(name);
+  return '<div class="cm-it' + (gone ? ' cm-it-lost' : '') + '" data-src="' + esc(name) + '"><div class="cm-it-h"><span class="cm-num">' + n + '</span><span class="cm-it-w">Edited source of diagram "' + esc(name) + '"</span>'
+    + (gone ? '<span class="cm-tag">not found</span>' : dgSrcStale(name) ? '<span class="cm-tag" title="The source of this diagram changed after the edit was written">not applied</span>' : ed.bad ? '<span class="cm-tag">does not parse</span>' : '')
+    + '</div><div class="cm-it-a"><button type="button" class="cm-del" data-act="srcdrop">Discard</button></div></div>';
 }
 // --- A comment on one part as a whole: the "/" key comments on the part that is showing. Its marker stands in the
 // part's own button, so it is visible from every part.
@@ -1750,7 +1859,7 @@ function cmLabsWire(root) {
 }
 function cmFeedback() {
   const open = CM.items.filter(c => c.state !== 'resolved').sort((x, y) => x._n - y._n);
-  if (!open.length) return '';
+  if (!open.length && !dgSrcNames().length) return '';
   const L = ['Feedback on the change explanation "' + baseTitle + '"'], path = pagePath(), used = [];
   if (path) L.push('Page: ' + path);
   L.push('Explanation id: ' + PAGE_ID + (QX.base && QX.head ? '. Range: ' + QX.base + ' to ' + QX.head + '.' : '.'), '');
@@ -1768,11 +1877,20 @@ function cmFeedback() {
     } else if (c.quote) L.push('   Quote: "' + cmExcerpt(c.quote, 400) + '"');
     L.push('   Comment: ' + ind(c.text), '');
   });
+  dgSrcNames().forEach((name, i) => {
+    const ed = CM.edits[name], gone = !dgSrcFirst(name), d2 = ed.kind !== 'mermaid';
+    L.push((open.length + i + 1) + '. Diagram "' + name + '" (' + (d2 ? 'D2' : 'Mermaid') + '): the reader edited its source. Replace the source with the text below' + (d2 ? ' and regenerate the diagram.' : '.'));
+    if (gone) L.push('   Note: this diagram is no longer on the page.');
+    else if (dgSrcStale(name)) L.push('   Note: the diagram\'s source changed after this edit was written. Carry its intent over; do not undo the newer changes.');
+    if (ed.bad) L.push('   Note: this text does not parse as Mermaid (' + ed.bad + '). Keep its intent and make it valid.');
+    ed.text.replace(/\n+$/, '').split('\n').forEach(t => L.push('   | ' + t));
+    L.push('');
+  });
   if (used.length) { L.push('Labels:'); CM_LABELS.filter(l => used.includes(l)).forEach(l => L.push('- ' + l[1] + ': ' + l[2])); L.push(''); }
   L.push(CM_ASK);
   return L.join('\n') + '\n';
 }
-function cmOpenCount() { return CM.items.filter(c => c.state !== 'resolved').length; }
+function cmOpenCount() { return CM.items.filter(c => c.state !== 'resolved').length + dgSrcNames().length; }
 function cmCopy(btn) {
   const text = cmFeedback();
   if (!text) { showToast('No open comments to copy'); return; }
@@ -1820,7 +1938,7 @@ function cmItemHtml(c) {
 }
 function cmDrawPanel() {
   const open = CM.items.filter(c => c.state !== 'resolved').sort((x, y) => x._n - y._n), done = CM.items.filter(c => c.state === 'resolved');
-  const cnt = document.querySelector('#cm-panel-btn .cm-count'); if (cnt) cnt.textContent = open.length || '';
+  const cnt = document.querySelector('#cm-panel-btn .cm-count'); if (cnt) cnt.textContent = (open.length + dgSrcNames().length) || '';
   fitTools();
   if (!cmPanelOpen()) return;
   const list = document.querySelector('#cm-panel .cm-pl'), was = list.querySelector('.cm-it-ta'), wasOpen = !!(list.querySelector('.cm-res') || {}).open;
@@ -1829,8 +1947,8 @@ function cmDrawPanel() {
   if (cmEdit === 'new') h += '<div class="cm-it" data-cid="new"><div class="cm-it-h"><span class="cm-it-w">The whole explanation</span></div>'
     + '<textarea class="cm-it-ta" aria-label="Comment" placeholder="Your comment on the explanation as a whole">' + esc(cmEditText || '') + '</textarea>' + cmLabsHtml(cmEditLab || '')
     + '<div class="cm-it-a"><button type="button" data-act="cancel">Cancel</button><button type="button" class="cm-save" data-act="save">Save</button></div></div>';
-  h += open.map(cmItemHtml).join('');
-  if (!open.length && cmEdit !== 'new') h += '<div class="cm-empty">No open comments. Select text, point at a paragraph, a table cell or a diff line, or press / to comment on the part that is showing.</div>';
+  h += open.map(cmItemHtml).join('') + dgSrcNames().map((n, i) => dgSrcItemHtml(n, open.length + i + 1)).join('');
+  if (!open.length && !dgSrcNames().length && cmEdit !== 'new') h += '<div class="cm-empty">No open comments. Select text, point at a paragraph, a table cell or a diff line, or press / to comment on the part that is showing.</div>';
   if (done.length) h += '<details class="cm-res"' + (wasOpen ? ' open' : '') + '><summary>Resolved (' + done.length + ')</summary>' + done.map(cmItemHtml).join('') + '</details>';
   list.innerHTML = h;
   const ta = list.querySelector('.cm-it-ta');
@@ -1907,6 +2025,7 @@ function cmPanelInit() {
     if (b && b.dataset.act === 'copy') { cmCopy(b); return; }
     if (b && b.dataset.act === 'pic') { const pc = CM.items.find(x => x.id === (it || {}).dataset.cid); if (pc && pc.pic) cmCopyPic(pc.pic); return; }
     if (b && b.dataset.act === 'preview') { const v = p.querySelector('.cm-prev'); v.hidden = !v.hidden; b.setAttribute('aria-expanded', v.hidden ? 'false' : 'true'); return; }
+    if (it && it.dataset.src) { if (b && b.dataset.act === 'srcdrop') dgSrcDrop(it.dataset.src); else dgSrcJump(it.dataset.src); return; }
     if (b) { if (b.dataset.act === 'close') cmPanel(false); else cmPanelAct(b.dataset.act, it ? it.dataset.cid : 'new'); return; }
     if (!it || e.target.closest('textarea, summary, .cm-labs') || it.closest('.cm-res') || (document.getSelection() || '').toString()) return;
     cmJump(CM.items.find(x => x.id === it.dataset.cid));
@@ -2249,7 +2368,7 @@ function cmInit() {
     // A click outside the diagram leaves comment mode, as Escape does. The comment box, the panel and the tools of
     // the top bar (panel, light and dark, sketch) are not "outside": the reader uses them while commenting.
     if (cmDgMode && !cmCard && e.target.closest && e.target.closest('.dg') !== cmDgMode && !e.target.closest('.cm-card, #cm-panel, .top-tools, #dg-ov-bar')) cmDgSetMode(null);
-    if (!m && cmDgMode && !cmOff() && e.target.closest && e.target.closest('.dg') === cmDgMode && !e.target.closest('.cm-dgbar')) {
+    if (!m && cmDgMode && !cmOff() && e.target.closest && e.target.closest('.dg') === cmDgMode && !e.target.closest('.cm-dgbar, .dg-src')) {
       if ((cmDgMode === ovBody() && OV.moved) || ZD.moved) return;   // the end of a drag, in the full-window view or on a zoomed diagram
       cmOpen({ sel: cmDgSel(cmDgMode, cmDgHit(cmDgMode, e.clientX, e.clientY)) }); return;
     }

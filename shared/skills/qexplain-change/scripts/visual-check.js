@@ -437,6 +437,61 @@ async function routeLibs(target) {
     }
     await page.evaluate(() => { CM.items = []; cmChanged(); switchPart(PART_KEYS[0], true); }); await wait(400);
   }
+  // The source of a diagram as editable text: Mermaid redraws, a bad text keeps the last good drawing, D2 is text only
+  const typeSrc = (id, text) => page.evaluate(([id, text]) => { const ta = document.querySelector('#' + id + ' > .dg-src textarea'); ta.value = text; ta.dispatchEvent(new Event('input', { bubbles: true })); }, [id, text]);
+  const srcState = id => page.evaluate(id => { const dg = document.getElementById(id), box = dg.querySelector(':scope > .dg-src'), ed = CM.edits[dg.dataset.name];
+    return { open: !!box, text: box ? box.querySelector('textarea').value : null, st: box ? box.querySelector('.dg-src-st').textContent : '', ask: box ? !box.querySelector('.dg-src-ask').hidden : false,
+      ed: ed ? { bad: ed.bad, kind: ed.kind } : null, marked: dg.querySelector('.dg-srcb').classList.contains('dg-edited'), drawn: (dg.querySelector('.mmd svg') || { textContent: '' }).textContent }; }, id);
+  if (await page.evaluate(() => PART_KEYS.includes('walkthrough') && !!document.querySelector('#part-walkthrough .dg[data-kind="mermaid"]'))) {
+    await page.evaluate(() => switchPart('walkthrough', true)); await wait(1800);
+    const sq = await page.evaluate(() => { const dg = document.querySelector('#part-walkthrough .dg[data-kind="mermaid"]'); dg.scrollIntoView({ block: 'center' }); const src = QX.mermaid0[cmDgInfo(dg).mid];
+      const m = /:\s*(.+)$/m.exec(src); return { id: dg.id, name: dg.dataset.name, src, msg: m ? m[1].trim() : '' }; });
+    if (sq.msg) {
+      await wait(300); await page.click('#' + sq.id + ' .dg-srcb'); await wait(300);
+      let s = await srcState(sq.id);
+      log(s.open && s.text === sq.src && s.st === 'Not edited.' && !s.marked, 'the Source button shows the diagram\'s source as text, unedited');
+      const edited = sq.src.replace(sq.msg, sq.msg + ' EDITED');
+      await typeSrc(sq.id, edited); await wait(2200); s = await srcState(sq.id);
+      log(!!s.ed && s.ed.bad === '' && s.marked && s.drawn.includes(sq.msg + ' EDITED') && /redrawn/.test(s.st), 'editing a Mermaid source redraws the diagram and marks it as edited');
+      await typeSrc(sq.id, 'this is not a diagram at all'); await wait(2200); s = await srcState(sq.id);   // Mermaid forgives much inside a diagram; this has no diagram type
+      const badFb = await page.evaluate(() => cmFeedback());
+      log(!!s.ed && s.ed.bad.length > 3 && s.drawn.includes(sq.msg + ' EDITED') && /^Does not parse: /.test(s.st) && badFb.includes('does not parse as Mermaid'),
+        `a source that does not parse is reported and the diagram keeps its last good drawing: ${s.st.slice(0, 90)}`);
+      await typeSrc(sq.id, edited); await wait(2200);
+      const fb = await page.evaluate(() => cmFeedback());
+      log(fb.includes('1. Diagram "' + sq.name + '" (Mermaid): the reader edited its source. Replace the source with the text below.') && edited.trim().split('\n').every(l => fb.includes('   | ' + l)) && fb.trimEnd().endsWith(await page.evaluate(() => CM_ASK)),
+        'an edited source goes into the copied feedback as a numbered item, line by line');
+      await page.reload(); await wait(2200);
+      log(await page.evaluate(([id, t]) => (document.querySelector('#' + id + ' .mmd svg') || { textContent: '' }).textContent.includes(t) && document.getElementById(id).querySelector('.dg-srcb').classList.contains('dg-edited'), [sq.id, sq.msg + ' EDITED']),
+        'after a reload the edit is still applied and the diagram is drawn from it');
+      await page.evaluate(n => { CM.edits[n].base = 'an older source'; cmSave(); }, sq.name); await page.reload(); await wait(2200);
+      s = await srcState(sq.id);
+      const staleFb = await page.evaluate(() => cmFeedback());
+      log(s.open && s.ask && !s.drawn.includes('EDITED') && s.text === edited && /not applied/.test(s.st) && staleFb.includes('source changed after this edit was written'),
+        'an edit written against an older source is not applied: its diagram shows the new source and asks to keep or discard');
+      await page.click('#' + sq.id + ' .dg-src [data-s="keep"]'); await wait(2200); s = await srcState(sq.id);
+      const kept = !s.ask && s.drawn.includes('EDITED');
+      await page.click('#' + sq.id + ' .dg-src-h [data-s="reset"]'); await wait(2200); s = await srcState(sq.id);
+      log(kept && !s.ed && !s.marked && s.text === sq.src && !s.drawn.includes('EDITED') && await page.evaluate(() => cmFeedback() === ''), '"Keep my edit" applies it; Reset puts the original back and removes the edit');
+      await page.click('#' + sq.id + ' .dg-src [data-s="close"]'); await wait(200);
+    }
+    await page.evaluate(() => switchPart(PART_KEYS[0], true)); await wait(400);
+  }
+  if (d2dg) {
+    await page.evaluate(id => document.getElementById(id).scrollIntoView({ block: 'center' }), d2dg); await wait(300);
+    await page.click('#' + d2dg + ' .dg-srcb'); await wait(300);
+    const d2src = await page.evaluate(id => QX.dg[document.getElementById(id).dataset.name].src, d2dg);
+    let s = await srcState(d2dg); const d2open = s.open && s.text === d2src;
+    await typeSrc(d2dg, d2src + '\nextra: Added by the reader\n'); await wait(900); s = await srcState(d2dg);
+    await page.click('#cm-panel-btn'); await wait(300);
+    const d2fb = await page.evaluate(() => cmFeedback());
+    log(d2open && !!s.ed && s.ed.kind === 'd2' && s.marked && /not redrawn/.test(s.st) && d2fb.includes('(D2): the reader edited its source. Replace the source with the text below and regenerate the diagram.') && d2fb.includes('   | extra: Added by the reader')
+      && await page.evaluate(() => document.querySelector('#cm-panel-btn .cm-count').textContent === '1' && document.querySelectorAll('#cm-panel .cm-it[data-src]').length === 1),
+      'a D2 source is edited as text with no redraw; the copied text asks for the diagram to be regenerated, and the panel lists the edit');
+    await page.evaluate(() => document.querySelector('#cm-panel .cm-it[data-src] [data-act="srcdrop"]').click()); await wait(300); s = await srcState(d2dg);
+    log(!s.ed && !s.marked && s.text === d2src && await page.evaluate(() => document.querySelectorAll('#cm-panel .cm-it[data-src]').length === 0 && cmFeedback() === ''), 'Discard in the panel removes the edit and puts the original text back');
+    await page.evaluate(id => { dgSrcOpen(document.getElementById(id), false); cmPanel(false); }, d2dg); await wait(200);
+  }
   const looks = await page.evaluate(() => { const css = e => { const s = getComputedStyle(e); return [s.width, s.height, s.borderTopColor, s.borderTopLeftRadius, s.color].join(); };
     const mm = [...document.querySelectorAll('.dg[data-kind="mermaid"]')].find(d => !cmDgParts(d).length); let hint = null;
     if (mm) { cmDgSetMode(mm); hint = mm.querySelector(':scope > .cm-dgtip').textContent; cmDgSetMode(null); }
