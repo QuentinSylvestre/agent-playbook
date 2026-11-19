@@ -43,7 +43,8 @@
  *      Hunks that are only a move, spacing or one word replaced carry a badge, and a button hides
  *      them. A changed picture shows before and after. The agent's notes stand under their lines,
  *      read-only.
- *   7. At 390px wide no part scrolls the page sideways. No page errors.
+ *   7. At 390px wide no part scrolls the page sideways. No page errors. In the written parts no text is cut
+ *      off by its own box, no block runs out of its column, and no text lies under another element.
  *   8. Comments: selecting prose copies it with a location line and offers a Comment button; Enter
  *      saves, Shift+Enter adds a line, Escape keeps a box that holds text. A saved comment is
  *      highlighted and numbered, survives a reload, and reopens from its marker or its text. The
@@ -1237,6 +1238,54 @@ async function routeLibs(target) {
   log(await page.$('#verified') !== null, 'Brief has the verified section');
 
   // 7. Phone width, for each part present
+  // Layout of the written content, part by part: text cut off by its own box, a block that runs out of the column,
+  // and text that another element covers. The Diff review part is left out: it cuts long lines on purpose.
+  // The detectors are first shown three planted faults, and must find exactly those.
+  const installLayout = p => p.evaluate(() => { window.__qxLayout = () => {
+    const chrome = '.part-bar, .top-tools, .rev-bar, #cm-panel, #toast, .cm-card, #cm-add, .cm-badd';
+    const out = { clipped: [], escaped: [], covered: [], blocks: 0 };
+    const name = el => el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + ' "' + el.textContent.trim().replace(/\s+/g, ' ').slice(0, 40) + '"';
+    const part = document.querySelector('.part-panel.active'), root = part.querySelector('.page') || part;
+    const box = root.getBoundingClientRect(), cs0 = getComputedStyle(root), left = box.left + parseFloat(cs0.paddingLeft), right = box.right - parseFloat(cs0.paddingRight);
+    // inside something that scrolls or cuts on purpose, a wide block is that container's business
+    const held = el => { for (let a = el.parentElement; a && a !== root; a = a.parentElement) if (/(auto|scroll|hidden|clip)/.test(getComputedStyle(a).overflowX)) return true; return false; };
+    const blocks = [...root.querySelectorAll('p, li, td, th, h1, h2, h3, h4, pre, table, img, figcaption, blockquote, dt, dd')].filter(el => el.offsetParent !== null && !el.closest('.dg, .rev-bar, .cm-layer, svg'));
+    blocks.forEach(el => {
+      out.blocks++;
+      const cs = getComputedStyle(el), r = el.getBoundingClientRect();
+      if (el.textContent.trim() && /(hidden|clip)/.test(cs.overflowX + ' ' + cs.overflowY) && (el.scrollWidth > el.clientWidth + 1 || el.scrollHeight > el.clientHeight + 1)) out.clipped.push(name(el));
+      if (!held(el) && r.width > 0 && (r.right > right + 2 || r.left < left - 2)) out.escaped.push(name(el) + ' by ' + Math.round(Math.max(r.right - right, left - r.left)) + 'px');
+    });
+    blocks.filter(el => /^(P|LI|TD|TH|H1|H2|H3|H4|FIGCAPTION|DT|DD)$/.test(el.tagName) && el.textContent.trim()).slice(0, 400).forEach(el => {
+      el.scrollIntoView({ block: 'center' });
+      const r = el.getBoundingClientRect(); if (r.width < 4 || r.height < 4) return;
+      const pts = [[0.5, 0.5], [0.15, 0.3], [0.85, 0.3], [0.15, 0.7], [0.85, 0.7]].map(([fx, fy]) => [r.left + r.width * fx, r.top + r.height * fy]).filter(([x, y]) => x >= 0 && y >= 0 && x < innerWidth && y < innerHeight);
+      const hid = pts.filter(([x, y]) => { const top = document.elementFromPoint(x, y); return top && !el.contains(top) && !top.contains(el) && !top.closest(chrome); }).length;
+      if (pts.length >= 3 && hid >= pts.length - 1) out.covered.push(name(el));      // nearly all of it, not a corner
+    });
+    window.scrollTo(0, 0);
+    return out;
+  }; });
+  const layoutOf = (p, key) => p.evaluate(key => { switchPart(key); return window.__qxLayout(); }, key);
+  const layoutParts = (await page.evaluate(() => PART_KEYS.slice())).filter(k => k !== 'diff');
+  await installLayout(page);
+  {
+    await page.evaluate(k => switchPart(k), layoutParts[0]); await wait(200);
+    const planted = await page.evaluate(() => { const root = document.querySelector('.part-panel.active .page'), w = document.createElement('div'); w.id = 'vc-faults';
+      w.innerHTML = '<p id="vc-clip" style="width:90px;overflow:hidden;white-space:nowrap">A sentence much longer than ninety pixels can hold</p><p id="vc-esc" style="width:3000px">A block far wider than the column</p>'
+        + '<div style="position:relative"><p id="vc-cov">A sentence that lies under something else</p><div style="position:absolute;inset:0;background:#fff"></div></div><p id="vc-fine">A plain sentence that is fine.</p>';
+      root.appendChild(w); const r = window.__qxLayout(); w.remove();
+      const only = (list, id) => list.filter(x => x.includes('#vc-')).length === 1 && list.some(x => x.includes(id)); return { clip: only(r.clipped, '#vc-clip'), esc: only(r.escaped, '#vc-esc'), cov: only(r.covered, '#vc-cov') }; });
+    log(planted.clip && planted.esc && planted.cov, `the three layout detectors find a planted fault each and nothing else among the planted blocks (cut-off text ${planted.clip}, block out of the column ${planted.esc}, covered text ${planted.cov})`);
+    const found = [];
+    for (const k of layoutParts) { const r = await layoutOf(page, k); await wait(k === 'maps' ? 500 : 100); found.push(Object.assign(k === 'maps' ? await layoutOf(page, k) : r, { k })); }
+    const say = kind => found.filter(r => r[kind].length).map(r => r.k + ': ' + r[kind].slice(0, 3).join('; ')).join(' | ');
+    const n = found.reduce((s, r) => s + r.blocks, 0);
+    log(found.every(r => !r.clipped.length), `no text is cut off by its own box (${n} blocks in ${layoutParts.join(', ')})` + (say('clipped') ? ': ' + say('clipped') : ''));
+    log(found.every(r => !r.escaped.length), 'no block runs out of its column' + (say('escaped') ? ': ' + say('escaped') : ''));
+    log(found.every(r => !r.covered.length), 'no text is covered by another element' + (say('covered') ? ': ' + say('covered') : ''));
+    await page.evaluate(() => { switchPart(PART_KEYS[0]); window.scrollTo(0, 0); });
+  }
   const phone = await browser.newPage({ viewport: { width: 390, height: 800 } }); watch(phone);
   await routeLibs(phone);
   for (const part of info.parts) {
