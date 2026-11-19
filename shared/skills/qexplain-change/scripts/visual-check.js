@@ -284,6 +284,54 @@ async function routeLibs(target) {
       await page.click('#sketch-toggle'); await wait(400);
       log(fitsOther && await ringFits(), 'the ring follows its node when the diagram switches between sketch and classic');
     }
+    // Zoom of a diagram on the page: Ctrl + wheel and the buttons; the plain wheel still scrolls the page
+    const zc = await page.evaluate(id => { const dg = document.getElementById(id); dg.scrollIntoView({ block: 'center' }); const b = cmDgBox(dg).getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; }, d2dg);
+    await wait(300); const y0 = await page.evaluate(() => window.scrollY);
+    await page.mouse.move(zc.x, zc.y); await page.keyboard.down('Control'); await page.mouse.wheel(0, -300); await page.keyboard.up('Control'); await wait(300);
+    const zs = await page.evaluate(id => { const dg = document.getElementById(id); return { z: dg._zoom ? dg._zoom.z : 1, cls: dg.classList.contains('dg-zoomed'), fit: !dg.querySelector('.dg-zb[data-z="fit"]').hidden, y: window.scrollY }; }, d2dg);
+    log(zs.z > 1 && zs.cls && zs.fit && zs.y === y0 && await ringFits(), `Ctrl + wheel zooms a diagram on the page without scrolling it, and the rings follow (${Math.round(zs.z * 100)}%)`);
+    await page.click('#' + d2dg + ' .dg-zb[data-z="in"]'); await wait(300);
+    const z2 = await page.evaluate(id => document.getElementById(id)._zoom.z, d2dg);
+    await page.mouse.move(zc.x, zc.y); await page.mouse.down(); await page.mouse.move(zc.x - 70, zc.y - 10, { steps: 4 }); await page.mouse.up(); await wait(300);
+    log(z2 > zs.z && await ringFits() && await page.evaluate(id => document.getElementById(id)._zoom.x < 0 && !ovOpen() && !document.querySelector('.cm-card'), d2dg),
+      'the "+" button zooms further and a drag moves the zoomed diagram; the end of the drag opens nothing');
+    await page.click('#' + d2dg + ' .dg-zb[data-z="fit"]'); await wait(300);
+    await page.mouse.move(zc.x, zc.y); await page.mouse.wheel(0, 200); await wait(300);
+    log(await page.evaluate(([id, y0]) => { const dg = document.getElementById(id); return dg._zoom.z === 1 && !dg.classList.contains('dg-zoomed') && dg.querySelector('.dg-zb[data-z="fit"]').hidden && window.scrollY > y0; }, [d2dg, y0]),
+      'Fit puts the diagram back, and the plain wheel over a diagram scrolls the page');
+    await page.evaluate(id => document.getElementById(id).scrollIntoView({ block: 'center' }), d2dg); await wait(300);
+    Object.assign(n0, await partAt(false, 0));
+    // The full-window view: zoom, move, rings that stay on their parts, and comment mode
+    await page.keyboard.press('Escape'); await wait(200);
+    await page.mouse.click(n0.x, n0.y); await wait(400);
+    const ovFits = () => page.evaluate(() => { const body = ovBody(), c = CM.items.find(x => x.kind === 'dg' && x.tk === 'node'), r = body.querySelector('.cm-ring:not(.cm-whole):not(.cm-hot)'), g = cmDgGroup(body, c._did, true);
+      if (!r || !g) return false; const a = r.getBoundingClientRect(), b = g.getBoundingClientRect(); return Math.abs(a.left - (b.left - 4)) < 2 && Math.abs(a.top - (b.top - 4)) < 2 && Math.abs(a.width - (b.width + 8)) < 2; });
+    const ov0 = await page.evaluate(() => ({ open: ovOpen(), z: OV.z, x: OV.x, bar: !!document.querySelector('#dg-ov-body > .cm-dgbar'), marks: document.querySelectorAll('#dg-ov-body .cm-dgl .cm-mark').length }));
+    log(ov0.open && ov0.bar && ov0.marks === 2 && await ovFits(), 'the full-window view shows the comments of its diagram, with each ring on its part');
+    const mid = await page.evaluate(() => { const b = ovBody().getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; });
+    await page.mouse.move(mid.x, mid.y); await page.mouse.wheel(0, -300); await wait(300);
+    const z1 = await page.evaluate(() => OV.z), fit1 = await ovFits();
+    await page.mouse.down(); await page.mouse.move(mid.x - 90, mid.y - 30, { steps: 4 }); await page.mouse.up(); await wait(300);
+    log(z1 > ov0.z && fit1 && await ovFits() && await page.evaluate(x0 => OV.x !== x0 && ovOpen() && !document.querySelector('.cm-card'), ov0.x),
+      `the wheel zooms and a drag moves the diagram; rings follow, and the end of a drag is not a click (zoom ${Math.round(ov0.z * 100)}% to ${Math.round(z1 * 100)}%)`);
+    await page.click('#dg-ov-bar [data-z="fit"]'); await wait(300);
+    log(await page.evaluate(z => Math.abs(OV.z - z) < 0.001, ov0.z) && await ovFits(), 'Fit brings the whole diagram back into the window');
+    await page.click('#dg-ov-body .cm-dgbtn'); await wait(200);
+    log(await page.evaluate(() => { const tip = document.querySelector('#dg-ov-body > .cm-dgtip'), r = tip.getBoundingClientRect(), top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return getComputedStyle(tip).display !== 'none' && r.height > 8 && top === tip; }), 'the comment-mode hint is visible in the full-window view');
+    const on = await page.evaluate(() => { const body = ovBody(), used = CM.items.filter(c => c.kind === 'dg').map(c => c._did), all = cmDgParts(body);
+      const p = all.find(q => !q.edge && !used.includes(q.id) && !all.some(o => o.id.startsWith(q.id + '.'))); const b = p.g.getBoundingClientRect(); return { id: p.id, x: b.left + b.width / 2, y: b.top + b.height / 2 }; });
+    await page.mouse.click(on.x, on.y); await wait(300);
+    const ovCard = await page.evaluate(() => { const k = document.querySelector('.cm-card'); if (!k) return null; const b = k.getBoundingClientRect(), top = document.elementFromPoint(b.left + 20, b.top + 10);
+      return { title: k.querySelector('.cm-k').textContent, onTop: !!top && !!top.closest('.cm-card') }; });
+    await page.keyboard.type('from the full-window view'); await page.keyboard.press('Enter'); await wait(300);
+    log(!!ovCard && ovCard.onTop && ovCard.title.startsWith('Node ') && ovCard.title.includes(on.id) && await page.evaluate(([id, did]) => { const c = CM.items.find(x => x.text === 'from the full-window view'), dg = document.getElementById(id);
+      return !!c && c.did === did && c._dg === dg && c.part === dg.closest('.part-panel').id.slice(5) && c._state === 'anchored' && document.querySelectorAll('#dg-ov-body .cm-dgl .cm-mark').length === 3; }, [d2dg, on.id]),
+      'comment mode works in the full-window view; the box shows above the view and the comment belongs to the diagram on the page');
+    await page.keyboard.press('Escape'); await wait(150); const modeOff = await page.evaluate(() => ovOpen() && !cmDgMode);
+    await page.keyboard.press('Escape'); await wait(200);
+    log(modeOff && await page.evaluate(id => !ovOpen() && document.querySelectorAll('#' + id + ' .cm-dgl .cm-mark').length === 3, d2dg), 'Escape leaves comment mode first and closes the view next; the new comment is marked on the page');
+    await page.click('#' + d2dg + ' .cm-dgbtn'); await wait(200);
     const outside = await page.evaluate(id => { const b = document.getElementById(id).getBoundingClientRect(); return { x: b.left + 200, y: b.bottom + 40 }; }, d2dg);
     await page.mouse.click(outside.x, outside.y); await wait(200);
     const leftByClick = await page.evaluate(id => !document.getElementById(id).classList.contains('cm-mode') && !document.querySelector('.cm-card'), d2dg);

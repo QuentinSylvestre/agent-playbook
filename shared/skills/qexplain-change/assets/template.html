@@ -123,10 +123,17 @@
   .dg.plain .v-dark marker .connection { fill: #cba6f7 !important; }
   .dg.plain g.removed, .dg.plain g.removed-edge { display: none; }
   /* Click a diagram to read it full window */
-  #dg-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.78); z-index: 500; overflow: auto; padding: 3rem 2vw 2rem; }
+  #dg-overlay { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.78); z-index: 500; overflow: hidden; padding: 3rem 2vw 1.5rem; }
   #dg-overlay[hidden] { display: none; }
-  #dg-ov-body { background: var(--cy-bg); border-radius: 4px; padding: 0.5rem; width: 96vw; }
-  #dg-ov-body > svg { display: block; width: 100%; max-width: none; max-height: none; height: auto; }
+  #dg-ov-body { position: relative; box-sizing: border-box; background: var(--cy-bg); border-radius: 4px; width: 96vw; height: calc(100vh - 4.5rem); overflow: hidden; cursor: grab; }
+  #dg-ov-body.dg { margin: 0; left: 0; transform: none; width: 96vw; }
+  #dg-ov-body > .cm-ovv { position: absolute; left: 0; top: 0; width: 100%; transform-origin: 0 0; }
+  #dg-ov-body > .cm-ovv > svg { display: block; width: 100%; max-width: none; max-height: none; height: auto; }
+  #dg-ov-body.cm-mode { cursor: crosshair; outline: 2px dashed rgba(9, 105, 218, 0.8); outline-offset: -2px; }
+  #dg-ov-body > .cm-dgtip { right: auto; left: 50%; bottom: auto; top: 6px; margin: 0; transform: translateX(-50%); z-index: 4; }   /* inside: the view clips what stands outside it */
+  #dg-ov-bar { position: fixed; top: 0.6rem; left: 2vw; z-index: 510; display: flex; align-items: center; gap: 6px; color: #fff; font-size: 12px; }
+  #dg-ov-bar button { min-width: 2rem; padding: 0.25rem 0.6rem; border-radius: 4px; border: 1px solid var(--border-strong); background: var(--toggle-bg); color: var(--toggle-text); cursor: pointer; }
+  #dg-ov-zoom { min-width: 3rem; text-align: center; }
   #dg-close { position: fixed; top: 0.6rem; right: 1rem; z-index: 510; padding: 0.25rem 0.7rem; border-radius: 4px; border: 1px solid var(--border-strong); background: var(--toggle-bg); color: var(--toggle-text); cursor: pointer; }
   /* Tour */
   .tour-box { display: flex; align-items: center; gap: 0.5rem; background: var(--btn-bg); border: 1px solid var(--border); border-radius: 4px; padding: 0.5rem 0.75rem; margin-top: 0.6rem; font-size: 0.88rem; }
@@ -288,7 +295,14 @@
   .cm-dgbtn[aria-pressed="true"] { background: #0969da; border-color: #0969da; color: #fff; }
   .cm-dgtip { display: none; position: absolute; right: 0; bottom: 100%; margin-bottom: 4px; padding: 1px 9px; border-radius: 10px; background: #0969da; color: #fff; font-size: 11px; line-height: 1.6; white-space: nowrap; }
   .dg.cm-mode > .cm-dgtip { display: block; }
+  .dg.cm-mode .dgv, .dg.cm-mode .mmd, .dg.cm-mode .cm-ovv { cursor: crosshair; }
   .dg.cm-mode .dgv, .dg.cm-mode .mmd { cursor: crosshair; outline: 2px dashed rgba(9, 105, 218, 0.6); outline-offset: -2px; }
+  .dg-zb { width: 24px; height: 20px; padding: 0; border: 1px solid var(--border-strong); border-radius: 5px; background: var(--surface); color: var(--text-light); font: 600 12px/1 -apple-system, "Segoe UI", sans-serif; cursor: pointer; opacity: 0.55; }
+  .dg-zb[data-z="fit"] { width: auto; padding: 0 7px; opacity: 1; }
+  .dg-zb[hidden] { display: none; }
+  .dg:hover .dg-zb { opacity: 1; }
+  .dg-zb:hover { border-color: var(--link); color: var(--link); }
+  .dg.dg-zoomed .dgv, .dg.dg-zoomed .mmd { overflow: hidden; cursor: grab; }
   .cm-dgl { position: absolute; inset: 0; overflow: hidden; pointer-events: none; z-index: 3; }
   .cm-ring { position: absolute; border: 2px solid #d68f00; border-radius: 7px; box-shadow: 0 0 0 3px rgba(214, 143, 0, 0.22); }
   .cm-ring.cm-whole { border-style: dashed; border-radius: 4px; box-shadow: none; }
@@ -338,7 +352,7 @@
   .cm-sw:focus-visible { outline: 2px solid #ffd166; outline-offset: 2px; }
   #theme-toggle { display: inline-flex; align-items: center; justify-content: center; height: 1.65rem; padding: 0 0.5rem; }
   body.cm-off .cm-layer, body.cm-off #cm-add, body.cm-off .cm-badd, body.cm-off #cm-hint, body.cm-off .cm-tadd, body.cm-off .cm-tmark, body.cm-off .cbtn, body.cm-off .cm-fmark,
-  body.cm-off .cm-dgbar, body.cm-off .cm-dgl, body.cm-off .cm-dmark, body.cm-off #cm-panel-btn, body.cm-off #cm-panel, body.cm-off #copy-feedback { display: none !important; }
+  body.cm-off .cm-dgbtn, body.cm-off .cm-dgl, body.cm-off .cm-dmark, body.cm-off #cm-panel-btn, body.cm-off #cm-panel, body.cm-off #copy-feedback { display: none !important; }
   body.cm-off tr.cm-dl td, body.cm-off tr.cm-dl td.ln { box-shadow: none; }
   .part-btn.cm-on { box-shadow: inset 0 0 0 2px rgba(9, 105, 218, 0.55); border-radius: 4px 4px 0 0; }
   .fh.cm-fh-on { box-shadow: inset 3px 0 0 rgba(9, 105, 218, 0.9); }
@@ -354,7 +368,7 @@
   #cm-add { position: fixed; z-index: 400; padding: 3px 11px; border: 1px solid #8a5200; border-radius: 14px; background: #b26a00; color: #fff; font: 600 12px/1.5 -apple-system, "Segoe UI", sans-serif; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.28); }
   #cm-add[hidden] { display: none; }
   #cm-add:hover { background: #8a5200; }
-  .cm-card { position: fixed; z-index: 450; width: min(384px, calc(100vw - 16px)); background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.28); padding: 10px; font-size: 13px; line-height: 1.45; }
+  .cm-card { position: fixed; z-index: 650; width: min(384px, calc(100vw - 16px)); background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.28); padding: 10px; font-size: 13px; line-height: 1.45; }
   .cm-card .cm-q { color: var(--text-light); font-size: 12px; margin-bottom: 6px; max-height: 3.1em; overflow: hidden; border-left: 3px solid #d68f00; padding-left: 7px; }
   .cm-card textarea { display: block; width: 100%; min-height: 76px; resize: vertical; font: inherit; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--bg); color: var(--text); }
   .cm-card textarea:focus { outline: 2px solid #d68f00; outline-offset: 0; }
@@ -432,7 +446,7 @@
   <div id="nav-resizer" title="Drag to resize, double-click to reset"></div>
   <div id="main"><div id="excluded-note"></div><div id="fc"></div></div>
 </div><!--@/PART:diff-->
-<div id="dg-overlay" hidden><button id="dg-close" type="button">Close</button><div id="dg-ov-body"></div></div>
+<div id="dg-overlay" hidden><div id="dg-ov-bar"><button type="button" data-z="out" title="Zoom out (-)" aria-label="Zoom out">-</button><span id="dg-ov-zoom">100%</span><button type="button" data-z="in" title="Zoom in (+)" aria-label="Zoom in">+</button><button type="button" data-z="fit" title="Fit the window (0)">Fit</button></div><button id="dg-close" type="button">Close</button><div id="dg-ov-body"></div></div>
 <div id="info-pop" hidden role="dialog" aria-label="About this page"><!--@PROVENANCE--></div>
 <div id="copybox" hidden role="dialog" aria-modal="true" aria-label="Copy by hand"><div class="cb-card">
   <p>The browser refused to copy. The text is selected below: press Ctrl+C (Cmd+C on a Mac), then close.</p>
@@ -1057,23 +1071,124 @@ window.addEventListener('scroll', () => { if (!scrollRaf) scrollRaf = requestAni
 window.addEventListener('resize', () => { if (diffActive()) measureHeader(); });
 
 // Click a diagram to read it full window. Escape, the Close button or a click outside the diagram closes it.
+// There the diagram can be zoomed (wheel, + and -, 0 to fit) and moved (drag). The view shows a copy of the drawing
+// inside a stage that carries the zoom; the comment layer stands beside the stage and is drawn again after every
+// change, so rings stay on their parts. A comment made there belongs to the diagram on the page.
+// A diagram on the page zooms in place: Ctrl + wheel (the plain wheel keeps scrolling the page; a trackpad pinch
+// arrives as Ctrl + wheel) or the buttons on the diagram. A zoomed diagram is moved by dragging; Fit puts it back.
+const ZD = { drag: null, moved: false };
+function dgApply(dg) {
+  const st = dg._zoom, on = !!st && st.z > 1.001;
+  dg.classList.toggle('dg-zoomed', on);
+  dg.querySelectorAll('.dgv > svg, .mmd > svg').forEach(s => { s.style.transformOrigin = '0 0'; s.style.transform = on ? 'translate(' + st.x + 'px,' + st.y + 'px) scale(' + st.z + ')' : ''; });
+  const fit = dg.querySelector('.dg-zb[data-z="fit"]'); if (fit) fit.hidden = !on;
+}
+// f multiplies the zoom about a point of the window (the middle of the diagram when none is given); f = 0 fits.
+function dgZoom(dg, f, cx, cy) {
+  const box = cmDgBox(dg), svg = box.querySelector('svg'); if (!svg) return;
+  const st = dg._zoom || (dg._zoom = { z: 1, x: 0, y: 0 }), r = svg.getBoundingClientRect(), br = box.getBoundingClientRect();
+  if (cx === undefined) { cx = br.left + br.width / 2; cy = br.top + br.height / 2; }
+  const w = r.width / st.z, h = r.height / st.z, px = cx - (r.left - st.x), py = cy - (r.top - st.y);
+  const z = f === 0 ? 1 : Math.min(8, Math.max(1, st.z * f)), k = z / st.z;
+  st.x = px - (px - st.x) * k; st.y = py - (py - st.y) * k; st.z = z;
+  dgHold(st, w, h); dgApply(dg); if (cmReady) cmDrawDgSoon();
+}
+// Keeps a zoomed diagram over its own place: it cannot be dragged away from its frame.
+function dgHold(st, w, h) {
+  if (st.z <= 1.001) { st.z = 1; st.x = 0; st.y = 0; return; }
+  st.x = Math.min(0, Math.max(w * (1 - st.z), st.x)); st.y = Math.min(0, Math.max(h * (1 - st.z), st.y));
+}
+document.addEventListener('wheel', e => {
+  const dg = e.ctrlKey && e.target.closest ? e.target.closest('.dg') : null;
+  if (!dg || dg.id === 'dg-ov-body') return;
+  e.preventDefault(); dgZoom(dg, e.deltaY < 0 ? 1.25 : 0.8, e.clientX, e.clientY);
+}, { passive: false });
+document.addEventListener('mousedown', e => {
+  ZD.moved = false;
+  const box = e.button === 0 && e.target.closest ? e.target.closest('.dg.dg-zoomed .dgv, .dg.dg-zoomed .mmd') : null;
+  if (!box) return;
+  const dg = box.closest('.dg'), st = dg._zoom, r = box.querySelector('svg').getBoundingClientRect();
+  ZD.drag = { dg, x: e.clientX, y: e.clientY, ox: st.x, oy: st.y, w: r.width / st.z, h: r.height / st.z }; e.preventDefault();
+}, true);
+document.addEventListener('mousemove', e => {
+  if (!ZD.drag) return;
+  const dx = e.clientX - ZD.drag.x, dy = e.clientY - ZD.drag.y, st = ZD.drag.dg._zoom;
+  if (!ZD.moved && Math.hypot(dx, dy) < 5) return;                 // a press that barely moves is a click
+  ZD.moved = true; st.x = ZD.drag.ox + dx; st.y = ZD.drag.oy + dy;
+  dgHold(st, ZD.drag.w, ZD.drag.h); dgApply(ZD.drag.dg); if (cmReady) cmDrawDgSoon();
+});
+document.addEventListener('mouseup', () => { ZD.drag = null; });
+const OV = { z: 1, x: 0, y: 0, drag: null, moved: false };
+function ovBody() { return document.getElementById('dg-ov-body'); }
+function ovOpen() { return !document.getElementById('dg-overlay').hidden; }
+function ovApply() {
+  const s = ovBody().querySelector(':scope > .cm-ovv'); if (!s) return;
+  s.style.transform = 'translate(' + OV.x + 'px,' + OV.y + 'px) scale(' + OV.z + ')';
+  document.getElementById('dg-ov-zoom').textContent = Math.round(OV.z * 100) + '%';
+  if (cmReady) cmDrawDgSoon();
+}
+function ovFit() {
+  const body = ovBody(), s = body.querySelector(':scope > .cm-ovv'); if (!s) return;
+  const h = s.offsetHeight || 1;
+  OV.z = Math.min(1, body.clientHeight / h); OV.x = (body.clientWidth - s.offsetWidth * OV.z) / 2; OV.y = Math.max(0, (body.clientHeight - h * OV.z) / 2);
+  ovApply();
+}
+// Zooms about a point of the window (the pointer, or the middle of the view), which stays where it is.
+function ovZoom(f, cx, cy) {
+  const r = ovBody().getBoundingClientRect(), px = (cx === undefined ? r.left + r.width / 2 : cx) - r.left, py = (cy === undefined ? r.top + r.height / 2 : cy) - r.top;
+  const z = Math.min(8, Math.max(0.1, OV.z * f)), k = z / OV.z;
+  OV.x = px - (px - OV.x) * k; OV.y = py - (py - OV.y) * k; OV.z = z; ovApply();
+}
 function openOverlay(svg) {
   const c = svg.cloneNode(true);
   c.removeAttribute('style'); c.removeAttribute('width'); c.removeAttribute('height');
-  const body = document.getElementById('dg-ov-body');
-  body.innerHTML = ''; body.appendChild(c);
+  const body = ovBody(), src = svg.closest('.dg'), stage = document.createElement('div');
+  stage.className = 'cm-ovv'; stage.appendChild(c);
+  body.innerHTML = ''; body.appendChild(stage);
+  body.classList.add('dg'); body._src = src; body.dataset.name = src ? src.dataset.name || '' : ''; body.dataset.kind = src ? src.dataset.kind || '' : '';
   document.getElementById('dg-overlay').hidden = false;
+  ovFit(); if (cmReady) cmDraw();
 }
-function closeOverlay() { document.getElementById('dg-overlay').hidden = true; document.getElementById('dg-ov-body').innerHTML = ''; }
+function closeOverlay() {
+  const body = ovBody();
+  if (cmDgMode === body) cmDgSetMode(null);
+  document.getElementById('dg-overlay').hidden = true;
+  body.innerHTML = ''; body.classList.remove('dg', 'cm-mode'); body._src = null; OV.drag = null;
+  if (cmReady) cmDraw();
+}
 document.addEventListener('click', e => {
-  if (e.target.closest('#dg-overlay')) { if (e.target.id === 'dg-overlay' || e.target.id === 'dg-close') closeOverlay(); return; }
+  if (e.target.closest('#dg-overlay')) {
+    const zb = e.target.closest('#dg-ov-bar button');
+    if (zb) { if (zb.dataset.z === 'fit') ovFit(); else ovZoom(zb.dataset.z === 'in' ? 1.25 : 0.8); }
+    else if (!OV.moved && (e.target.id === 'dg-overlay' || e.target.id === 'dg-close')) closeOverlay();   // the end of a drag is not a click
+    return;
+  }
   if ((window.getSelection() || '').toString()) return;
+  if (ZD.moved) return;                                            // the end of a drag on a zoomed diagram
   if (cmDgMode && e.target.closest('.dg') === cmDgMode) return;   // comment mode owns the click
   const dgv = e.target.closest('.dgv'), mm = e.target.closest('.dg .mmd');
   const svg = dgv ? dgv.querySelector(':scope > svg') : (mm ? mm.querySelector('svg') : null);
   if (svg) openOverlay(svg);
 });
-document.addEventListener('keydown', e => { if (e.key === 'Escape' && !document.getElementById('dg-overlay').hidden) closeOverlay(); });
+document.addEventListener('keydown', e => {
+  if (!ovOpen() || e.ctrlKey || e.metaKey || e.altKey || /^(TEXTAREA|INPUT|SELECT)$/.test(e.target.tagName)) return;
+  if (e.key === 'Escape') { if (!cmDgMode) closeOverlay(); }       // in comment mode Escape leaves the mode first
+  else if (e.key === '+' || e.key === '=') ovZoom(1.25);
+  else if (e.key === '-') ovZoom(0.8);
+  else if (e.key === '0') ovFit();
+});
+ovBody().addEventListener('wheel', e => { e.preventDefault(); ovZoom(e.deltaY < 0 ? 1.25 : 0.8, e.clientX, e.clientY); }, { passive: false });
+ovBody().addEventListener('mousedown', e => {
+  if (e.button !== 0 || e.target.closest('.cm-dgbar, .cm-mark')) return;
+  OV.drag = { x: e.clientX, y: e.clientY, ox: OV.x, oy: OV.y }; OV.moved = false; e.preventDefault();
+});
+document.addEventListener('mousemove', e => {
+  if (!OV.drag) return;
+  const dx = e.clientX - OV.drag.x, dy = e.clientY - OV.drag.y;
+  if (!OV.moved && Math.hypot(dx, dy) < 5) return;                 // a press that barely moves is a click
+  OV.moved = true; OV.x = OV.drag.ox + dx; OV.y = OV.drag.oy + dy; ovApply();
+});
+document.addEventListener('mouseup', () => { OV.drag = null; });
 
 // A change summary row opens its file in Diff review.
 document.addEventListener('click', e => {
@@ -1229,12 +1344,12 @@ function cmDgOf(c) {
   const root = document.getElementById('part-' + c.part); if (!root) return null;
   return Array.from(root.querySelectorAll('.dg')).filter(d => d.dataset.name === c.dname)[c.dn || 0] || null;
 }
-function cmDgBox(dg) { return Array.from(dg.querySelectorAll('.dgv, .mmd')).find(x => x.offsetParent !== null) || dg; }
+function cmDgBox(dg) { return Array.from(dg.querySelectorAll('.dgv, .mmd, .cm-ovv')).find(x => x.offsetParent !== null) || dg; }
 // The group of one D2 object: in the variant that is showing (for geometry), or in the light classic one (for its text).
 function cmDgGroup(dg, id, shown) {
   if (cmDgInfo(dg).kind === 'mermaid') { const p = cmMmParts(dg).find(x => x.id === id); return p ? p.g : null; }
   const tok = (cmDgInfo(dg).ids || {})[id]; if (!tok) return null;
-  const vs = Array.from(dg.querySelectorAll('.dgv')), v = shown ? vs.find(x => x.offsetParent !== null) : dg.querySelector('.dgv.v-light.v-classic') || vs[0];
+  const vs = Array.from(dg.querySelectorAll('.dgv, .cm-ovv')), v = shown ? vs.find(x => x.offsetParent !== null) : dg.querySelector('.dgv.v-light.v-classic') || vs[0];
   return v ? v.querySelector('g[class="' + tok + '"], g[class^="' + tok + ' "]') : null;
 }
 function cmDgLabel(dg, id) {
@@ -1248,7 +1363,7 @@ function cmDgLabel(dg, id) {
 // known by its text. Until a diagram is drawn, a comment on it is checked against the diagram's source text.
 function cmHash(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
 function cmMmParts(dg) {
-  const svg = dg.querySelector('.mmd svg'); if (!svg) return [];
+  const svg = dg.querySelector('.mmd svg, .cm-ovv svg'); if (!svg) return [];
   const out = [], seen = {}, txt = e => e.textContent.replace(/\s+/g, ' ').trim();
   const key = (kind, t) => { const k = kind + ':' + t; seen[k] = (seen[k] || 0) + 1; return seen[k] > 1 ? k + ' #' + seen[k] : k; };
   svg.querySelectorAll('g.node').forEach(g => { const m = /-flowchart-(.+)-\d+$/.exec(g.id || ''); if (m) out.push({ id: m[1], g, edge: false, what: 'node', label: txt(g) || m[1] }); });
@@ -1348,10 +1463,11 @@ function cmDgHit(dg, x, y) {
   return best;
 }
 function cmDgSel(dg, part) {
-  const root = dg.closest('.part-panel'), same = Array.from(root.querySelectorAll('.dg')).filter(d => d.dataset.name === dg.dataset.name);
-  return { part: root.id.slice(5), kind: 'dg', dname: dg.dataset.name, dn: same.indexOf(dg), tk: part ? (part.edge ? 'edge' : 'node') : 'whole', did: part ? part.id : '',
+  const real = dg._src || dg;        // the full-window view shows a copy: the comment belongs to the diagram on the page
+  const root = real.closest('.part-panel'), same = Array.from(root.querySelectorAll('.dg')).filter(d => d.dataset.name === real.dataset.name);
+  return { part: root.id.slice(5), kind: 'dg', dname: real.dataset.name, dn: same.indexOf(real), tk: part ? (part.edge ? 'edge' : 'node') : 'whole', did: part ? part.id : '',
     dlabel: part ? cmDgLabel(dg, part.id) : '', dwhat: part ? part.what : '', dends: (part && part.ends) || null,
-    dsrc: cmDgInfo(dg).kind === 'mermaid' ? cmHash(QX.mermaid[cmDgInfo(dg).mid] || '') : '', quote: '', pieces: [], el: [part ? part.g : cmDgBox(dg)], dgEl: dg };
+    dsrc: cmDgInfo(real).kind === 'mermaid' ? cmHash(QX.mermaid[cmDgInfo(real).mid] || '') : '', quote: '', pieces: [], el: [part ? part.g : cmDgBox(dg)], dgEl: real };
 }
 function cmDgSetMode(dg) {
   if (cmDgMode) { cmDgMode.classList.remove('cm-mode'); const b = cmDgMode.querySelector('.cm-dgbtn'); if (b) b.setAttribute('aria-pressed', 'false'); }
@@ -1368,8 +1484,12 @@ function cmDgBar(dg) {
   if (dg.querySelector(':scope > .cm-dgbar')) return;
   const bar = document.createElement('div'); bar.className = 'cm-dgbar';
   const tip = document.createElement('div'); tip.className = 'cm-dgtip'; dg.appendChild(tip);   // above the frame, so it hides nothing
-  bar.innerHTML = '<button type="button" class="cm-dgbtn" title="Comment on this diagram or on one of its parts" aria-label="Comment on this diagram" aria-pressed="false">' + CM_ICON + '</button>';
-  bar.querySelector('button').addEventListener('click', e => { e.stopPropagation(); cmDgSetMode(cmDgMode === dg ? null : dg); });
+  const zoom = dg.id === 'dg-ov-body' ? '' : '<button type="button" class="dg-zb" data-z="fit" title="Back to the whole diagram" hidden>Fit</button>'
+    + '<button type="button" class="dg-zb" data-z="out" title="Zoom out" aria-label="Zoom out">-</button><button type="button" class="dg-zb" data-z="in" title="Zoom in (or Ctrl + wheel)" aria-label="Zoom in">+</button>';
+  if (zoom) dg.querySelectorAll('.dgv, .mmd').forEach(x => { x.title = 'Click to enlarge. Ctrl + wheel or the buttons zoom; drag moves a zoomed diagram.'; });
+  bar.innerHTML = zoom + '<button type="button" class="cm-dgbtn" title="Comment on this diagram or on one of its parts" aria-label="Comment on this diagram" aria-pressed="false">' + CM_ICON + '</button>';
+  bar.querySelector('.cm-dgbtn').addEventListener('click', e => { e.stopPropagation(); cmDgSetMode(cmDgMode === dg ? null : dg); });
+  bar.querySelectorAll('.dg-zb').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); dgZoom(dg, b.dataset.z === 'fit' ? 0 : b.dataset.z === 'in' ? 1.25 : 0.8); }));
   dg.appendChild(bar);
 }
 function cmDgMove(e) {
@@ -1380,14 +1500,17 @@ function cmDgMove(e) {
   if ((hot ? hot.tk + hot.id : '') === (cmDgHot ? cmDgHot.tk + cmDgHot.id : '')) return;
   cmDgHot = hot; cmDraw();
 }
+let cmDgRaf = 0;
+function cmDrawDgSoon() { if (!cmDgRaf) cmDgRaf = requestAnimationFrame(() => { cmDgRaf = 0; cmDrawDg(); }); }
 function cmDrawDg() {
   document.querySelectorAll('.cm-dgl').forEach(l => l.remove());
   document.querySelectorAll('.dg .cm-eg').forEach(g => g.classList.remove('cm-eg', 'cm-eg-on'));
   document.querySelectorAll('.dg').forEach(dg => {
     cmDgBar(dg);
+    if (dg._zoom) dgApply(dg);                    // a Mermaid redraw replaces the drawing and loses its zoom
     if (dg.offsetParent === null) return;         // not on screen: nothing can be measured
     const layer = document.createElement('div'); layer.className = 'cm-dgl';
-    const base = dg.getBoundingClientRect();
+    const base = dg.getBoundingClientRect(), real = dg._src || dg;
     const ring = (b, pad, cls) => { const d = document.createElement('div'); d.className = 'cm-ring' + cls;
       d.style.cssText = 'left:' + (b.left - base.left - pad) + 'px;top:' + (b.top - base.top - pad) + 'px;width:' + (b.width + 2 * pad) + 'px;height:' + (b.height + 2 * pad) + 'px'; layer.appendChild(d); };
     const show = (tk, id, cls, c) => {
@@ -1405,9 +1528,9 @@ function cmDrawDg() {
       m.style.cssText = 'left:' + Math.max(0, at[0] - base.left) + 'px;top:' + Math.max(0, at[1] - base.top) + 'px';
       layer.appendChild(m);
     };
-    CM.items.filter(c => c.kind === 'dg' && c._pieces && c._dg === dg).sort((x, y) => x._n - y._n)
+    CM.items.filter(c => c.kind === 'dg' && c._pieces && c._dg === real).sort((x, y) => x._n - y._n)
       .forEach(c => show(c.tk, c._did, (c.id === cmActive ? ' cm-active' : '') + (c.id === cmFlash ? ' cm-flash' : ''), c));
-    if (cmDraft && cmDraft.kind === 'dg' && cmDraft.sel.dgEl === dg) show(cmDraft.sel.tk, cmDraft.sel.did, ' cm-pending');
+    if (cmDraft && cmDraft.kind === 'dg' && cmDraft.sel.dgEl === real) show(cmDraft.sel.tk, cmDraft.sel.did, ' cm-pending');
     else if (cmDgHot && cmDgHot.dg === dg && !cmCard) show(cmDgHot.tk, cmDgHot.id, ' cm-hot');
     dg.appendChild(layer);
   });
@@ -1994,8 +2117,9 @@ function cmInit() {
     const m = e.target.closest ? e.target.closest('.cm-mark') : null;
     // A click outside the diagram leaves comment mode, as Escape does. The comment box, the panel and the tools of
     // the top bar (panel, light and dark, sketch) are not "outside": the reader uses them while commenting.
-    if (cmDgMode && !cmCard && e.target.closest && e.target.closest('.dg') !== cmDgMode && !e.target.closest('.cm-card, #cm-panel, .top-tools')) cmDgSetMode(null);
+    if (cmDgMode && !cmCard && e.target.closest && e.target.closest('.dg') !== cmDgMode && !e.target.closest('.cm-card, #cm-panel, .top-tools, #dg-ov-bar')) cmDgSetMode(null);
     if (!m && cmDgMode && !cmOff() && e.target.closest && e.target.closest('.dg') === cmDgMode && !e.target.closest('.cm-dgbar')) {
+      if ((cmDgMode === ovBody() && OV.moved) || ZD.moved) return;   // the end of a drag, in the full-window view or on a zoomed diagram
       cmOpen({ sel: cmDgSel(cmDgMode, cmDgHit(cmDgMode, e.clientX, e.clientY)) }); return;
     }
     const sel = document.getSelection();
