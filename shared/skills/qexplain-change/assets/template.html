@@ -1136,7 +1136,9 @@ function cmResolve() {
     if (!c._pieces.length) { c._pieces = null; c._at = -1; return; }
     if (c.kind === 'block') c._el = cmBlockOf(c._pieces[0].startContainer);
     if (c._el && c.tag === 'table') c._el = c._el.closest('table');
-    c._state = cmSection(e.root, c._pieces[0].startContainer) === c.section ? 'anchored' : 'moved';
+    // The section the text stands under now; a comment that moved is described by where it is, not where it was.
+    c._section = cmSection(e.root, c._pieces[0].startContainer);
+    c._state = c._section === c.section ? 'anchored' : 'moved';
   });
   // Numbers follow the document, so the markers on the page and the copied feedback read in the same order.
   CM.items.forEach(c => { c._n = 0; });
@@ -1244,7 +1246,8 @@ function cmWhere(c, bare) {
   if (c.part === 'diff') return cmDiffTitle(c);
   const el = c._el && !Array.isArray(c._el) ? c._el : null;
   const what = el ? cmBlockName(el).replace(/^./, m => m.toLowerCase()) + ' ' : '';
-  return cmPartName(c.part) + (c.section ? ' > ' + c.section : '') + (bare ? (what ? ', ' + what.trim() : '') : ': ' + what + '"' + cmExcerpt(c.quote, 70) + '"');
+  const sec = c._pieces ? c._section : c.section;
+  return cmPartName(c.part) + (sec ? ' > ' + sec : '') + (bare ? (what ? ', ' + what.trim() : '') : ': ' + what + '"' + cmExcerpt(c.quote, 70) + '"');
 }
 // --- Copy feedback: every open comment as one text an agent can act on. A label, chosen with one click, adds a fixed
 // instruction. The text is copied after every change to the comments, and the panel can show it before it is copied.
