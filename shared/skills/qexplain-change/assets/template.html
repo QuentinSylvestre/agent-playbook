@@ -312,9 +312,22 @@
   .dg-src-st.warn { color: #b26a00; }
   .dg-src-ask { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--border); background: rgba(214, 143, 0, 0.13); font-size: 12px; }
   .dg-src-ask[hidden] { display: none; }
-  .dg-src textarea { display: block; width: 100%; min-height: 9.5rem; resize: vertical; border: none; border-radius: 0 0 4px 4px; padding: 8px 10px; background: var(--bg); color: var(--text); font: 12px/1.55 "Cascadia Code", Consolas, monospace; white-space: pre; overflow: auto; tab-size: 2; font-variant-ligatures: none; }   /* no ligatures: "-->" must read as it is typed */
+  .dg-src-b { display: flex; align-items: stretch; border-radius: 0 0 4px 4px; background: var(--bg); overflow: hidden; }
+  /* Line numbers stand beside the text and scroll with it; the markers of the comments stand in the same column. */
+  .dg-src-g { flex: none; position: relative; overflow: hidden; width: 3.5rem; border-right: 1px solid var(--border); color: var(--text-light); font: 12px/1.55 "Cascadia Code", Consolas, monospace; user-select: none; }
+  .dg-src-gi { position: absolute; top: 0; left: 0; right: 0; padding: 8px 0 32px; }   /* out of the flow: the text alone sets the height of the editor */
+  .dg-src-ln { height: 1.55em; padding: 0 6px 0 5px; text-align: right; }
+  /* A text box holds no highlight, so the highlights are drawn on a layer behind it. The box never wraps and its font
+     has one width, which gives every line and every character a place that can be computed. */
+  .dg-src-t { flex: 1; min-width: 0; position: relative; }
+  .dg-src-hl { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+  .dg-src-hi { position: absolute; top: 0; left: 0; }
+  .dg-src-m { position: absolute; visibility: hidden; white-space: pre; font: 12px/1.55 "Cascadia Code", Consolas, monospace; font-variant-ligatures: none; }
+  .dg-src-t .dg-src-add { position: absolute; right: 20px; z-index: 2; }
+  body.cm-off .dg-src-hl, body.cm-off .dg-src-g .cm-mark, body.cm-off .dg-src-add { display: none !important; }
+  .dg-src textarea { display: block; position: relative; width: 100%; min-height: 9.5rem; resize: vertical; border: none; border-radius: 0; padding: 8px 10px; background: transparent; color: var(--text); font: 12px/1.55 "Cascadia Code", Consolas, monospace; white-space: pre; overflow: auto; tab-size: 2; font-variant-ligatures: none; }   /* no ligatures: "-->" must read as it is typed */
   .dg-src textarea:focus { outline: 2px solid #d68f00; outline-offset: -2px; }
-  .dg-src button { border: 1px solid var(--border-strong); background: var(--btn-bg); color: var(--text); cursor: pointer; }
+  .dg-src-h button, .dg-src-ask button { border: 1px solid var(--border-strong); background: var(--btn-bg); color: var(--text); cursor: pointer; }
   .dg-zb[hidden] { display: none; }
   .dg:hover .dg-zb { opacity: 1; }
   .dg-zb:hover { border-color: var(--link); color: var(--link); }
@@ -356,6 +369,7 @@
     body.cm-open { padding-right: var(--cm-w); }
     body.cm-open .top-tools, body.cm-open #info-pop { right: calc(var(--cm-w) + 1rem); }
     body.cm-open #header { right: var(--cm-w); }
+    body.cm-open .part-panel .dg { width: min(1100px, calc(100vw - var(--cm-w) - 32px)); }   /* a diagram keeps clear of the list: its buttons and the line numbers of its source stay in reach */
   }
   .cm-mark.cm-tmark { display: inline-block; margin-left: 6px; vertical-align: 1px; }
   .cm-tadd { display: none; margin-left: 7px; vertical-align: -3px; width: 22px; height: 18px; align-items: center; justify-content: center; border: 1px solid var(--border-strong); border-radius: 5px; color: var(--text-light); }
@@ -409,7 +423,7 @@
   .cm-dgbtn[aria-pressed="true"], .cm-dgbtn[aria-pressed="true"]:hover { background: #0969da; border-color: #0969da; color: #fff; }
   #cm-add { display: inline-flex; align-items: center; gap: 5px; }
   /* One look for the text buttons of the comment box and the panel. */
-  .cm-acts button, .cm-it-a button, .cm-ph button, .cm-pf button, .cm-pic button, .dg-src button { padding: 3px 10px; border-radius: 4px; font-size: 12px; line-height: 1.4; }
+  .cm-acts button, .cm-it-a button, .cm-ph button, .cm-pf button, .cm-pic button, .dg-src-h button, .dg-src-ask button { padding: 3px 10px; border-radius: 4px; font-size: 12px; line-height: 1.4; }
 </style>
 </head>
 <body>
@@ -1482,7 +1496,7 @@ function cmMmInSrc(src, c) {
 }
 // The line of the Mermaid source a comment's part comes from, for the copied feedback.
 function cmMmLine(c) {
-  const dg = c._dg; if (!dg || c.tk === 'whole') return '';
+  const dg = c._dg; if (!dg || c.tk === 'whole' || c.tk === 'src') return '';
   const info = cmDgInfo(dg); if (info.kind !== 'mermaid') return '';
   const lines = (QX.mermaid[info.mid] || '').split('\n');
   let i = -1;
@@ -1496,6 +1510,7 @@ function cmDgName(what, id, label) { return /^(message|participant|note)$/.test(
 function cmDgTitle(s) {
   const d = 'diagram "' + s.dname + '"';
   if (s.tk === 'whole') return 'The whole ' + d;
+  if (s.tk === 'src') { const n = (s.lines || []).length, a = s._ln || s.ln; return 'Source of ' + d + ', line' + (n > 1 ? 's ' + a + ' to ' + (a + n - 1) : ' ' + a); }
   if (s.tk === 'box') {
     const ps = s.dparts || [];
     const word = ps.every(p => p.dwhat === 'node') ? 'node' : 'part';
@@ -1514,13 +1529,18 @@ function cmResolveDg(c) {
   c._dlabel = ''; c._dends = null;
   cmResolveDg1(c, dg);
   // Whether the comment finds its part in the diagram as built: an edit in the source editor is measured against this.
-  if (info.kind === 'mermaid' && QX.mermaid[info.mid] === QX.mermaid0[info.mid]) c._ok0 = !!c._pieces;
+  if (c.tk === 'src') { if (!CM.edits[dg.dataset.name]) c._ok0 = !!c._pieces; }
+  else if (info.kind === 'mermaid' && QX.mermaid[info.mid] === QX.mermaid0[info.mid]) c._ok0 = !!c._pieces;
 }
 function cmResolveDg1(c, dg) {
   const e = CMX[c.part], nx = e ? e.ix.nodes.find(n => dg.compareDocumentPosition(n.node) & Node.DOCUMENT_POSITION_FOLLOWING) : null;
   // Diagrams are not part of the indexed text, so a diagram comment takes its place from the first text after its diagram.
   const place = state => { c._pieces = []; c._dg = dg; c._state = state; c._at = nx ? nx.start - 0.5 : (e ? e.ix.text.length : 0); };
   if (c.tk === 'whole') { place('anchored'); return; }
+  if (c.tk === 'src') {      // lines of the source, looked up by their text in the source as the editor shows it
+    const i = dgSrcFind(dgSrcText(dg), c); if (i < 0) return;
+    c._ln = i + 1; place('anchored'); c._at += Math.min(0.4, (i + 1) / 1e4); return;
+  }
   if (c.tk === 'box') {      // a box holds while at least one of its parts is still there; a lost or renamed part shows as moved
     const got = (c.dparts || []).map(p => cmDgFind(dg, p, c.dsrc)).filter(Boolean);
     if (!got.length) return;
@@ -1625,7 +1645,7 @@ function cmDgLost(dg) {
     bar.insertBefore(b, bar.firstChild);
   }
   b.hidden = !n; b.textContent = n + ' not placed';
-  b.title = n + ' comment' + (n === 1 ? '' : 's') + ' on this diagram no longer find' + (n === 1 ? 's its' : ' their') + ' part. Click to see ' + (n === 1 ? 'it' : 'them') + '.';
+  b.title = n + ' comment' + (n === 1 ? '' : 's') + ' on this diagram no longer find' + (n === 1 ? 's what it was' : ' what they were') + ' about. Click to see ' + (n === 1 ? 'it' : 'them') + '.';
 }
 function cmShowLost(real) {
   const ids = cmDgLostOf(real).map(c => c.id);
@@ -1739,7 +1759,7 @@ function cmDrawDg() {
   document.querySelectorAll('.cm-dgl').forEach(l => l.remove());
   document.querySelectorAll('.dg .cm-eg').forEach(g => g.classList.remove('cm-eg', 'cm-eg-on'));
   document.querySelectorAll('.dg').forEach(dg => {
-    cmDgBar(dg); cmDgLost(dg); dgSrcStatus(dg); dgSrcMark(dg);
+    cmDgBar(dg); cmDgLost(dg); dgSrcStatus(dg); dgSrcMark(dg); dgSrcMarks(dg);
     if (dg._zoom) dgApply(dg);                    // a Mermaid redraw replaces the drawing and loses its zoom
     if (dg.offsetParent === null) return;         // not on screen: nothing can be measured
     const layer = document.createElement('div'); layer.className = 'cm-dgl';
@@ -1748,6 +1768,7 @@ function cmDrawDg() {
       d.style.cssText = 'left:' + (b.left - base.left - pad) + 'px;top:' + (b.top - base.top - pad) + 'px;width:' + (b.width + 2 * pad) + 'px;height:' + (b.height + 2 * pad) + 'px'; layer.appendChild(d); };
     const show = (tk, id, cls, c, src) => {
       let at = null;
+      if (tk === 'src') return;                   // a comment on the source is marked beside its line, in the source editor
       if (tk === 'box') {
         // The frame is fitted to the parts as they stand now; the stored box serves only when none of them can be measured.
         const gs = (src._dids || src.dparts.map(p => p.did)).map(i => cmDgGroup(dg, i, true)).filter(Boolean).map(g => g.getBoundingClientRect()).filter(b => b.width > 0.5);
@@ -1784,16 +1805,129 @@ function dgSrcOrig(dg) { const i = cmDgInfo(dg); return i.kind === 'mermaid' ? (
 function dgSrcFirst(name) { return Array.from(document.querySelectorAll('.part-panel .dg')).find(d => d.dataset.name === name) || null; }
 function dgSrcStale(name) { const ed = CM.edits[name], dg = dgSrcFirst(name); return !!ed && !!dg && ed.base !== cmHash(dgSrcOrig(dg)); }
 function dgSrcNames() { return Object.keys(CM.edits || {}); }
+// Says whether the diagram is drawn again; a redraw looks the comments up again when it ends.
 function dgSrcApply(mid, text) {
-  if (QX.mermaid[mid] === text) return;
+  if (QX.mermaid[mid] === text) return false;
   QX.mermaid[mid] = text;
   document.querySelectorAll('.mmd[data-mid="' + mid + '"]').forEach(el => { delete el.dataset.theme; });      // every use of the diagram is drawn again
   const act = document.querySelector('.part-panel.active');
   renderMermaid(act, act && act.id === 'part-maps' ? () => renderTourStep(currentVid) : null);
+  return true;
+}
+// --- Comments on the source itself. The text the editor shows is the reader's edit when there is one, the source as
+// built otherwise. A comment keeps the text of its lines, its line number and the lines before and after. It is looked
+// up by that text: one match is taken; among several, the one between the same two lines; otherwise it is not found.
+function dgSrcText(dg) { const ed = CM.edits[dg.dataset.name]; return ed ? ed.text : dgSrcOrig(dg); }
+function dgSrcFind(text, c) {
+  const L = String(text).split('\n').map(l => l.trim()), want = (c.lines || []).map(l => l.trim()), k = want.length;
+  if (!k) return -1;
+  const at = [];
+  for (let i = 0; i + k <= L.length; i++) if (want.every((w, j) => L[i + j] === w)) at.push(i);
+  if (cmHash(text) === c.dsrc && at.includes(c.ln - 1)) return c.ln - 1;      // the very text the comment was written on
+  if (at.length < 2) return at.length ? at[0] : -1;
+  const ctx = c.ctx || [], side = i => (i < 0 || i >= L.length ? null : L[i]);
+  const near = at.filter(i => side(i - 1) === (ctx[0] === undefined ? null : ctx[0]) && side(i + k) === (ctx[1] === undefined ? null : ctx[1]));
+  return near.length === 1 ? near[0] : -1;
+}
+function dgSrcComments(name) { return CM.items.filter(c => c.kind === 'dg' && c.tk === 'src' && c.dname === name && c.state !== 'resolved').sort((x, y) => x._n - y._n); }
+// The lines the selection in the text covers, as [first, last] counted from 1, or null when nothing is selected.
+function dgSrcSelLines(ta) {
+  const a = ta.selectionStart, b = ta.selectionEnd; if (a === b) return null;
+  const v = ta.value, n = i => v.slice(0, i).split('\n').length;
+  return [n(a), n(v[b - 1] === '\n' ? b - 1 : b)];
+}
+function dgSrcRows(dg) {
+  const box = dg.querySelector(':scope > .dg-src'); if (!box) return;
+  const gi = box.querySelector('.dg-src-gi'), n = box.querySelector('textarea').value.split('\n').length;
+  let rows = gi.querySelectorAll('.dg-src-ln').length;
+  for (; rows > n; rows--) gi.querySelector('.dg-src-ln:last-of-type').remove();
+  for (; rows < n; rows++) { const r = document.createElement('div'); r.className = 'dg-src-ln'; r.textContent = rows + 1; gi.insertBefore(r, gi.querySelector('.cm-mark')); }
+}
+// Where the text stands inside the editor: the width of one character, the height of one line, the padding.
+function dgSrcGeo(box) {
+  const ta = box.querySelector('textarea'), cs = getComputedStyle(ta);
+  if (!box._ch) { const s = document.createElement('span'); s.className = 'dg-src-m'; s.textContent = 'M'.repeat(40); box.appendChild(s); const w = s.getBoundingClientRect().width; s.remove(); if (w) box._ch = w / 40; }
+  return { ta, ch: box._ch || 7.2, lh: parseFloat(cs.lineHeight) || 18.6, px: parseFloat(cs.paddingLeft) || 0, py: parseFloat(cs.paddingTop) || 0 };
+}
+function dgSrcCol(s) { let n = 0; for (const ch of s) n = ch === '\t' ? n + 2 - n % 2 : n + 1; return n; }      // a tab goes to the next even column, as tab-size says
+// The stretches of text a comment covers, one per line that is not empty: [line, first column, column after the last].
+// A comment on words inside one line covers those words; any other covers its lines from their first to their last character.
+function dgSrcSegs(c, L, i) {
+  return c.lines.map((_, j) => {
+    const s = L[i + j] || '', q = c.lines.length === 1 && c.quote ? s.indexOf(c.quote) : -1;
+    const a = q >= 0 ? q : s.length - s.replace(/^\s+/, '').length, b = q >= 0 ? q + c.quote.length : s.replace(/\s+$/, '').length;
+    return [i + j, dgSrcCol(s.slice(0, a)), dgSrcCol(s.slice(0, b))];
+  }).filter(s => s[2] > s[1]);
+}
+// The same stretches as things that can be measured on screen, wherever the text has been scrolled to since.
+function dgSrcEls(box, segs) {
+  return segs.map(s => ({ getBoundingClientRect: () => {
+    const g = dgSrcGeo(box), r = g.ta.getBoundingClientRect(), left = r.left + g.px + s[1] * g.ch - g.ta.scrollLeft, top = r.top + g.py + s[0] * g.lh - g.ta.scrollTop, width = (s[2] - s[1]) * g.ch;
+    return { left, top, width, height: g.lh, right: left + width, bottom: top + g.lh };
+  } }));
+}
+function dgSrcScroll(box) {
+  const ta = box.querySelector('textarea'), g = box.querySelector('.dg-src-g');
+  box.querySelector('.dg-src-hi').style.transform = 'translate(' + -ta.scrollLeft + 'px,' + -ta.scrollTop + 'px)';
+  if (Math.abs(g.scrollTop - ta.scrollTop) > 1) g.scrollTop = ta.scrollTop;
+}
+// Draws the comments of a source as the page draws those on its text: the words highlighted, a numbered marker in the margin.
+function dgSrcMarks(dg) {
+  const box = dg.querySelector(':scope > .dg-src'); if (!box) return;
+  dgSrcRows(dg);                                   // Reset and Discard change the text without an input event
+  const g = dgSrcGeo(box), ta = g.ta, L = ta.value.split('\n'), gi = box.querySelector('.dg-src-gi'), hi = box.querySelector('.dg-src-hi'), taken = [];
+  gi.querySelectorAll('.cm-mark').forEach(m => m.remove()); hi.textContent = '';
+  const paint = (segs, cls) => segs.forEach(s => { const d = document.createElement('div'); d.className = 'cm-hl' + cls;
+    d.style.cssText = 'left:' + (g.px + s[1] * g.ch) + 'px;top:' + (g.py + s[0] * g.lh) + 'px;width:' + (s[2] - s[1]) * g.ch + 'px;height:' + (g.lh - 2) + 'px'; hi.appendChild(d); });
+  dgSrcComments(dg.dataset.name).forEach(c => {
+    const i = dgSrcFind(ta.value, c); if (i < 0) return;
+    const segs = dgSrcSegs(c, L, i), cls = (c.id === cmActive ? ' cm-active' : '') + (c.id === cmFlash ? ' cm-flash' : '');
+    paint(segs, cls);
+    const m = document.createElement('button'); m.type = 'button'; m.className = 'cm-mark' + cls; m.dataset.cid = c.id; m.dataset.ln = i + 1; m.textContent = c._n; m.title = 'Comment ' + c._n + ': ' + c.text.slice(0, 120);
+    let top = g.py + i * g.lh + (g.lh - 18) / 2;
+    while (taken.some(x => Math.abs(x - top) < 19)) top += 19;      // two on one line stack downwards, as in the margin of the text
+    taken.push(top); m.style.cssText = 'left:2px;top:' + top + 'px'; gi.appendChild(m);
+    if (cmDgOf(c) === dg || !c._el) c._el = dgSrcEls(box, segs);      // one source can stand under several uses of its diagram
+  });
+  if (cmDraft && cmDraft.kind === 'dg' && cmDraft.sel.tk === 'src' && cmDraft.sel.dgEl === dg) paint(dgSrcSegs(cmDraft.sel, L, cmDraft.sel.ln - 1), ' cm-pending');
+  dgSrcScroll(box);
+}
+// What a comment on lines a to b of the text as it stands would be about, or null when those lines are empty. Empty
+// lines at either end are left out. A selection inside one line is kept as the words the comment is about.
+function dgSrcSel(dg, a, b) {
+  const box = dg.querySelector(':scope > .dg-src'), ta = box.querySelector('textarea'), L = ta.value.split('\n'), sel = dgSrcSelLines(ta);
+  while (a <= b && !(L[a - 1] || '').trim()) a++;
+  while (b >= a && !(L[b - 1] || '').trim()) b--;
+  if (a > b) return null;
+  const picked = sel && a === b && sel[0] === a && sel[1] === a ? ta.value.slice(ta.selectionStart, ta.selectionEnd).trim() : '';
+  const root = dg.closest('.part-panel'), same = Array.from(root.querySelectorAll('.dg')).filter(d => d.dataset.name === dg.dataset.name);
+  const s = { part: root.id.slice(5), kind: 'dg', tk: 'src', dname: dg.dataset.name, dn: same.indexOf(dg), did: '', dlabel: '', dwhat: '', dends: null, dsrc: cmHash(ta.value),
+    lines: L.slice(a - 1, b).map(l => l.replace(/\s+$/, '')), ln: a, ctx: [a > 1 ? L[a - 2].trim() : null, b < L.length ? L[b].trim() : null],
+    quote: picked && picked !== L[a - 1].trim() ? picked : '', pieces: [], dgEl: dg, ta };
+  s.el = dgSrcEls(box, dgSrcSegs(s, L, a - 1));
+  return s;
+}
+function dgSrcComment(dg, a, b) { const s = dgSrcSel(dg, a, b); if (s) cmOpen({ sel: s }); else showToast('Nothing on this line to comment on'); }
+// Text selected in an editor, as the page's "Comment" button needs it. A text box keeps its selection to itself: the
+// document's own selection is empty while text is selected in one.
+function dgSrcPending() {
+  const ta = document.activeElement; if (!ta || ta.tagName !== 'TEXTAREA' || !ta.closest('.dg-src')) return null;
+  const r = dgSrcSelLines(ta), s = r ? dgSrcSel(ta.closest('.dg'), r[0], r[1]) : null; if (!s || !s.el.length) return null;
+  const last = s.el[s.el.length - 1].getBoundingClientRect(), tr = ta.getBoundingClientRect();
+  s.box = { right: Math.max(tr.left, Math.min(last.right, tr.right - 110)), bottom: Math.max(tr.top, Math.min(last.bottom, tr.bottom)) };
+  return s;
+}
+// Brings a comment's line into view in the editor.
+function dgSrcShow(dg, c) {
+  const ta = dg.querySelector(':scope > .dg-src textarea'); if (!ta) return;
+  const i = dgSrcFind(ta.value, c); if (i < 0) return;
+  ta.scrollTop = Math.max(0, i * (parseFloat(getComputedStyle(ta).lineHeight) || 18.6) - ta.clientHeight / 2 + 20);
 }
 function dgSrcMark(dg) {
   const b = dg.querySelector(':scope > .cm-dgbar .dg-srcb'); if (!b) return;
-  const name = dg.dataset.name, ed = CM.edits[name];
+  const name = dg.dataset.name, ed = CM.edits[name], n = cmOff() ? 0 : dgSrcComments(name).filter(c => c._pieces).length;
+  const text = 'Source' + (n ? ' (' + n + ')' : '');
+  if (b.textContent !== text) { b.textContent = text; b.title = 'Show and edit the source of this diagram' + (n ? '. ' + n + ' comment' + (n === 1 ? '' : 's') + ' on its lines.' : ''); }
   b.classList.toggle('dg-edited', !!ed); b.setAttribute('aria-expanded', dg.querySelector(':scope > .dg-src') ? 'true' : 'false');
   // An edit written against an older source is shown to the reader once, not applied and not hidden.
   if (ed && dgSrcStale(name) && !dg._asked && dg.offsetParent !== null && dgSrcFirst(name) === dg) { dg._asked = true; dgSrcOpen(dg, true); }
@@ -1803,27 +1937,37 @@ function dgSrcStatus(dg) {
   const name = dg.dataset.name, ed = CM.edits[name], st = box.querySelector('.dg-src-st'), kind = cmDgInfo(dg).kind, stale = dgSrcStale(name);
   box.querySelector('.dg-src-ask').hidden = !stale;
   // Comments that found their part in the diagram as built and do not find it in the edited one.
-  const off = ed && !stale && !ed.bad && kind === 'mermaid' ? CM.items.filter(c => c.kind === 'dg' && c.state !== 'resolved' && c.dname === name && !c._pieces && c._ok0 === true).length : 0;
-  st.classList.toggle('bad', !!(ed && ed.bad)); st.classList.toggle('warn', off > 0);
-  const text = !ed ? 'Not edited.' : stale ? 'Your edit is not applied.' : ed.bad ? 'Does not parse: ' + ed.bad + ' The diagram keeps its last good drawing.'
-    : off ? 'Edited: the diagram is redrawn. With this edit, ' + off + ' comment' + (off === 1 ? '' : 's') + ' on the diagram no longer find' + (off === 1 ? 's its' : ' their') + ' part. Reset brings ' + (off === 1 ? 'it' : 'them') + ' back.'
+  // A comment on a part is judged on a diagram that is drawn again, so only on a Mermaid text that parses; one on a line, on any text.
+  const gone = ed && !stale ? CM.items.filter(c => c.kind === 'dg' && c.state !== 'resolved' && c.dname === name && !c._pieces && c._ok0 === true && (c.tk === 'src' || (kind === 'mermaid' && !ed.bad))) : [];
+  const off = gone.length, lines = gone.filter(c => c.tk === 'src').length, what = !lines ? 'part' : lines === off ? 'line' : 'place';
+  st.classList.toggle('bad', !!(ed && ed.bad)); st.classList.toggle('warn', off > 0 && !ed.bad);
+  const warn = off ? ' With this edit, ' + off + ' comment' + (off === 1 ? '' : 's') + ' on the ' + (!lines ? 'diagram' : lines === off ? 'source' : 'diagram and its source') + ' no longer find' + (off === 1 ? 's its ' : ' their ') + what
+    + '. Reset brings ' + (off === 1 ? 'it' : 'them') + ' back.' : '';
+  const text = !ed ? 'Not edited.' : stale ? 'Your edit is not applied.' : ed.bad ? 'Does not parse: ' + ed.bad + ' The diagram keeps its last good drawing.' + warn
+    : off ? (kind === 'mermaid' ? 'Edited: the diagram is redrawn.' : 'Edited.') + warn
     : kind === 'mermaid' ? 'Edited: the diagram is redrawn. The edit goes into the copied feedback.' : 'Edited. The diagram is not redrawn here: the agent regenerates it from the copied feedback.';
   if (st.textContent !== text) st.textContent = text;
   dgSrcMark(dg);
 }
 function dgSrcSet(dg, text, keep) {
   const name = dg.dataset.name, info = cmDgInfo(dg), orig = dgSrcOrig(dg), seq = dg._seq = (dg._seq || 0) + 1;
-  const done = () => { if (dg._seq !== seq) return; cmSave(); dgSrcStatus(dg); cmDrawPanel(); };
-  if (text === orig) { delete CM.edits[name]; if (info.kind === 'mermaid') dgSrcApply(info.mid, orig); done(); return; }
+  // Where no redraw follows, the comments are looked up again here: those on the source depend on the text alone.
+  const done = redrawn => { if (dg._seq !== seq) return; cmSave(); if (!redrawn) { cmResolve(); cmDraw(); } dgSrcStatus(dg); cmDrawPanel(); };
+  if (text === orig) { delete CM.edits[name]; done(info.kind === 'mermaid' && dgSrcApply(info.mid, orig)); return; }
   const old = CM.edits[name], ed = CM.edits[name] = { text, kind: info.kind, base: old && !keep && old.base !== cmHash(orig) ? old.base : cmHash(orig), bad: '' };
-  if (info.kind !== 'mermaid' || ed.base !== cmHash(orig)) { done(); return; }      // D2, or an edit still waiting for "keep or discard"
-  Promise.resolve().then(() => mermaid.parse(text)).then(() => { if (dg._seq === seq) dgSrcApply(info.mid, text); },
-    e => { if (dg._seq === seq && CM.edits[name]) CM.edits[name].bad = String((e && e.message) || e).split('\n').filter(Boolean).slice(0, 2).join(' ').slice(0, 200); }).then(done);
+  if (info.kind !== 'mermaid' || ed.base !== cmHash(orig)) { done(false); return; }      // D2, or an edit still waiting for "keep or discard"
+  Promise.resolve().then(() => mermaid.parse(text)).then(() => dg._seq === seq && dgSrcApply(info.mid, text),
+    e => { if (dg._seq === seq && CM.edits[name]) CM.edits[name].bad = String((e && e.message) || e).split('\n').filter(Boolean).slice(0, 2).join(' ').slice(0, 200); return false; }).then(done);
 }
 function dgSrcOpen(dg, open) {
   let box = dg.querySelector(':scope > .dg-src');
   if (!open) {
-    if (box) { box.remove(); if (CM.edits[dg.dataset.name]) cmAutoCopy('Source edit kept'); }
+    if (box) {
+      // A comment box standing on a line of this editor has nothing left to stand on.
+      const on = cmDraft ? cmDraft.sel : CM.items.find(x => x.id === cmActive);
+      if (cmCard && on && on.tk === 'src' && on.dname === dg.dataset.name) { if (cmCard._dirty()) { cmNudge(); return; } cmClose(); }
+      box.remove(); if (CM.edits[dg.dataset.name]) cmAutoCopy('Source edit kept');
+    }
     dgSrcMark(dg); cmRefresh(); return;
   }
   if (!box) {
@@ -1832,11 +1976,32 @@ function dgSrcOpen(dg, open) {
     box.innerHTML = '<div class="dg-src-h"><strong></strong><span class="dg-src-st"></span><button type="button" data-s="reset" title="Put the original source back">Reset</button><button type="button" data-s="close">Close</button></div>'
       + '<div class="dg-src-ask" hidden>The source of this diagram changed after you edited it, so your edit is not applied. '
       + '<button type="button" data-s="keep">Keep my edit</button><button type="button" data-s="reset">Discard my edit</button></div>'
-      + '<textarea spellcheck="false" aria-label="Source of the diagram"></textarea>';
+      + '<div class="dg-src-b"><div class="dg-src-g"><div class="dg-src-gi"></div></div><div class="dg-src-t"><div class="dg-src-hl"><div class="dg-src-hi"></div></div>'
+      + '<textarea spellcheck="false" aria-label="Source of the diagram"></textarea>'
+      + '<button type="button" class="cm-badd dg-src-add" title="Comment on this line" aria-label="Comment on this line" hidden>' + CM_ICON + '</button></div></div>';
     box.querySelector('strong').textContent = 'Source of diagram "' + dg.dataset.name + '" (' + kind + ')';
-    const ta = box.querySelector('textarea'); let timer = 0;
-    ta.addEventListener('input', () => { clearTimeout(timer); timer = setTimeout(() => dgSrcSet(dg, ta.value, false), 350); });
+    const ta = box.querySelector('textarea'), g = box.querySelector('.dg-src-g'), add = box.querySelector('.dg-src-add'), body = box.querySelector('.dg-src-b'); let timer = 0;
+    ta.addEventListener('input', () => { dgSrcMarks(dg); clearTimeout(timer); timer = setTimeout(() => dgSrcSet(dg, ta.value, false), 350); });
     ta.addEventListener('keydown', e => e.stopPropagation());        // the page's own keys stay out of the text
+    // The numbers scroll with the text, whichever of the two is moved (a script can scroll the numbers; a reader cannot).
+    ta.addEventListener('scroll', () => { dgSrcScroll(box); add.hidden = true; if (!cmCard) cmAddButton().hidden = true; });
+    g.addEventListener('scroll', () => { if (Math.abs(g.scrollTop - ta.scrollTop) > 1) ta.scrollTop = g.scrollTop; });
+    ta.addEventListener('keyup', () => setTimeout(cmOffer, 0));      // a selection made with the keys; one made with the mouse is seen by the page
+    // As on a paragraph or a diff line: a comment button follows the pointer from line to line.
+    const line = () => (ta.value.split('\n')[add._ln - 1] || '');
+    body.addEventListener('mousemove', e => {
+      if (add.contains(e.target)) return;
+      const q = dgSrcGeo(box), r = ta.getBoundingClientRect(), ln = Math.floor((e.clientY - r.top - q.py + ta.scrollTop) / q.lh) + 1, top = q.py + (ln - 1) * q.lh - ta.scrollTop + (q.lh - 20) / 2;
+      const picking = document.activeElement === ta && ta.selectionStart !== ta.selectionEnd;
+      add._ln = ln;
+      add.hidden = !!cmCard || cmOff() || picking || ln < 1 || !line().trim() || top < 0 || top > ta.clientHeight - 20;
+      if (!add.hidden) add.style.top = top + 'px';
+    });
+    body.addEventListener('mouseleave', () => { add.hidden = true; cmHint(null); });
+    add.addEventListener('mousedown', e => e.preventDefault());
+    add.addEventListener('mouseenter', () => cmHint(dgSrcEls(box, dgSrcSegs({ lines: [line()] }, ta.value.split('\n'), add._ln - 1))));
+    add.addEventListener('mouseleave', () => cmHint(null));
+    add.addEventListener('click', () => { cmHint(null); add.hidden = true; ta.setSelectionRange(ta.selectionEnd, ta.selectionEnd); dgSrcComment(dg, add._ln, add._ln); });
     box.addEventListener('click', e => {
       const b = e.target.closest('button[data-s]'); if (!b) return;
       clearTimeout(timer);
@@ -1848,14 +2013,14 @@ function dgSrcOpen(dg, open) {
   }
   const ed = CM.edits[dg.dataset.name];
   box.querySelector('textarea').value = ed ? ed.text : dgSrcOrig(dg);
-  dgSrcStatus(dg); cmRefresh();
+  dgSrcRows(dg); dgSrcMarks(dg); dgSrcStatus(dg); cmRefresh();
 }
 function dgSrcDrop(name) {
   const dg = dgSrcFirst(name), info = dg ? cmDgInfo(dg) : null;
   delete CM.edits[name];
-  if (info && info.kind === 'mermaid') dgSrcApply(info.mid, dgSrcOrig(dg));
-  document.querySelectorAll('.part-panel .dg').forEach(d => { if (d.dataset.name !== name) return; const ta = d.querySelector(':scope > .dg-src textarea'); if (ta) ta.value = dgSrcOrig(d); dgSrcStatus(d); dgSrcMark(d); });
-  cmSave(); cmDrawPanel(); cmAutoCopy('Source edit discarded');
+  const redrawn = !!info && info.kind === 'mermaid' && dgSrcApply(info.mid, dgSrcOrig(dg));
+  document.querySelectorAll('.part-panel .dg').forEach(d => { if (d.dataset.name !== name) return; const ta = d.querySelector(':scope > .dg-src textarea'); if (ta) { ta.value = dgSrcOrig(d); dgSrcRows(d); } dgSrcStatus(d); dgSrcMark(d); });
+  cmSave(); if (!redrawn) { cmResolve(); cmDraw(); } cmDrawPanel(); cmAutoCopy('Source edit discarded');
 }
 // From the panel: goes to the diagram and opens its source.
 function dgSrcJump(name) {
@@ -1960,7 +2125,7 @@ function cmLabsWire(root) {
 // Diagram comments find their parts again by id first, so the copied text lists the ids a rework should keep.
 function cmKeepIds(open) {
   const by = {}, names = [];
-  open.filter(c => c.kind === 'dg' && c._pieces && c.tk !== 'whole' && c._dg).forEach(c => {
+  open.filter(c => c.kind === 'dg' && c._pieces && c.tk !== 'whole' && c.tk !== 'src' && c._dg).forEach(c => {
     const kind = cmDgInfo(c._dg).kind;
     if (!by[c.dname]) { by[c.dname] = { kind, ids: [], seq: false }; names.push(c.dname); }
     const e = by[c.dname], add = id => { if (id && !e.ids.includes(id)) e.ids.push(id); };
@@ -1990,7 +2155,10 @@ function cmFeedback() {
       + (!c._pieces ? ' (not found on the page as it is now; what it was about follows)' : c._state === 'moved' ? ' (this has moved since the comment was written)' : ''));
     if (c.kind === 'dg' && cmMmLine(c)) L.push('   ' + cmMmLine(c));
     if (c.kind === 'dg' && c.tk === 'box' && c.pic) L.push('   A picture of the boxed area is kept with this comment on the page. Ask for it if the names are not enough.');
-    if (c.part === 'diff' && c.kind === 'line') {
+    const src = c.kind === 'dg' && c.tk === 'src';
+    // A line number means nothing without the text it counts in: with an edit, that is the reader's text, not the file.
+    if (src && c._pieces && CM.edits[c.dname]) L.push('   The line number counts in the source as the reader edited it, given in full below, not in the source as built.');
+    if (src || (c.part === 'diff' && c.kind === 'line')) {
       if (c.quote) L.push('   Selected: "' + cmExcerpt(c.quote, 400) + '"');
       c.lines.slice(0, 12).forEach(t => L.push('   | ' + t));
       if (c.lines.length > 12) L.push('   | ... (' + (c.lines.length - 12) + ' more lines)');
@@ -2050,7 +2218,7 @@ function cmItemHtml(c) {
   const lostDg = lost && c.kind === 'dg' && !!cmDgOf(c);
   let h = '<div class="cm-it' + (lost ? ' cm-it-lost' : '') + (lostDg ? ' cm-it-go' : '') + '" data-cid="' + esc(c.id) + '"><div class="cm-it-h">'
     + (c._n ? '<span class="cm-num">' + c._n + '</span>' : '') + '<span class="cm-it-w">' + esc(cmWhere(c)) + '</span>' + (cmLabel(c.label) ? '<span class="cm-tag cm-tag-l">' + cmLabel(c.label)[1] + '</span>' : '')
-    + (lost ? '<span class="cm-tag" title="' + (lostDg ? 'The part of the diagram this comment was about is no longer in it. Click to go to the diagram.' : 'The text this comment was about is no longer on the page, or stands in more than one place') + '">not found</span>'
+    + (lost ? '<span class="cm-tag" title="' + (lostDg ? (c.tk === 'src' ? 'The lines this comment was about are no longer in the source of the diagram. Click to go to the diagram.' : 'The part of the diagram this comment was about is no longer in it. Click to go to the diagram.') :'The text this comment was about is no longer on the page, or stands in more than one place') + '">not found</span>'
       : c._state === 'moved' ? '<span class="cm-tag" title="The text this comment was about now stands in another place">moved</span>' : '') + '</div>';
   if (editing) return h + '<textarea class="cm-it-ta" aria-label="Comment">' + esc(cmEditText !== null ? cmEditText : c.text) + '</textarea>' + cmLabsHtml(cmEditLab !== null ? cmEditLab : c.label || '')
     + '<div class="cm-it-a"><button type="button" data-act="cancel">Cancel</button><button type="button" class="cm-save" data-act="save">Save</button></div></div>';
@@ -2129,6 +2297,8 @@ function cmJump(c) {
     if (sub && !sub.classList.contains('active')) switchSub(sub.dataset.group, sub.id.slice(4));
     if (map && !map.classList.contains('active')) switchMap(map.id.slice(5), false);
     anchor = node;
+    // A comment on the source: its editor is opened on the line.
+    if (c.kind === 'dg' && c.tk === 'src' && node) { dgSrcOpen(node, true); dgSrcShow(node, c); anchor = node.querySelector(':scope > .dg-src') || node; }
   }
   cmFlash = c.id; cmDraw();
   if (c.part === 'diff' && c.kind !== 'part') anchor = c._el && c._el[0];
@@ -2409,9 +2579,9 @@ function cmSetOff(off) {
 function cmOffer() {
   const b = cmAddButton();
   if (cmCard) { b.hidden = true; return; }
-  cmPending = cmReadSelection();
+  cmPending = cmReadSelection() || dgSrcPending();
   if (!cmPending) { b.hidden = true; return; }
-  if (cmPending.part !== 'diff') cmCopySel(cmPending);        // the Diff review part copies its own selections
+  if (cmPending.part !== 'diff' && cmPending.tk !== 'src') cmCopySel(cmPending);        // the Diff review part copies its own selections
   if (cmOff()) { cmPending = null; b.hidden = true; return; }
   b.hidden = false;
   const w = b.offsetWidth || 80, box = cmPending.box;
@@ -2426,8 +2596,9 @@ function cmNudge() { if (!cmCard) return; cmCard.classList.remove('cm-nudge'); v
 function cmOpen(target) {
   if (cmCard && cmCard._dirty()) { cmNudge(); return; }   // never replace a box that holds unsaved text
   cmClose(); cmAddButton().hidden = true; cmHideBlockAdd();
+  if (target.sel && target.sel.ta) target.sel.ta.setSelectionRange(target.sel.ta.selectionEnd, target.sel.ta.selectionEnd);      // a selection in a source editor is spent
   const c = target.c || null, src = c || target.sel, first = c ? c.text : '';
-  const quote = src.part === 'diff' ? (src.quote || (src.lines || []).join('\n')) : src.quote;
+  const quote = src.part === 'diff' || src.tk === 'src' ? (src.quote || (src.lines || []).join('\n')) : src.quote;
   const card = document.createElement('div'); card.className = 'cm-card'; card.setAttribute('role', 'dialog'); card.setAttribute('aria-label', c ? 'Edit comment' : 'New comment');
   card.innerHTML = '<div class="cm-k"></div><div class="cm-q"></div><textarea class="cm-text" rows="3" placeholder="Your comment" aria-label="Comment"></textarea>'
     + '<div class="cm-row"><span class="cm-hint">Enter saves. Shift+Enter adds a line.</span><span class="cm-acts">'
@@ -2445,7 +2616,7 @@ function cmOpen(target) {
     if (c) { c.text = text; c.label = lab(); }
     else {
       const s = target.sel, base = { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text, label: lab(), t: Date.now(), state: 'open' };
-      CM.items.push(Object.assign(base, s.kind === 'dg' ? { kind: 'dg', part: s.part, dname: s.dname, dn: s.dn, tk: s.tk, did: s.did, dlabel: s.dlabel, dwhat: s.dwhat, dends: s.dends, dsrc: s.dsrc, dpos: s.dpos || undefined, dparts: s.dparts, dbox: s.dbox, pic: s.pic || undefined, quote: '' }
+      CM.items.push(Object.assign(base, s.kind === 'dg' ? { kind: 'dg', part: s.part, dname: s.dname, dn: s.dn, tk: s.tk, did: s.did, dlabel: s.dlabel, dwhat: s.dwhat, dends: s.dends, dsrc: s.dsrc, dpos: s.dpos || undefined, dparts: s.dparts, dbox: s.dbox, pic: s.pic || undefined, lines: s.lines, ln: s.ln, ctx: s.ctx, quote: s.quote || '' }
         : s.kind === 'part' ? { kind: 'part', part: s.part, quote: '' } : s.part === 'diff'
         ? { kind: s.kind, part: 'diff', path: s.path, side: s.side, ln: s.ln, ln2: s.ln2, lines: s.lines, quote: s.quote }
         : { kind: s.el ? 'block' : 'text', tag: s.el && s.el.tagName === 'TABLE' ? 'table' : undefined, part: s.part, section: s.section, quote: s.quote, prefix: s.prefix, suffix: s.suffix }));
@@ -2503,7 +2674,7 @@ function cmInit() {
     if (cmCard && !cmCard.contains(e.target) && !(e.target.closest && e.target.closest('#cm-add, .cm-badd, .cm-mark'))) { if (cmCard._dirty()) cmNudge(); else cmClose(); }
   });
   document.addEventListener('mouseup', e => { if (!(e.target.closest && e.target.closest('.cm-card, #cm-add, .cm-badd'))) setTimeout(cmOffer, 0); });
-  document.addEventListener('selectionchange', () => { const s = document.getSelection(); if ((!s || s.isCollapsed) && !cmCard) cmAddButton().hidden = true; });
+  document.addEventListener('selectionchange', () => { const s = document.getSelection(); if ((!s || s.isCollapsed) && !cmCard && !dgSrcPending()) cmAddButton().hidden = true; });
   window.addEventListener('scroll', () => { if (!cmCard) cmAddButton().hidden = true; cmHideBlockAdd(); }, { passive: true });
   // A wide diagram scrolls sideways inside its own frame; that scroll does not reach the window.
   document.addEventListener('scroll', e => { if (e.target.classList && e.target.classList.contains('dgv')) cmRefresh(); }, true);

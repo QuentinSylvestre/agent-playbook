@@ -439,6 +439,13 @@ async function routeLibs(target) {
   }
   // The source of a diagram as editable text: Mermaid redraws, a bad text keeps the last good drawing, D2 is text only
   const typeSrc = (id, text) => page.evaluate(([id, text]) => { const ta = document.querySelector('#' + id + ' > .dg-src textarea'); ta.value = text; ta.dispatchEvent(new Event('input', { bubbles: true })); }, [id, text]);
+  // Points at a line of the source as a reader would, then presses the comment button that appears beside it.
+  const srcAdd = async (id, ln) => {
+    const pt = await page.evaluate(([id, ln]) => { const box = document.querySelector('#' + id + ' > .dg-src'), g = dgSrcGeo(box), ta = g.ta; ta.scrollTop = Math.max(0, (ln - 3) * g.lh);
+      const r = ta.getBoundingClientRect(); return [r.left + 80, r.top + g.py + (ln - 0.5) * g.lh - ta.scrollTop]; }, [id, ln]);
+    await page.mouse.move(pt[0] - 5, pt[1]); await page.mouse.move(pt[0], pt[1]); await wait(120);
+    await page.click('#' + id + ' .dg-src-add'); await wait(300);
+  };
   const srcState = id => page.evaluate(id => { const dg = document.getElementById(id), box = dg.querySelector(':scope > .dg-src'), ed = CM.edits[dg.dataset.name];
     return { open: !!box, text: box ? box.querySelector('textarea').value : null, st: box ? box.querySelector('.dg-src-st').textContent : '', ask: box ? !box.querySelector('.dg-src-ask').hidden : false,
       ed: ed ? { bad: ed.bad, kind: ed.kind } : null, marked: dg.querySelector('.dg-srcb').classList.contains('dg-edited'), drawn: (dg.querySelector('.mmd svg') || { textContent: '' }).textContent }; }, id);
@@ -515,6 +522,19 @@ async function routeLibs(target) {
         await dropC();
         await page.click('#' + sq.id + ' .dg-src-h [data-s="reset"]'); await wait(2200);
         log(await page.evaluate(() => cmFeedback() === '') && await chipOf() === '', 'after Reset and with the comments removed, nothing is left to copy and nothing is counted as not placed');
+        // A comment on a message and one on its source line: deleting the line loses both, Reset brings both back
+        const both = await addDg('message:' + sq.msg, 'vc both part');
+        await srcAdd(sq.id, li + 1);
+        await page.keyboard.type('vc both line'); await page.keyboard.press('Enter'); await wait(400);
+        await typeSrc(sq.id, withLine(() => null)); await wait(2200); s = await srcState(sq.id);
+        const lostChip = await chipOf();
+        await page.click('#' + sq.id + ' .dg-src-h [data-s="reset"]'); await wait(2200);
+        const again = await page.evaluate(id => { const dg = document.getElementById(id), cs = CM.items.filter(x => /^vc both/.test(x.text));
+          return { n: cs.length, ok: cs.every(x => x._state === 'anchored'), rows: dg.querySelectorAll('.dg-src-ln').length, lines: dg.querySelector(':scope > .dg-src textarea').value.split('\n').length, marks: dg.querySelectorAll('.dg-src-g .cm-mark').length }; }, sq.id);
+        log(both && /With this edit, 2 comments on the diagram and its source no longer find their place\. Reset brings them back\./.test(s.st) && lostChip === '2 not placed'
+          && again.n === 2 && again.ok && again.rows === again.lines && again.marks === 1 && await chipOf() === '',
+          `deleting a line that carries a comment on its message and one on the line itself loses both and says so; Reset brings both back and the line numbers match the text again (${again.rows} numbers, ${again.lines} lines): ${s.st.slice(0, 110)}`);
+        await dropC();
       }
       await page.click('#' + sq.id + ' .dg-src [data-s="close"]'); await wait(200);
     }
@@ -533,6 +553,48 @@ async function routeLibs(target) {
       'a D2 source is edited as text with no redraw; the copied text asks for the diagram to be regenerated, and the panel lists the edit');
     await page.evaluate(() => document.querySelector('#cm-panel .cm-it[data-src] [data-act="srcdrop"]').click()); await wait(300); s = await srcState(d2dg);
     log(!s.ed && !s.marked && s.text === d2src && await page.evaluate(() => document.querySelectorAll('#cm-panel .cm-it[data-src]').length === 0 && cmFeedback() === ''), 'Discard in the panel removes the edit and puts the original text back');
+    // Comments on the source itself, made and shown as on the text of the page; a comment is found again by the text of its lines
+    await page.evaluate(() => cmPanel(false)); await wait(200);
+    const sl = await page.evaluate(id => { const L = document.querySelector('#' + id + ' > .dg-src textarea').value.split('\n'), T = L.map(l => l.trim());
+      const k = T.findIndex((t, i) => i > 0 && i < 6 && i < T.length - 1 && t && T[i + 1] && T.indexOf(t) === T.lastIndexOf(t));
+      return { k: k + 1, line: k < 0 ? '' : L[k].replace(/\s+$/, ''), name: document.getElementById(id).dataset.name, rows: document.querySelectorAll('#' + id + ' .dg-src-ln').length, n: L.length }; }, d2dg);
+    if (sl.k) {
+      const srcC = () => page.evaluate(id => { const c = CM.items.find(x => x.tk === 'src'), dg = document.getElementById(id), m = dg.querySelector('.dg-src-g .cm-mark'), h = dg.querySelector('.dg-src-hi .cm-hl'), g = dgSrcGeo(dg.querySelector(':scope > .dg-src'));
+        return { st: c ? c._state : 'none', ln: c && c._pieces ? c._ln : 0, at: m ? +m.dataset.ln : 0, hl: h ? Math.round((parseFloat(h.style.top) - g.py) / g.lh) + 1 : 0, look: m ? getComputedStyle(m).width + ' ' + getComputedStyle(m).backgroundColor : '', btn: dg.querySelector('.dg-srcb').textContent, where: c && c._pieces ? cmWhere(c, true) : '',
+          chip: (dg.querySelector('.cm-dglost:not([hidden])') || { textContent: '' }).textContent, stt: (dg.querySelector('.dg-src-st') || { textContent: '' }).textContent, fb: cmFeedback() }; }, d2dg);
+      const cardHead = () => page.evaluate(() => { const c = document.querySelector('.cm-card'); return c ? c.querySelector('.cm-k').textContent + ' | ' + c.querySelector('.cm-q').textContent : ''; });
+      await srcAdd(d2dg, sl.k);
+      const head = await cardHead();
+      await page.keyboard.type('vc source line'); await page.keyboard.press('Enter'); await wait(400);
+      let c = await srcC();
+      log(sl.rows === sl.n && head === 'Source of diagram "' + sl.name + '", line ' + sl.k + ' | ' + sl.line && c.st === 'anchored' && c.at === sl.k && c.hl === sl.k && c.look === '18px rgb(178, 106, 0)' && c.btn === 'Source (1)'
+        && c.fb.includes('Source of diagram "' + sl.name + '", line ' + sl.k + '\n   | ' + sl.line + '\n   Comment: vc source line') && !/Source line \d|keep the ids|reader edited/.test(c.fb),
+        `the button beside a line of the source comments on that line; its text is highlighted, the usual marker stands beside it, the Source button counts it and its text is copied (${c.look}): ${head.slice(0, 90)}`);
+      await typeSrc(d2dg, '# a line added above\n' + d2src); await wait(900); c = await srcC();
+      log(c.st === 'anchored' && c.ln === sl.k + 1 && c.at === sl.k + 1 && c.hl === sl.k + 1 && c.where.endsWith('line ' + (sl.k + 1)) && c.fb.includes('counts in the source as the reader edited it') && !/no longer/.test(c.stt),
+        `a comment on a source line follows its line when the reader adds lines above, and the copied text says which text the number counts in (${c.st}, line ${c.ln})`);
+      const dl = d2src.split('\n'), one = dl[sl.k - 1];
+      await typeSrc(d2dg, dl.filter((l, i) => i !== sl.k - 1).join('\n') + '\nxx\n' + one + '\nyy\n' + one + '\nzz'); await wait(900); const two = await srcC();
+      await typeSrc(d2dg, d2src + '\nxx\n' + one); await wait(900); const dup = await srcC();
+      log(two.st === 'notfound' && /With this edit, 1 comment on the source no longer finds its line\. Reset brings it back\./.test(two.stt) && two.chip === '1 not placed' && dup.st === 'anchored' && dup.ln === sl.k,
+        `a line that now stands twice, neither time between its old neighbours, is not guessed at and is counted as not placed; between its old neighbours it is found (${two.st}, ${dup.st} line ${dup.ln}): ${two.stt.slice(0, 100)}`);
+      await typeSrc(d2dg, d2src); await wait(900);
+      const selRows = await page.evaluate(([id, k]) => { const ta = document.querySelector('#' + id + ' > .dg-src textarea'), L = ta.value.split('\n'), a = L.slice(0, k - 1).join('\n').length + (k > 1 ? 1 : 0);
+        ta.scrollTop = 0; ta.focus(); ta.setSelectionRange(a + 1, a + L[k - 1].length + 1 + L[k].length); ta.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowDown', shiftKey: true }));
+        return new Promise(r => setTimeout(() => r(!document.getElementById('cm-add').hidden && document.getSelection().isCollapsed ? 2 : 0), 80)); }, [d2dg, sl.k]);
+      await page.click('#cm-add'); await wait(300);
+      const head2 = await cardHead(), pend = await page.evaluate(id => document.querySelectorAll('#' + id + ' .dg-src-hi .cm-hl.cm-pending').length, d2dg);
+      const spent = await page.evaluate(id => { const ta = document.querySelector('#' + id + ' > .dg-src textarea'); return ta.selectionStart === ta.selectionEnd; }, d2dg);
+      await page.keyboard.press('Escape'); await wait(200);
+      log(selRows === 2 && pend === 2 && spent && head2.startsWith('Source of diagram "' + sl.name + '", lines ' + sl.k + ' to ' + (sl.k + 1) + ' | '), `text selected in the source brings up the page's Comment button, though the document's own selection is empty; it comments on the selected lines, which stay highlighted while the box is open: ${head2.slice(0, 80)}`);
+      await page.evaluate(id => dgSrcOpen(document.getElementById(id), false), d2dg); await page.reload(); await wait(1800);
+      const shut = await page.evaluate(id => { const dg = document.getElementById(id), c = CM.items.find(x => x.tk === 'src'); return !dg.querySelector(':scope > .dg-src') && dg.querySelector('.dg-srcb').textContent === 'Source (1)' && !!c && c._state === 'anchored'; }, d2dg);
+      await page.evaluate(() => cmPanel(true)); await wait(300);
+      await page.click('#cm-panel .cm-it[data-cid] .cm-it-t'); await wait(500);
+      log(shut && await page.evaluate(([id, k]) => { const box = document.querySelector('#' + id + ' > .dg-src'); return !!box && !!box.querySelector('.dg-src-g .cm-mark.cm-flash[data-ln="' + k + '"]') && !!box.querySelector('.dg-src-hi .cm-hl.cm-flash'); }, [d2dg, sl.k]),
+        'after a reload the comment is still on its line with the editor closed; from the panel a click opens the editor on that line');
+      await page.evaluate(() => { CM.items = CM.items.filter(x => x.tk !== 'src'); cmChanged(); }); await wait(200);
+    }
     await page.evaluate(id => { dgSrcOpen(document.getElementById(id), false); cmPanel(false); }, d2dg); await wait(200);
   }
   const looks = await page.evaluate(() => { const css = e => { const s = getComputedStyle(e); return [s.width, s.height, s.borderTopColor, s.borderTopLeftRadius, s.color].join(); };
