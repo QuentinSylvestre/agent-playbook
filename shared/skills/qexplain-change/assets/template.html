@@ -237,6 +237,33 @@
     .sp { grid-template-columns: 1fr; }
     .pane + .pane { border-left: none; border-top: 2px solid var(--border); }
   }
+  /* Comments: highlights and numbered markers sit in a layer over the page, so the page's text is never rewritten. */
+  .page { position: relative; }
+  .cm-layer { position: absolute; inset: 0; pointer-events: none; z-index: 2; }
+  .cm-hl { position: absolute; background: rgba(255, 193, 7, 0.30); border-bottom: 2px solid rgba(214, 143, 0, 0.9); border-radius: 2px; }
+  [data-theme="dark"] .cm-hl { background: rgba(255, 193, 7, 0.20); }
+  .cm-hl.cm-pending, .cm-hl.cm-active { background: rgba(9, 105, 218, 0.22); border-bottom-color: rgba(9, 105, 218, 0.9); }
+  .cm-mark.cm-active { background: #0969da; }
+  .cm-over .page { cursor: pointer; }
+  .cm-mark { position: absolute; pointer-events: auto; width: 18px; height: 18px; padding: 0; border: none; border-radius: 9px; background: #b26a00; color: #fff; font: 600 10.5px/18px -apple-system, "Segoe UI", sans-serif; text-align: center; cursor: pointer; }
+  .cm-mark:hover, .cm-mark:focus-visible { background: #8a5200; outline: 2px solid #ffd166; outline-offset: 1px; }
+  #cm-add { position: fixed; z-index: 400; padding: 3px 11px; border: 1px solid #8a5200; border-radius: 14px; background: #b26a00; color: #fff; font: 600 12px/1.5 -apple-system, "Segoe UI", sans-serif; cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.28); }
+  #cm-add[hidden] { display: none; }
+  #cm-add:hover { background: #8a5200; }
+  .cm-card { position: fixed; z-index: 450; width: min(384px, calc(100vw - 16px)); background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: 8px; box-shadow: 0 10px 30px rgba(0,0,0,0.28); padding: 10px; font-size: 13px; line-height: 1.45; }
+  .cm-card .cm-q { color: var(--text-light); font-size: 12px; margin-bottom: 6px; max-height: 3.1em; overflow: hidden; border-left: 3px solid #d68f00; padding-left: 7px; }
+  .cm-card textarea { display: block; width: 100%; min-height: 76px; resize: vertical; font: inherit; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--bg); color: var(--text); }
+  .cm-card textarea:focus { outline: 2px solid #d68f00; outline-offset: 0; }
+  .cm-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 8px; }
+  .cm-hint { color: var(--text-light); font-size: 11px; }
+  .cm-acts { display: flex; gap: 6px; flex: none; }
+  .cm-acts button { padding: 3px 10px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--btn-bg); color: var(--text); font-size: 12px; cursor: pointer; }
+  .cm-acts .cm-save { background: #b26a00; border-color: #8a5200; color: #fff; }
+  .cm-acts .cm-del { color: #c0392b; }
+  .cm-card.cm-nudge { animation: cm-nudge 0.25s; }
+  @keyframes cm-nudge { 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+  @media (max-width: 760px) { .cm-mark { width: 15px; height: 15px; line-height: 15px; font-size: 9.5px; left: 0 !important; }
+    .cm-card { left: 0 !important; top: auto !important; bottom: 0; width: 100%; border-radius: 10px 10px 0 0; } }
 </style>
 </head>
 <body>
@@ -945,6 +972,256 @@ document.addEventListener('click', e => {
 });
 
 // ---------------- Start ----------------
+// ---------------- Comments ----------------
+// The reader selects text and comments on it. A comment is stored with the quoted text and a little of what surrounds
+// it, never with a DOM path: prose is rewritten on every build, so after a rebuild a comment is re-found by its quote.
+// One match (or one match whose surroundings agree) places it; anything else leaves it "not found". It is never
+// placed on a guess. Highlights and markers are drawn in a layer over the page, so the page's own text is not touched.
+const CM_KEY = 'qexplain-change-comments-' + PAGE_ID;
+const CM_SKIP = 'svg, .dg, script, style, button, textarea, input, select, .sub-bar, .map-bar, .tour-box, .chg, .cm-layer';
+const CM_CTX = 32, CM_MAX_QUOTE = 2000;
+let CM = { v: 1, items: [] };
+try { const saved = JSON.parse(lsGet(CM_KEY) || 'null'); if (saved && saved.v === 1 && Array.isArray(saved.items)) CM = saved; } catch (e) {}
+function cmSave() { lsSet(CM_KEY, JSON.stringify(CM, (k, v) => (k[0] === '_' ? undefined : v))); }
+function cmRoots() {
+  return PART_KEYS.filter(k => k !== 'diff').map(k => ({ part: k, root: document.querySelector('#part-' + k + ' .page') })).filter(r => r.root);
+}
+// The commentable text of one part as a single string, with the text node behind every position.
+function cmIndex(root) {
+  const nodes = []; let text = '', n;
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode: t => (t.parentElement && t.parentElement.closest(CM_SKIP) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT) });
+  while ((n = walker.nextNode())) { nodes.push({ node: n, start: text.length }); text += n.nodeValue; }
+  return { text, nodes };
+}
+function cmRangeOffsets(ix, range) {
+  let s = -1, e = -1;
+  for (const it of ix.nodes) {
+    if (!range.intersectsNode(it.node)) continue;
+    const a = it.node === range.startContainer ? range.startOffset : 0;
+    const b = it.node === range.endContainer ? range.endOffset : it.node.nodeValue.length;
+    if (b <= a) continue;
+    if (s < 0) s = it.start + a;
+    e = it.start + b;
+  }
+  if (s < 0) return null;
+  while (s < e && /\s/.test(ix.text[s])) s++;
+  while (e > s && /\s/.test(ix.text[e - 1])) e--;
+  if (e - s > CM_MAX_QUOTE) e = s + CM_MAX_QUOTE;
+  return e - s >= 2 ? [s, e] : null;
+}
+// The text-node pieces that make up [s, e), each as its own range: a range over whole blocks would also report the blocks' boxes.
+function cmPieces(ix, s, e) {
+  const out = [];
+  for (const it of ix.nodes) {
+    const a = Math.max(s, it.start), b = Math.min(e, it.start + it.node.nodeValue.length);
+    if (b <= a) continue;
+    const r = document.createRange(); r.setStart(it.node, a - it.start); r.setEnd(it.node, b - it.start); out.push(r);
+  }
+  return out;
+}
+function cmFind(ix, c) {
+  const hits = []; let i = -1;
+  while ((i = ix.text.indexOf(c.quote, i + 1)) >= 0 && hits.length < 100) hits.push(i);
+  if (hits.length === 1) return hits[0];
+  const agree = hits.filter(h => ix.text.slice(Math.max(0, h - c.prefix.length), h) === c.prefix
+    && ix.text.slice(h + c.quote.length, h + c.quote.length + c.suffix.length) === c.suffix);
+  return agree.length === 1 ? agree[0] : null;
+}
+function cmSection(root, node) {
+  let found = null;
+  root.querySelectorAll('h1, h2, h3, h4').forEach(h => { if (!h.closest(CM_SKIP) && (h.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING)) found = h; });
+  return found ? found.textContent.trim().replace(/\s+/g, ' ') : '';
+}
+let CMX = {};
+function cmResolve() {
+  CMX = {}; cmRoots().forEach(r => { CMX[r.part] = { root: r.root, ix: cmIndex(r.root) }; });
+  CM.items.forEach(c => {
+    c._pieces = null; c._at = -1; c._state = 'notfound';
+    const e = CMX[c.part]; if (!e) return;
+    const at = cmFind(e.ix, c); if (at === null) return;
+    c._at = at; c._pieces = cmPieces(e.ix, at, at + c.quote.length);
+    if (!c._pieces.length) { c._pieces = null; c._at = -1; return; }
+    c._state = cmSection(e.root, c._pieces[0].startContainer) === c.section ? 'anchored' : 'moved';
+  });
+  // Numbers follow the document, so the markers on the page and the copied feedback read in the same order.
+  CM.items.slice().sort((x, y) => (x._pieces ? 0 : 1) - (y._pieces ? 0 : 1) || PART_KEYS.indexOf(x.part) - PART_KEYS.indexOf(y.part) || x._at - y._at || x.t - y.t)
+    .forEach((c, i) => { c._n = i + 1; });
+}
+function cmDraw() {
+  document.querySelectorAll('.cm-layer').forEach(l => l.remove());
+  cmRoots().forEach(({ part, root }) => {
+    if (root.offsetParent === null) return;   // the part is not on screen: nothing can be measured
+    const layer = document.createElement('div'); layer.className = 'cm-layer';
+    const base = root.getBoundingClientRect(), taken = [];
+    CM.items.filter(c => c.part === part && c._pieces).sort((x, y) => x._n - y._n).forEach(c => {
+      const rects = [];
+      c._pieces.forEach(r => Array.from(r.getClientRects()).forEach(b => { if (b.width > 0.5 && b.height > 0.5) rects.push(b); }));
+      if (!rects.length) return;              // inside a sub-tab that is not showing
+      rects.forEach(b => {
+        const d = document.createElement('div'); d.className = 'cm-hl' + (c.id === cmActive ? ' cm-active' : '');
+        d.style.cssText = 'left:' + (b.left - base.left) + 'px;top:' + (b.top - base.top) + 'px;width:' + b.width + 'px;height:' + b.height + 'px';
+        layer.appendChild(d);
+      });
+      const m = document.createElement('button'); m.type = 'button'; m.className = 'cm-mark' + (c.id === cmActive ? ' cm-active' : ''); m.dataset.cid = c.id;
+      m.textContent = c._n; m.title = 'Comment ' + c._n + ': ' + c.text.slice(0, 120);
+      // Markers stand in the left margin, level with the first line of their text; two on one line stack downwards.
+      let top = rects[0].top - base.top + (rects[0].height - 18) / 2;
+      while (taken.some(t => Math.abs(t - top) < 19)) top += 19;
+      taken.push(top);
+      m.style.cssText = 'left:2px;top:' + top + 'px';
+      layer.appendChild(m);
+    });
+    // The text being commented on stays marked while the box is open: the box takes the focus, and with it the selection.
+    if (cmDraft && cmDraft.part === part) cmDraft.pieces.forEach(r => Array.from(r.getClientRects()).forEach(b => {
+      if (b.width <= 0.5 || b.height <= 0.5) return;
+      const d = document.createElement('div'); d.className = 'cm-hl cm-pending';
+      d.style.cssText = 'left:' + (b.left - base.left) + 'px;top:' + (b.top - base.top) + 'px;width:' + b.width + 'px;height:' + b.height + 'px';
+      layer.appendChild(d);
+    }));
+    root.appendChild(layer);
+  });
+}
+let cmRaf = 0;
+function cmRefresh() { if (!cmRaf) cmRaf = requestAnimationFrame(() => { cmRaf = 0; cmDraw(); }); }
+
+// --- Selecting text offers a Comment button; the selection stays alive when the button is pressed.
+let cmPending = null, cmCard = null, cmDraft = null, cmActive = null;
+function cmBoxes(pieces) {
+  const out = [];
+  pieces.forEach(r => Array.from(r.getClientRects()).forEach(b => { if (b.width > 0.5 && b.height > 0.5) out.push(b); }));
+  return out;
+}
+// Where a box may stand without covering the text it is about: under the last line, or over the first.
+function cmSpan(pieces) {
+  const bs = cmBoxes(pieces); if (!bs.length) return null;
+  return { left: bs[bs.length - 1].left, top: Math.min.apply(null, bs.map(b => b.top)), bottom: Math.max.apply(null, bs.map(b => b.bottom)) };
+}
+// The comment whose highlight is under a point; the shortest quote wins where two overlap.
+function cmAt(x, y) {
+  const hits = CM.items.filter(c => c._pieces && cmBoxes(c._pieces).some(b => x >= b.left && x <= b.right && y >= b.top && y <= b.bottom));
+  return hits.sort((a, b) => a.quote.length - b.quote.length)[0] || null;
+}
+function cmOverText(e) {
+  const t = e.target;
+  if (!t || !t.closest || !t.closest('.page') || t.closest('a, button, input, textarea, select, summary, .cm-card')) return null;
+  return cmAt(e.clientX, e.clientY);
+}
+function cmReadSelection() {
+  const sel = document.getSelection();
+  if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
+  const range = sel.getRangeAt(0);
+  const hit = cmRoots().find(r => r.root.offsetParent !== null && range.intersectsNode(r.root));
+  if (!hit) return null;
+  const ix = cmIndex(hit.root), off = cmRangeOffsets(ix, range);
+  if (!off) return null;
+  const pieces = cmPieces(ix, off[0], off[1]); if (!pieces.length) return null;
+  const boxes = Array.from(pieces[pieces.length - 1].getClientRects());
+  if (!boxes.length) return null;
+  return { part: hit.part, quote: ix.text.slice(off[0], off[1]), prefix: ix.text.slice(Math.max(0, off[0] - CM_CTX), off[0]),
+    suffix: ix.text.slice(off[1], off[1] + CM_CTX), section: cmSection(hit.root, pieces[0].startContainer), box: boxes[boxes.length - 1], pieces };
+}
+function cmAddButton() {
+  let b = document.getElementById('cm-add');
+  if (!b) {
+    b = document.createElement('button'); b.id = 'cm-add'; b.type = 'button'; b.textContent = 'Comment'; b.hidden = true;
+    b.title = 'Comment on the selected text';
+    b.addEventListener('mousedown', e => e.preventDefault());   // keeps the selection
+    b.addEventListener('click', () => { if (cmPending) cmOpen({ sel: cmPending }); });
+    document.body.appendChild(b);
+  }
+  return b;
+}
+function cmOffer() {
+  const b = cmAddButton();
+  if (cmCard) { b.hidden = true; return; }
+  cmPending = cmReadSelection();
+  if (!cmPending) { b.hidden = true; return; }
+  b.hidden = false;
+  const w = b.offsetWidth || 80, box = cmPending.box;
+  b.style.left = Math.min(window.innerWidth - w - 8, Math.max(8, box.right + 6)) + 'px';
+  b.style.top = Math.min(window.innerHeight - 34, Math.max(8, box.bottom + 6)) + 'px';
+}
+
+// --- The comment box. Enter saves; Shift+Enter or Ctrl+Enter adds a line; Escape or a click outside closes it only when
+// nothing would be lost.
+function cmClose() { if (cmCard) { cmCard.remove(); cmCard = null; } if (cmDraft || cmActive) { cmDraft = null; cmActive = null; cmDraw(); } }
+function cmNudge() { if (!cmCard) return; cmCard.classList.remove('cm-nudge'); void cmCard.offsetWidth; cmCard.classList.add('cm-nudge'); }
+function cmOpen(target) {
+  cmClose(); cmAddButton().hidden = true;
+  const c = target.c || null, quote = c ? c.quote : target.sel.quote, first = c ? c.text : '';
+  const card = document.createElement('div'); card.className = 'cm-card'; card.setAttribute('role', 'dialog'); card.setAttribute('aria-label', c ? 'Edit comment' : 'New comment');
+  card.innerHTML = '<div class="cm-q"></div><textarea class="cm-text" rows="3" placeholder="Your comment" aria-label="Comment"></textarea>'
+    + '<div class="cm-row"><span class="cm-hint">Enter saves. Shift+Enter adds a line.</span><span class="cm-acts">'
+    + (c ? '<button type="button" class="cm-del">Delete</button>' : '') + '<button type="button" class="cm-cancel">Cancel</button><button type="button" class="cm-save">Save</button></span></div>';
+  card.querySelector('.cm-q').textContent = quote.length > 160 ? quote.slice(0, 157) + '...' : quote;
+  const ta = card.querySelector('.cm-text'); ta.value = first;
+  const dirty = () => ta.value.trim() !== first.trim();
+  const save = () => {
+    const text = ta.value.trim();
+    if (!text) { cmNudge(); ta.focus(); return; }
+    if (c) c.text = text;
+    else CM.items.push({ id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), kind: 'text', part: target.sel.part,
+      section: target.sel.section, quote: target.sel.quote, prefix: target.sel.prefix, suffix: target.sel.suffix, text, t: Date.now(), state: 'open' });
+    cmSave(); cmResolve(); cmDraw(); cmClose();
+    const sel = document.getSelection(); if (sel) sel.removeAllRanges();
+    const saved = c || CM.items[CM.items.length - 1];
+    showToast(saved._pieces ? 'Comment ' + saved._n + ' saved' : 'Comment saved');
+  };
+  ta.addEventListener('keydown', e => {
+    e.stopPropagation();
+    if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) {
+      if (e.shiftKey) return;                                   // the browser adds the line
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) { ta.setRangeText('\n', ta.selectionStart, ta.selectionEnd, 'end'); return; }
+      save();
+    } else if (e.key === 'Escape') { e.preventDefault(); if (dirty()) cmNudge(); else cmClose(); }
+  });
+  card.querySelector('.cm-save').addEventListener('click', save);
+  card.querySelector('.cm-cancel').addEventListener('click', cmClose);
+  if (c) card.querySelector('.cm-del').addEventListener('click', () => {
+    CM.items = CM.items.filter(x => x !== c); cmSave(); cmResolve(); cmDraw(); cmClose(); showToast('Comment deleted');
+  });
+  card._dirty = dirty;
+  document.body.appendChild(card); cmCard = card;
+  const pieces = c ? c._pieces : target.sel.pieces;
+  if (c) cmActive = c.id; else cmDraft = { part: target.sel.part, pieces };
+  cmDraw();
+  const h = card.offsetHeight, w = card.offsetWidth;
+  let box = cmSpan(pieces) || { left: 8, top: 8, bottom: 8 };
+  // No room under the text nor over it: bring the end of the text up so the box fits under it.
+  if (window.innerHeight - box.bottom < h + 16 && box.top < h + 16) {
+    window.scrollBy(0, box.bottom - (window.innerHeight - h - 16)); box = cmSpan(pieces) || box;
+  }
+  card.style.left = Math.min(window.innerWidth - w - 8, Math.max(8, box.left)) + 'px';
+  card.style.top = (window.innerHeight - box.bottom < h + 16 && box.top > h + 16 ? box.top - h - 8 : Math.min(window.innerHeight - h - 8, box.bottom + 8)) + 'px';
+  ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
+}
+function cmInit() {
+  cmResolve(); cmDraw();
+  if (window.ResizeObserver) { const ro = new ResizeObserver(cmRefresh); cmRoots().forEach(r => ro.observe(r.root)); }
+  window.addEventListener('resize', cmRefresh);
+  window.addEventListener('popstate', cmRefresh);
+  document.addEventListener('click', e => {
+    const m = e.target.closest ? e.target.closest('.cm-mark') : null;
+    const sel = document.getSelection();
+    const c = m ? CM.items.find(x => x.id === m.dataset.cid) : (!sel || sel.isCollapsed ? cmOverText(e) : null);
+    if (c) { if (cmCard && cmCard._dirty()) cmNudge(); else if (cmActive !== c.id) cmOpen({ c }); return; }
+    setTimeout(cmRefresh, 0);                                   // a tab or sub-tab may have changed what is on screen
+  });
+  document.addEventListener('mousedown', e => {
+    if (cmCard && !cmCard.contains(e.target) && !(e.target.closest && e.target.closest('#cm-add, .cm-mark'))) { if (cmCard._dirty()) cmNudge(); else cmClose(); }
+  });
+  document.addEventListener('mouseup', e => { if (!(e.target.closest && e.target.closest('.cm-card, #cm-add'))) setTimeout(cmOffer, 0); });
+  document.addEventListener('selectionchange', () => { const s = document.getSelection(); if ((!s || s.isCollapsed) && !cmCard) cmAddButton().hidden = true; });
+  window.addEventListener('scroll', () => { if (!cmCard) cmAddButton().hidden = true; }, { passive: true });
+  let overRaf = 0;
+  document.addEventListener('mousemove', e => {
+    if (overRaf) return;
+    overRaf = requestAnimationFrame(() => { overRaf = 0; document.documentElement.classList.toggle('cm-over', !!cmOverText(e)); });
+  }, { passive: true });
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   applyTheme(isDark());
   applySketch(document.documentElement.getAttribute('data-sketch') === 'classic');
@@ -953,6 +1230,7 @@ window.addEventListener('DOMContentLoaded', () => {
   fitTools();
   switchPart(PART_KEYS[0], false);
   restoreFromHash();
+  cmInit();
 });
 window.addEventListener('popstate', restoreFromHash);
 </script>

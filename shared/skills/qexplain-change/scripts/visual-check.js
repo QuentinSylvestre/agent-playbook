@@ -106,6 +106,59 @@ async function routeLibs(target) {
   log(await page.evaluate(() => document.getElementById('copybox').hidden && !document.getElementById('info-pop').hidden), 'Escape closes that box and leaves the Info menu open');
   await page.mouse.click(300, 400); await wait(150);
   log(await page.evaluate(() => document.getElementById('info-pop').hidden), 'a click outside closes the Info menu');
+  // Comments on selected prose: offer, box keys, marker, storage, reload, edit, delete
+  const cmKey = await page.evaluate(() => CM_KEY);
+  await page.evaluate(k => localStorage.removeItem(k), cmKey);
+  await page.reload(); await wait(1200);
+  const selectProse = () => page.evaluate(() => {
+    const w = document.createTreeWalker(document.querySelector('#part-brief .page'), NodeFilter.SHOW_TEXT);
+    let t; while ((t = w.nextNode())) { if (t.nodeValue.trim().length > 60 && t.parentElement.closest('p')) break; }
+    const r = document.createRange(); r.setStart(t, 2); r.setEnd(t, 40);
+    t.parentElement.scrollIntoView({ block: 'center' });
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+    return s.toString();
+  });
+  const quoted = await selectProse(); await wait(250);
+  log(await page.evaluate(() => { const b = document.getElementById('cm-add'); return !!b && !b.hidden; }), 'selecting prose offers a Comment button');
+  await page.click('#cm-add'); await wait(150);
+  log(await page.evaluate(() => document.querySelectorAll('#part-brief .cm-hl.cm-pending').length > 0 && document.activeElement === document.querySelector('.cm-card textarea')), 'the Comment button opens the box, focused, and keeps the chosen text marked');
+  await page.keyboard.type('first line'); await page.keyboard.press('Shift+Enter'); await page.keyboard.type('second'); await page.keyboard.press('Control+Enter'); await page.keyboard.type('third');
+  log(await page.evaluate(() => document.querySelector('.cm-card textarea').value) === 'first line\nsecond\nthird', 'Shift+Enter and Ctrl+Enter each add a line');
+  await page.keyboard.press('Escape'); await wait(100);
+  await page.mouse.click(5, 300); await wait(100);
+  log(await page.evaluate(() => !!document.querySelector('.cm-card')), 'Escape and a click outside leave a box that holds text open');
+  await page.focus('.cm-card textarea'); await page.keyboard.press('Enter'); await wait(250);
+  const afterSave = await page.evaluate(k => ({ card: !!document.querySelector('.cm-card') || !!document.querySelector('.cm-pending'), marks: document.querySelectorAll('#part-brief .cm-mark').length,
+    hl: document.querySelectorAll('#part-brief .cm-hl').length, stored: JSON.parse(localStorage.getItem(k) || '{"items":[]}').items }), cmKey);
+  log(!afterSave.card && afterSave.marks === 1 && afterSave.hl >= 1 && afterSave.stored.length === 1 && afterSave.stored[0].quote === quoted
+    && afterSave.stored[0].text === 'first line\nsecond\nthird', `Enter saves: one marker, ${afterSave.hl} highlight box(es), the quote and text stored`);
+  log(await page.evaluate(() => document.querySelector('#part-brief .page p').innerHTML.indexOf('<mark') < 0 && !document.querySelector('#part-brief .page p .cm-hl')), 'the page text itself is not rewritten');
+  await page.reload(); await wait(1200);
+  log(await page.evaluate(() => document.querySelectorAll('#part-brief .cm-mark').length === 1 && CM.items[0]._state === 'anchored'), 'after a reload the comment is re-found by its quote and marked again');
+  await page.click('#part-brief .cm-mark'); await wait(150);
+  log(await page.evaluate(() => { const t = document.querySelector('.cm-card textarea'); return !!t && t.value === 'first line\nsecond\nthird' && !!document.querySelector('.cm-card .cm-del'); }), 'clicking the marker reopens the comment for editing');
+  await page.keyboard.press('Escape'); await wait(100);
+  log(await page.evaluate(() => !document.querySelector('.cm-card')), 'Escape closes an unchanged box');
+  const hlAt = await page.evaluate(() => { const h = document.querySelector('#part-brief .cm-hl'); h.scrollIntoView({ block: 'center' });
+    const b = h.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; });
+  await page.mouse.move(hlAt.x, hlAt.y); await wait(100);
+  log(await page.evaluate(() => document.documentElement.classList.contains('cm-over')), 'the pointer over highlighted text shows it can be clicked');
+  await page.mouse.click(hlAt.x, hlAt.y); await wait(200);
+  const opened = await page.evaluate(() => { const card = document.querySelector('.cm-card'); if (!card) return null;
+    const hs = [...document.querySelectorAll('#part-brief .cm-hl.cm-active')].map(h => h.getBoundingClientRect()), k = card.getBoundingClientRect();
+    return { active: hs.length, mark: !!document.querySelector('.cm-mark.cm-active'), clear: hs.every(h => k.top >= h.bottom - 1 || k.bottom <= h.top + 1) }; });
+  log(!!opened && opened.active >= 1 && opened.mark, 'clicking highlighted text opens its comment and marks the text it concerns');
+  log(!!opened && opened.clear, 'the reopened box does not cover the text it concerns');
+  await page.keyboard.type(' more'); await page.mouse.click(hlAt.x, hlAt.y); await wait(150);
+  log(await page.evaluate(() => { const t = document.querySelector('.cm-card textarea'); return !!t && t.value.endsWith(' more'); }), 'a click on a highlight does not replace a box that holds unsaved text');
+  await page.evaluate(() => document.querySelector('.cm-card .cm-cancel').click()); await wait(100);
+  log(await page.evaluate(() => !document.querySelector('.cm-hl.cm-active')), 'closing the box returns the highlight to its resting colour');
+  await page.evaluate(() => { CM.items[0].quote = 'text that is not on the page'; cmResolve(); cmDraw(); });
+  log(await page.evaluate(() => CM.items[0]._state === 'notfound' && document.querySelectorAll('.cm-mark').length === 0), 'a comment whose quote is gone is not placed anywhere');
+  await page.reload(); await wait(1200);
+  await page.click('#part-brief .cm-mark'); await wait(150); await page.click('.cm-card .cm-del'); await wait(200);
+  log(await page.evaluate(k => document.querySelectorAll('.cm-mark').length === 0 && JSON.parse(localStorage.getItem(k)).items.length === 0, cmKey), 'Delete removes the comment and its marker');
   await page.evaluate(() => { navigator.clipboard.writeText = window.__w; document.execCommand = window.__x; });
   log(has('brief'), `parts present: ${info.parts.join(', ')}`);
 
