@@ -27,8 +27,9 @@ import re
 import sys
 from html.parser import HTMLParser
 
-# CDNs the skill is allowed to load from. Edit deliberately.
-KNOWN_HOSTS = {"cdn.jsdelivr.net", "unpkg.com", "cdnjs.cloudflare.com"}
+# The one host the page may load a script from. The page's content security policy (assets/template.html) allows the
+# same host and no other: a script from elsewhere would pass here and then not run. Change both together.
+KNOWN_HOSTS = {"cdn.jsdelivr.net"}
 
 # A pinned URL carries a full semver somewhere in the path.
 SEMVER = re.compile(r"\d+\.\d+\.\d+")
@@ -396,6 +397,7 @@ def selftest():
     expect("pinned", fixture(head_extra=mermaid), "remote-assets-pinned", "PASS")
     expect("unpinned", fixture(head_extra='<script src="https://cdn.jsdelivr.net/npm/mermaid@latest/dist/m.js"></script>'), "remote-assets-pinned", "FAIL")
     expect("unknown host", fixture(head_extra='<script src="https://evil.example/x@1.2.3/a.js"></script>'), "remote-assets-pinned", "FAIL")
+    expect("a host the page's policy does not allow", fixture(head_extra='<script src="https://unpkg.com/mermaid@11.17.2/dist/mermaid.min.js"></script>'), "remote-assets-pinned", "FAIL")
     expect("data url font is local", fixture(head_extra="<style>@font-face{src:url(\"data:font/woff2;base64,AAAA\")}</style>"), "remote-assets-pinned", "PASS")
     # no-module-scripts, no-runtime-fetch
     expect("module script", fixture(head_extra='<script type="module">1</script>'), "no-module-scripts", "FAIL")
