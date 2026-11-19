@@ -914,6 +914,21 @@ async function routeLibs(target) {
     });
     log(wm.one === '30>90' && wm.far === null && wm.grown === ', retries', `word marks cover what differs between two lines, grow with an added argument, and are left out when the lines have little in common (${wm.one}; ${wm.grown})`);
     log(wm.pairs > 0 && wm.marked > 0 && wm.same && wm.faithful, `a removed line stands beside the line that replaces it (${wm.pairs} pairs, ${wm.marked} with marks); a line with no counterpart keeps an empty cell opposite (${wm.lone})`);
+    // Files named under Brief sections: every file of the page is reachable from the Brief, and a link opens its diff card
+    {
+      const sf = await page.evaluate(() => { const links = [...document.querySelectorAll('#part-brief .sec-files a[data-file]')]; if (!links.length) return null;
+        const named = new Set(links.map(a => a.dataset.file)), rest = document.querySelector('#part-brief .sec-files.sec-rest'), heads = [...document.querySelectorAll('#part-brief h2[id^="change-"]')];
+        const lastChange = heads[heads.length - 1], after = rest ? !!(lastChange.compareDocumentPosition(rest) & Node.DOCUMENT_POSITION_FOLLOWING) : true;
+        const next = rest && rest.nextElementSibling; return { links: links.length, all: ordered.every(p => named.has(p)), extra: [...named].filter(p => !fmap[p]).length, after, endsChanges: !rest || !next || (next.tagName === 'H2' && !/^change-/.test(next.id)), go: links[0].dataset.file }; });
+      if (sf) {
+        await page.evaluate(() => { switchPart('brief'); const a = document.querySelector('#part-brief .sec-files a[data-file]'); a.scrollIntoView({ block: 'center' }); }); await wait(300);
+        await page.click('#part-brief .sec-files a[data-file]'); await wait(900);
+        const went = await page.evaluate(p => { const c = card(p), b = c.getBoundingClientRect(); return diffActive() && b.top < innerHeight && b.bottom > 0 && (document.querySelector('.ni.on') || { dataset: {} }).dataset.p === p; }, sf.go);
+        log(sf.all && sf.extra === 0 && sf.after && sf.endsChanges && went,
+          `the Brief names every file of the page under its sections or in one list after them (${sf.links} links), and a link opens that file's card in Diff review`);
+        await page.evaluate(() => window.scrollTo(0, 0));
+      }
+    }
     // The agent's notes on diff lines: under their lines, read-only, both sides level, and never in the copied feedback
     {
       const an = await page.evaluate(() => {

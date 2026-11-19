@@ -162,7 +162,7 @@ One fragment, one scrolling page. Heading ids are fixed and the validator checks
 |---|---|---|
 | `intent` | yes | Why the change exists, in a few sentences, from the ticket, plan or commit messages |
 | `context` | yes | The mechanism the change touches and its state just before. End on the problem. A diagram goes here when it shows a structure |
-| `change-<name>` | yes, one or more | What changed. Group the sections by subsystem when there are several (`SUBSYSTEMS` line). Order them so each builds on the previous: entry point first, then what it calls. Never git order or alphabetical |
+| `change-<name>` | yes, one or more | What changed. Group the sections by subsystem when there are several (`SUBSYSTEMS` line). Order them so each builds on the previous: entry point first, then what it calls. Never git order or alphabetical. Name the files a section is about on its heading: `<h2 id="change-reporter" data-files="path/a.go, path/b.go">`, paths as in the diff, separated by commas. The build writes the links to their diff cards, lists after the last change section the files no section names, and stops on a path that is not on the page |
 | `decisions` | optional | Choices made and why, with the alternative rejected, when the plan or code records them |
 | `precedent` | optional | Where the codebase already does this, and where this differs |
 | `deploy` | optional | Migrations, settings, re-runs, other hosts or repos affected |

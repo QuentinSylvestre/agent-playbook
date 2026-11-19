@@ -294,6 +294,48 @@ def line_notes(data, kept):
     return out, bad
 
 
+CHANGE_HEAD = re.compile(r"""<h2\b(?=[^>]*\bid=["']change-[^"']+["'])([^>]*)>.*?</h2>""", re.S | re.I)
+ANY_H2 = re.compile(r"<h2\b[^>]*>", re.I)
+
+
+def brief_files(brief, paths, diff_selected):
+    """Turn the files a Brief change section names into a line of links to their diff cards.
+
+    A section names its files on its heading: <h2 id="change-x" data-files="a/b.go, c/d.py">. The build writes the
+    line under the heading, so it cannot drift from the diff: a path that is not on the page stops the build. Files
+    that no section names are listed once, after the last change section. Nothing is added when no section names a
+    file. Returns (the brief, the files no section names)."""
+    known, named, out, last, any_named = set(paths), [], [], 0, False
+    short = lambda p: "/".join(p.split("/")[-2:])
+    link = lambda p: (f'<a href="#part-diff" data-file="{html.escape(p, quote=True)}" title="{html.escape(p, quote=True)}">{html.escape(short(p))}</a>' if diff_selected
+                      else f'<code title="{html.escape(p, quote=True)}">{html.escape(short(p))}</code>')
+    end_of_changes = 0
+    for m in CHANGE_HEAD.finditer(brief):
+        attr = re.search(r"""\bdata-files=("([^"]*)"|'([^']*)')""", m.group(1))
+        out.append(brief[last:m.end()])
+        last = end_of_changes = m.end()
+        if attr is None:
+            continue
+        any_named = True
+        files = [html.unescape(p).strip() for p in (attr.group(2) if attr.group(2) is not None else attr.group(3)).split(",") if p.strip()]
+        unknown = [p for p in files if p not in known]
+        if unknown:
+            fail(f"brief.html: a change section names {', '.join(qd.safe_path(p) for p in unknown)}, which is not a file of this page. "
+                 "Write each path as the diff shows it, separated by commas. The files of this page: " + ", ".join(qd.safe_path(p) for p in paths))
+        named += files
+        if files:
+            out.append('<p class="sec-files"><span>Files:</span> ' + ", ".join(link(p) for p in dict.fromkeys(files)) + "</p>")
+    rest = [p for p in paths if p not in set(named)] if any_named else []
+    tail = brief[last:]
+    if rest:
+        # The catch-all stands where the change sections end: before the next section, or at the end of the brief.
+        nxt = ANY_H2.search(tail)
+        cut = nxt.start() if nxt else len(tail)
+        tail = (tail[:cut] + '<p class="sec-files sec-rest"><span>Changed files that no section above names:</span> '
+                + ", ".join(link(p) for p in rest) + "</p>" + tail[cut:])
+    return "".join(out) + tail, rest
+
+
 def script_json(data):
     # "<" never appears raw, so no "</script>" or "<!--" inside the data can end the script early.
     text = json.dumps(data, ensure_ascii=False, indent=1)
@@ -904,6 +946,10 @@ def main(argv=None):
              "path:side:line, or reword your own text" + hint)
 
     # Fragments
+    brief, unnamed = brief_files(brief, [path for path, _ in kept], "diff" in selected)
+    if unnamed:
+        print(f"NOTE\t{len(unnamed)} changed files are named by no Brief section and are listed after the change sections: "
+              + ", ".join(qd.safe_path(p) for p in unnamed))
     brief_out = fill_placeholders(brief, diagrams, "brief.html")
     walk_out = walkthrough_html(fill_placeholders(walkthrough, diagrams, "walkthrough.html")) if "walkthrough" in selected else ""
     maps_out, view_data = ("", [])
@@ -1131,6 +1177,21 @@ def selftest():
         case("a page without the Diff review part loads no highlighter", "highlight.min.js" not in page and "<!--@HLJS-->" not in page, "")
         rc, log, page = run("brief-diff", std)
         case("brief and diff page", rc == 0 and 'id="part-diff"' in page and "diff --git" in page, log[-300:])
+        # Files named on Brief sections
+        named_brief = os.path.join(content, "brief-files.html")
+        filed = lambda files, extra=(): (open(named_brief, "w", encoding="utf-8", newline="\n").write(SELF_BRIEF.replace("{DIAGRAM}", "").replace(
+            '<h2 id="change-api">', f'<h2 id="change-api" data-files="{files}">')), run("brief-files", ["--brief", named_brief, "--rationales", os.path.join(content, "rationales.json")] + list(extra)))[1]
+        f_rc, f_log, f_page = filed("src/api/handler.py, src/api/models.py")
+        case("a Brief section that names its files gets a line of links to their diff cards",
+             f_rc == 0 and '<p class="sec-files"><span>Files:</span> <a href="#part-diff" data-file="src/api/handler.py"' in f_page and f_page.count('class="sec-files"') == 1, f_log[-300:])
+        rest_at, verified_at = f_page.find('class="sec-files sec-rest"'), f_page.find('<h2 id="verified"')
+        case("files that no section names are listed once, where the change sections end, and the build says so",
+             0 < rest_at < verified_at and all(f_page.count(f'data-file="{p}"') == 1 for p in SELF_FILES) and "NOTE\t3 changed files are named by no Brief section" in f_log, f_log[-400:])
+        f_rc, f_log, f_page = filed("src/api/handler.py, src/api/missing.py")
+        case("a Brief section that names a file not on the page stops the build and lists the files of the page",
+             f_rc != 0 and "src/api/missing.py, which is not a file of this page" in f_log and "docs/guide.md" in f_log, f_log[-400:])
+        f_rc, f_log, f_page = filed("src/api/handler.py", ["--parts", "brief"])
+        case("without the Diff review part the files are named and not linked", f_rc == 0 and 'class="sec-files"' in f_page and "data-file=" not in f_page and "<code title=\"src/api/handler.py\">" in f_page, f_log[-300:])
         # Notes on diff lines
         note_file = os.path.join(content, "notes.json")
         noted = lambda notes: (open(note_file, "w", encoding="utf-8", newline="\n").write(json.dumps(notes)), run("notes", std + ["--notes", note_file]))[1]

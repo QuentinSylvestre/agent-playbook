@@ -228,6 +228,11 @@
   .rv .rbtn { background: rgba(63,185,80,.15); border-color: var(--add-fg); color: var(--add-fg); }
   .colbtn { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; padding: 2px 4px; transition: transform .15s; }
   .fc.iscol > .fh > .colbtn { transform: rotate(-90deg); }
+  /* The files a Brief section is about, written by the build as links to their diff cards. */
+  .sec-files { margin: -0.35rem 0 0.9rem; font-size: 0.86em; color: var(--text-light); }
+  .sec-files span { font-weight: 600; }
+  .sec-files a, .sec-files code { font-family: "Cascadia Code", Consolas, monospace; font-size: 0.93em; }
+  .sec-files.sec-rest { margin-top: 1rem; padding-top: 0.6rem; border-top: 1px dashed var(--border-strong); }
   .rat { padding: 8px 14px 6px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); }
   /* The functions a file's hunks change, with their callers. */
   .fnl { padding: 5px 14px 6px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); }
@@ -1555,7 +1560,7 @@ document.addEventListener('mousemove', e => {
 });
 document.addEventListener('mouseup', () => { OV.drag = null; });
 
-// A change summary row opens its file in Diff review.
+// A change summary row, or a file named under a Brief section, opens that file in Diff review.
 document.addEventListener('click', e => {
   const a = e.target.closest('a[data-file]');
   if (!a) return;
