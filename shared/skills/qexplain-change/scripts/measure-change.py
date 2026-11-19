@@ -150,6 +150,24 @@ def selftest():
     check(qd.hunk_functions("a.yml", "diff --git a/a.yml b/a.yml\n@@ -1 +1 @@ top:\n-a: 1\n+a: 2\n") == {"hunks": [""], "list": []}, "a language with no rule gets no label")
     check(qd.read_decl("ts", "export const load = async (id: string) => {")["call"] == "load" and qd.read_decl("go", "type Batch struct {")["call"] == ""
           and qd.read_decl("py", "    x = def_value(1)") is None, "declarations are read by keyword; a type has no callers")
+    # Hunks that hold no real edit
+    mv = ("diff --git a/m.go b/m.go\n--- a/m.go\n+++ b/m.go\n@@ -1,8 +1,4 @@\n a\n-func old() int {\n-\treturn compute(1) + compute(2)\n-}\n-\n b\n c\n d\n"
+          "@@ -20,3 +16,7 @@\n x\n y\n z\n+\n+func old() int {\n+\treturn compute(1) + compute(2)\n+}\n")
+    kinds = qd.hunk_kinds([("m.go", mv)])["m.go"]
+    check([k and k["k"] for k in kinds] == ["move", "move"] and "added at m.go:20" in kinds[0]["t"] and "removed at m.go:2" in kinds[1]["t"],
+          "a block removed in one place and added unchanged in another is a move on both sides, each naming the other")
+    check(qd.hunk_kinds([("m.go", mv.replace("+\treturn compute(1) + compute(2)", "+\treturn compute(1) + compute(3)"))]) == {}, "a moved block with one changed character is not a move")
+    mixed = mv.replace("@@ -1,8 +1,4 @@\n a\n", "@@ -1,8 +1,5 @@\n a\n+var added = true\n")
+    check([k and k["k"] for k in qd.hunk_kinds([("m.go", mixed)])["m.go"]] == [None, "move"], "a hunk that moves a block and also adds a line is not labelled; its twin still is")
+    check(qd.hunk_kinds([("s.go", "diff --git a/s.go b/s.go\n@@ -1,2 +1,2 @@\n-}\n-\n+\n+}\n")]) == {"s.go": [{"k": "space", "t": "Only spacing changes in this hunk."}]}
+          and qd.hunk_kinds([("s.go", "diff --git a/s.go b/s.go\n@@ -1,3 +1,3 @@\n a\n-x = 1\n+y = 2\n b\n")]) == {}, "two lines swapped around an empty line are spacing; a small edit is nothing")
+    sp = "diff --git a/c.yml b/c.yml\n@@ -1,4 +1,4 @@\n logging:\n-    level: info\n-    format: json\n+  level: info\n+  format: json\n end: 1\n"
+    check(qd.hunk_kinds([("c.yml", sp)])["c.yml"][0]["k"] == "space" and qd.hunk_kinds([("c.yml", sp.replace("+  format: json", "+  format: text"))]) == {},
+          "a re-indented block is spacing only; with one value changed it is not")
+    wd = "diff --git a/r.py b/r.py\n@@ -1,5 +1,5 @@\n-    listeners = set()\n+    seen_ids = set()\n     for f in frames:\n-        listeners.add(f)\n-    return len(listeners)\n+        seen_ids.add(f)\n+    return len(seen_ids)\n"
+    check(qd.hunk_kinds([("r.py", wd)])["r.py"][0] == {"k": "word", "t": 'Only "listeners" replaced by "seen_ids", on 3 lines.'}, "one word replaced by another on every changed line is a rename")
+    check(qd.hunk_kinds([("r.py", wd.replace("+    return len(seen_ids)", "+    return len(seen_ids) + 1"))]) == {} and qd.hunk_kinds([("r.py", "diff --git a/r.py b/r.py\n@@ -1 +1 @@\n-a = old\n+a = new\n")]) == {},
+          "a rename with one more edit is not a rename; neither is a single changed line")
     # Classification
     for name, want in (("pkg/test_foo.py", "test"), ("src/FooTest.java", "test"), ("web/__fixtures__/x.json", "test"),
                        ("go.sum", "generated"), ("dist/app.min.js", "generated"), ("src/latest.java", "src"), ("a.go", "src")):

@@ -373,6 +373,117 @@ def hunk_functions(path, block):
     return {"hunks": labels, "list": [{k: f[k] for k in ("kind", "name", "call", "sig")} for f in found]}
 
 
+def changed_runs(hunk):
+    """The runs of changed lines in a hunk, each {"dels": [(old line number, text)], "adds": [(new line number, text)]}.
+    Context lines separate the runs."""
+    runs, cur, old, new = [], None, hunk["old"][0], hunk["new"][0]
+    for line in hunk["lines"]:
+        mark, text = line[:1], line[1:]
+        if mark == "\\":
+            continue
+        if mark in "+-":
+            if cur is None:
+                cur = {"dels": [], "adds": []}
+                runs.append(cur)
+            if mark == "-":
+                cur["dels"].append((old, text))
+                old += 1
+            else:
+                cur["adds"].append((new, text))
+                new += 1
+        else:
+            cur = None
+            old += 1
+            new += 1
+    return runs
+
+
+def _block(lines):
+    """A run's lines as a key for exact comparison: trailing spaces and the empty lines at either end left out.
+    Returns (key, line number of the first kept line), or (None, 0) when the block is too small to mean anything."""
+    kept = [(n, t.rstrip()) for n, t in lines]
+    while kept and not kept[0][1]:
+        kept.pop(0)
+    while kept and not kept[-1][1]:
+        kept.pop()
+    full = [t for _, t in kept if t.strip()]
+    if len(full) < 2 or sum(len("".join(t.split())) for t in full) < 30:
+        return None, 0
+    return tuple(t for _, t in kept), kept[0][0]
+
+
+WORD_TOKEN = re.compile(r"[A-Za-z0-9_]+|\s+|[^A-Za-z0-9_\s]")
+
+
+def _one_swap(a, b):
+    """The (old word, new word) when line b is line a with one word replaced by another, wherever it stands; else None."""
+    ta, tb = WORD_TOKEN.findall(a), WORD_TOKEN.findall(b)
+    if len(ta) != len(tb):
+        return None
+    swaps = {(x, y) for x, y in zip(ta, tb) if x != y}
+    if len(swaps) != 1:
+        return None
+    x, y = next(iter(swaps))
+    return (x, y) if re.fullmatch(r"\w+", x) and re.fullmatch(r"\w+", y) else None
+
+
+def hunk_kinds(files):
+    """Hunks that hold no real edit, per file: {path: [None, or {"k": kind, "t": what the page says} per hunk]}.
+
+    spacing: the removed and the added text are the same once every space, tab and line end is taken out.
+    word:    every changed line is its old line with the same one word replaced by the same other word, on two
+             lines or more.
+    move:    every run of changed lines is only removed or only added, and the very same lines are added or removed
+             in another place of this change.
+    Only exact matches count. A hunk that holds anything else gets no label, so a real edit is never dressed as one."""
+    parsed = [(path, parse_hunks(block)) for path, block in files]
+    index = {}
+    for path, hunks in parsed:
+        for hunk in hunks:
+            for run in changed_runs(hunk):
+                # The other end of a move may stand right beside a real edit: its lines count as a block all the same.
+                for sign, lines in (("-", run["dels"]), ("+", run["adds"])):
+                    key, at = _block(lines)
+                    if key:
+                        index.setdefault(key, {}).setdefault(sign, []).append((path, at))
+    out = {}
+    for path, hunks in parsed:
+        kinds = []
+        for hunk in hunks:
+            runs = changed_runs(hunk)
+            dels = [t for r in runs for _, t in r["dels"]]
+            adds = [t for r in runs for _, t in r["adds"]]
+            squash = lambda lines: "".join("".join(t.split()) for t in lines)
+            kind = None
+            if runs and squash(dels) == squash(adds):
+                kind = {"k": "space", "t": "Only spacing changes in this hunk."}
+            if not kind and len(dels) >= 2 and all(len(r["dels"]) == len(r["adds"]) for r in runs):
+                swaps = {_one_swap(d, a) for r in runs for (_, d), (_, a) in zip(r["dels"], r["adds"])}
+                if len(swaps) == 1 and None not in swaps:
+                    x, y = next(iter(swaps))
+                    kind = {"k": "word", "t": f'Only "{x}" replaced by "{y}", on {len(dels)} lines.'}
+            if not kind and runs:
+                places = []
+                for run in runs:
+                    if bool(run["dels"]) == bool(run["adds"]):
+                        places = None
+                        break
+                    sign, other = ("-", "+") if run["dels"] else ("+", "-")
+                    key, _ = _block(run["dels"] or run["adds"])
+                    twin = index.get(key, {}).get(other) if key else None
+                    if not twin:
+                        places = None
+                        break
+                    places.append(("added" if sign == "-" else "removed", twin[0]))
+                if places:
+                    verb, (where, line) = places[0]
+                    kind = {"k": "move", "t": f"Moved: the same lines are {verb} at {safe_path(where)}:{line}."}
+            kinds.append(kind)
+        if any(kinds):
+            out[path] = kinds
+    return out
+
+
 def find_callers(repo, rev, call, limit=8):
     """Places where a name is called, by name alone: the tracked files of the repo (at rev, or the working tree when
     rev is None) are searched for the name as a whole word followed by an opening parenthesis. Declarations of that

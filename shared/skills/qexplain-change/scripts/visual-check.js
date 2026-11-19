@@ -907,6 +907,29 @@ async function routeLibs(target) {
     });
     log(wm.one === '30>90' && wm.far === null && wm.grown === ', retries', `word marks cover what differs between two lines, grow with an added argument, and are left out when the lines have little in common (${wm.one}; ${wm.grown})`);
     log(wm.pairs > 0 && wm.marked > 0 && wm.same && wm.faithful, `a removed line stands beside the line that replaces it (${wm.pairs} pairs, ${wm.marked} with marks); a line with no counterpart keeps an empty cell opposite (${wm.lone})`);
+    // Hunks that hold no real edit carry a label; a button hides their lines, never by default, and a jump shows them again
+    {
+      const hk = await page.evaluate(() => {
+        const K = QX.hk || {}, want = Object.values(K).reduce((s, ks) => s + ks.filter(Boolean).length, 0), b = document.getElementById('hkbtn');
+        let badges = 0, right = true, rows = 0;
+        Object.keys(K).forEach(p => { const c = card(p); c.querySelectorAll('.sp .pane:first-child tr.hunk').forEach((tr, i) => { const k = K[p][i], bd = tr.querySelector('.hkb');
+          if (!!k !== !!bd || (k && bd.title !== k.t)) right = false; if (bd) badges++; }); rows += c.querySelectorAll('.sp .pane:first-child tr.hkrow').length; });
+        const other = document.querySelectorAll('.fc tr.hkrow').length, shown = () => [...document.querySelectorAll('.fc:not(.iscol) tr.hkrow')].filter(r => r.offsetParent !== null).length;
+        const before = { hide: document.body.classList.contains('hk-hide'), shown: shown(), text: b.textContent, hidden: b.hidden };
+        document.querySelectorAll('.fc.iscol').forEach(c => toggleC(c.dataset.p, false));
+        const open = shown(); hkSet(); const after = { shown: shown(), text: b.textContent, plain: [...document.querySelectorAll('.fc tr[data-ln]:not(.hkrow)')].filter(r => r.offsetParent !== null).length };
+        const first = document.querySelector('.fc .sp .pane:nth-child(2) tr.hkrow[data-ln]'), p = first ? first.dataset.path : '';
+        return { want, badges, right, rows, other, before, open, after, kinds: Object.values(K).flat().filter(Boolean).map(k => k.k).join(','), go: first ? [p, +first.dataset.ln] : null };
+      });
+      if (hk.want) {
+        log(hk.badges === hk.want && hk.right && hk.rows > 0 && !hk.before.hide && !hk.before.hidden && hk.before.text === 'Hide moves and reformatting (' + hk.want + ')',
+          `hunks that are only a move, only spacing or one word replaced are labelled as the build found them (${hk.kinds}), and nothing is hidden to start with`);
+        log(hk.open > 0 && hk.after.shown === 0 && hk.after.plain > 0 && hk.after.text === 'Show moves and reformatting (' + hk.want + ')', `the button hides the lines of those hunks and no other line (${hk.open} lines hidden, ${hk.after.plain} still shown)`);
+        if (hk.go) { await page.evaluate(([p, ln]) => fnGo(p, ln), hk.go); await wait(300);
+          log(await page.evaluate(([p, ln]) => { const tr = card(p).querySelector('.sp .pane:nth-child(2) tr[data-ln="' + ln + '"]'); return !document.body.classList.contains('hk-hide') && tr.offsetParent !== null; }, hk.go), 'going to a line inside a hidden hunk shows the hidden lines again'); }
+        await page.evaluate(() => { hkSet(false); window.scrollTo(0, 0); });
+      }
+    }
     // The functions a file's hunks change, and their callers: shown as the build found them, with the limits said
     {
       const fn = await page.evaluate(() => {

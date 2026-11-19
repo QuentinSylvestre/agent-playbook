@@ -238,6 +238,11 @@
   .fnl a { color: var(--accent); }
   .fn-note { margin: 3px 0 0; font-size: 11px; font-style: italic; }
   .hfn { margin-left: 10px; font-style: normal; font-weight: 600; }
+  .hkb { margin-left: 10px; padding: 0 6px; border: 1px solid currentColor; border-radius: 8px; font: 600 10px/1.5 -apple-system, "Segoe UI", sans-serif; font-style: normal; white-space: nowrap; }
+  body.hk-hide tr.hkrow { display: none; }
+  body.hk-hide .hkb::after { content: ", lines hidden"; }
+  #hkbtn[hidden] { display: none; }
+  #hkbtn[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
   tr.fn-hit td { animation: cm-flash-row 0.5s 3; }
   .db.col { display: none; }
   .sp { display: grid; grid-template-columns: 1fr 1fr; }
@@ -509,6 +514,7 @@
     <div id="dfind"><input id="dsearch" type="text" placeholder="Find in the diff (f)" aria-label="Find in the diff"><span id="dcount" aria-live="polite"></span><button class="nbtn" type="button" onclick="dsGo(-1)" title="Previous match (Shift+Enter)" aria-label="Previous match" disabled>&uarr;</button><button class="nbtn" type="button" onclick="dsGo(1)" title="Next match (Enter)" aria-label="Next match" disabled>&darr;</button></div>
     <div id="navview"><button class="nvbtn on" onclick="setNavView('group', this)">Group</button><button class="nvbtn" onclick="setNavView('tree', this)">Tree</button></div>
     <div id="filter-group"></div>
+    <button class="nbtn" id="hkbtn" type="button" aria-pressed="false" onclick="hkSet()" title="Hide the lines of hunks that are only a move, only spacing, or one word replaced on every line" hidden></button>
     <div id="progress">Reviewed: <span id="rc">0</span>&thinsp;/&thinsp;<span id="tc">0</span></div>
     <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
       <button class="nbtn" onclick="navHunk(-1)">Prev hunk</button><button class="nbtn" onclick="navHunk(1)">Next hunk</button>
@@ -813,13 +819,13 @@ function parseDiff(raw) {
 // The two sides of a file's diff, row by row. A run of removed lines followed by added lines is a replacement: the
 // first removed line stands beside the first added one, and so on, each pair with its word-level marks. Lines left
 // over on either side keep an empty cell opposite.
-function splitDiff(lines, labels) {
-  const L = [], R = []; let ln = 1, rn = 1, inHunk = false, dels = [], adds = [], hunk = 0;
+function splitDiff(lines, labels, kinds) {
+  const L = [], R = []; let ln = 1, rn = 1, inHunk = false, dels = [], adds = [], hunk = 0, hk = null;
   const flush = () => {
     const k = Math.min(dels.length, adds.length);
-    for (let i = 0; i < k; i++) { const w = wordMarks(dels[i].c, adds[i].c); L.push({ t: 'del', ln: dels[i].ln, c: dels[i].c, w: w && w[0] }); R.push({ t: 'add', ln: adds[i].ln, c: adds[i].c, w: w && w[1] }); }
-    dels.slice(k).forEach(d => { L.push({ t: 'del', ln: d.ln, c: d.c }); R.push({ t: 'del', ln: '', c: '' }); });
-    adds.slice(k).forEach(a => { L.push({ t: 'add', ln: '', c: '' }); R.push({ t: 'add', ln: a.ln, c: a.c }); });
+    for (let i = 0; i < k; i++) { const w = wordMarks(dels[i].c, adds[i].c); L.push({ t: 'del', ln: dels[i].ln, c: dels[i].c, w: w && w[0], hk }); R.push({ t: 'add', ln: adds[i].ln, c: adds[i].c, w: w && w[1], hk }); }
+    dels.slice(k).forEach(d => { L.push({ t: 'del', ln: d.ln, c: d.c, hk }); R.push({ t: 'del', ln: '', c: '', hk }); });
+    adds.slice(k).forEach(a => { L.push({ t: 'add', ln: '', c: '', hk }); R.push({ t: 'add', ln: a.ln, c: a.c, hk }); });
     dels = []; adds = [];
   };
   for (const line of lines) {
@@ -828,12 +834,13 @@ function splitDiff(lines, labels) {
       const m = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
       if (m) { ln = +m[1]; rn = +m[2]; }
       inHunk = true;
-      const h = { t: 'h', ln: '', c: line, fn: (labels || [])[hunk++] || '' }; L.push(h); R.push(h); continue;      // fn: the function the hunk changes, from the build
+      hk = (kinds || [])[hunk] || null;      // hk: the hunk holds no real edit, from the build; its rows carry it too
+      const h = { t: 'h', ln: '', c: line, fn: (labels || [])[hunk++] || '', hk }; L.push(h); R.push(h); continue;      // fn: the function the hunk changes, from the build
     }
     if (!inHunk || line.startsWith('\\')) continue;
     if (line.startsWith('-')) { if (adds.length) flush(); dels.push({ ln: ln++, c: line.slice(1) }); }
     else if (line.startsWith('+')) adds.push({ ln: rn++, c: line.slice(1) });
-    else { flush(); L.push({ t: '', ln: ln++, c: line.slice(1) }); R.push({ t: '', ln: rn++, c: line.slice(1) }); }
+    else { flush(); L.push({ t: '', ln: ln++, c: line.slice(1), hk }); R.push({ t: '', ln: rn++, c: line.slice(1), hk }); }
   }
   flush();
   return { L, R };
@@ -868,10 +875,12 @@ function renderPane(rows, path) {
   let h = '<table class="dt"><colgroup><col class="lnc"><col></colgroup><tbody>';
   for (const r of rows) {
     if (r.t === 'h') {      // with a label from the build, it stands in place of the text git prints after the second @@
-      const at = r.fn && r.c.match(/^@@ [^@]+ @@/);
-      h += '<tr class="hunk"><td class="ln">&hellip;</td><td>' + (at ? esc(at[0]) + '<span class="hfn" title="Where the first change of this hunk stands">' + esc(r.fn) + '</span>' : esc(r.c)) + '</td></tr>'; continue;
+      // A hunk with no real edit says so first, where a long label cannot cut it off.
+      const at = r.c.match(/^@@ [^@]+ @@/), badge = r.hk ? '<span class="hkb" title="' + esc(r.hk.t) + '">' + (HK_NAMES[r.hk.k] || 'no real edit') + '</span>' : '';
+      const rest = !at ? esc(r.c) : esc(at[0]) + badge + (r.fn ? '<span class="hfn" title="Where the first change of this hunk stands">' + esc(r.fn) + '</span>' : esc(r.c.slice(at[0].length)));
+      h += '<tr class="hunk' + (r.hk ? ' hkh' : '') + '"><td class="ln">&hellip;</td><td>' + rest + (at ? '' : badge) + '</td></tr>'; continue;
     }
-    h += '<tr class="' + r.t + '" data-path="' + esc(path) + '"' + (r.ln !== '' ? ' data-ln="' + r.ln + '"' : '') + '>'
+    h += '<tr class="' + r.t + (r.hk ? ' hkrow' : '') + '" data-path="' + esc(path) + '"' + (r.ln !== '' ? ' data-ln="' + r.ln + '"' : '') + '>'
       + '<td class="ln">' + r.ln + '</td><td' + (r.w && r.w.length ? ' data-w="' + r.w.map(x => x.join('-')).join(',') + '"' : '') + '>' + (markedHtml(r.c, r.w) || '&nbsp;') + '</td></tr>';
   }
   return h + '</tbody></table>';
@@ -912,7 +921,7 @@ function ensureDiff() {
   document.getElementById('filter-group').innerHTML = '<button class="fbtn on" onclick="setF(\'all\',this)">All</button>'
     + GROUPS.map(g => '<button class="fbtn" onclick="setF(\'' + g.f + '\',this)">' + esc(g.label) + '</button>').join('')
     + '<button class="fbtn" onclick="setF(\'ur\',this)">Unreviewed</button>';
-  renderExcluded(); buildNav(); buildFiles(); initNavResize(); measureHeader();
+  renderExcluded(); buildNav(); buildFiles(); hkInit(); initNavResize(); measureHeader();
 }
 // Files left out of the page: their names, counts and reasons only.
 function renderExcluded() {
@@ -1086,8 +1095,26 @@ function fnGo(p, ln) {
   if (c.classList.contains('iscol')) toggleC(p, false);
   const pane = c.querySelectorAll('.sp .pane')[1], tr = pane && pane.querySelector('tr[data-ln="' + ln + '"]');
   if (!tr) { jumpTo(p); return; }
-  tr.scrollIntoView({ block: 'center' }); setActive(p);
+  hkShow(tr); tr.scrollIntoView({ block: 'center' }); setActive(p);
   tr.classList.add('fn-hit'); setTimeout(() => tr.classList.remove('fn-hit'), 1600);
+}
+// --- Hunks that hold no real edit: only a move, only spacing, or one word replaced on every line. The build decides
+// (hunk_kinds in scripts/qexplain_change_diff.py) and labels exact matches only. They are shown like any hunk; a
+// button hides their lines, and anything that goes to a line inside one shows them again.
+const HK_NAMES = { move: 'moved', space: 'spacing only', word: 'one word replaced' };
+function hkSet(hide) {
+  const b = document.getElementById('hkbtn'); if (!b) return;
+  const on = hide === undefined ? !document.body.classList.contains('hk-hide') : hide;
+  document.body.classList.toggle('hk-hide', on); b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  b.textContent = (on ? 'Show' : 'Hide') + ' moves and reformatting (' + b.dataset.n + ')';
+  if (cmReady) cmRefresh();
+  dsPaintSoon();
+}
+function hkShow(tr) { if (tr && tr.classList.contains('hkrow') && document.body.classList.contains('hk-hide')) hkSet(false); }
+function hkInit() {
+  const b = document.getElementById('hkbtn'), n = Object.values(QX.hk || {}).reduce((s, ks) => s + ks.filter(Boolean).length, 0);
+  if (!b) return;
+  b.hidden = !n; b.dataset.n = n; b.textContent = 'Hide moves and reformatting (' + n + ')';
 }
 const card = p => document.querySelector('.fc[data-p="' + CSS.escape(p) + '"]');
 const navEl = p => document.querySelector('.ni[data-p="' + CSS.escape(p) + '"]');
@@ -1291,7 +1318,7 @@ document.addEventListener('keydown', e => {
 // not the page, so a match in a collapsed file counts and opens the file when it is reached. A context line stands on
 // both sides and counts once. Matches are painted with the browser's highlight registry, which adds no element.
 let dsHits = [], dsAt = -1, dsTimer = 0, dsRaf = 0;
-function dsRows(p) { const f = fmap[p]; return f._S || (f._S = splitDiff(f.lines, ((QX.fns || {})[p] || {}).hunks)); }
+function dsRows(p) { const f = fmap[p]; return f._S || (f._S = splitDiff(f.lines, ((QX.fns || {})[p] || {}).hunks, (QX.hk || {})[p])); }
 function dsFind() {
   const q = document.getElementById('dsearch').value.toLowerCase();
   dsHits = []; dsAt = -1;
@@ -1346,6 +1373,7 @@ function dsGo(dir) {
   hlCard(c);
   const tr = c.querySelectorAll('.sp .pane')[h.k].querySelectorAll('tr')[h.i];
   if (tr) {
+    hkShow(tr);
     // A match in the cut-off end of a long line: the line is unfolded so the match can be read.
     const td = tr.querySelector('td:not(.ln)'), r = dsRange(td, h.a, h.b);
     if (r && r.getBoundingClientRect().right > td.getBoundingClientRect().right - 6) tr.querySelectorAll('td:not(.ln)').forEach(c => c.classList.add('expanded'));
@@ -2562,7 +2590,7 @@ function cmJump(c) {
     if (c.kind === 'dg' && c.tk === 'src' && node) { dgSrcOpen(node, true); dgSrcShow(node, c); anchor = node.querySelector(':scope > .dg-src') || node; }
   }
   cmFlash = c.id; cmDraw();
-  if (c.part === 'diff' && c.kind !== 'part') anchor = c._el && c._el[0];
+  if (c.part === 'diff' && c.kind !== 'part') { anchor = c._el && c._el[0]; hkShow(anchor); }
   if (anchor) anchor.scrollIntoView({ block: 'center' });
   clearTimeout(cmFlashT); cmFlashT = setTimeout(() => { cmFlash = null; cmDraw(); }, 1700);
 }

@@ -830,6 +830,8 @@ def main(argv=None):
             "patch": {path: qd.patch_hash(block) for path, block in kept} if "diff" in selected else {},
             # Per file: a label per hunk and the functions it changes, with callers found by name. See changed_functions.
             "fns": fns, "callers": callers_searched,
+            # Per file and hunk: a hunk that is only a move, only spacing or one word replaced. See qd.hunk_kinds.
+            "hk": qd.hunk_kinds(kept) if "diff" in selected else {},
         }) + ";",
     }
     for marker in ("{{TITLE}}", "<!--@PROVENANCE-->", "<!--@MERMAID-->", "<!--@BRIEF-->", "/*@DATA*/"):
