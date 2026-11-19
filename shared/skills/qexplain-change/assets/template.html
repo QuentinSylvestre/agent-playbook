@@ -160,6 +160,15 @@
   #header h1 { font-size: 14px; font-weight: 700; margin: 0; }
   #search { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 5px 10px; border-radius: 6px; width: 180px; font-size: 12px; }
   #search:focus { outline: none; border-color: var(--accent); }
+  #dfind { display: flex; align-items: center; gap: 5px; }
+  #dsearch { background: var(--bg); border: 1px solid var(--border); color: var(--text); padding: 5px 10px; border-radius: 6px; width: 170px; font-size: 12px; }
+  #dsearch:focus { outline: none; border-color: var(--accent); }
+  #dcount { min-width: 4.2rem; color: var(--muted); font-size: 11px; white-space: nowrap; }
+  #dcount.none { color: var(--del-fg); }
+  #dfind .nbtn { padding-left: 7px; padding-right: 7px; }
+  #dfind .nbtn:disabled { opacity: 0.4; cursor: default; }
+  ::highlight(ds) { background-color: #ffe066; color: #1f2328; }
+  ::highlight(ds-cur) { background-color: #ff9632; color: #1f2328; }
   #filter-group { display: flex; gap: 5px; flex-wrap: wrap; }
   .fbtn { background: var(--bg); border: 1px solid var(--border); color: var(--muted); padding: 3px 10px; border-radius: 12px; font-size: 11px; cursor: pointer; }
   .fbtn:hover, .fbtn.on { background: var(--accent); border-color: var(--accent); color: #fff; }
@@ -487,6 +496,7 @@
     <div class="hashpill" title="{{BASE_REF}}"><span>base</span><b>{{BASE_REF}}</b><button class="hcpbtn" id="hcp-base" onclick="copyRef('base')" title="Copy">copy</button></div>
     <div class="hashpill" title="{{HEAD_REF}}"><span>head</span><b>{{HEAD_REF}}</b><button class="hcpbtn" id="hcp-head" onclick="copyRef('head')" title="Copy">copy</button></div>
     <input id="search" type="text" placeholder="Filter files" oninput="filterFiles()">
+    <div id="dfind"><input id="dsearch" type="text" placeholder="Find in the diff (f)" aria-label="Find in the diff"><span id="dcount" aria-live="polite"></span><button class="nbtn" type="button" onclick="dsGo(-1)" title="Previous match (Shift+Enter)" aria-label="Previous match" disabled>&uarr;</button><button class="nbtn" type="button" onclick="dsGo(1)" title="Next match (Enter)" aria-label="Next match" disabled>&darr;</button></div>
     <div id="navview"><button class="nvbtn on" onclick="setNavView('group', this)">Group</button><button class="nvbtn" onclick="setNavView('tree', this)">Tree</button></div>
     <div id="filter-group"></div>
     <div id="progress">Reviewed: <span id="rc">0</span>&thinsp;/&thinsp;<span id="tc">0</span></div>
@@ -494,7 +504,7 @@
       <button class="nbtn" onclick="navHunk(-1)">Prev hunk</button><button class="nbtn" onclick="navHunk(1)">Next hunk</button>
       <button class="nbtn" onclick="navFile(-1)">Prev file</button><button class="nbtn" onclick="navFile(1)">Next file</button>
       <button class="nbtn" id="copy-feedback" onclick="cmCopy(this)" title="Copy every open comment as one text for an agent">Copy feedback</button>
-      <span style="color:var(--muted);font-size:11px"><span class="kbd">j/k</span> hunk <span class="kbd">J/K</span> file <span class="kbd">m</span> mark <span class="kbd">c</span> collapse</span>
+      <span style="color:var(--muted);font-size:11px"><span class="kbd">j/k</span> hunk <span class="kbd">J/K</span> file <span class="kbd">m</span> mark <span class="kbd">c</span> collapse <span class="kbd">f</span> find</span>
     </div>
   </div>
   <div id="nav"><div id="nav-inner"></div></div>
@@ -971,7 +981,7 @@ function buildFiles() {
     else if (!hasHunks) h += '<div class="file-msg">No textual diff.</div>';
     else {
       if (f.renamedFrom) h += '<div class="file-msg">Renamed from ' + esc(f.renamedFrom) + '.</div>';
-      const { L, R } = splitDiff(f.lines);
+      const { L, R } = dsRows(p);
       h += '<div class="sp"><div class="pane">' + renderPane(L, p) + '</div><div class="pane">' + renderPane(R, p) + '</div></div>';
     }
     h += '</div></div>';
@@ -1025,6 +1035,7 @@ function hlCard(c) {
       try { lines = hlLines(hljs.highlight(text, { language: lang, ignoreIllegals: true }).value); } catch (e) { return; }
       if (lines.length !== cells.length) return;
       cells.forEach((td, i) => { td.innerHTML = lines[i] || '&nbsp;'; if (td.dataset.w) hlMark(td, td.dataset.w.split(',').map(x => x.split('-').map(Number))); });
+      dsPaintSoon();      // the cells were rewritten: the search's matches are painted again
     };
     pane.querySelectorAll('tr').forEach(tr => { if (tr.classList.contains('hunk')) flush(); else if (tr.dataset.ln) run.push(tr.querySelector('td:not(.ln)')); });
     flush();
@@ -1230,9 +1241,86 @@ document.addEventListener('keydown', e => {
   else if (e.key === 'K') navFile(-1);
   else if (e.key === 'm' && cur) toggleR(cur);
   else if (e.key === 'c' && cur) toggleC(cur);
+  else if (e.key === 'f') { const box = document.getElementById('dsearch'); box.focus(); box.select(); }
   else return;
   e.preventDefault();
 });
+// --- Search inside the diff. The "f" key or a click goes to the box; Enter and Shift+Enter go to the next and the
+// previous match; Escape empties it. Ctrl+F stays the browser's own search. The search reads the lines of the diff,
+// not the page, so a match in a collapsed file counts and opens the file when it is reached. A context line stands on
+// both sides and counts once. Matches are painted with the browser's highlight registry, which adds no element.
+let dsHits = [], dsAt = -1, dsTimer = 0, dsRaf = 0;
+function dsRows(p) { const f = fmap[p]; return f._S || (f._S = splitDiff(f.lines)); }
+function dsFind() {
+  const q = document.getElementById('dsearch').value.toLowerCase();
+  dsHits = []; dsAt = -1;
+  if (q) ordered.forEach(p => {
+    if (!fmap[p].lines.some(l => l.startsWith('@@')) || fmap[p].binary) return;
+    const S = dsRows(p);
+    S.L.forEach((l, i) => [l, S.R[i]].forEach((r, k) => {
+      if (r.t === 'h' || r.ln === '' || (k === 1 && r.t === '')) return;
+      const s = r.c.toLowerCase();
+      for (let at = s.indexOf(q); at >= 0; at = s.indexOf(q, at + q.length)) dsHits.push({ p, k, i, a: at, b: at + q.length, both: r.t === '' });
+    }));
+  });
+  dsPaint(); dsCount();
+}
+function dsCount() {
+  const el = document.getElementById('dcount'), q = document.getElementById('dsearch').value, n = dsHits.length;
+  el.textContent = !q ? '' : !n ? 'No match' : dsAt < 0 ? n + ' match' + (n === 1 ? '' : 'es') : (dsAt + 1) + ' of ' + n;
+  el.classList.toggle('none', !!q && !n);
+  document.querySelectorAll('#dfind .nbtn').forEach(b => { b.disabled = !n; });
+}
+// The stretch of a cell's text between two character positions, whatever spans the colours and the marks put in it.
+function dsRange(td, a, b) {
+  const w = document.createTreeWalker(td, NodeFilter.SHOW_TEXT), r = document.createRange(); let n, at = 0, begun = false;
+  while ((n = w.nextNode())) {
+    const end = at + n.data.length;
+    if (!begun && a < end) { r.setStart(n, a - at); begun = true; }
+    if (begun && b <= end) { r.setEnd(n, b - at); return r; }
+    at = end;
+  }
+  return null;
+}
+function dsPaint() {
+  if (!window.Highlight || !CSS.highlights) return;
+  const rows = {}, cell = (p, k, i) => {
+    const key = p + '\n' + k; if (!rows[key]) { const c = card(p), pane = c && c.querySelectorAll('.sp .pane')[k]; rows[key] = pane ? pane.querySelectorAll('tr') : []; }
+    return rows[key][i] ? rows[key][i].querySelector('td:not(.ln)') : null;
+  };
+  const all = [], cur = [];
+  dsHits.slice(0, 3000).forEach((h, n) => (h.both ? [0, 1] : [h.k]).forEach(k => {
+    const td = cell(h.p, k, h.i), r = td && dsRange(td, h.a, h.b);
+    if (r) (n === dsAt ? cur : all).push(r);
+  }));
+  CSS.highlights.set('ds', new Highlight(...all)); CSS.highlights.set('ds-cur', new Highlight(...cur));
+}
+function dsPaintSoon() { if (dsHits.length && !dsRaf) dsRaf = requestAnimationFrame(() => { dsRaf = 0; dsPaint(); }); }
+function dsGo(dir) {
+  const n = dsHits.length; if (!n) return;
+  dsAt = dsAt < 0 ? (dir > 0 ? 0 : n - 1) : (dsAt + dir + n) % n;
+  const h = dsHits[dsAt], c = card(h.p);
+  if (c.classList.contains('hide')) { document.getElementById('search').value = ''; setF('all', document.querySelector('.fbtn')); }
+  if (c.classList.contains('iscol')) toggleC(h.p, false);
+  hlCard(c);
+  const tr = c.querySelectorAll('.sp .pane')[h.k].querySelectorAll('tr')[h.i];
+  if (tr) {
+    // A match in the cut-off end of a long line: the line is unfolded so the match can be read.
+    const td = tr.querySelector('td:not(.ln)'), r = dsRange(td, h.a, h.b);
+    if (r && r.getBoundingClientRect().right > td.getBoundingClientRect().right - 6) tr.querySelectorAll('td:not(.ln)').forEach(c => c.classList.add('expanded'));
+    tr.scrollIntoView({ block: 'center' });
+  }
+  setActive(h.p); dsPaint(); dsCount();
+}
+function dsInit() {
+  const box = document.getElementById('dsearch'); if (!box) return;
+  box.addEventListener('input', () => { clearTimeout(dsTimer); dsTimer = setTimeout(dsFind, 150); });
+  box.addEventListener('keydown', e => {
+    if (e.key === 'Enter') { e.preventDefault(); clearTimeout(dsTimer); if (dsAt < 0) dsFind(); dsGo(e.shiftKey ? -1 : 1); }
+    else if (e.key === 'Escape') { e.preventDefault(); clearTimeout(dsTimer); box.value = ''; dsFind(); box.blur(); }
+  });
+}
+dsInit();
 let scrollRaf = null;
 window.addEventListener('scroll', () => { if (!scrollRaf) scrollRaf = requestAnimationFrame(() => { scrollRaf = null; syncNavToScroll(); }); }, { passive: true });
 window.addEventListener('resize', () => { if (diffActive()) measureHeader(); });

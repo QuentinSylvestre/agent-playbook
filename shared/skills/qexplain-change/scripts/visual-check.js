@@ -907,6 +907,36 @@ async function routeLibs(target) {
     });
     log(wm.one === '30>90' && wm.far === null && wm.grown === ', retries', `word marks cover what differs between two lines, grow with an added argument, and are left out when the lines have little in common (${wm.one}; ${wm.grown})`);
     log(wm.pairs > 0 && wm.marked > 0 && wm.same && wm.faithful, `a removed line stands beside the line that replaces it (${wm.pairs} pairs, ${wm.marked} with marks); a line with no counterpart keeps an empty cell opposite (${wm.lone})`);
+    // Search inside the diff: "f" goes to the box, the count is exact, Enter walks the matches and opens a collapsed file
+    {
+      const word = await page.evaluate(() => { const count = q => ordered.reduce((n, p) => { let inH = false; fmap[p].lines.forEach(l => { if (l.startsWith('@@')) { inH = true; return; } if (!inH || !/^[-+ ]/.test(l)) return;
+          const s = l.slice(1).toLowerCase(); for (let at = s.indexOf(q); at >= 0; at = s.indexOf(q, at + q.length)) n++; }); return n; }, 0);
+        const q = ['listener', 'return', 'batch', 'the'].find(w => count(w) > 2) || ''; return { q, n: q ? count(q) : 0 }; });
+      if (word.q) {
+        const ctrl = await page.evaluate(() => document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'f', ctrlKey: true, bubbles: true, cancelable: true })) && document.activeElement.id !== 'dsearch');
+        await page.evaluate(() => { document.activeElement.blur(); window.scrollTo(0, 0); }); await page.keyboard.press('f'); await wait(150);
+        const focused = await page.evaluate(() => document.activeElement.id === 'dsearch');
+        await page.keyboard.type(word.q.toUpperCase()); await wait(400);
+        const ds = () => page.evaluate(() => { const cur = CSS.highlights.get('ds-cur'), r = cur && [...cur][0], b = r ? r.getBoundingClientRect() : null;
+          return { count: document.getElementById('dcount').textContent, all: (CSS.highlights.get('ds') || { size: 0 }).size, cur: cur ? cur.size : 0, text: r ? r.toString() : '', seen: !!b && b.top > 0 && b.bottom < innerHeight && b.width > 0, at: dsAt, n: dsHits.length,
+            col: dsAt >= 0 ? card(dsHits[dsAt].p).classList.contains('iscol') : null }; });
+        const typed = await ds();
+        await page.keyboard.press('Enter'); await wait(400); const first = await ds();
+        await page.evaluate(() => toggleC(dsHits[dsHits.length - 1].p, true)); await page.keyboard.press('Shift+Enter'); await wait(400); const last = await ds();
+        log(ctrl && focused && typed.count === word.n + ' matches' && typed.n === word.n && typed.all >= word.n && first.count === '1 of ' + word.n && first.cur >= 1 && first.text.toLowerCase() === word.q && first.seen,
+          `Ctrl+F is left to the browser; "f" goes to the diff search; "${word.q}" in capitals finds all ${word.n} matches counted in the raw diff; Enter goes to the first and shows it (${typed.count}, ${first.count})`);
+        log(last.count === word.n + ' of ' + word.n && last.col === false && last.seen && last.text.toLowerCase() === word.q, `Shift+Enter from the first match wraps to the last, and a collapsed file opens to show it (${last.count})`);
+        // every match can be read once it is reached, also one that stood in the cut-off end of a long line
+        let unread = 0, unfolded = 0;
+        for (let i = 0; i < word.n; i++) { await page.keyboard.press('Enter'); await wait(120); const s = await page.evaluate(() => { const r = [...CSS.highlights.get('ds-cur')][0], b = r.getBoundingClientRect(), td = r.startContainer.parentElement.closest('td'), t = td.getBoundingClientRect();
+          return { ok: b.width > 0 && b.left >= t.left - 1 && b.right <= t.right + 1 && b.top > 0 && b.bottom < innerHeight, open: td.classList.contains('expanded') }; }); if (!s.ok) unread++; if (s.open) unfolded++; }
+        log(unread === 0, `each of the ${word.n} matches stands inside its cell and on screen when it is reached; ${unfolded} long lines were unfolded for that`);
+        await page.keyboard.press('Escape'); await wait(300); const gone = await ds();
+        await page.evaluate(() => { document.getElementById('dsearch').value = 'zz-no-such-text'; dsFind(); }); const none = await ds();
+        await page.evaluate(() => { document.getElementById('dsearch').value = ''; dsFind(); window.scrollTo(0, 0); });
+        log(gone.count === '' && gone.all === 0 && gone.cur === 0 && none.count === 'No match', 'Escape empties the search and removes its marks; a text that is not in the diff says "No match"');
+      }
+    }
     // Syntax colours: applied when the highlighter is there, the text and the word marks unchanged; plain without it
     await wait(1200);
     const hl = await page.evaluate(() => {
