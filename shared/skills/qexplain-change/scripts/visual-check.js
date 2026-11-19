@@ -891,6 +891,22 @@ async function routeLibs(target) {
       log(vis > 0 && vis < info.files, `type filter narrows ${info.files} files to ${vis}`);
       await filters[0].click();
     }
+    // A removed line stands beside the line that replaces it, and the words that differ are marked
+    const wm = await page.evaluate(() => {
+      const one = wordMarks('  timeout: 30 # seconds', '  timeout: 90 # seconds'), far = wordMarks('return nil', 'x := compute(batch, now)'), grown = wordMarks('send(batch)', 'send(batch, retries)');
+      const cut = (s, r) => r.map(([a, b]) => s.slice(a, b)).join('|');
+      const cards = [...document.querySelectorAll('.fc')].map(c => { const P = c.querySelectorAll('.sp .pane'); return P.length === 2 ? [[...P[0].querySelectorAll('tr')], [...P[1].querySelectorAll('tr')]] : null; }).filter(Boolean);
+      let pairs = 0, marked = 0, same = cards.every(([l, r]) => l.length === r.length), faithful = true, lone = 0;
+      cards.forEach(([l, r]) => l.forEach((row, i) => {
+        const o = r[i], lt = row.querySelector('td:not(.ln)'), rt = o.querySelector('td:not(.ln)');
+        if (row.classList.contains('del') && o.classList.contains('add')) { pairs++; if (lt.querySelector('.wm') || rt.querySelector('.wm')) marked++; if (!row.dataset.ln || !o.dataset.ln) faithful = false; }
+        else if (row.classList.contains('del') || row.classList.contains('add')) { lone++; if (!!row.dataset.ln === !!o.dataset.ln) faithful = false; }      // exactly one side holds a line
+      }));
+      const p = fmap[ordered.find(x => /@@/.test(fmap[x].lines.join('\n')))], raw = p.lines.filter(x => /^[-+ ]/.test(x) && !/^(---|\+\+\+) /.test(x)).length;
+      return { one: one ? cut('  timeout: 30 # seconds', one[0]) + '>' + cut('  timeout: 90 # seconds', one[1]) : 'null', far, grown: grown ? cut('send(batch, retries)', grown[1]) : 'null', pairs, marked, same, faithful, lone };
+    });
+    log(wm.one === '30>90' && wm.far === null && wm.grown === ', retries', `word marks cover what differs between two lines, grow with an added argument, and are left out when the lines have little in common (${wm.one}; ${wm.grown})`);
+    log(wm.pairs > 0 && wm.marked > 0 && wm.same && wm.faithful, `a removed line stands beside the line that replaces it (${wm.pairs} pairs, ${wm.marked} with marks); a line with no counterpart keeps an empty cell opposite (${wm.lone})`);
     const addRow = await page.$('.fc:not(.iscol) tr.add td:not(.ln)');
     if (addRow) {
       const addBg = await addRow.evaluate(t => getComputedStyle(t).backgroundColor);
