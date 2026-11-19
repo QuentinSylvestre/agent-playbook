@@ -207,8 +207,6 @@
   .colbtn { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; padding: 2px 4px; transition: transform .15s; }
   .fc.iscol > .fh > .colbtn { transform: rotate(-90deg); }
   .rat { padding: 8px 14px 6px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); }
-  .notearea { background: transparent; border: none; border-bottom: 1px dashed var(--border); color: var(--text); font-size: 11px; width: 100%; resize: vertical; padding: 5px 14px; font-family: inherit; min-height: 26px; }
-  .notearea:focus { outline: none; border-bottom-color: var(--accent); }
   .db.col { display: none; }
   .sp { display: grid; grid-template-columns: 1fr 1fr; }
   .pane { overflow-x: auto; }
@@ -277,12 +275,20 @@
   .cm-tag { flex: none; border: 1px solid var(--border-strong); border-radius: 8px; padding: 0 6px; font-size: 10.5px; white-space: nowrap; }
   .cm-it-t { white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0; }
   .cm-it-a { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
-  .cm-it-a button, .cm-ph button { padding: 2px 9px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--btn-bg); color: var(--text); font-size: 11.5px; cursor: pointer; }
-  .cm-it-a button:hover, .cm-ph button:hover { border-color: #b26a00; }
+  .cm-it-a button, .cm-ph button, .cm-pf button { padding: 2px 9px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--btn-bg); color: var(--text); font-size: 11.5px; cursor: pointer; }
+  .cm-it-a button:hover, .cm-ph button:hover, .cm-pf button:hover { border-color: #b26a00; }
   .cm-it-a .cm-del { color: #c0392b; }
-  .cm-it-a .cm-save { background: #b26a00; border-color: #8a5200; color: #fff; }
+  .cm-it-a .cm-save, .cm-pf .cm-save { background: #b26a00; border-color: #8a5200; color: #fff; }
   .cm-it textarea { display: block; width: 100%; min-height: 70px; resize: vertical; font: inherit; margin: 6px 0; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface); color: var(--text); }
   .cm-it textarea:focus { outline: 2px solid #d68f00; outline-offset: 0; }
+  .cm-labs { display: flex; gap: 4px; flex-wrap: wrap; margin-top: 6px; }
+  .cm-lab { padding: 1px 8px; border: 1px solid var(--border-strong); border-radius: 10px; background: transparent; color: var(--text-light); font-size: 11px; cursor: pointer; }
+  .cm-lab:hover { border-color: #0969da; }
+  .cm-lab.on { background: #0969da; border-color: #0969da; color: #fff; }
+  .cm-tag.cm-tag-l { border-color: #0969da; color: #0969da; }
+  .cm-pf { display: flex; gap: 6px; justify-content: flex-end; padding: 8px 12px; border-top: 1px solid var(--border); }
+  .cm-prev { flex: none; max-height: 45%; overflow: auto; margin: 0; padding: 8px 12px; border-top: 1px solid var(--border); background: var(--bg); font: 11px/1.45 "Cascadia Code", Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+  .cm-prev[hidden] { display: none; }
   .cm-res summary { cursor: pointer; color: var(--text-light); margin: 12px 2px 8px; }
   .cm-res .cm-it { opacity: 0.78; cursor: default; }
   .cm-empty { color: var(--text-light); padding: 12px 4px; }
@@ -377,7 +383,7 @@
     <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
       <button class="nbtn" onclick="navHunk(-1)">Prev hunk</button><button class="nbtn" onclick="navHunk(1)">Next hunk</button>
       <button class="nbtn" onclick="navFile(-1)">Prev file</button><button class="nbtn" onclick="navFile(1)">Next file</button>
-      <button class="nbtn" id="copy-notes" onclick="copyNotes()">Copy notes</button>
+      <button class="nbtn" id="copy-feedback" onclick="cmCopy(this)" title="Copy every open comment as one text for an agent">Copy feedback</button>
       <span style="color:var(--muted);font-size:11px"><span class="kbd">j/k</span> hunk <span class="kbd">J/K</span> file <span class="kbd">m</span> mark <span class="kbd">c</span> collapse</span>
     </div>
   </div>
@@ -733,15 +739,6 @@ function renderExcluded() {
   document.getElementById('excluded-note').innerHTML = '<div class="callout"><strong>Left out of this page.</strong> Review these yourself in a terminal. If a path starts with a repo label, leave the label out there.<ul>'
     + items.map(x => '<li><code style="overflow-wrap:anywhere">' + esc(x.path) + '</code> +' + x.add + ' -' + x.del + ' (' + esc(x.reason || 'left out') + ')</li>').join('') + '</ul></div>';
 }
-// Copies every file note as Markdown, ready to paste into a merge request or a follow-up list.
-function copyNotes() {
-  const noted = ordered.filter(p => (ST[p + '__n'] || '').trim());
-  if (!noted.length) { showToast('No notes yet'); return; }
-  const reviewed = ordered.filter(p => ST[p]).length;
-  const lines = ['# Review notes: ' + baseTitle, '', 'Base: ' + QX.base + '. Head: ' + QX.head + '. Reviewed ' + reviewed + ' of ' + ordered.length + ' files.', ''];
-  noted.forEach(p => lines.push('- `' + p + '`' + (ST[p] ? ' (reviewed)' : '') + ': ' + ST[p + '__n'].trim().replace(/\n/g, '\n  ')));
-  copyText(lines.join('\n') + '\n', 'Copied notes on ' + noted.length + ' files', document.getElementById('copy-notes'));
-}
 function setNavView(v, btn) {
   navMode = v;
   document.querySelectorAll('.nvbtn').forEach(b => b.classList.toggle('on', b === btn));
@@ -799,7 +796,6 @@ function buildFiles() {
       + '<button class="cbtn" type="button" title="Comment on this file" aria-label="Comment on this file" onclick="event.stopPropagation();cmFile(\'' + q + '\')">' + CM_ICON + '</button>'
       + '<button class="rbtn" onclick="event.stopPropagation();toggleR(\'' + q + '\')">' + (rv ? 'Reviewed' : 'Mark reviewed') + '</button></div>'
       + '<div class="rat">' + esc(QX.rationales[p] || 'No rationale recorded.') + '</div>'
-      + '<textarea class="notearea" placeholder="Add a file note" oninput="ST[\'' + q + '__n\']=this.value;saveS()">' + esc(ST[p + '__n'] || '') + '</textarea>'
       + '<div class="db' + (col ? ' col' : '') + '">';
     const hasHunks = f.lines.some(l => l.startsWith('@@'));
     if (f.binary) h += '<div class="file-msg">Binary file. No textual diff.</div>';
@@ -935,12 +931,12 @@ function showCopyBox(text) {
   t.value = text; box.hidden = false; t.focus(); t.select();
 }
 function closeCopyBox() { document.getElementById('copybox').hidden = true; }
-function copyText(text, msg, btn) {
+function copyText(text, msg, btn, quietMsg) {
   const done = () => {
     if (btn) { btn.classList.add('copied'); setTimeout(() => btn.classList.remove('copied'), 1500); }
     showToast(msg);
   };
-  const fallback = () => { if (copyLegacy(text)) done(); else showCopyBox(text); };
+  const fallback = () => { if (copyLegacy(text)) done(); else if (quietMsg) showToast(quietMsg); else showCopyBox(text); };
   let p = null;
   try { p = navigator.clipboard && navigator.clipboard.writeText ? navigator.clipboard.writeText(text) : null; } catch (e) { p = null; }
   if (p && p.then) p.then(done, fallback); else fallback();
@@ -1206,7 +1202,7 @@ function cmDrawParts() {
 // edited, resolved or deleted there. A resolved comment leaves the page and the numbering and waits in a closed group.
 // The comment on the explanation as a whole is written from the panel.
 const CM_PANEL_KEY = 'qexplain-change-panel';
-let cmEdit = null, cmEditText = null, cmFlash = null, cmFlashT = null, cmLastOn = null;
+let cmEdit = null, cmEditText = null, cmEditLab = null, cmFlash = null, cmFlashT = null, cmLastOn = null;
 function cmKeys(ta, save, escape) {
   ta.addEventListener('keydown', e => {
     e.stopPropagation();
@@ -1220,13 +1216,84 @@ function cmKeys(ta, save, escape) {
 }
 function cmExcerpt(s, n) { s = String(s || '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n - 3) + '...' : s; }
 // Where a comment stands, in words a reader and an agent can both follow.
-function cmWhere(c) {
+function cmWhere(c, bare) {
   if (c.part === 'page') return 'The whole explanation';
   if (c.kind === 'part') return cmPartName(c.part) + ', the whole part';
   if (c.part === 'diff') return cmDiffTitle(c);
   const el = c._el && !Array.isArray(c._el) ? c._el : null;
   const what = el ? cmBlockName(el).replace(/^./, m => m.toLowerCase()) + ' ' : '';
-  return cmPartName(c.part) + (c.section ? ' > ' + c.section : '') + ': ' + what + '"' + cmExcerpt(c.quote, 70) + '"';
+  return cmPartName(c.part) + (c.section ? ' > ' + c.section : '') + (bare ? (what ? ', ' + what.trim() : '') : ': ' + what + '"' + cmExcerpt(c.quote, 70) + '"');
+}
+// --- Copy feedback: every open comment as one text an agent can act on. A label, chosen with one click, adds a fixed
+// instruction. The text is copied after every change to the comments, and the panel can show it before it is copied.
+const CM_LABELS = [
+  ['fix', 'Fix', 'Change this as asked.'],
+  ['question', 'Question', 'Answer the question. Change the page only if the answer shows that it is wrong.'],
+  ['wrong', 'Wrong', 'Check this against the code, then correct it or show why it is right.'],
+  ['unclear', 'Unclear', 'Rewrite this so that it is plain on a first read.'],
+  ['cut', 'Cut', 'Remove this, or say why it should stay.'],
+];
+const CM_ASK = 'Reply to every numbered comment with its number and one of: addressed, deferred, rejected, and one line on what you changed or why. Rebuild the explanation page if anything changed.';
+function cmLabel(k) { return CM_LABELS.find(l => l[0] === k) || null; }
+function cmLabsHtml(cur) {
+  return '<div class="cm-labs" role="group" aria-label="Label">' + CM_LABELS.map(l => '<button type="button" class="cm-lab' + (l[0] === cur ? ' on' : '') + '" data-lab="' + l[0]
+    + '" aria-pressed="' + (l[0] === cur) + '" title="' + esc(l[2]) + '">' + l[1] + '</button>').join('') + '</div>';
+}
+function cmLabOf(root) { const b = root.querySelector('.cm-lab.on'); return b ? b.dataset.lab : ''; }
+function cmLabsWire(root) {
+  root.addEventListener('click', e => {
+    const b = e.target.closest('.cm-lab'); if (!b) return;
+    const on = !b.classList.contains('on');
+    b.parentElement.querySelectorAll('.cm-lab').forEach(x => { x.classList.remove('on'); x.setAttribute('aria-pressed', 'false'); });
+    if (on) { b.classList.add('on'); b.setAttribute('aria-pressed', 'true'); }
+    const ta = b.closest('.cm-card, .cm-it').querySelector('textarea'); if (ta) ta.focus();
+  });
+}
+function cmFeedback() {
+  const open = CM.items.filter(c => c.state !== 'resolved').sort((x, y) => x._n - y._n);
+  if (!open.length) return '';
+  const L = ['Feedback on the change explanation "' + baseTitle + '"'], path = pagePath(), used = [];
+  if (path) L.push('Page: ' + path);
+  L.push('Explanation id: ' + PAGE_ID + (QX.base && QX.head ? '. Range: ' + QX.base + ' to ' + QX.head + '.' : '.'), '');
+  const ind = s => String(s).replace(/\n/g, '\n   ');
+  open.forEach(c => {
+    const lab = cmLabel(c.label); if (lab && !used.includes(lab)) used.push(lab);
+    L.push(c._n + '. ' + (lab ? '[' + lab[1] + '] ' : '') + cmWhere(c, true)
+      + (!c._pieces ? ' (not found on the page as it is now; what it was about follows)' : c._state === 'moved' ? ' (this has moved since the comment was written)' : ''));
+    if (c.part === 'diff' && c.kind === 'line') {
+      if (c.quote) L.push('   Selected: "' + cmExcerpt(c.quote, 400) + '"');
+      c.lines.slice(0, 12).forEach(t => L.push('   | ' + t));
+      if (c.lines.length > 12) L.push('   | ... (' + (c.lines.length - 12) + ' more lines)');
+    } else if (c.quote) L.push('   Quote: "' + cmExcerpt(c.quote, 400) + '"');
+    L.push('   Comment: ' + ind(c.text), '');
+  });
+  if (used.length) { L.push('Labels:'); CM_LABELS.filter(l => used.includes(l)).forEach(l => L.push('- ' + l[1] + ': ' + l[2])); L.push(''); }
+  L.push(CM_ASK);
+  return L.join('\n') + '\n';
+}
+function cmOpenCount() { return CM.items.filter(c => c.state !== 'resolved').length; }
+function cmCopy(btn) {
+  const text = cmFeedback();
+  if (!text) { showToast('No open comments to copy'); return; }
+  copyText(text, 'Copied feedback: ' + cmOpenCount() + ' comment' + (cmOpenCount() === 1 ? '' : 's'), btn);
+}
+// After a change to the comments the clipboard is brought up to date. A refusal is said in the toast, never in a box.
+function cmAutoCopy(what) {
+  const text = cmFeedback();
+  if (!text) { showToast(what); return; }
+  copyText(text, what + '. Feedback copied (' + cmOpenCount() + ')', null, what + '. Not copied: use Copy feedback');
+}
+// Notes written in the old per-file note box become file comments, once.
+function cmAdoptNotes() {
+  let n = 0;
+  Object.keys(ST).filter(k => k.slice(-3) === '__n').forEach(k => {
+    const text = String(ST[k] || '').trim(), path = k.slice(0, -3); delete ST[k]; n++;
+    if (!text) return;
+    const c = CM.items.find(x => x.part === 'diff' && x.kind === 'file' && x.path === path);
+    if (c) c.text += '\n' + text;
+    else CM.items.push({ id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), kind: 'file', part: 'diff', path, quote: '', text, label: '', t: Date.now(), state: 'open' });
+  });
+  if (n) { lsSet(STORE_KEY, JSON.stringify(ST)); cmSave(); }
 }
 function cmPanelOpen() { return document.body.classList.contains('cm-open'); }
 function cmPanel(open) {
@@ -1234,17 +1301,17 @@ function cmPanel(open) {
   document.getElementById('cm-panel').hidden = !open;
   document.getElementById('cm-panel-btn').setAttribute('aria-expanded', open ? 'true' : 'false');
   lsSet(CM_PANEL_KEY, open ? '1' : '0');
-  if (!open) { cmEdit = null; cmEditText = null; }
+  if (!open) { cmEdit = null; cmEditText = cmEditLab = null; }
   cmDrawPanel(); fitTools(); if (diffActive()) measureHeader(); cmRefresh();
 }
 function cmChanged() { cmSave(); cmResolve(); cmDraw(); cmDrawPanel(); }
 function cmItemHtml(c) {
   const done = c.state === 'resolved', lost = !done && !c._pieces, editing = cmEdit === c.id;
   let h = '<div class="cm-it' + (lost ? ' cm-it-lost' : '') + '" data-cid="' + esc(c.id) + '"><div class="cm-it-h">'
-    + (c._n ? '<span class="cm-num">' + c._n + '</span>' : '') + '<span class="cm-it-w">' + esc(cmWhere(c)) + '</span>'
+    + (c._n ? '<span class="cm-num">' + c._n + '</span>' : '') + '<span class="cm-it-w">' + esc(cmWhere(c)) + '</span>' + (cmLabel(c.label) ? '<span class="cm-tag cm-tag-l">' + cmLabel(c.label)[1] + '</span>' : '')
     + (lost ? '<span class="cm-tag" title="The text this comment was about is no longer on the page, or stands in more than one place">not found</span>'
       : c._state === 'moved' ? '<span class="cm-tag" title="The text this comment was about now stands in another place">moved</span>' : '') + '</div>';
-  if (editing) return h + '<textarea class="cm-it-ta" aria-label="Comment">' + esc(cmEditText !== null ? cmEditText : c.text) + '</textarea>'
+  if (editing) return h + '<textarea class="cm-it-ta" aria-label="Comment">' + esc(cmEditText !== null ? cmEditText : c.text) + '</textarea>' + cmLabsHtml(cmEditLab !== null ? cmEditLab : c.label || '')
     + '<div class="cm-it-a"><button type="button" data-act="cancel">Cancel</button><button type="button" class="cm-save" data-act="save">Save</button></div></div>';
   return h + '<div class="cm-it-t">' + esc(c.text) + '</div><div class="cm-it-a">'
     + (done ? '<button type="button" data-act="reopen">Reopen</button>' : '<button type="button" data-act="edit">Edit</button><button type="button" data-act="resolve">Resolve</button>')
@@ -1256,10 +1323,10 @@ function cmDrawPanel() {
   fitTools();
   if (!cmPanelOpen()) return;
   const list = document.querySelector('#cm-panel .cm-pl'), was = list.querySelector('.cm-it-ta'), wasOpen = !!(list.querySelector('.cm-res') || {}).open;
-  if (was) cmEditText = was.value;
+  if (was) { cmEditText = was.value; cmEditLab = cmLabOf(list); }
   let h = '';
   if (cmEdit === 'new') h += '<div class="cm-it" data-cid="new"><div class="cm-it-h"><span class="cm-it-w">The whole explanation</span></div>'
-    + '<textarea class="cm-it-ta" aria-label="Comment" placeholder="Your comment on the explanation as a whole">' + esc(cmEditText || '') + '</textarea>'
+    + '<textarea class="cm-it-ta" aria-label="Comment" placeholder="Your comment on the explanation as a whole">' + esc(cmEditText || '') + '</textarea>' + cmLabsHtml(cmEditLab || '')
     + '<div class="cm-it-a"><button type="button" data-act="cancel">Cancel</button><button type="button" class="cm-save" data-act="save">Save</button></div></div>';
   h += open.map(cmItemHtml).join('');
   if (!open.length && cmEdit !== 'new') h += '<div class="cm-empty">No open comments. Select text, point at a paragraph, a table cell or a diff line, or press / to comment on the part that is showing.</div>';
@@ -1271,6 +1338,7 @@ function cmDrawPanel() {
     cmKeys(ta, () => cmPanelAct('save', id), () => { const c = CM.items.find(x => x.id === id); if (ta.value.trim() === (c ? c.text : '')) cmPanelAct('cancel', id); });
     if (!was) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
   }
+  document.querySelector('#cm-panel .cm-prev').textContent = cmFeedback() || 'Nothing to copy: there are no open comments.';
   cmLastOn = null; cmPanelMark();
 }
 // Marks the comment whose box is open, without redrawing the list (a redraw would lose what is being typed in it).
@@ -1287,20 +1355,20 @@ function cmPanelAct(act, id) {
   const c = CM.items.find(x => x.id === id), list = document.querySelector('#cm-panel .cm-pl'), ta = list.querySelector('.cm-it-ta');
   if (act === 'new' || act === 'edit') {
     if (ta && ta.value.trim() !== (cmEdit === 'new' ? '' : (CM.items.find(x => x.id === cmEdit) || {}).text)) { ta.focus(); return; }   // finish the one in hand first
-    cmEdit = act === 'new' ? 'new' : id; cmEditText = null; if (ta) ta.remove(); cmDrawPanel(); return;
+    cmEdit = act === 'new' ? 'new' : id; cmEditText = cmEditLab = null; if (ta) ta.remove(); cmDrawPanel(); return;
   }
-  if (act === 'cancel') { cmEdit = null; cmEditText = null; if (ta) ta.remove(); cmDrawPanel(); return; }
+  if (act === 'cancel') { cmEdit = null; cmEditText = cmEditLab = null; if (ta) ta.remove(); cmDrawPanel(); return; }
   if (act === 'save') {
     const text = ta ? ta.value.trim() : ''; if (!text) { if (ta) ta.focus(); return; }
-    if (id === 'new') CM.items.push({ id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), kind: 'page', part: 'page', quote: '', text, t: Date.now(), state: 'open' });
-    else if (c) c.text = text;
-    cmEdit = null; cmEditText = null; ta.remove(); cmChanged(); showToast('Comment saved'); return;
+    if (id === 'new') CM.items.push({ id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), kind: 'page', part: 'page', quote: '', text, label: cmLabOf(list), t: Date.now(), state: 'open' });
+    else if (c) { c.text = text; c.label = cmLabOf(list); }
+    cmEdit = null; cmEditText = cmEditLab = null; ta.remove(); cmChanged(); cmAutoCopy('Comment saved'); return;
   }
   if (!c) return;
   if (cmActive === c.id) cmClose();
-  if (act === 'resolve') { c.state = 'resolved'; cmChanged(); showToast('Comment resolved'); }
-  else if (act === 'reopen') { c.state = 'open'; cmChanged(); showToast('Comment reopened'); }
-  else if (act === 'del') { CM.items = CM.items.filter(x => x !== c); if (cmEdit === c.id) { cmEdit = null; cmEditText = null; } cmChanged(); showToast('Comment deleted'); }
+  if (act === 'resolve') { c.state = 'resolved'; cmChanged(); cmAutoCopy('Comment resolved'); }
+  else if (act === 'reopen') { c.state = 'open'; cmChanged(); cmAutoCopy('Comment reopened'); }
+  else if (act === 'del') { CM.items = CM.items.filter(x => x !== c); if (cmEdit === c.id) { cmEdit = null; cmEditText = cmEditLab = null; } cmChanged(); cmAutoCopy('Comment deleted'); }
 }
 // Goes to what a comment is about: its part, its sub-tab or its file, then the place itself, which flashes.
 function cmJump(c) {
@@ -1329,12 +1397,16 @@ function cmJump(c) {
 function cmPanelInit() {
   const p = document.createElement('aside'); p.id = 'cm-panel'; p.hidden = true; p.setAttribute('aria-label', 'Comments');
   p.innerHTML = '<div class="cm-ph"><strong>Comments</strong><button type="button" data-act="new" title="Comment on the explanation as a whole">General comment</button>'
-    + '<button type="button" data-act="close" title="Close the list">Close</button></div><div class="cm-pl"></div>';
-  document.body.appendChild(p);
+    + '<button type="button" data-act="close" title="Close the list">Close</button></div><div class="cm-pl"></div><div class="cm-prev" hidden></div>'
+    + '<div class="cm-pf"><button type="button" data-act="preview" aria-expanded="false" title="Show the exact text that will be copied">Preview</button>'
+    + '<button type="button" class="cm-save" data-act="copy" title="Copy every open comment as one text for an agent">Copy feedback</button></div>';
+  document.body.appendChild(p); cmLabsWire(p);
   p.addEventListener('click', e => {
     const b = e.target.closest('button[data-act]'), it = e.target.closest('.cm-it');
+    if (b && b.dataset.act === 'copy') { cmCopy(b); return; }
+    if (b && b.dataset.act === 'preview') { const v = p.querySelector('.cm-prev'); v.hidden = !v.hidden; b.setAttribute('aria-expanded', v.hidden ? 'false' : 'true'); return; }
     if (b) { if (b.dataset.act === 'close') cmPanel(false); else cmPanelAct(b.dataset.act, it ? it.dataset.cid : 'new'); return; }
-    if (!it || e.target.closest('textarea, summary') || it.closest('.cm-res') || (document.getSelection() || '').toString()) return;
+    if (!it || e.target.closest('textarea, summary, .cm-labs') || it.closest('.cm-res') || (document.getSelection() || '').toString()) return;
     cmJump(CM.items.find(x => x.id === it.dataset.cid));
   });
   if (lsGet(CM_PANEL_KEY) === '1') cmPanel(true); else cmDrawPanel();
@@ -1599,13 +1671,14 @@ function cmOpen(target) {
   const el = (c ? c._el : target.sel.el) || null;
   card.querySelector('.cm-k').textContent = src.kind === 'part' ? cmPartTitle(src.part) : src.part === 'diff' ? cmDiffTitle(src) : el ? cmBlockName(el) : '';
   const ta = card.querySelector('.cm-text'); ta.value = first;
-  const dirty = () => ta.value.trim() !== first.trim();
+  ta.insertAdjacentHTML('afterend', cmLabsHtml(c ? c.label || '' : '')); cmLabsWire(card);
+  const lab = () => cmLabOf(card), dirty = () => ta.value.trim() !== first.trim() || lab() !== (c ? c.label || '' : '');
   const save = () => {
     const text = ta.value.trim();
     if (!text) { cmNudge(); ta.focus(); return; }
-    if (c) c.text = text;
+    if (c) { c.text = text; c.label = lab(); }
     else {
-      const s = target.sel, base = { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text, t: Date.now(), state: 'open' };
+      const s = target.sel, base = { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text, label: lab(), t: Date.now(), state: 'open' };
       CM.items.push(Object.assign(base, s.kind === 'part' ? { kind: 'part', part: s.part, quote: '' } : s.part === 'diff'
         ? { kind: s.kind, part: 'diff', path: s.path, side: s.side, ln: s.ln, ln2: s.ln2, lines: s.lines, quote: s.quote }
         : { kind: s.el ? 'block' : 'text', tag: s.el && s.el.tagName === 'TABLE' ? 'table' : undefined, part: s.part, section: s.section, quote: s.quote, prefix: s.prefix, suffix: s.suffix }));
@@ -1613,13 +1686,13 @@ function cmOpen(target) {
     cmSave(); cmResolve(); cmDraw(); cmClose(); cmDrawPanel();
     const sel = document.getSelection(); if (sel) sel.removeAllRanges();
     const saved = c || CM.items[CM.items.length - 1];
-    showToast(saved._pieces ? 'Comment ' + saved._n + ' saved' : 'Comment saved');
+    cmAutoCopy(saved._n ? 'Comment ' + saved._n + ' saved' : 'Comment saved');
   };
   cmKeys(ta, save, () => { if (dirty()) cmNudge(); else cmClose(); });
   card.querySelector('.cm-save').addEventListener('click', save);
   card.querySelector('.cm-cancel').addEventListener('click', cmClose);
   if (c) card.querySelector('.cm-del').addEventListener('click', () => {
-    CM.items = CM.items.filter(x => x !== c); cmSave(); cmResolve(); cmDraw(); cmClose(); cmDrawPanel(); showToast('Comment deleted');
+    CM.items = CM.items.filter(x => x !== c); cmSave(); cmResolve(); cmDraw(); cmClose(); cmDrawPanel(); cmAutoCopy('Comment deleted');
   });
   card._dirty = dirty;
   document.body.appendChild(card); cmCard = card;
@@ -1639,6 +1712,7 @@ function cmOpen(target) {
 let cmReady = false;
 function cmInit() {
   cmReady = true;
+  cmAdoptNotes();
   cmResolve(); cmDraw(); cmPanelInit();
   if (window.ResizeObserver) { const ro = new ResizeObserver(cmRefresh); cmRoots().forEach(r => ro.observe(r.root)); }
   window.addEventListener('resize', cmRefresh);

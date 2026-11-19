@@ -34,7 +34,7 @@
  *      counts; state survives a reload under qexplain-change-diff-<slug>; j and m work; a
  *      type filter narrows the list; added rows are coloured; clicking a cell wraps
  *      and unwraps it; tree view shows directories; the sidebar resizes, persists,
- *      and resets on double-click; both hash pills copy; Copy notes exports a note with
+ *      and resets on double-click; both hash pills copy; Copy feedback replaces the note box, with
  *      its file path; every file left out is named. A summary row opens its file here.
  *   7. At 390px wide no part scrolls the page sideways. No page errors.
  *
@@ -223,6 +223,37 @@ async function routeLibs(target) {
   await page.evaluate(() => { document.querySelector('.cm-card .cm-cancel').click(); CM.items = []; cmChanged(); cmPanel(false); });
   log(await page.evaluate(() => { const tools = document.getElementById('top-tools').getBoundingClientRect(), last = [...document.querySelectorAll('.part-btn')].pop().getBoundingClientRect();
     return getComputedStyle(document.getElementById('top-tools')).position !== 'fixed' || last.right <= tools.left; }), 'the part buttons stay clear of the tools with the comment button added');
+  // Copy feedback: labels, the automatic copy, the preview, the button, and old notes turned into file comments
+  const clip = async () => (await page.evaluate(() => navigator.clipboard.readText().catch(() => ''))).replace(/\r\n/g, '\n');   // Windows hands the clipboard back with CRLF
+  const quotedF = await selectProse(); await wait(250); await page.click('#cm-add'); await wait(150);
+  await page.click('.cm-card .cm-lab[data-lab="question"]'); await page.keyboard.type('why?'); await page.keyboard.press('Shift+Enter'); await page.keyboard.type('second'); await page.keyboard.press('Enter'); await wait(400);
+  const auto = await clip();
+  log(auto.startsWith('Feedback on the change explanation "') && /\nPage: .+\.html\n/.test(auto) && auto.includes('\nExplanation id: ') && /\n1\. \[Question\] \S/.test(auto) && auto.includes('\n   Quote: "' + quotedF + '"\n')
+    && auto.includes('\n   Comment: why?\n   second\n') && auto.includes('\nLabels:\n- Question: ') && auto.trimEnd().endsWith(await page.evaluate(() => CM_ASK)),
+    'saving a comment copies the feedback: page path, numbered comment with label, quote and text, the label instruction, the closing request');
+  await page.click('#cm-panel-btn'); await wait(250); await page.click('#cm-panel [data-act="preview"]'); await wait(150);
+  log(await page.evaluate(a => { const v = document.querySelector('#cm-panel .cm-prev'); return !v.hidden && v.textContent === a && v.getBoundingClientRect().height > 40; }, auto), 'the preview shows the exact text that is copied');
+  await page.evaluate(() => { const c = CM.items[0]; document.querySelector('#cm-panel .cm-it[data-cid="' + c.id + '"] [data-act="edit"]').click(); }); await wait(150);
+  await page.click('#cm-panel .cm-lab[data-lab="fix"]'); await page.keyboard.press('Enter'); await wait(400);
+  log(await page.evaluate(() => CM.items[0].label === 'fix' && document.querySelector('#cm-panel .cm-tag-l').textContent === 'Fix' && document.querySelector('#cm-panel .cm-prev').textContent.includes('1. [Fix] ')
+    && !document.querySelector('#cm-panel .cm-prev').textContent.includes('Question')) && (await clip()).includes('1. [Fix] '), 'a label changed in the panel shows on the comment, in the preview and in the copied text');
+  await page.evaluate(() => navigator.clipboard.writeText('x')); await page.click('#cm-panel [data-act="copy"]'); await wait(300);
+  log(await clip() === await page.evaluate(() => document.querySelector('#cm-panel .cm-prev').textContent), 'Copy feedback copies the text the preview shows');
+  const lineFb = await page.evaluate(() => { const p = ordered[0], rows = cmDiffSide(p, 'new'); if (rows.length < 2) return null;
+    CM.items.push({ id: 'cl', kind: 'line', part: 'diff', path: p, side: 'new', ln: rows[0].ln, ln2: rows[1].ln, lines: [rows[0].c, rows[1].c], quote: '', text: 'two lines', label: '', t: 5, state: 'open' });
+    CM.items.push({ id: 'cf', kind: 'file', part: 'diff', path: p, quote: '', text: 'the file', label: '', t: 6, state: 'open' });
+    CM.items.push({ id: 'cg', kind: 'text', part: PART_KEYS[0], section: '', quote: 'text that is not on the page', prefix: '', suffix: '', text: 'lost', label: '', t: 7, state: 'open' });
+    cmChanged(); const f = cmFeedback();
+    return { f, file: '. File ' + p + '\n   Comment: the file', line: '. ' + p + ', lines ' + rows[0].ln + ' to ' + rows[1].ln + ', new side\n   | ' + rows[0].c + '\n   | ' + rows[1].c + '\n   Comment: two lines' }; });
+  if (lineFb) log(lineFb.f.includes(lineFb.file) && lineFb.f.includes(lineFb.line) && lineFb.f.indexOf(lineFb.file) < lineFb.f.indexOf(lineFb.line) && /\(not found on the page as it is now[^\n]*\n   Quote: "text that is not on the page"/.test(lineFb.f),
+    'the copied text names a file, quotes diff lines with their numbers, and says when a comment is no longer found');
+  await page.evaluate(() => { CM.items.forEach(c => { c.state = 'resolved'; }); cmChanged(); });
+  log(await page.evaluate(() => cmFeedback() === '' && document.querySelector('#cm-panel .cm-prev').textContent.startsWith('Nothing to copy')), 'resolved comments are left out of the copied text');
+  await page.evaluate(() => { CM.items = []; cmSave(); const ST2 = JSON.parse(localStorage.getItem(STORE_KEY) || '{}'); ST2[ordered[0] + '__n'] = 'an old note'; localStorage.setItem(STORE_KEY, JSON.stringify(ST2)); });
+  await page.reload(); await wait(1200);
+  log(await page.evaluate(() => { const c = CM.items[0]; return CM.items.length === 1 && c.kind === 'file' && c.path === ordered[0] && c.text === 'an old note' && c._n === 1
+    && !Object.keys(JSON.parse(localStorage.getItem(STORE_KEY))).some(k => k.slice(-3) === '__n'); }), 'a note from the old per-file note box becomes a file comment, once');
+  await page.evaluate(() => { CM.items = []; cmChanged(); cmPanel(false); });
   // Comments on a whole paragraph or table cell, without selecting text
   const pAt = await page.evaluate(() => {
     const p = [...document.querySelectorAll('#part-brief .page p')].find(x => x.textContent.trim().length > 60 && cmBlockOf(x) === x);
@@ -512,17 +543,7 @@ async function routeLibs(target) {
         'the file header button comments on the file and leaves the card open');
       await page.evaluate(() => { CM.items = []; cmSave(); cmResolve(); cmDraw(); });
     }
-    const noteText = 'visual-check note';
-    await page.evaluate(() => { const b = document.querySelector('.fbtn'); if (b) b.click(); });
-    const noteBox = await page.$('.fc:not(.iscol):not(.hide) .notearea');
-    if (noteBox) {
-      await noteBox.fill(noteText);
-      await page.click('#copy-notes'); await wait(200);
-      const notes = await page.evaluate(() => navigator.clipboard.readText().catch(() => ''));
-      const cardPath = await noteBox.evaluate(t => t.closest('.fc').dataset.p);
-      log(notes.includes(noteText) && notes.includes(cardPath), 'Copy notes exports the note with its file path');
-      await noteBox.fill('');
-    } else log(false, 'Copy notes: no open file card to write a note on');
+    log(await page.evaluate(() => !document.querySelector('.notearea') && !document.getElementById('copy-notes') && !!document.getElementById('copy-feedback')), 'the per-file note box and Copy notes are replaced by Copy feedback');
     const leftOut = await page.evaluate(() => (QX.excluded || []).length);
     if (leftOut) log(await page.$$eval('#excluded-note li', n => n.length) === leftOut, `Diff review names all ${leftOut} files left out`);
   }
