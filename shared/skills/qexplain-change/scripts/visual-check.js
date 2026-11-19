@@ -473,6 +473,49 @@ async function routeLibs(target) {
       const kept = !s.ask && s.drawn.includes('EDITED');
       await page.click('#' + sq.id + ' .dg-src-h [data-s="reset"]'); await wait(2200); s = await srcState(sq.id);
       log(kept && !s.ed && !s.marked && s.text === sq.src && !s.drawn.includes('EDITED') && await page.evaluate(() => cmFeedback() === ''), '"Keep my edit" applies it; Reset puts the original back and removes the edit');
+      // A reworked diagram: a comment follows its part by its place, is never moved to a neighbour, and stays visible when it is lost
+      const addDg = (pid, text) => page.evaluate(([id, pid, text]) => { const dg = document.getElementById(id), part = cmDgParts(dg).find(x => x.id === pid); if (!part) return false; const c = cmDgSel(dg, part);
+        CM.items.push({ id: 'vc' + Date.now().toString(36) + CM.items.length, text, label: '', t: Date.now(), state: 'open', kind: 'dg', part: c.part, dname: c.dname, dn: c.dn, tk: c.tk, did: c.did, dlabel: c.dlabel, dwhat: c.dwhat, dends: c.dends, dsrc: c.dsrc, dpos: c.dpos, quote: '' });
+        cmChanged(); return true; }, [sq.id, pid, text]);
+      const dgC = text => page.evaluate(text => { const c = CM.items.find(x => x.text === text); return c ? { st: c._state, did: c._did || '', where: c._pieces ? cmWhere(c, true) : '' } : { st: 'none', did: '', where: '' }; }, text);
+      const dropC = () => page.evaluate(() => { CM.items = CM.items.filter(x => !/^vc /.test(x.text)); cmChanged(); });
+      const chipOf = () => page.evaluate(id => { const b = document.querySelector('#' + id + ' .cm-dglost'); return b && !b.hidden ? b.textContent : ''; }, sq.id);
+      const lines = sq.src.split('\n'), li = lines.findIndex(l => l.includes(sq.msg) && /-[->)x]/.test(l));
+      const withLine = f => lines.map((l, i) => i === li ? f(l) : l).filter(l => l !== null).join('\n');
+      if (li >= 0 && await addDg('message:' + sq.msg, 'vc follows')) {
+        await typeSrc(sq.id, withLine(l => l.replace(sq.msg, sq.msg + ' REWORDED'))); await wait(2200);
+        let c = await dgC('vc follows'); s = await srcState(sq.id);
+        log(c.st === 'moved' && c.where.includes('"' + sq.msg + ' REWORDED" (was "' + sq.msg + '")') && !/no longer/.test(s.st) && await chipOf() === '',
+          `a sequence message reworded in the source keeps its comment, named as it reads now with its old wording: ${c.st} ${c.where.slice(0, 110)}`);
+        await typeSrc(sq.id, withLine(() => null)); await wait(2200); c = await dgC('vc follows'); s = await srcState(sq.id);
+        log(!!s.ed && s.ed.bad === '' && c.st === 'notfound' && /With this edit, 1 comment on the diagram no longer finds its part\. Reset brings it back\./.test(s.st) && await chipOf() === '1 not placed',
+          `an edit that removes a commented part says so in the editor, and the diagram counts the comment as not placed: ${s.st.slice(0, 120)}`);
+        await page.click('#' + sq.id + ' .cm-dglost'); await wait(300);
+        log(await page.evaluate(() => cmPanelOpen() && document.querySelectorAll('#cm-panel .cm-it.cm-it-lost.cm-it-flash').length === 1), 'a click on "not placed" opens the panel on the comment that lost its part');
+        await page.evaluate(() => cmPanel(false)); await dropC();
+        await typeSrc(sq.id, withLine(l => l + '\n' + l.replace(sq.msg, sq.msg + ' TWIN'))); await wait(2200);
+        const twinOk = await addDg('message:' + sq.msg, 'vc sibling');
+        await typeSrc(sq.id, withLine(l => l.replace(sq.msg, sq.msg + ' TWIN'))); await wait(2200);       // the commented message is gone, the one beside it stays
+        const gone = await dgC('vc sibling');
+        await typeSrc(sq.id, withLine(l => l.replace(sq.msg, sq.msg + ' REWORDED') + '\n' + l.replace(sq.msg, sq.msg + ' TWIN'))); await wait(2200);
+        const back = await dgC('vc sibling');
+        log(twinOk && gone.st === 'notfound' && back.st === 'moved' && back.did === 'message:' + sq.msg + ' REWORDED',
+          `a deleted message is not taken for the one that stood beside it; reworded among unchanged neighbours it is found again (${gone.st}, ${back.st} ${back.did})`);
+        await dropC();
+        await typeSrc(sq.id, 'flowchart LR\n  a[Alpha] --> b[Beta]\n  a --> c[Gamma]'); await wait(2200);
+        const nodeOk = await addDg('b', 'vc node');
+        await typeSrc(sq.id, 'flowchart LR\n  a[Alpha] --> b2[Beta two]\n  a --> c[Gamma]'); await wait(2200);
+        const n1 = await dgC('vc node'), keep = await page.evaluate(() => cmFeedback());
+        await typeSrc(sq.id, 'flowchart LR\n  a[Alpha] --> c[Gamma]'); await wait(2200);
+        const n2 = await dgC('vc node');
+        log(nodeOk && n1.st === 'moved' && n1.did === 'b2' && n2.st === 'notfound',
+          `a flowchart node whose id and label both changed is found by its neighbours; a deleted node is not taken for a neighbour that was already there (${n1.st} ${n1.did}, ${n2.st})`);
+        log(keep.includes('keep the ids below unless a comment asks you to remove the part:\n- Diagram "' + sq.name + '" (Mermaid): b2\n') && keep.trimEnd().endsWith(await page.evaluate(() => CM_ASK)),
+          'the copied text lists the ids a rework should keep, before the closing request');
+        await dropC();
+        await page.click('#' + sq.id + ' .dg-src-h [data-s="reset"]'); await wait(2200);
+        log(await page.evaluate(() => cmFeedback() === '') && await chipOf() === '', 'after Reset and with the comments removed, nothing is left to copy and nothing is counted as not placed');
+      }
       await page.click('#' + sq.id + ' .dg-src [data-s="close"]'); await wait(200);
     }
     await page.evaluate(() => switchPart(PART_KEYS[0], true)); await wait(400);

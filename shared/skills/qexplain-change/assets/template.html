@@ -276,6 +276,8 @@
   .cm-it:hover { border-color: #d68f00; }
   .cm-it.cm-it-on { border-color: #0969da; box-shadow: 0 0 0 1px #0969da; }
   .cm-it.cm-it-lost { cursor: default; border-style: dashed; }
+  .cm-it.cm-it-lost.cm-it-go { cursor: pointer; }
+  .cm-it.cm-it-flash { border-color: #d68f00; box-shadow: 0 0 0 2px #d68f00; }
   .cm-it-h { display: flex; gap: 7px; align-items: flex-start; font-size: 11.5px; color: var(--text-light); overflow-wrap: anywhere; }
   .cm-it-w { flex: 1; min-width: 0; }
   .cm-num { flex: none; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: #b26a00; color: #fff; font: 600 10.5px/18px -apple-system, "Segoe UI", sans-serif; text-align: center; }
@@ -293,6 +295,9 @@
   .cm-dgbtn { display: flex; align-items: center; justify-content: center; width: 26px; height: 22px; padding: 0; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface); color: var(--text-light); cursor: pointer; }
   .cm-dgbtn:hover { border-color: #b26a00; color: #b26a00; }
   .cm-dgbtn[aria-pressed="true"] { background: #0969da; border-color: #0969da; color: #fff; }
+  .cm-dglost { height: 20px; padding: 0 8px; border: 1px dashed #b26a00; border-radius: 10px; background: var(--surface); color: #b26a00; font: 600 11px/1 -apple-system, "Segoe UI", sans-serif; white-space: nowrap; cursor: pointer; }
+  .cm-dglost:hover { border-style: solid; }
+  .cm-dglost[hidden] { display: none; }
   .cm-dgtip { display: none; position: absolute; right: 0; bottom: 100%; margin-bottom: 4px; padding: 1px 9px; border-radius: 10px; background: #0969da; color: #fff; font-size: 11px; line-height: 1.6; white-space: nowrap; }
   .dg.cm-mode > .cm-dgtip { display: block; }
   .dg.cm-mode .dgv, .dg.cm-mode .mmd, .dg.cm-mode .cm-ovv { cursor: crosshair; }
@@ -304,6 +309,7 @@
   .dg-src-h { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 5px 8px; border-bottom: 1px solid var(--border); font-size: 12px; }
   .dg-src-st { flex: 1; min-width: 12rem; color: var(--text-light); }
   .dg-src-st.bad { color: #c0392b; }
+  .dg-src-st.warn { color: #b26a00; }
   .dg-src-ask { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--border); background: rgba(214, 143, 0, 0.13); font-size: 12px; }
   .dg-src-ask[hidden] { display: none; }
   .dg-src textarea { display: block; width: 100%; min-height: 9.5rem; resize: vertical; border: none; border-radius: 0 0 4px 4px; padding: 8px 10px; background: var(--bg); color: var(--text); font: 12px/1.55 "Cascadia Code", Consolas, monospace; white-space: pre; overflow: auto; tab-size: 2; font-variant-ligatures: none; }   /* no ligatures: "-->" must read as it is typed */
@@ -367,7 +373,7 @@
   .cm-sw:focus-visible { outline: 2px solid #ffd166; outline-offset: 2px; }
   #theme-toggle { display: inline-flex; align-items: center; justify-content: center; height: 1.65rem; padding: 0 0.5rem; }
   body.cm-off .cm-layer, body.cm-off #cm-add, body.cm-off .cm-badd, body.cm-off #cm-hint, body.cm-off .cm-tadd, body.cm-off .cm-tmark, body.cm-off .cbtn, body.cm-off .cm-fmark,
-  body.cm-off .cm-dgbtn, body.cm-off .cm-dgl, body.cm-off .cm-dmark, body.cm-off #cm-panel-btn, body.cm-off #cm-panel, body.cm-off #copy-feedback { display: none !important; }
+  body.cm-off .cm-dgbtn, body.cm-off .cm-dglost, body.cm-off .cm-dgl, body.cm-off .cm-dmark, body.cm-off #cm-panel-btn, body.cm-off #cm-panel, body.cm-off #copy-feedback { display: none !important; }
   body.cm-off tr.cm-dl td, body.cm-off tr.cm-dl td.ln { box-shadow: none; }
   .part-btn.cm-on { box-shadow: inset 0 0 0 2px rgba(9, 105, 218, 0.55); border-radius: 4px 4px 0 0; }
   .fh.cm-fh-on { box-shadow: inset 3px 0 0 rgba(9, 105, 218, 0.9); }
@@ -1392,6 +1398,7 @@ function cmDgLabel(dg, id) {
 function cmHash(s) { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return (h >>> 0).toString(36); }
 function cmMmParts(dg) {
   const svg = dg.querySelector('.mmd svg, .cm-ovv svg'); if (!svg) return [];
+  const host = svg.closest('.mmd'); if (host && !host.dataset.theme) return [];      // an edited source not drawn again yet: the drawing is the old one
   const out = [], seen = {}, txt = e => e.textContent.replace(/\s+/g, ' ').trim();
   const key = (kind, t) => { const k = kind + ':' + t; seen[k] = (seen[k] || 0) + 1; return seen[k] > 1 ? k + ' #' + seen[k] : k; };
   svg.querySelectorAll('g.node').forEach(g => { const m = /-flowchart-(.+)-\d+$/.exec(g.id || ''); if (m) out.push({ id: m[1], g, edge: false, what: 'node', label: txt(g) || m[1] }); });
@@ -1410,6 +1417,63 @@ function cmMmParts(dg) {
   svg.querySelectorAll('text.noteText').forEach(t => out.push({ id: key('note', txt(t)), g: t, edge: false, what: 'note', label: txt(t) }));
   return out;
 }
+// --- The place of a part, kept with a comment. A part whose id and label both changed is still found by where it
+// stands: a sequence message by its sender, its receiver and its rank among the messages between those two, when every
+// other message between them reads as before; a flowchart node by its neighbours and a connection by its ends, when
+// the part that fits carries an id the diagram did not have before. A part found this way is shown as moved. Messages
+// are read from the source text, so the answer is the same before and after the diagram is drawn.
+function cmSeq(src) {
+  const out = [], norm = s => s.replace(/<br\s*\/?>/gi, ' ').replace(/\s+/g, ' ').trim();
+  String(src || '').split('\n').forEach(l => {
+    const m = /^\s*(.+?)\s*(?:<<-->>|<<->>|--?>>|--?>|--?x|--?\))\s*[+-]?\s*(.+?)\s*:\s*(.*)$/.exec(l);
+    if (m && !/^\s*(%%|note\b|participant\b|actor\b|title\b)/i.test(l)) out.push({ a: m[1], b: m[2], text: norm(m[3]) });
+  });
+  return out;
+}
+function cmSeqId(msgs, i) { const t = msgs[i].text, n = msgs.slice(0, i + 1).filter(m => m.text === t).length; return 'message:' + t + (n > 1 ? ' #' + n : ''); }
+function cmMmNb(parts, id) {
+  const lab = x => (parts.find(n => n.what === 'node' && n.id === x) || {}).label || x;
+  return parts.filter(p => p.ends && (p.ends[0] === id || p.ends[1] === id)).map(p => p.ends[0] === id ? ['out', p.ends[1], lab(p.ends[1])] : ['in', p.ends[0], lab(p.ends[0])]);
+}
+function cmDgPos(dg, part) {
+  const info = cmDgInfo(dg._src || dg); if (info.kind !== 'mermaid' || !part) return null;
+  if (part.what === 'message') {
+    const msgs = cmSeq(QX.mermaid[info.mid]), i = msgs.findIndex((m, j) => cmSeqId(msgs, j) === part.id); if (i < 0) return null;
+    const pair = msgs.filter(m => m.a === msgs[i].a && m.b === msgs[i].b);
+    return { a: msgs[i].a, b: msgs[i].b, k: pair.indexOf(msgs[i]), t: pair.map(m => m.text) };
+  }
+  const parts = cmMmParts(dg), nodes = parts.filter(p => p.what === 'node');
+  if (part.what === 'node') return { ids: nodes.map(n => n.id), nb: cmMmNb(parts, part.id) };
+  if (part.what === 'connection' && part.ends) return { ids: nodes.map(n => n.id), el: part.ends.map(x => (nodes.find(n => n.id === x) || {}).label || x) };
+  return null;
+}
+// [its id now, 'moved', its label now], or null.
+function cmMmPos(src, p, parts) {
+  const q = p.dpos; if (!q) return null;
+  if (p.dwhat === 'message') {
+    if (!q.t) return null;
+    const msgs = cmSeq(src), pair = msgs.filter(m => m.a === q.a && m.b === q.b);
+    // Same number of messages between the two, every other one unchanged, and this one reworded: nothing else counts.
+    if (pair.length !== q.t.length || !pair[q.k] || pair.some((m, i) => (i === q.k) === (m.text === q.t[i]))) return null;
+    const id = cmSeqId(msgs, msgs.indexOf(pair[q.k]));
+    return !parts.length || parts.some(x => x.id === id) ? [id, 'moved', pair[q.k].text] : null;
+  }
+  if (!parts.length || !q.ids) return null;
+  const nodes = parts.filter(x => x.what === 'node'), edges = parts.filter(x => x.ends), isNew = id => !q.ids.includes(id);
+  if (p.dwhat === 'node') {
+    if (!q.nb || !q.nb.length) return null;
+    const fits = n => { const nb = cmMmNb(parts, n.id); return nb.length === q.nb.length && q.nb.every(o => nb.some(c => c[0] === o[0] && (c[1] === o[1] || c[2] === o[2]))); };
+    const c = nodes.filter(n => isNew(n.id) && fits(n));
+    return c.length === 1 ? [c[0].id, 'moved', c[0].label] : null;
+  }
+  if (p.dwhat === 'connection' && p.dends && q.el) {
+    const end = i => { const same = nodes.filter(n => n.label === q.el[i]); return nodes.find(n => n.id === p.dends[i]) || (same.length === 1 ? same[0] : null); };
+    const A = end(0), B = end(1);
+    const c = edges.filter(e => A && B ? e.ends[0] === A.id && e.ends[1] === B.id : A ? e.ends[0] === A.id && isNew(e.ends[1]) : B ? e.ends[1] === B.id && isNew(e.ends[0]) : false);
+    return c.length === 1 ? [c[0].id, 'moved', c[0].label] : null;
+  }
+  return null;
+}
 function cmMmRe(id) { return new RegExp('(^|[^\\w-])' + String(id).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^\\w-]|$)'); }
 function cmMmInSrc(src, c) {
   if (c.dwhat === 'node') return cmMmRe(c.did).test(src);
@@ -1423,8 +1487,8 @@ function cmMmLine(c) {
   const lines = (QX.mermaid[info.mid] || '').split('\n');
   let i = -1;
   if (c.dwhat === 'node') i = lines.findIndex(l => cmMmRe(c._did || c.did).test(l));
-  else if (c.dwhat === 'connection') i = c.dends ? lines.findIndex(l => cmMmRe(c.dends[0]).test(l) && cmMmRe(c.dends[1]).test(l)) : -1;
-  else i = lines.findIndex(l => l.includes(c.dlabel));
+  else if (c.dwhat === 'connection') { const ends = c._dends || c.dends; i = ends ? lines.findIndex(l => cmMmRe(ends[0]).test(l) && cmMmRe(ends[1]).test(l)) : -1; }
+  else i = lines.findIndex(l => l.includes(c._dlabel || c.dlabel));
   return i < 0 ? '' : 'Source line ' + (i + 1) + ': ' + lines[i].trim();
 }
 // A part known by its text is named by that text alone; a part with an id is named by its label and its id.
@@ -1439,11 +1503,20 @@ function cmDgTitle(s) {
   }
   const id = s._did || s.did, what = s.dwhat || (s.tk === 'edge' ? 'connection' : 'node');
   // A part known by its text is named by that text alone; a part with an id is named by its label and its id.
-  const lab = /^(message|participant|note)$/.test(what) ? '"' + s.dlabel + '"' : s.dlabel && s.dlabel !== id ? '"' + s.dlabel + '" (' + id + ')' : id;
-  return what.charAt(0).toUpperCase() + what.slice(1) + ' ' + lab + ' in ' + d;
+  // A part found again under another wording is named as it reads now, with what it read when the comment was written.
+  const now = s._dlabel || s.dlabel, was = s._dlabel && s.dlabel && s._dlabel !== s.dlabel ? ' (was "' + s.dlabel + '")' : '';
+  const lab = /^(message|participant|note)$/.test(what) ? '"' + now + '"' : now && now !== id ? '"' + now + '" (' + id + ')' : id;
+  return what.charAt(0).toUpperCase() + what.slice(1) + ' ' + lab + was + ' in ' + d;
 }
 function cmResolveDg(c) {
   const dg = cmDgOf(c); if (!dg) return;
+  const info = cmDgInfo(dg);
+  c._dlabel = ''; c._dends = null;
+  cmResolveDg1(c, dg);
+  // Whether the comment finds its part in the diagram as built: an edit in the source editor is measured against this.
+  if (info.kind === 'mermaid' && QX.mermaid[info.mid] === QX.mermaid0[info.mid]) c._ok0 = !!c._pieces;
+}
+function cmResolveDg1(c, dg) {
   const e = CMX[c.part], nx = e ? e.ix.nodes.find(n => dg.compareDocumentPosition(n.node) & Node.DOCUMENT_POSITION_FOLLOWING) : null;
   // Diagrams are not part of the indexed text, so a diagram comment takes its place from the first text after its diagram.
   const place = state => { c._pieces = []; c._dg = dg; c._state = state; c._at = nx ? nx.start - 0.5 : (e ? e.ix.text.length : 0); };
@@ -1455,7 +1528,9 @@ function cmResolveDg(c) {
     place(c._lost || got.some(g => g[1] === 'moved') ? 'moved' : 'anchored'); return;
   }
   const got = cmDgFind(dg, c, c.dsrc);
-  if (got) { c._did = got[0]; place(got[1]); }
+  if (!got) return;
+  const part = cmDgInfo(dg).kind === 'mermaid' ? cmMmParts(dg).find(x => x.id === got[0]) : null;
+  c._did = got[0]; c._dlabel = part ? part.label : got[2] || ''; c._dends = (part && part.ends) || null; place(got[1]);
 }
 // One part of a diagram, looked up again: [its id now, 'anchored' or 'moved'], or null when it is not found.
 function cmDgFind(dg, p, dsrc) {
@@ -1463,10 +1538,10 @@ function cmDgFind(dg, p, dsrc) {
   if (info.kind === 'mermaid') {
     const parts = cmMmParts(dg), src = QX.mermaid[info.mid] || '';
     // Not drawn yet: an unchanged source has the same parts, a changed one is searched for the part.
-    if (!parts.length) return cmHash(src) === dsrc || cmMmInSrc(src, p) ? [p.did, 'anchored'] : null;
+    if (!parts.length) return cmHash(src) === dsrc || cmMmInSrc(src, p) ? [p.did, 'anchored'] : cmMmPos(src, p, parts);
     if (parts.some(q => q.id === p.did)) return [p.did, 'anchored'];
     const like = parts.filter(q => q.what === p.dwhat && q.label === p.dlabel);
-    return p.dlabel && like.length === 1 ? [like[0].id, 'moved'] : null;
+    return p.dlabel && like.length === 1 ? [like[0].id, 'moved'] : cmMmPos(src, p, parts);
   }
   const ids = info.ids; if (!ids) return null;
   if (ids[p.did]) return [p.did, 'anchored'];
@@ -1510,7 +1585,7 @@ function cmDgSel(dg, part) {
   const real = dg._src || dg;        // the full-window view shows a copy: the comment belongs to the diagram on the page
   const root = real.closest('.part-panel'), same = Array.from(root.querySelectorAll('.dg')).filter(d => d.dataset.name === real.dataset.name);
   return { part: root.id.slice(5), kind: 'dg', dname: real.dataset.name, dn: same.indexOf(real), tk: part ? (part.edge ? 'edge' : 'node') : 'whole', did: part ? part.id : '',
-    dlabel: part ? cmDgLabel(dg, part.id) : '', dwhat: part ? part.what : '', dends: (part && part.ends) || null,
+    dlabel: part ? cmDgLabel(dg, part.id) : '', dwhat: part ? part.what : '', dends: (part && part.ends) || null, dpos: cmDgPos(dg, part),
     dsrc: cmDgInfo(real).kind === 'mermaid' ? cmHash(QX.mermaid[cmDgInfo(real).mid] || '') : '', quote: '', pieces: [], el: [part ? part.g : cmDgBox(dg)], dgEl: real };
 }
 function cmDgSetMode(dg) {
@@ -1537,6 +1612,27 @@ function cmDgBar(dg) {
   bar.querySelectorAll('.dg-srcb').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); dgSrcOpen(dg, !dg.querySelector(':scope > .dg-src')); }));
   bar.querySelectorAll('.dg-zb[data-z]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); dgZoom(dg, b.dataset.z === 'fit' ? 0 : b.dataset.z === 'in' ? 1.25 : 0.8); }));
   dg.appendChild(bar);
+}
+// Comments that no longer find their part are counted on their diagram; a click shows them in the panel.
+function cmDgLostOf(real) { return CM.items.filter(c => c.kind === 'dg' && c.state !== 'resolved' && !c._pieces && cmDgOf(c) === real); }
+function cmDgLost(dg) {
+  const real = dg._src || dg, bar = dg.querySelector(':scope > .cm-dgbar'); if (!bar) return;
+  const n = cmDgLostOf(real).length; let b = bar.querySelector('.cm-dglost');
+  if (!b) {
+    if (!n) return;
+    b = document.createElement('button'); b.type = 'button'; b.className = 'cm-dglost';
+    b.addEventListener('click', e => { e.stopPropagation(); cmShowLost(real); });
+    bar.insertBefore(b, bar.firstChild);
+  }
+  b.hidden = !n; b.textContent = n + ' not placed';
+  b.title = n + ' comment' + (n === 1 ? '' : 's') + ' on this diagram no longer find' + (n === 1 ? 's its' : ' their') + ' part. Click to see ' + (n === 1 ? 'it' : 'them') + '.';
+}
+function cmShowLost(real) {
+  const ids = cmDgLostOf(real).map(c => c.id);
+  if (!cmPanelOpen()) cmPanel(true);
+  const its = Array.from(document.querySelectorAll('#cm-panel .cm-pl > .cm-it')).filter(it => ids.includes(it.dataset.cid));
+  its.forEach(it => it.classList.add('cm-it-flash')); if (its[0]) its[0].scrollIntoView({ block: 'center' });
+  setTimeout(() => its.forEach(it => it.classList.remove('cm-it-flash')), 1800);
 }
 function cmDgMove(e) {
   if (!cmDgMode || cmCard || cmOff()) return;
@@ -1632,7 +1728,7 @@ document.addEventListener('mouseup', () => {
   if (!parts.length) { showToast('No part is mostly inside the box'); return; }
   // From here on the box is the frame around the parts it took, not the rectangle that was drawn.
   const fit = cmUnion(parts.map(p => p.g.getBoundingClientRect()), 9), r = cmDgBox(dg).querySelector('svg').getBoundingClientRect(), s = cmDgSel(dg, null);
-  s.tk = 'box'; s.dparts = parts.map(p => ({ did: p.id, dlabel: p.label || cmDgLabel(dg, p.id), dwhat: p.what, dends: null }));
+  s.tk = 'box'; s.dparts = parts.map(p => ({ did: p.id, dlabel: p.label || cmDgLabel(dg, p.id), dwhat: p.what, dends: null, dpos: cmDgPos(dg, p) || undefined }));
   s.dbox = [(fit.left - r.left) / r.width, (fit.top - r.top) / r.height, fit.width / r.width, fit.height / r.height];
   s.el = [{ getBoundingClientRect: () => cmBoxRect(dg, s.dbox) || fit }];
   cmDgPicture(dg, fit, parts).then(pic => { s.pic = pic; cmOpen({ sel: s }); if (!pic) showToast('No picture could be made of the area; the comment names its parts'); });
@@ -1643,7 +1739,7 @@ function cmDrawDg() {
   document.querySelectorAll('.cm-dgl').forEach(l => l.remove());
   document.querySelectorAll('.dg .cm-eg').forEach(g => g.classList.remove('cm-eg', 'cm-eg-on'));
   document.querySelectorAll('.dg').forEach(dg => {
-    cmDgBar(dg); dgSrcMark(dg);
+    cmDgBar(dg); cmDgLost(dg); dgSrcStatus(dg); dgSrcMark(dg);
     if (dg._zoom) dgApply(dg);                    // a Mermaid redraw replaces the drawing and loses its zoom
     if (dg.offsetParent === null) return;         // not on screen: nothing can be measured
     const layer = document.createElement('div'); layer.className = 'cm-dgl';
@@ -1706,9 +1802,13 @@ function dgSrcStatus(dg) {
   const box = dg.querySelector(':scope > .dg-src'); if (!box) return;
   const name = dg.dataset.name, ed = CM.edits[name], st = box.querySelector('.dg-src-st'), kind = cmDgInfo(dg).kind, stale = dgSrcStale(name);
   box.querySelector('.dg-src-ask').hidden = !stale;
-  st.classList.toggle('bad', !!(ed && ed.bad));
-  st.textContent = !ed ? 'Not edited.' : stale ? 'Your edit is not applied.' : ed.bad ? 'Does not parse: ' + ed.bad + ' The diagram keeps its last good drawing.'
+  // Comments that found their part in the diagram as built and do not find it in the edited one.
+  const off = ed && !stale && !ed.bad && kind === 'mermaid' ? CM.items.filter(c => c.kind === 'dg' && c.state !== 'resolved' && c.dname === name && !c._pieces && c._ok0 === true).length : 0;
+  st.classList.toggle('bad', !!(ed && ed.bad)); st.classList.toggle('warn', off > 0);
+  const text = !ed ? 'Not edited.' : stale ? 'Your edit is not applied.' : ed.bad ? 'Does not parse: ' + ed.bad + ' The diagram keeps its last good drawing.'
+    : off ? 'Edited: the diagram is redrawn. With this edit, ' + off + ' comment' + (off === 1 ? '' : 's') + ' on the diagram no longer find' + (off === 1 ? 's its' : ' their') + ' part. Reset brings ' + (off === 1 ? 'it' : 'them') + ' back.'
     : kind === 'mermaid' ? 'Edited: the diagram is redrawn. The edit goes into the copied feedback.' : 'Edited. The diagram is not redrawn here: the agent regenerates it from the copied feedback.';
+  if (st.textContent !== text) st.textContent = text;
   dgSrcMark(dg);
 }
 function dgSrcSet(dg, text, keep) {
@@ -1857,6 +1957,26 @@ function cmLabsWire(root) {
     const ta = b.closest('.cm-card, .cm-it').querySelector('textarea'); if (ta) ta.focus();
   });
 }
+// Diagram comments find their parts again by id first, so the copied text lists the ids a rework should keep.
+function cmKeepIds(open) {
+  const by = {}, names = [];
+  open.filter(c => c.kind === 'dg' && c._pieces && c.tk !== 'whole' && c._dg).forEach(c => {
+    const kind = cmDgInfo(c._dg).kind;
+    if (!by[c.dname]) { by[c.dname] = { kind, ids: [], seq: false }; names.push(c.dname); }
+    const e = by[c.dname], add = id => { if (id && !e.ids.includes(id)) e.ids.push(id); };
+    const one = (what, id, ends) => {
+      if (/^(message|participant|note)$/.test(what) || (kind === 'mermaid' && /^(message|participant|note):/.test(id))) { e.seq = true; return; }
+      if (what !== 'connection' && !(kind !== 'mermaid' && CM_EDGE.test(id))) { add(id); return; }
+      const m = kind === 'mermaid' ? null : /^(.*?)\((.+?) (?:->|<->|<-|--) (.+)\)\[\d+\]$/.exec(id);
+      (m ? [m[1] + m[2], m[1] + m[3]] : ends || []).forEach(add);
+    };
+    if (c.tk === 'box') (c._dids || []).forEach(id => one(((c.dparts || []).find(x => x.did === id) || {}).dwhat || 'node', id, null));
+    else one(c.dwhat || (c.tk === 'edge' ? 'connection' : 'node'), c._did || c.did, c._dends || c.dends);
+  });
+  const L = names.filter(n => by[n].ids.length || by[n].seq).map(n => '- Diagram "' + n + '" (' + (by[n].kind === 'mermaid' ? 'Mermaid' : 'D2') + '): '
+    + (by[n].ids.length ? by[n].ids.join(', ') : 'its parts have no ids. Keep the participants and the order of the messages.'));
+  return L.length ? ['Diagram comments find their parts again by id. When you rework one of these diagrams, keep the ids below unless a comment asks you to remove the part:'].concat(L, '') : [];
+}
 function cmFeedback() {
   const open = CM.items.filter(c => c.state !== 'resolved').sort((x, y) => x._n - y._n);
   if (!open.length && !dgSrcNames().length) return '';
@@ -1886,6 +2006,7 @@ function cmFeedback() {
     ed.text.replace(/\n+$/, '').split('\n').forEach(t => L.push('   | ' + t));
     L.push('');
   });
+  cmKeepIds(open).forEach(l => L.push(l));
   if (used.length) { L.push('Labels:'); CM_LABELS.filter(l => used.includes(l)).forEach(l => L.push('- ' + l[1] + ': ' + l[2])); L.push(''); }
   L.push(CM_ASK);
   return L.join('\n') + '\n';
@@ -1926,9 +2047,10 @@ function cmPanel(open) {
 function cmChanged() { cmSave(); cmResolve(); cmDraw(); cmDrawPanel(); }
 function cmItemHtml(c) {
   const done = c.state === 'resolved', lost = !done && !c._pieces, editing = cmEdit === c.id;
-  let h = '<div class="cm-it' + (lost ? ' cm-it-lost' : '') + '" data-cid="' + esc(c.id) + '"><div class="cm-it-h">'
+  const lostDg = lost && c.kind === 'dg' && !!cmDgOf(c);
+  let h = '<div class="cm-it' + (lost ? ' cm-it-lost' : '') + (lostDg ? ' cm-it-go' : '') + '" data-cid="' + esc(c.id) + '"><div class="cm-it-h">'
     + (c._n ? '<span class="cm-num">' + c._n + '</span>' : '') + '<span class="cm-it-w">' + esc(cmWhere(c)) + '</span>' + (cmLabel(c.label) ? '<span class="cm-tag cm-tag-l">' + cmLabel(c.label)[1] + '</span>' : '')
-    + (lost ? '<span class="cm-tag" title="The text this comment was about is no longer on the page, or stands in more than one place">not found</span>'
+    + (lost ? '<span class="cm-tag" title="' + (lostDg ? 'The part of the diagram this comment was about is no longer in it. Click to go to the diagram.' : 'The text this comment was about is no longer on the page, or stands in more than one place') + '">not found</span>'
       : c._state === 'moved' ? '<span class="cm-tag" title="The text this comment was about now stands in another place">moved</span>' : '') + '</div>';
   if (editing) return h + '<textarea class="cm-it-ta" aria-label="Comment">' + esc(cmEditText !== null ? cmEditText : c.text) + '</textarea>' + cmLabsHtml(cmEditLab !== null ? cmEditLab : c.label || '')
     + '<div class="cm-it-a"><button type="button" data-act="cancel">Cancel</button><button type="button" class="cm-save" data-act="save">Save</button></div></div>';
@@ -1991,7 +2113,7 @@ function cmPanelAct(act, id) {
 }
 // Goes to what a comment is about: its part, its sub-tab or its file, then the place itself, which flashes.
 function cmJump(c) {
-  if (!c || !c._pieces || c.part === 'page') return;
+  if (!c || c.part === 'page' || (!c._pieces && !(c.kind === 'dg' && cmDgOf(c)))) return;
   if ((document.querySelector('.part-btn.active') || { dataset: {} }).dataset.part !== c.part) switchPart(c.part);
   let anchor = null;
   if (c.kind === 'part') anchor = null;
@@ -2002,7 +2124,7 @@ function cmJump(c) {
       if (cd.classList.contains('iscol')) toggleC(c.path, false);
     }
   } else {
-    const node = c.kind === 'dg' ? c._dg : c._el && !Array.isArray(c._el) ? c._el : c._pieces[0] ? c._pieces[0].startContainer.parentElement : null;
+    const node = c.kind === 'dg' ? (c._pieces ? c._dg : cmDgOf(c)) : c._el && !Array.isArray(c._el) ? c._el : c._pieces[0] ? c._pieces[0].startContainer.parentElement : null;
     const sub = node && node.closest('.sub-panel'), map = node && node.closest('.map-panel');
     if (sub && !sub.classList.contains('active')) switchSub(sub.dataset.group, sub.id.slice(4));
     if (map && !map.classList.contains('active')) switchMap(map.id.slice(5), false);
@@ -2323,7 +2445,7 @@ function cmOpen(target) {
     if (c) { c.text = text; c.label = lab(); }
     else {
       const s = target.sel, base = { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text, label: lab(), t: Date.now(), state: 'open' };
-      CM.items.push(Object.assign(base, s.kind === 'dg' ? { kind: 'dg', part: s.part, dname: s.dname, dn: s.dn, tk: s.tk, did: s.did, dlabel: s.dlabel, dwhat: s.dwhat, dends: s.dends, dsrc: s.dsrc, dparts: s.dparts, dbox: s.dbox, pic: s.pic || undefined, quote: '' }
+      CM.items.push(Object.assign(base, s.kind === 'dg' ? { kind: 'dg', part: s.part, dname: s.dname, dn: s.dn, tk: s.tk, did: s.did, dlabel: s.dlabel, dwhat: s.dwhat, dends: s.dends, dsrc: s.dsrc, dpos: s.dpos || undefined, dparts: s.dparts, dbox: s.dbox, pic: s.pic || undefined, quote: '' }
         : s.kind === 'part' ? { kind: 'part', part: s.part, quote: '' } : s.part === 'diff'
         ? { kind: s.kind, part: 'diff', path: s.path, side: s.side, ln: s.ln, ln2: s.ln2, lines: s.lines, quote: s.quote }
         : { kind: s.el ? 'block' : 'text', tag: s.el && s.el.tagName === 'TABLE' ? 'table' : undefined, part: s.part, section: s.section, quote: s.quote, prefix: s.prefix, suffix: s.suffix }));
