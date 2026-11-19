@@ -286,6 +286,8 @@ A comment on boxed parts can say a picture is kept on the page. Ask the user for
 
 In both cases, rebuild the page when anything changed, with the same output name, so that comments already on the page carry over and show as still in place, moved or not found. Re-run Step 4 on the rebuilt page. Never ask the user to use the comment tools; they are a convenience.
 
+Mark each block you changed in answer: add `data-changed` to its tag, with a reason when it helps (`data-changed="Answer to comment 3: named the caller"`, a sentence or two, at most 300 characters). Remove the marks left by the rebuild before, so the marks always describe the latest rebuild only. The page counts the marked blocks and lets the reader step through them.
+
 ## Step 6: Close
 
 **A short recap in chat**: what the change does in two or three sentences, and which concepts were shaky in the quiz, if one ran. If you spotted a likely defect in Step 1, the one-line note and the `/qreview` pointer go here.

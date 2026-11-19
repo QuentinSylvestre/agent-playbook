@@ -336,6 +336,22 @@ def brief_files(brief, paths, diff_selected):
     return "".join(out) + tail, rest
 
 
+CHANGED_MARK = re.compile(r"""<[a-zA-Z][^<>]*\sdata-changed(?:=("[^"]*"|'[^']*'))?[^<>]*>""")
+
+
+def changed_marks(parts):
+    """Count the blocks the agent marked as changed in this rebuild (data-changed, with an optional reason) and
+    return (count, problems). A reason is at most 300 characters. The page turns the marks into a legend and a way to step through them."""
+    count, bad = 0, []
+    for name, text in parts:
+        for m in CHANGED_MARK.finditer(text or ""):
+            count += 1
+            reason = html.unescape((m.group(1) or '""')[1:-1])
+            if len(reason) > 300:
+                bad.append(f"{name}: a data-changed reason is {len(reason)} characters long; keep it under 300, a sentence or two")
+    return count, bad
+
+
 def script_json(data):
     # "<" never appears raw, so no "</script>" or "<!--" inside the data can end the script early.
     text = json.dumps(data, ensure_ascii=False, indent=1)
@@ -946,6 +962,11 @@ def main(argv=None):
              "path:side:line, or reword your own text" + hint)
 
     # Fragments
+    marks, bad_marks = changed_marks([("brief.html", brief), ("walkthrough.html", walkthrough)])
+    if bad_marks:
+        fail("; ".join(bad_marks[:4]))
+    if marks:
+        print(f"NOTE\t{marks} {'block is' if marks == 1 else 'blocks are'} marked as changed; the page shows a legend and steps through them")
     brief, unnamed = brief_files(brief, [path for path, _ in kept], "diff" in selected)
     if unnamed:
         print(f"NOTE\t{len(unnamed)} changed files are named by no Brief section and are listed after the change sections: "
@@ -1177,6 +1198,17 @@ def selftest():
         case("a page without the Diff review part loads no highlighter", "highlight.min.js" not in page and "<!--@HLJS-->" not in page, "")
         rc, log, page = run("brief-diff", std)
         case("brief and diff page", rc == 0 and 'id="part-diff"' in page and "diff --git" in page, log[-300:])
+        # Blocks marked as changed in a rebuild
+        marked_brief = os.path.join(content, "brief-marked.html")
+        marked = lambda attr: (open(marked_brief, "w", encoding="utf-8", newline="\n").write(SELF_BRIEF.replace("{DIAGRAM}", "").replace(
+            "<p>The handler now validates input first.</p>", f"<p {attr}>The handler now validates input first.</p><ul><li data-changed>One more case.</li></ul>")),
+            run("brief-marked", ["--brief", marked_brief, "--rationales", os.path.join(content, "rationales.json")]))[1]
+        m_rc, m_log, m_page = marked('data-changed="Answer to comment 2: said what is checked first"')
+        case("blocks marked as changed are kept on the page and counted", m_rc == 0 and "NOTE\t2 blocks are marked as changed" in m_log
+             and 'data-changed="Answer to comment 2: said what is checked first"' in m_page and "<li data-changed>" in m_page, m_log[-300:])
+        m_rc, m_log, m_page = marked('data-changed="' + "x" * 330 + '"')
+        case("a reason that is too long stops the build and says how long it may be", m_rc != 0 and "keep it under 300" in m_log, m_log[-300:])
+        case("a page with no marked block says nothing about them", "marked as changed" not in log, "")
         # Files named on Brief sections
         named_brief = os.path.join(content, "brief-files.html")
         filed = lambda files, extra=(): (open(named_brief, "w", encoding="utf-8", newline="\n").write(SELF_BRIEF.replace("{DIAGRAM}", "").replace(

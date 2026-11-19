@@ -228,6 +228,25 @@
   .rv .rbtn { background: rgba(63,185,80,.15); border-color: var(--add-fg); color: var(--add-fg); }
   .colbtn { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; padding: 2px 4px; transition: transform .15s; }
   .fc.iscol > .fh > .colbtn { transform: rotate(-90deg); }
+  /* Blocks the agent changed in this rebuild: a bar on the left and the word "changed", never the colour alone. */
+  .page [data-changed] { position: relative; }
+  .page [data-changed]::before { content: ""; position: absolute; left: -14px; top: 1px; bottom: 1px; width: 3px; border-radius: 2px; background: #8250df; }
+  .page td[data-changed]::before, .page th[data-changed]::before { left: 0; }
+  .page p[data-changed]::after, .page li[data-changed]::after, .page td[data-changed]::after, .page th[data-changed]::after, .page h2[data-changed]::after, .page h3[data-changed]::after {
+    content: "changed"; margin-left: 8px; padding: 0 6px; border: 1px solid #8250df; border-radius: 8px; color: #8250df; font: 600 10px/1.6 -apple-system, "Segoe UI", sans-serif; white-space: nowrap; vertical-align: 1px; }
+  [data-theme="dark"] .page [data-changed]::before { background: #a371f7; }
+  [data-theme="dark"] .page [data-changed]::after { border-color: #a371f7; color: #a371f7; }
+  .page .rev-on { animation: rev-flash 0.6s 2; }
+  @keyframes rev-flash { 50% { background: rgba(130, 80, 223, 0.18); } }
+  /* The legend floats at the bottom left and stays there while the page scrolls. Its width is fixed and its buttons
+     are its last row, so the box grows upwards with its text and the buttons never move. */
+  .rev-bar { position: fixed; left: 12px; bottom: 14px; z-index: 210; display: flex; flex-direction: column; gap: 6px; width: min(16.5rem, calc(100vw - 24px)); padding: 8px 10px;
+    border: 1px solid #8250df; border-radius: 8px; background: var(--surface); box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2); font-size: 12.5px; line-height: 1.4; }
+  .rev-bar .rev-why { padding-top: 6px; border-top: 1px solid var(--border); overflow-wrap: anywhere; }
+  .rev-bar .rev-why:empty { display: none; }
+  .rev-bar .rev-row { display: flex; align-items: center; gap: 8px; }
+  .rev-bar .rev-at { color: var(--text-light); }
+  .rev-bar button { padding: 3px 10px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--btn-bg); color: var(--text); font-size: 12px; cursor: pointer; }
   /* The files a Brief section is about, written by the build as links to their diff cards. */
   .sec-files { margin: -0.35rem 0 0.9rem; font-size: 0.86em; color: var(--text-light); }
   .sec-files span { font-weight: 600; }
@@ -1576,7 +1595,7 @@ document.addEventListener('click', e => {
 // One match (or one match whose surroundings agree) places it; anything else leaves it "not found". It is never
 // placed on a guess. Highlights and markers are drawn in a layer over the page, so the page's own text is not touched.
 const CM_KEY = 'qexplain-change-comments-' + PAGE_ID;
-const CM_SKIP = 'svg, .dg, script, style, button, textarea, input, select, .sub-bar, .map-bar, .tour-box, .chg, .cm-layer';
+const CM_SKIP = 'svg, .dg, script, style, button, textarea, input, select, .sub-bar, .map-bar, .tour-box, .chg, .cm-layer, .rev-bar';
 const CM_CTX = 32, CM_MAX_QUOTE = 2000;
 let CM = { v: 1, items: [] };
 try { const saved = JSON.parse(lsGet(CM_KEY) || 'null'); if (saved && saved.v === 1 && Array.isArray(saved.items)) CM = saved; } catch (e) {}
@@ -1707,6 +1726,29 @@ function cmDraw() {
 let cmRaf = 0;
 function cmRefresh() { if (!cmRaf) cmRaf = requestAnimationFrame(() => { cmRaf = 0; cmDraw(); }); }
 
+// --- Blocks the agent changed in this rebuild. The agent marks a block with data-changed, with a short reason when
+// it has one. The page adds a legend that floats at the bottom left of the part and lets the reader step through the marked blocks.
+function revInit() {
+  cmRoots().forEach(({ root }) => {
+    const marks = Array.from(root.querySelectorAll('[data-changed]')); if (!marks.length) return;
+    const bar = document.createElement('div'); bar.className = 'rev-bar'; let at = -1;
+    bar.innerHTML = '<span class="rev-what"><strong>Changed in this version:</strong> ' + marks.length + ' block' + (marks.length === 1 ? '. It has' : 's. Each has')
+      + ' a bar on its left and the word "changed".</span><span class="rev-why" aria-live="polite"></span>'
+      + '<span class="rev-row"><button type="button" data-r="-1">Previous</button><button type="button" data-r="1">Next</button><span class="rev-at"></span></span>';
+    bar.addEventListener('click', e => {
+      const b = e.target.closest('button[data-r]'); if (!b) return;
+      at = at < 0 ? (b.dataset.r === '1' ? 0 : marks.length - 1) : (at + +b.dataset.r + marks.length) % marks.length;
+      const el = marks[at], sub = el.closest('.sub-panel');
+      if (sub && !sub.classList.contains('active')) switchSub(sub.dataset.group, sub.id.slice(4));
+      marks.forEach(m => m.classList.remove('rev-on')); el.classList.add('rev-on');
+      el.scrollIntoView({ block: 'center' });
+      bar.querySelector('.rev-at').textContent = (at + 1) + ' of ' + marks.length;
+      bar.querySelector('.rev-why').textContent = el.dataset.changed || '';      // above the buttons: its length cannot move them
+    });
+    marks.forEach(m => { if (m.dataset.changed) m.title = 'Changed in this version: ' + m.dataset.changed; });
+    root.insertBefore(bar, root.firstChild);
+  });
+}
 // --- Selecting text offers a Comment button; the selection stays alive when the button is pressed.
 let cmPending = null, cmCard = null, cmDraft = null, cmActive = null;
 function cmBoxes(pieces) {
@@ -3029,6 +3071,7 @@ window.addEventListener('DOMContentLoaded', () => {
   fitTools();
   switchPart(PART_KEYS[0], false);
   restoreFromHash();
+  revInit();      // before the comments are placed: the legend stands in the page
   cmInit();
 });
 window.addEventListener('popstate', restoreFromHash);

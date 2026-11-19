@@ -914,6 +914,34 @@ async function routeLibs(target) {
     });
     log(wm.one === '30>90' && wm.far === null && wm.grown === ', retries', `word marks cover what differs between two lines, grow with an added argument, and are left out when the lines have little in common (${wm.one}; ${wm.grown})`);
     log(wm.pairs > 0 && wm.marked > 0 && wm.same && wm.faithful, `a removed line stands beside the line that replaces it (${wm.pairs} pairs, ${wm.marked} with marks); a line with no counterpart keeps an empty cell opposite (${wm.lone})`);
+    // Blocks the agent marked as changed: a legend counts them, each says "changed" in words, and the buttons step through them
+    {
+      const rv = await page.evaluate(() => { const parts = cmRoots().map(({ part, root }) => ({ part, n: root.querySelectorAll('[data-changed]').length, bar: root.querySelector('.rev-bar') })).filter(x => x.n || x.bar);
+        if (!parts.length) return null;
+        const words = [...document.querySelectorAll('.page [data-changed]')].filter(el => /^(P|LI|TD|TH|H2|H3)$/.test(el.tagName)).every(el => getComputedStyle(el, '::after').content.includes('changed'));
+        return { parts: parts.map(x => x.part), legend: parts.every(x => x.bar && x.bar.querySelector('.rev-what').textContent.includes(x.n + ' block')), total: parts.reduce((s, x) => s + x.n, 0), words, first: parts[0].part, n0: parts[0].n,
+          indexed: cmRoots().some(({ root }) => cmIndex(root).text.includes('Changed in this version')) }; });
+      if (rv) {
+        await page.evaluate(p => switchPart(p), rv.first); await wait(300);
+        // the legend floats: it stands at the same place on screen wherever the page is scrolled, and only on its own part
+        const float = await page.evaluate(async p => { const bar = document.querySelector('#part-' + p + ' .rev-bar'), at = () => { const b = bar.getBoundingClientRect(); return [Math.round(b.left), Math.round(innerHeight - b.bottom)]; };
+          window.scrollTo(0, 0); await new Promise(r => setTimeout(r, 80)); const a = at(); window.scrollTo(0, document.body.scrollHeight); await new Promise(r => setTimeout(r, 80)); const b = at(); window.scrollTo(0, 0);
+          const other = PART_KEYS.find(k => k !== p && !document.querySelector('#part-' + k + ' .rev-bar')); let gone = true;
+          if (other) { switchPart(other); gone = bar.offsetParent === null && bar.getBoundingClientRect().width === 0; switchPart(p); }
+          const nb = bar.querySelector('button[data-r="1"]').getBoundingClientRect();
+          return { fixed: getComputedStyle(bar).position === 'fixed', same: a.join() === b.join() && a[1] >= 0 && a[1] < 60, gone, btn: Math.round(nb.left) + ',' + Math.round(nb.top) }; }, rv.first); await wait(300);
+        const seen = [];
+        for (let i = 0; i < rv.n0 + 1; i++) { await page.click('#part-' + rv.first + ' .rev-bar button[data-r="1"]'); await wait(250);
+          seen.push(await page.evaluate(p => { const el = document.querySelector('#part-' + p + ' .rev-on'), b = el ? el.getBoundingClientRect() : null, all = [...document.querySelectorAll('#part-' + p + ' [data-changed]')];
+            const nb = document.querySelector('#part-' + p + ' .rev-bar button[data-r="1"]').getBoundingClientRect();
+            return { i: el ? all.indexOf(el) : -1, ok: !!b && b.top > 0 && b.bottom < innerHeight, at: document.querySelector('#part-' + p + ' .rev-at').textContent, said: document.querySelector('#part-' + p + ' .rev-why').textContent,
+              why: el ? el.dataset.changed || '' : '', btn: Math.round(nb.left) + ',' + Math.round(nb.top) }; }, rv.first)); }
+        const order = seen.map(s => s.i).join(','), want = [...Array(rv.n0).keys(), 0].join(',');
+        log(rv.legend && rv.words && !rv.indexed && float.fixed && float.same && float.gone && order === want && seen.every(s => s.ok && s.at === (s.i + 1) + ' of ' + rv.n0 && s.said === s.why && s.btn === float.btn),
+          `blocks marked as changed (${rv.total} in ${rv.parts.join(', ')}) carry the word "changed"; the legend counts them and stays in place while the page scrolls; Next steps through them in page order and wraps around, each reason shown above the buttons, which never move; the legend is not commentable text`);
+        await page.evaluate(() => { switchPart(PART_KEYS[0]); window.scrollTo(0, 0); });
+      }
+    }
     // Files named under Brief sections: every file of the page is reachable from the Brief, and a link opens its diff card
     {
       const sf = await page.evaluate(() => { const links = [...document.querySelectorAll('#part-brief .sec-files a[data-file]')]; if (!links.length) return null;
