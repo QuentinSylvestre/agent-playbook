@@ -45,6 +45,14 @@
  *      comments in page order; a click goes to the target; edit, resolve, reopen and delete work
  *      there, and a general comment is written there. Copy feedback copies the text the preview
  *      shows, and a save copies it too. The Annotate switch hides all of it and keeps the comments.
+ *   9. Diagrams: the comment button on a diagram starts comment mode; a click comments on a part or
+ *      on the whole diagram, Shift + drag boxes several parts and keeps a picture. "-", "+", "Fit"
+ *      and Ctrl + wheel zoom; a click opens the full-window view, where comment mode works too.
+ *      "Source" opens the source as text: a Mermaid edit redraws the diagram, a text that does not
+ *      parse keeps the last drawing, a D2 edit is text only. In the source, the pointer offers a
+ *      button on a line and a selection offers "Comment"; the commented text is highlighted and
+ *      numbered. An edit that unseats a comment says so, and the diagram counts it as "not placed".
+ *      The copied text lists the ids to keep.
  *
  * Exit codes: 0 every check OK, 1 at least one BAD, 2 could not run.
  */

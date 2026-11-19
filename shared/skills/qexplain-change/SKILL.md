@@ -248,11 +248,21 @@ On a correct answer, confirm and add one sentence the reader did not have. On a 
 
 ## Feedback on the page
 
-The reader can comment on the page itself: on selected text, a paragraph, a list item, a table cell or a whole table, a diff line or a range of lines, a file, a whole part, or the explanation as a whole. A panel lists the comments, and "Copy feedback" copies them as one text. You do not write any of this; the template provides it.
+The reader can comment on the page itself: on selected text, a paragraph, a list item, a table cell or a whole table, a diff line or a range of lines, a file, a whole part, or the explanation as a whole. On a diagram the reader can comment on one part, on several parts boxed together, on the whole diagram or on lines of its source, and can edit that source. A panel lists the comments, and "Copy feedback" copies them as one text. You do not write any of this; the template provides it.
 
 **When the user gives feedback on a page you built.** Feedback comes in two forms, and both count the same.
 
 *Copied from the page.* The text starts with "Feedback on the change explanation" and lists numbered comments, each with its location and, for some, a label. Act on every open comment, then reply with each number and one of: addressed, deferred, rejected, and one line on what you changed or why.
+
+Three kinds of item concern diagrams.
+
+- *A comment on a part* names the part and its id. For a Mermaid part it also gives the source line.
+- *A comment on source lines* gives the line number and the text of the lines. When it says the number counts in the source as the reader edited it, read it against the edited source given in the same feedback, not against your file.
+- *An edited source* is the reader's own version of a diagram. Replace the diagram's source file with it. If a note says it does not parse, or that the source changed after the edit was written, keep its intent and make it valid; do not undo newer changes.
+
+A comment on boxed parts can say a picture is kept on the page. Ask the user for it only when the names are not enough.
+
+**Keep ids when you rework a commented diagram.** Diagram comments find their parts again by id. The feedback lists the ids to keep, per diagram. Do not rename them unless a comment asks you to remove the part. To reword a label, change the label and leave the id. A sequence diagram has no ids: keep its participants and the order of its messages.
 
 *Typed in the chat.* The user describes what to change in their own words, with or without a screenshot. Find the part of the page they mean from what they say. If two places could match, ask which one before changing either. Then reply in the same way: one line per point, saying what you changed or why not.
 
