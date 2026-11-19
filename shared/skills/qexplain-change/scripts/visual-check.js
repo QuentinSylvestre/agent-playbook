@@ -178,17 +178,49 @@ async function routeLibs(target) {
   log(await page.evaluate(() => { const pt = CM.items.find(c => c.kind === 'part'), pr = CM.items.find(c => c.kind === 'text'), m = document.querySelector('.part-btn.active .cm-tmark');
     return !!pt && pt.part === PART_KEYS[0] && !!pr && pt._n === 1 && pr._n === 2 && !!m && m.textContent === '1' && !document.querySelector('#part-brief .cm-layer .cm-hl.cm-blk'); }),
     'a part comment is numbered before the comments inside its part, with its marker on the tab');
-  await page.click('#cm-page'); await wait(200);
-  const gk = await page.evaluate(() => (document.querySelector('.cm-card .cm-k') || {}).textContent || '');
+  // The panel: every comment in page order, with a general comment, jump, edit, resolve, reopen and delete
+  const pAct = (kind, a) => page.evaluate(([kind, a]) => { const c = CM.items.find(x => x.kind === kind), it = document.querySelector('#cm-panel .cm-it[data-cid="' + c.id + '"]');
+    (a ? it.querySelector('[data-act="' + a + '"]') : it.querySelector('.cm-it-t')).click(); }, [kind, a]);
+  await page.click('#cm-panel-btn'); await wait(300);
+  log(await page.evaluate(() => { const p = document.getElementById('cm-panel'), nums = [...p.querySelectorAll('.cm-pl > .cm-it .cm-num')].map(n => n.textContent);
+    const wide = window.innerWidth >= 1101, pg = document.querySelector('.part-panel.active .page').getBoundingClientRect(), tools = document.getElementById('top-tools').getBoundingClientRect();
+    return !p.hidden && nums.join() === '1,2' && document.querySelector('#cm-panel-btn .cm-count').textContent === '2'
+      && (!wide || (pg.right <= p.getBoundingClientRect().left + 1 && tools.right <= p.getBoundingClientRect().left)); }),
+    'the Comments button opens the list of comments in page order, beside the page on a wide window');
+  await page.click('#cm-panel [data-act="new"]'); await wait(150);
   await page.keyboard.type('general'); await page.keyboard.press('Enter'); await wait(250);
-  log(gk === 'The whole explanation' && await page.evaluate(() => { const g = CM.items.find(c => c.kind === 'page'), pt = CM.items.find(c => c.kind === 'part'), m = document.querySelector('#cm-page-marks .cm-mark');
-    return !!g && g._n === 1 && pt._n === 2 && !!m && m.textContent === '1'; }), 'the top-bar button comments on the whole explanation, numbered before every part');
+  log(await page.evaluate(() => { const g = CM.items.find(c => c.kind === 'page'), pt = CM.items.find(c => c.kind === 'part'), pr = CM.items.find(c => c.kind === 'text'), first = document.querySelector('#cm-panel .cm-pl > .cm-it');
+    return !!g && g._n === 1 && pt._n === 2 && pr._n === 3 && first.dataset.cid === g.id && first.querySelector('.cm-it-w').textContent === 'The whole explanation'; }),
+    'a general comment is written from the panel and is numbered before every part');
+  await page.evaluate(() => { if (PART_KEYS.length > 1) switchPart(PART_KEYS[1], false); window.scrollTo(0, 0); }); await wait(300);
+  await pAct('text'); await wait(500);
+  log(await page.evaluate(() => { const h = document.querySelector('#part-brief .cm-hl.cm-flash'); if (!h) return false; const b = h.getBoundingClientRect();
+    return document.querySelector('.part-btn.active').dataset.part === PART_KEYS[0] && b.top >= 0 && b.bottom <= window.innerHeight; }),
+    'a click on a comment in the panel goes to its part, brings its text into view and flashes it');
+  await pAct('text', 'edit'); await wait(150);
+  await page.keyboard.press('Control+A'); await page.keyboard.type('prose, edited'); await page.keyboard.press('Shift+Enter'); await page.keyboard.type('second line'); await page.keyboard.press('Enter'); await wait(250);
+  log(await page.evaluate(() => { const c = CM.items.find(x => x.kind === 'text'); return c.text === 'prose, edited\nsecond line' && !document.querySelector('#cm-panel textarea')
+    && document.querySelector('#cm-panel .cm-it[data-cid="' + c.id + '"] .cm-it-t').textContent === c.text; }), 'a comment is edited in the panel with the same keys as in the box');
+  await pAct('text', 'resolve'); await wait(250);
+  log(await page.evaluate(k => { const c = CM.items.find(x => x.kind === 'text'), res = document.querySelector('#cm-panel .cm-res');
+    return c.state === 'resolved' && c._n === 0 && !document.querySelector('#part-brief .cm-hl') && !!res && !res.open && res.querySelectorAll('.cm-it').length === 1
+      && [...document.querySelectorAll('#cm-panel .cm-pl > .cm-it .cm-num')].map(n => n.textContent).join() === '1,2' && document.querySelector('#cm-panel-btn .cm-count').textContent === '2'
+      && JSON.parse(localStorage.getItem(k)).items.find(x => x.id === c.id).state === 'resolved'; }, cmKey),
+    'a resolved comment leaves the page and the numbering and waits in a closed group');
+  await pAct('text', 'reopen'); await wait(250);
+  log(await page.evaluate(() => { const c = CM.items.find(x => x.kind === 'text'); return c.state === 'open' && c._n === 3 && document.querySelectorAll('#part-brief .cm-hl').length >= 1; }), 'a resolved comment can be reopened');
+  await page.evaluate(() => { const c = CM.items.find(x => x.kind === 'text'); c.quote = 'text that is not on the page'; cmChanged(); }); await wait(150);
+  log(await page.evaluate(() => { const c = CM.items.find(x => x.kind === 'text'), it = document.querySelector('#cm-panel .cm-it[data-cid="' + c.id + '"]');
+    return it.classList.contains('cm-it-lost') && it.querySelector('.cm-tag').textContent === 'not found' && c._n === 3; }), 'a comment that is not found stays in the panel, marked as not found');
+  await pAct('text', 'del'); await wait(250);
+  log(await page.evaluate(() => !CM.items.some(x => x.kind === 'text') && document.querySelectorAll('#cm-panel .cm-pl .cm-it').length === 2), 'a comment is deleted from the panel');
   await page.reload(); await wait(1200);
   await page.evaluate(() => { if (PART_KEYS.length > 1) switchPart(PART_KEYS[1], false); }); await wait(300);
   await page.click('.part-btn .cm-tmark'); await wait(400);
   log(await page.evaluate(() => { const t = document.querySelector('.cm-card textarea'); return !!t && t.value === 'part a/b' && document.querySelector('.part-btn.active').dataset.part === PART_KEYS[0]; }),
     'after a reload the marker on a tab goes to that part and reopens its comment');
-  await page.evaluate(() => { document.querySelector('.cm-card .cm-cancel').click(); CM.items = []; cmSave(); cmResolve(); cmDraw(); });
+  log(await page.evaluate(() => !document.getElementById('cm-panel').hidden && !!document.querySelector('#cm-panel .cm-it.cm-it-on')), 'the panel stays open across a reload and marks the comment whose box is open');
+  await page.evaluate(() => { document.querySelector('.cm-card .cm-cancel').click(); CM.items = []; cmChanged(); cmPanel(false); });
   log(await page.evaluate(() => { const tools = document.getElementById('top-tools').getBoundingClientRect(), last = [...document.querySelectorAll('.part-btn')].pop().getBoundingClientRect();
     return getComputedStyle(document.getElementById('top-tools')).position !== 'fixed' || last.right <= tools.left; }), 'the part buttons stay clear of the tools with the comment button added');
   // Comments on a whole paragraph or table cell, without selecting text

@@ -260,8 +260,45 @@
   tr.cm-dl.cm-dl-on td.ln { box-shadow: inset 3px 0 0 rgba(9, 105, 218, 0.9), inset 0 0 0 999px rgba(9, 105, 218, 0.15); }
   .cm-mark.cm-dmark { left: 3px; top: 2px; width: 15px; height: 15px; line-height: 15px; font-size: 9.5px; }
   .cm-mark.cm-fmark { position: static; flex: none; }
-  #cm-page-marks { display: inline-flex; align-items: center; gap: 3px; }
-  #cm-page.cm-on { border-color: #0969da; color: #0969da; }
+  /* The comments panel: every comment in page order. On a wide window it stands beside the page; on a narrow one, over it. */
+  :root { --cm-w: 340px; }
+  #cm-panel { position: fixed; top: 0; right: 0; bottom: 0; width: min(var(--cm-w), 100vw); z-index: 250; display: flex; flex-direction: column; background: var(--surface); color: var(--text); border-left: 1px solid var(--border-strong); box-shadow: -6px 0 18px rgba(0,0,0,0.12); font-size: 13px; line-height: 1.45; }
+  #cm-panel[hidden] { display: none; }
+  .cm-ph { display: flex; align-items: center; gap: 6px; padding: 9px 12px; border-bottom: 1px solid var(--border); }
+  .cm-ph strong { flex: 1; font-size: 14px; }
+  .cm-pl { flex: 1; overflow-y: auto; padding: 10px 10px 24px; }
+  .cm-it { border: 1px solid var(--border); border-radius: 6px; padding: 8px 9px; margin-bottom: 8px; background: var(--bg); cursor: pointer; }
+  .cm-it:hover { border-color: #d68f00; }
+  .cm-it.cm-it-on { border-color: #0969da; box-shadow: 0 0 0 1px #0969da; }
+  .cm-it.cm-it-lost { cursor: default; border-style: dashed; }
+  .cm-it-h { display: flex; gap: 7px; align-items: flex-start; font-size: 11.5px; color: var(--text-light); overflow-wrap: anywhere; }
+  .cm-it-w { flex: 1; min-width: 0; }
+  .cm-num { flex: none; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: #b26a00; color: #fff; font: 600 10.5px/18px -apple-system, "Segoe UI", sans-serif; text-align: center; }
+  .cm-tag { flex: none; border: 1px solid var(--border-strong); border-radius: 8px; padding: 0 6px; font-size: 10.5px; white-space: nowrap; }
+  .cm-it-t { white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0; }
+  .cm-it-a { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+  .cm-it-a button, .cm-ph button { padding: 2px 9px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--btn-bg); color: var(--text); font-size: 11.5px; cursor: pointer; }
+  .cm-it-a button:hover, .cm-ph button:hover { border-color: #b26a00; }
+  .cm-it-a .cm-del { color: #c0392b; }
+  .cm-it-a .cm-save { background: #b26a00; border-color: #8a5200; color: #fff; }
+  .cm-it textarea { display: block; width: 100%; min-height: 70px; resize: vertical; font: inherit; margin: 6px 0; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface); color: var(--text); }
+  .cm-it textarea:focus { outline: 2px solid #d68f00; outline-offset: 0; }
+  .cm-res summary { cursor: pointer; color: var(--text-light); margin: 12px 2px 8px; }
+  .cm-res .cm-it { opacity: 0.78; cursor: default; }
+  .cm-empty { color: var(--text-light); padding: 12px 4px; }
+  .cm-count { display: inline-block; min-width: 16px; margin-left: 5px; padding: 0 4px; border-radius: 8px; background: #b26a00; color: #fff; font-size: 10.5px; line-height: 16px; text-align: center; }
+  .cm-count:empty { display: none; }
+  .cm-hl.cm-flash { animation: cm-flash 0.5s 3; }
+  .cm-mark.cm-flash { animation: cm-flash-mark 0.5s 3; }
+  tr.cm-dl.cm-flash td { animation: cm-flash-row 0.5s 3; }
+  @keyframes cm-flash { 50% { background: rgba(9, 105, 218, 0.45); } }
+  @keyframes cm-flash-mark { 50% { transform: scale(1.6); background: #0969da; } }
+  @keyframes cm-flash-row { 50% { box-shadow: inset 0 0 0 999px rgba(9, 105, 218, 0.38); } }
+  @media (min-width: 1101px) {
+    body.cm-open { padding-right: var(--cm-w); }
+    body.cm-open .top-tools, body.cm-open #info-pop { right: calc(var(--cm-w) + 1rem); }
+    body.cm-open #header { right: var(--cm-w); }
+  }
   .cm-mark.cm-tmark { display: inline-block; margin-left: 6px; vertical-align: 1px; }
   .cm-tadd { display: none; margin-left: 7px; vertical-align: -3px; width: 22px; height: 18px; align-items: center; justify-content: center; border: 1px solid var(--border-strong); border-radius: 5px; color: var(--text-light); }
   .part-btn.active .cm-tadd { display: inline-flex; }
@@ -300,8 +337,7 @@
 
 <div class="part-bar" id="top-bar">
   <div class="top-tools" id="top-tools">
-    <span id="cm-page-marks"></span>
-    <button class="theme-toggle" id="cm-page" type="button" onclick="cmPage()" title="Comment on the explanation as a whole">General comment</button>
+    <button class="theme-toggle" id="cm-panel-btn" type="button" onclick="cmPanel(!cmPanelOpen())" aria-expanded="false" aria-controls="cm-panel" title="The list of all comments">Comments<span class="cm-count"></span></button>
     <button class="theme-toggle" id="info-toggle" type="button" onclick="toggleInfo()" aria-expanded="false" aria-controls="info-pop" title="Repository, range, build and the path of this page">Info</button>
     <button class="theme-toggle sketch-toggle" id="sketch-toggle" onclick="toggleSketch()" title="Switch the diagrams between sketch and classic style" hidden>Classic style</button>
     <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light mode">Theme</button>
@@ -778,7 +814,7 @@ function buildFiles() {
   }));
   document.getElementById('fc').innerHTML = h;
   upProg(); syncNavToScroll();
-  if (cmReady) { cmResolve(); cmDraw(); }
+  if (cmReady) { cmResolve(); cmDraw(); cmDrawPanel(); }
 }
 const card = p => document.querySelector('.fc[data-p="' + CSS.escape(p) + '"]');
 const navEl = p => document.querySelector('.ni[data-p="' + CSS.escape(p) + '"]');
@@ -1072,6 +1108,7 @@ function cmResolve() {
   CMX = {}; cmRoots().forEach(r => { CMX[r.part] = { root: r.root, ix: cmIndex(r.root) }; });
   CM.items.forEach(c => {
     c._pieces = null; c._el = null; c._at = -1; c._state = 'notfound';
+    if (c.state === 'resolved') return;
     if (c.part === 'page') { c._pieces = []; c._state = 'anchored'; c._at = c.t; return; }
     if (c.kind === 'part') { if (PART_KEYS.includes(c.part)) { c._pieces = []; c._state = 'anchored'; c._at = -1; } return; }
     if (c.part === 'diff') { cmResolveDiff(c); return; }
@@ -1084,7 +1121,8 @@ function cmResolve() {
     c._state = cmSection(e.root, c._pieces[0].startContainer) === c.section ? 'anchored' : 'moved';
   });
   // Numbers follow the document, so the markers on the page and the copied feedback read in the same order.
-  CM.items.slice().sort((x, y) => (x._pieces ? 0 : 1) - (y._pieces ? 0 : 1) || PART_KEYS.indexOf(x.part) - PART_KEYS.indexOf(y.part) || x._at - y._at || x.t - y.t)
+  CM.items.forEach(c => { c._n = 0; });
+  CM.items.filter(c => c.state !== 'resolved').sort((x, y) => (x._pieces ? 0 : 1) - (y._pieces ? 0 : 1) || PART_KEYS.indexOf(x.part) - PART_KEYS.indexOf(y.part) || x._at - y._at || x.t - y.t)
     .forEach((c, i) => { c._n = i + 1; });
 }
 function cmDraw() {
@@ -1097,11 +1135,11 @@ function cmDraw() {
       const rects = cmRectsOf(c._el, c._pieces);
       if (!rects.length) return;              // inside a sub-tab that is not showing
       rects.forEach(b => {
-        const d = document.createElement('div'); d.className = 'cm-hl' + (c._el ? ' cm-blk' : '') + (c.id === cmActive ? ' cm-active' : '');
+        const d = document.createElement('div'); d.className = 'cm-hl' + (c._el ? ' cm-blk' : '') + (c.id === cmActive ? ' cm-active' : '') + (c.id === cmFlash ? ' cm-flash' : '');
         d.style.cssText = 'left:' + (b.left - base.left) + 'px;top:' + (b.top - base.top) + 'px;width:' + b.width + 'px;height:' + b.height + 'px';
         layer.appendChild(d);
       });
-      const m = document.createElement('button'); m.type = 'button'; m.className = 'cm-mark' + (c.id === cmActive ? ' cm-active' : ''); m.dataset.cid = c.id;
+      const m = document.createElement('button'); m.type = 'button'; m.className = 'cm-mark' + (c.id === cmActive ? ' cm-active' : '') + (c.id === cmFlash ? ' cm-flash' : ''); m.dataset.cid = c.id;
       m.textContent = c._n; m.title = 'Comment ' + c._n + ': ' + c.text.slice(0, 120);
       // Markers stand in the left margin, level with the first line of their text; two on one line stack downwards.
       let top = rects[0].top - base.top + (Math.min(rects[0].height, 26) - 18) / 2;
@@ -1120,7 +1158,7 @@ function cmDraw() {
   });
   cmDrawDiff();
   cmDrawParts();
-  cmDrawPage();
+  cmPanelMark();
 }
 let cmRaf = 0;
 function cmRefresh() { if (!cmRaf) cmRaf = requestAnimationFrame(() => { cmRaf = 0; cmDraw(); }); }
@@ -1159,27 +1197,147 @@ function cmDrawParts() {
     c._el = [b];
     const m = document.createElement('span'); m.dataset.cid = c.id; m.textContent = c._n;
     m.title = 'Comment ' + c._n + ' on this part: ' + c.text.slice(0, 120);
-    m.className = 'cm-mark cm-fmark cm-tmark' + (c.id === cmActive ? ' cm-active' : '');
+    m.className = 'cm-mark cm-fmark cm-tmark' + (c.id === cmActive ? ' cm-active' : '') + (c.id === cmFlash ? ' cm-flash' : '');
     if (c.id === cmActive) b.classList.add('cm-on');
     b.appendChild(m);
   });
 }
-// --- Comments on the explanation as a whole: the button in the top bar. Their markers stand beside that button.
-function cmPage() { cmOpen({ sel: { part: 'page', kind: 'page', quote: '', pieces: [], el: [document.getElementById('cm-page')] } }); }
-function cmDrawPage() {
-  const box = document.getElementById('cm-page-marks'), btn = document.getElementById('cm-page'); if (!box || !btn) return;
-  box.innerHTML = '';
-  let on = !!(cmDraft && cmDraft.part === 'page');
-  CM.items.filter(c => c.part === 'page').sort((x, y) => x._n - y._n).forEach(c => {
-    c._el = [btn];
-    const m = document.createElement('button'); m.type = 'button'; m.dataset.cid = c.id; m.textContent = c._n;
-    m.title = 'Comment ' + c._n + ' on the whole explanation: ' + c.text.slice(0, 120);
-    m.className = 'cm-mark cm-fmark' + (c.id === cmActive ? ' cm-active' : '');
-    if (c.id === cmActive) on = true;
-    box.appendChild(m);
+// --- The panel lists every comment in page order. A click on a comment goes to what it is about; a comment can be
+// edited, resolved or deleted there. A resolved comment leaves the page and the numbering and waits in a closed group.
+// The comment on the explanation as a whole is written from the panel.
+const CM_PANEL_KEY = 'qexplain-change-panel';
+let cmEdit = null, cmEditText = null, cmFlash = null, cmFlashT = null, cmLastOn = null;
+function cmKeys(ta, save, escape) {
+  ta.addEventListener('keydown', e => {
+    e.stopPropagation();
+    if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) {
+      if (e.shiftKey) return;                                   // the browser adds the line
+      e.preventDefault();
+      if (e.ctrlKey || e.metaKey) { ta.setRangeText('\n', ta.selectionStart, ta.selectionEnd, 'end'); return; }
+      save();
+    } else if (e.key === 'Escape') { e.preventDefault(); escape(); }
   });
-  btn.classList.toggle('cm-on', on);
+}
+function cmExcerpt(s, n) { s = String(s || '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n - 3) + '...' : s; }
+// Where a comment stands, in words a reader and an agent can both follow.
+function cmWhere(c) {
+  if (c.part === 'page') return 'The whole explanation';
+  if (c.kind === 'part') return cmPartName(c.part) + ', the whole part';
+  if (c.part === 'diff') return cmDiffTitle(c);
+  const el = c._el && !Array.isArray(c._el) ? c._el : null;
+  const what = el ? cmBlockName(el).replace(/^./, m => m.toLowerCase()) + ' ' : '';
+  return cmPartName(c.part) + (c.section ? ' > ' + c.section : '') + ': ' + what + '"' + cmExcerpt(c.quote, 70) + '"';
+}
+function cmPanelOpen() { return document.body.classList.contains('cm-open'); }
+function cmPanel(open) {
+  document.body.classList.toggle('cm-open', open);
+  document.getElementById('cm-panel').hidden = !open;
+  document.getElementById('cm-panel-btn').setAttribute('aria-expanded', open ? 'true' : 'false');
+  lsSet(CM_PANEL_KEY, open ? '1' : '0');
+  if (!open) { cmEdit = null; cmEditText = null; }
+  cmDrawPanel(); fitTools(); if (diffActive()) measureHeader(); cmRefresh();
+}
+function cmChanged() { cmSave(); cmResolve(); cmDraw(); cmDrawPanel(); }
+function cmItemHtml(c) {
+  const done = c.state === 'resolved', lost = !done && !c._pieces, editing = cmEdit === c.id;
+  let h = '<div class="cm-it' + (lost ? ' cm-it-lost' : '') + '" data-cid="' + esc(c.id) + '"><div class="cm-it-h">'
+    + (c._n ? '<span class="cm-num">' + c._n + '</span>' : '') + '<span class="cm-it-w">' + esc(cmWhere(c)) + '</span>'
+    + (lost ? '<span class="cm-tag" title="The text this comment was about is no longer on the page, or stands in more than one place">not found</span>'
+      : c._state === 'moved' ? '<span class="cm-tag" title="The text this comment was about now stands in another place">moved</span>' : '') + '</div>';
+  if (editing) return h + '<textarea class="cm-it-ta" aria-label="Comment">' + esc(cmEditText !== null ? cmEditText : c.text) + '</textarea>'
+    + '<div class="cm-it-a"><button type="button" data-act="cancel">Cancel</button><button type="button" class="cm-save" data-act="save">Save</button></div></div>';
+  return h + '<div class="cm-it-t">' + esc(c.text) + '</div><div class="cm-it-a">'
+    + (done ? '<button type="button" data-act="reopen">Reopen</button>' : '<button type="button" data-act="edit">Edit</button><button type="button" data-act="resolve">Resolve</button>')
+    + '<button type="button" class="cm-del" data-act="del">Delete</button></div></div>';
+}
+function cmDrawPanel() {
+  const open = CM.items.filter(c => c.state !== 'resolved').sort((x, y) => x._n - y._n), done = CM.items.filter(c => c.state === 'resolved');
+  const cnt = document.querySelector('#cm-panel-btn .cm-count'); if (cnt) cnt.textContent = open.length || '';
   fitTools();
+  if (!cmPanelOpen()) return;
+  const list = document.querySelector('#cm-panel .cm-pl'), was = list.querySelector('.cm-it-ta'), wasOpen = !!(list.querySelector('.cm-res') || {}).open;
+  if (was) cmEditText = was.value;
+  let h = '';
+  if (cmEdit === 'new') h += '<div class="cm-it" data-cid="new"><div class="cm-it-h"><span class="cm-it-w">The whole explanation</span></div>'
+    + '<textarea class="cm-it-ta" aria-label="Comment" placeholder="Your comment on the explanation as a whole">' + esc(cmEditText || '') + '</textarea>'
+    + '<div class="cm-it-a"><button type="button" data-act="cancel">Cancel</button><button type="button" class="cm-save" data-act="save">Save</button></div></div>';
+  h += open.map(cmItemHtml).join('');
+  if (!open.length && cmEdit !== 'new') h += '<div class="cm-empty">No open comments. Select text, point at a paragraph, a table cell or a diff line, or press / to comment on the part that is showing.</div>';
+  if (done.length) h += '<details class="cm-res"' + (wasOpen ? ' open' : '') + '><summary>Resolved (' + done.length + ')</summary>' + done.map(cmItemHtml).join('') + '</details>';
+  list.innerHTML = h;
+  const ta = list.querySelector('.cm-it-ta');
+  if (ta) {
+    const id = cmEdit;
+    cmKeys(ta, () => cmPanelAct('save', id), () => { const c = CM.items.find(x => x.id === id); if (ta.value.trim() === (c ? c.text : '')) cmPanelAct('cancel', id); });
+    if (!was) { ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length); }
+  }
+  cmLastOn = null; cmPanelMark();
+}
+// Marks the comment whose box is open, without redrawing the list (a redraw would lose what is being typed in it).
+function cmPanelMark() {
+  if (!cmPanelOpen()) return;
+  document.querySelectorAll('#cm-panel .cm-it').forEach(it => {
+    const on = !!cmActive && it.dataset.cid === cmActive;
+    it.classList.toggle('cm-it-on', on);
+    if (on && cmLastOn !== cmActive) it.scrollIntoView({ block: 'nearest' });
+  });
+  cmLastOn = cmActive;
+}
+function cmPanelAct(act, id) {
+  const c = CM.items.find(x => x.id === id), list = document.querySelector('#cm-panel .cm-pl'), ta = list.querySelector('.cm-it-ta');
+  if (act === 'new' || act === 'edit') {
+    if (ta && ta.value.trim() !== (cmEdit === 'new' ? '' : (CM.items.find(x => x.id === cmEdit) || {}).text)) { ta.focus(); return; }   // finish the one in hand first
+    cmEdit = act === 'new' ? 'new' : id; cmEditText = null; if (ta) ta.remove(); cmDrawPanel(); return;
+  }
+  if (act === 'cancel') { cmEdit = null; cmEditText = null; if (ta) ta.remove(); cmDrawPanel(); return; }
+  if (act === 'save') {
+    const text = ta ? ta.value.trim() : ''; if (!text) { if (ta) ta.focus(); return; }
+    if (id === 'new') CM.items.push({ id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), kind: 'page', part: 'page', quote: '', text, t: Date.now(), state: 'open' });
+    else if (c) c.text = text;
+    cmEdit = null; cmEditText = null; ta.remove(); cmChanged(); showToast('Comment saved'); return;
+  }
+  if (!c) return;
+  if (cmActive === c.id) cmClose();
+  if (act === 'resolve') { c.state = 'resolved'; cmChanged(); showToast('Comment resolved'); }
+  else if (act === 'reopen') { c.state = 'open'; cmChanged(); showToast('Comment reopened'); }
+  else if (act === 'del') { CM.items = CM.items.filter(x => x !== c); if (cmEdit === c.id) { cmEdit = null; cmEditText = null; } cmChanged(); showToast('Comment deleted'); }
+}
+// Goes to what a comment is about: its part, its sub-tab or its file, then the place itself, which flashes.
+function cmJump(c) {
+  if (!c || !c._pieces || c.part === 'page') return;
+  if ((document.querySelector('.part-btn.active') || { dataset: {} }).dataset.part !== c.part) switchPart(c.part);
+  let anchor = null;
+  if (c.kind === 'part') anchor = null;
+  else if (c.part === 'diff') {
+    const cd = card(c.path);
+    if (cd) {
+      if (cd.classList.contains('hide')) { document.getElementById('search').value = ''; setF('all', document.querySelector('.fbtn')); }
+      if (cd.classList.contains('iscol')) toggleC(c.path, false);
+    }
+  } else {
+    const node = c._el && !Array.isArray(c._el) ? c._el : c._pieces[0] ? c._pieces[0].startContainer.parentElement : null;
+    const sub = node && node.closest('.sub-panel'), map = node && node.closest('.map-panel');
+    if (sub && !sub.classList.contains('active')) switchSub(sub.dataset.group, sub.id.slice(4));
+    if (map && !map.classList.contains('active')) switchMap(map.id.slice(5), false);
+    anchor = node;
+  }
+  cmFlash = c.id; cmDraw();
+  if (c.part === 'diff' && c.kind !== 'part') anchor = c._el && c._el[0];
+  if (anchor) anchor.scrollIntoView({ block: 'center' });
+  clearTimeout(cmFlashT); cmFlashT = setTimeout(() => { cmFlash = null; cmDraw(); }, 1700);
+}
+function cmPanelInit() {
+  const p = document.createElement('aside'); p.id = 'cm-panel'; p.hidden = true; p.setAttribute('aria-label', 'Comments');
+  p.innerHTML = '<div class="cm-ph"><strong>Comments</strong><button type="button" data-act="new" title="Comment on the explanation as a whole">General comment</button>'
+    + '<button type="button" data-act="close" title="Close the list">Close</button></div><div class="cm-pl"></div>';
+  document.body.appendChild(p);
+  p.addEventListener('click', e => {
+    const b = e.target.closest('button[data-act]'), it = e.target.closest('.cm-it');
+    if (b) { if (b.dataset.act === 'close') cmPanel(false); else cmPanelAct(b.dataset.act, it ? it.dataset.cid : 'new'); return; }
+    if (!it || e.target.closest('textarea, summary') || it.closest('.cm-res') || (document.getSelection() || '').toString()) return;
+    cmJump(CM.items.find(x => x.id === it.dataset.cid));
+  });
+  if (lsGet(CM_PANEL_KEY) === '1') cmPanel(true); else cmDrawPanel();
 }
 document.addEventListener('keydown', e => {
   if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
@@ -1229,7 +1387,7 @@ function cmDiffTitle(s) {
 function cmDrawDiff() {
   const main = document.getElementById('main'); if (!main) return;
   main.querySelectorAll('.cm-dmark, .cm-fmark').forEach(m => m.remove());
-  main.querySelectorAll('.cm-dl').forEach(r => r.classList.remove('cm-dl', 'cm-dl-on'));
+  main.querySelectorAll('.cm-dl').forEach(r => r.classList.remove('cm-dl', 'cm-dl-on', 'cm-flash'));
   main.querySelectorAll('.cm-fh-on').forEach(r => r.classList.remove('cm-fh-on'));
   main.querySelectorAll('.cbtn').forEach(b => { b.hidden = false; });
   CM.items.filter(c => c.part === 'diff' && c._pieces && c.kind !== 'part').sort((x, y) => x._n - y._n).forEach(c => {
@@ -1237,12 +1395,12 @@ function cmDrawDiff() {
     const on = c.id === cmActive, m = document.createElement('button');
     m.type = 'button'; m.dataset.cid = c.id; m.textContent = c._n; m.title = 'Comment ' + c._n + ': ' + c.text.slice(0, 120);
     if (c.kind === 'file') {
-      m.className = 'cm-mark cm-fmark' + (on ? ' cm-active' : '');
+      m.className = 'cm-mark cm-fmark' + (on ? ' cm-active' : '') + (c.id === cmFlash ? ' cm-flash' : '');
       const btn = c._el[0].querySelector('.cbtn'); btn.hidden = true; btn.before(m);
       c._el[0].classList.toggle('cm-fh-on', on);
       return;
     }
-    c._el.forEach(r => { r.classList.add('cm-dl'); if (on) r.classList.add('cm-dl-on'); });
+    c._el.forEach(r => { r.classList.add('cm-dl'); if (on) r.classList.add('cm-dl-on'); if (c.id === cmFlash) r.classList.add('cm-flash'); });
     m.className = 'cm-mark cm-dmark' + (on ? ' cm-active' : '');
     const cell = c._el[0].cells[0]; m.style.left = (3 + 9 * cell.querySelectorAll('.cm-dmark').length) + 'px';
     cell.appendChild(m);
@@ -1439,7 +1597,7 @@ function cmOpen(target) {
     + (c ? '<button type="button" class="cm-del">Delete</button>' : '') + '<button type="button" class="cm-cancel">Cancel</button><button type="button" class="cm-save">Save</button></span></div>';
   card.querySelector('.cm-q').textContent = quote.length > 160 ? quote.slice(0, 157) + '...' : quote;
   const el = (c ? c._el : target.sel.el) || null;
-  card.querySelector('.cm-k').textContent = src.kind === 'part' ? cmPartTitle(src.part) : src.part === 'page' ? 'The whole explanation' : src.part === 'diff' ? cmDiffTitle(src) : el ? cmBlockName(el) : '';
+  card.querySelector('.cm-k').textContent = src.kind === 'part' ? cmPartTitle(src.part) : src.part === 'diff' ? cmDiffTitle(src) : el ? cmBlockName(el) : '';
   const ta = card.querySelector('.cm-text'); ta.value = first;
   const dirty = () => ta.value.trim() !== first.trim();
   const save = () => {
@@ -1448,28 +1606,20 @@ function cmOpen(target) {
     if (c) c.text = text;
     else {
       const s = target.sel, base = { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text, t: Date.now(), state: 'open' };
-      CM.items.push(Object.assign(base, s.kind === 'part' ? { kind: 'part', part: s.part, quote: '' } : s.part === 'page' ? { kind: 'page', part: 'page', quote: '' } : s.part === 'diff'
+      CM.items.push(Object.assign(base, s.kind === 'part' ? { kind: 'part', part: s.part, quote: '' } : s.part === 'diff'
         ? { kind: s.kind, part: 'diff', path: s.path, side: s.side, ln: s.ln, ln2: s.ln2, lines: s.lines, quote: s.quote }
         : { kind: s.el ? 'block' : 'text', tag: s.el && s.el.tagName === 'TABLE' ? 'table' : undefined, part: s.part, section: s.section, quote: s.quote, prefix: s.prefix, suffix: s.suffix }));
     }
-    cmSave(); cmResolve(); cmDraw(); cmClose();
+    cmSave(); cmResolve(); cmDraw(); cmClose(); cmDrawPanel();
     const sel = document.getSelection(); if (sel) sel.removeAllRanges();
     const saved = c || CM.items[CM.items.length - 1];
     showToast(saved._pieces ? 'Comment ' + saved._n + ' saved' : 'Comment saved');
   };
-  ta.addEventListener('keydown', e => {
-    e.stopPropagation();
-    if (e.key === 'Enter' && !e.isComposing && e.keyCode !== 229) {
-      if (e.shiftKey) return;                                   // the browser adds the line
-      e.preventDefault();
-      if (e.ctrlKey || e.metaKey) { ta.setRangeText('\n', ta.selectionStart, ta.selectionEnd, 'end'); return; }
-      save();
-    } else if (e.key === 'Escape') { e.preventDefault(); if (dirty()) cmNudge(); else cmClose(); }
-  });
+  cmKeys(ta, save, () => { if (dirty()) cmNudge(); else cmClose(); });
   card.querySelector('.cm-save').addEventListener('click', save);
   card.querySelector('.cm-cancel').addEventListener('click', cmClose);
   if (c) card.querySelector('.cm-del').addEventListener('click', () => {
-    CM.items = CM.items.filter(x => x !== c); cmSave(); cmResolve(); cmDraw(); cmClose(); showToast('Comment deleted');
+    CM.items = CM.items.filter(x => x !== c); cmSave(); cmResolve(); cmDraw(); cmClose(); cmDrawPanel(); showToast('Comment deleted');
   });
   card._dirty = dirty;
   document.body.appendChild(card); cmCard = card;
@@ -1489,7 +1639,7 @@ function cmOpen(target) {
 let cmReady = false;
 function cmInit() {
   cmReady = true;
-  cmResolve(); cmDraw();
+  cmResolve(); cmDraw(); cmPanelInit();
   if (window.ResizeObserver) { const ro = new ResizeObserver(cmRefresh); cmRoots().forEach(r => ro.observe(r.root)); }
   window.addEventListener('resize', cmRefresh);
   window.addEventListener('popstate', cmRefresh);
