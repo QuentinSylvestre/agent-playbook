@@ -510,9 +510,53 @@
   #cm-add { display: inline-flex; align-items: center; gap: 5px; }
   /* One look for the text buttons of the comment box and the panel. */
   .cm-acts button, .cm-it-a button, .cm-ph button, .cm-pf button, .cm-pic button, .dg-src-h button, .dg-src-ask button { padding: 3px 10px; border-radius: 4px; font-size: 12px; line-height: 1.4; }
+
+  /* ---- With scripts off: the Brief is plain HTML and readable; the message says what is not. ---- */
+  .noscript { margin: 0; padding: 10px 15rem 10px 1.5rem; border-bottom: 2px solid #b26a00; background: #fff8e1; color: #1a1a1a; font-size: 14px; line-height: 1.5; }
+
+  /* ---- Print: the part that is showing, without the bars, the buttons and the comment tools. Browsers do not
+     print background colours by default, so the light colours are put back whatever theme is on screen, and the
+     colours that carry meaning in the diff are kept. ---- */
+  @media print {
+    [data-theme="dark"] {
+      --bg: #fff; --surface: #fff; --text: #1a1a1a; --text-light: #546e7a; --border: #ddd; --border-strong: #ccc; --pre-bg: #f0f0f0;
+      --callout-bg: #f0f6ff; --callout-border: #0066cc; --link: #0066cc; --btn-bg: #f7f7f7; --cy-bg: #f7f9fc; --cy-border: #e0e0e0;
+    }
+    #part-diff, [data-theme="dark"] #part-diff { --bg:#fff; --surface:#fff; --border:#d0d7de; --text:#1f2328; --muted:#57606a; --accent:#0969da; --add-bg:#e6ffec; --add-fg:#1a7f37; --del-bg:#ffebe9; --del-fg:#cf222e; --hunk-bg:#ddf4ff; --hunk-fg:#0550ae; --rv-bg:#fff;
+      --hl-key:#cf222e; --hl-str:#0a3069; --hl-com:#6e7781; --hl-num:#0550ae; --hl-fn:#8250df; --hl-type:#953800; --hl-attr:#116329; }
+    html, body { background: #fff !important; }
+    body, body.cm-open { padding: 0 !important; }
+    .part-bar, .top-tools, #header, #nav, #nav-resizer, #cm-panel, #cm-add, .cm-badd, .cm-card, #cm-hint, #toast, #info-pop, #dg-overlay, #copybox, .cm-layer, .cm-dgl, .cm-mark, .cm-dgbar, .cm-dgtip, .dg-src,
+    .rev-bar, .sub-bar, .map-bar, .tour-box button, .rbtn, .cbtn, .colbtn, .cm-tadd, .dg-src-add, .noscript { display: none !important; }
+    /* The part's name stands at the top of the sheet: the bar that showed it is not printed. */
+    .part-panel.active[data-print]::before { content: attr(data-print); display: block; margin: 0 0 12px; padding-bottom: 6px; border-bottom: 1px solid #ccc; font: 600 13px/1.4 -apple-system, "Segoe UI", sans-serif; color: #1a1a1a; }
+    .page, body.wide-part .page { max-width: none; padding: 0; }
+    #main { margin: 0 !important; padding: 0 !important; }
+    .fc { break-inside: auto; border-radius: 0; margin-bottom: 14px; }
+    .fh, .rat, tr { break-inside: avoid; }
+    .pane { overflow: visible; }
+    /* A long line wraps on paper, where it cannot be unfolded. A wrapped line makes its side taller than the other,
+       so the two sides can fall out of step below it; the smaller type keeps that rare. */
+    table.dt { font-size: 9.5px; }
+    table.dt td { white-space: pre-wrap; overflow: visible; text-overflow: clip; overflow-wrap: anywhere; }
+    tr.add td, tr.del td, tr.hunk td, .wm, table.dt tr.anote td, .b, .hkb, [data-changed]::before, [data-changed]::after { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .dg { width: 100% !important; left: 0 !important; transform: none !important; break-inside: avoid; }
+    .dgv { overflow: visible; }
+    .dgv > svg { max-height: none; }
+    /* A D2 diagram is printed in its light drawing, in the sketch or classic style that is on screen. */
+    html[data-theme="dark"] .dgv.v-dark { display: none !important; }
+    html[data-theme="dark"]:not([data-sketch="classic"]) .dgv.v-light.v-sketch, html[data-theme="dark"][data-sketch="classic"] .dgv.v-light.v-classic { display: block !important; }
+    /* A Mermaid diagram is drawn by a script in the colours of the theme on screen, and cannot be drawn again in the
+       middle of printing. One drawn for the dark theme is turned to light by inverting it and turning its hues back. */
+    html[data-theme="dark"] .mmd svg { filter: invert(1) hue-rotate(180deg); }
+    a { color: inherit; text-decoration: none; }
+    h2, h3, .fh { break-after: avoid; }
+    pre, table, figure { break-inside: avoid; }
+  }
 </style>
 </head>
 <body>
+<noscript><p class="noscript"><strong>Scripts are off in this browser.</strong> The Brief below can be read. The other parts, the diff, the diagrams drawn in the page, the tours and the comments need scripts: allow them for this file, or open it in another browser.</p></noscript>
 
 <div class="part-bar" id="top-bar">
   <div class="top-tools" id="top-tools">
@@ -595,6 +639,9 @@ function jsq(s) { return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); 
 let currentVid = null;
 
 // ---------------- Part switching and URL hash (#part or #maps/view) ----------------
+// For a printed sheet: what the page is and which part it shows, since the bar that said so is not printed.
+document.querySelectorAll('.part-panel').forEach(p => { const b = document.querySelector('.part-btn[data-part="' + p.id.slice(5) + '"]');
+  if (b && p.id !== 'part-brief') p.dataset.print = document.title + ' / ' + (b.dataset.label || b.textContent.trim()); });
 function switchPart(key, saveHash) {
   if (!PART_KEYS.includes(key)) return;
   document.querySelectorAll('.part-panel').forEach(p => p.classList.toggle('active', p.id === 'part-' + key));
@@ -2360,7 +2407,8 @@ function dgSrcOpen(dg, open) {
     ta.addEventListener('input', () => { dgSrcMarks(dg); clearTimeout(timer); timer = setTimeout(() => dgSrcSet(dg, ta.value, false), 350); });
     ta.addEventListener('keydown', e => e.stopPropagation());        // the page's own keys stay out of the text
     // The numbers scroll with the text, whichever of the two is moved (a script can scroll the numbers; a reader cannot).
-    ta.addEventListener('scroll', () => { dgSrcScroll(box); add.hidden = true; if (!cmCard) cmAddButton().hidden = true; });
+    // A scroll moves the lines: the button of the hovered line goes, and the Comment button of a selection is placed again.
+    ta.addEventListener('scroll', () => { dgSrcScroll(box); add.hidden = true; if (!cmCard) { if (dgSrcPending()) cmOffer(); else cmAddButton().hidden = true; } });
     g.addEventListener('scroll', () => { if (Math.abs(g.scrollTop - ta.scrollTop) > 1) ta.scrollTop = g.scrollTop; });
     ta.addEventListener('keyup', () => setTimeout(cmOffer, 0));      // a selection made with the keys; one made with the mouse is seen by the page
     // As on a paragraph or a diff line: a comment button follows the pointer from line to line.

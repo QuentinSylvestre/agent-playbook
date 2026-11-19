@@ -914,6 +914,39 @@ async function routeLibs(target) {
     });
     log(wm.one === '30>90' && wm.far === null && wm.grown === ', retries', `word marks cover what differs between two lines, grow with an added argument, and are left out when the lines have little in common (${wm.one}; ${wm.grown})`);
     log(wm.pairs > 0 && wm.marked > 0 && wm.same && wm.faithful, `a removed line stands beside the line that replaces it (${wm.pairs} pairs, ${wm.marked} with marks); a line with no counterpart keeps an empty cell opposite (${wm.lone})`);
+    // Print: the part that is showing, in the light colours, without bars, buttons and the comment tools
+    {
+      const shown = sel => page.evaluate(sel => [...document.querySelectorAll(sel)].filter(e => e.offsetParent !== null || getComputedStyle(e).position === 'fixed' && getComputedStyle(e).display !== 'none').length, sel);
+      const chrome = '.part-bar, .top-tools, #header, #nav, #cm-panel, .cm-mark, .cm-dgbar, .rev-bar, .rbtn, .cbtn, .sub-bar, .map-bar';
+      const parts = await page.evaluate(() => PART_KEYS.slice());
+      await page.evaluate(() => { document.documentElement.setAttribute('data-theme', 'dark'); cmPanel(true);
+        CM.items.push({ id: 'vcpr', kind: 'page', part: 'page', quote: '', text: 'vc print', label: '', t: Date.now(), state: 'open' }); cmChanged(); });
+      const res = [];
+      for (const k of parts) {
+        await page.evaluate(k => switchPart(k), k); await wait(k === 'maps' || k === 'diff' ? 900 : 300);
+        await page.emulateMedia({ media: 'print' }); await wait(150);
+        res.push(await page.evaluate(([k, chrome]) => { const p = document.getElementById('part-' + k), vis = e => getComputedStyle(e).display !== 'none' && e.getClientRects().length > 0;
+          const text = getComputedStyle(p.querySelector('p, td, li') || p).color.match(/\d+/g).map(Number), bg = getComputedStyle(document.body).backgroundColor;
+          const main = document.getElementById('main'), dark = [...p.querySelectorAll('.dgv.v-dark')].filter(vis).length, light = [...p.querySelectorAll('.dgv.v-light')].filter(vis).length;
+          return { k, chrome: [...document.querySelectorAll(chrome)].filter(vis).length, others: [...document.querySelectorAll('.part-panel')].filter(x => x !== p && vis(x)).length, body: p.textContent.trim().length > 20 && vis(p),
+            darkText: text[0] + text[1] + text[2] < 300, whiteBg: /255, 255, 255/.test(bg), pad: parseFloat(getComputedStyle(document.body).paddingRight), title: k === 'brief' ? 'n/a' : getComputedStyle(p, '::before').content,
+            main: k === 'diff' && main ? parseFloat(getComputedStyle(main).marginLeft) : 0, wrap: k === 'diff' ? getComputedStyle(p.querySelector('table.dt td:not(.ln)')).whiteSpace : 'n/a', dark, light, wide: document.documentElement.scrollWidth > innerWidth + 2,
+            mm: [...p.querySelectorAll('.mmd svg')].every(s => getComputedStyle(s).filter.includes('invert')) }; }, [k, chrome]));      // a Mermaid diagram drawn for the dark theme is turned to light
+        await page.emulateMedia({ media: 'screen' }); await wait(100);
+      }
+      await page.evaluate(() => { document.documentElement.removeAttribute('data-theme'); CM.items = CM.items.filter(x => x.id !== 'vcpr'); cmChanged(); cmPanel(false); switchPart(PART_KEYS[0]); window.scrollTo(0, 0); }); await wait(300);
+      const bad = res.filter(r => r.chrome || r.others || !r.body || !r.darkText || !r.whiteBg || r.pad || r.main || r.dark || !r.mm || (r.k !== 'brief' && !/ \/ /.test(r.title)) || (r.k === 'diff' && r.wrap !== 'pre-wrap'));
+      log(!bad.length, `printed from the dark theme with the comment list open, each part (${res.map(r => r.k).join(', ')}) shows its own content in dark text on white, named at the top, with no bar, button or comment tool` + (bad.length ? ': ' + JSON.stringify(bad).slice(0, 400) : ''));
+    }
+    // With scripts off, the page says so and the Brief can still be read
+    {
+      const ctx = await page.context().browser().newContext({ javaScriptEnabled: false, viewport: { width: 1100, height: 800 } });
+      const off = await ctx.newPage(); await off.goto(page.url().split('#')[0]); await off.waitForTimeout(500);
+      const msg = await off.locator('.noscript').innerText().catch(() => ''), brief = await off.locator('#part-brief h2').first().isVisible().catch(() => false), box = await off.locator('.noscript').boundingBox().catch(() => null);
+      await ctx.close();
+      const on = await page.evaluate(() => document.querySelectorAll('.noscript').length);
+      log(/Scripts are off/.test(msg) && /Brief below can be read/.test(msg) && brief && !!box && box.y < 5 && on === 0, 'with scripts off the page says so at its top and the Brief can still be read; with scripts on the message is not there');
+    }
     // Blocks the agent marked as changed: a legend counts them, each says "changed" in words, and the buttons step through them
     {
       const rv = await page.evaluate(() => { const parts = cmRoots().map(({ part, root }) => ({ part, n: root.querySelectorAll('[data-changed]').length, bar: root.querySelector('.rev-bar') })).filter(x => x.n || x.bar);
