@@ -143,6 +143,17 @@ Leave out the flags of parts not chosen (`--parts` defaults to `brief,diff`). Fo
 
 The build captures the diff as UTF-8, removes excluded files, renders the diagrams, inlines the data safely, warns about any file without a rationale or role, and runs the Step 4 validator. Fix every warning. It stops with nothing written if it finds credential-shaped text in the diff or in any file you wrote, diagram sources, tickets and links included; reword your own text, it cannot be allowed.
 
+### Write so the reader can answer back
+
+The reader comments on the page block by block, and you rebuild from those comments. Write for that.
+
+- **Answer first.** The first sentence of `intent` says what the change does and why, in words a reader could repeat. The first sentence of every later section carries that section's point. A reader who stops after any section has then seen what matters most so far.
+- **One claim per block.** A paragraph, a list item or a table cell holds one claim, so a comment lands on exactly that claim. Split a paragraph that makes three points into three.
+- **A heading says what the change does.** "The reporter refuses a batch with no listener id", not "Reporter" and not "Changes in reporter.go".
+- **Mark what you inferred.** A claim taken from a ticket, a plan, a test or a command stands as written. A claim you worked out from the code alone says so ("the code suggests", "probably"). Where you could not settle why something was done, write it as a question the reviewer can answer. This is a question about what the change means, never about whether it is good.
+- **Never colour alone.** In a table or a list you write, a state shown by colour is also said in words: "new", "changed", "removed". In a diagram, the tour caption or the sentence beside it names what is new; the colour only repeats it.
+- **Close on what you left out.** `verified` already lists the files left out. Add what you chose not to explain (generated files, mechanical renames, an area you did not read) and where the reader looks for it.
+
 ### The Brief
 
 One fragment, one scrolling page. Heading ids are fixed and the validator checks them, in this order:
