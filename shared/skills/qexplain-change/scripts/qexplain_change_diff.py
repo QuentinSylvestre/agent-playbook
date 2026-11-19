@@ -373,6 +373,24 @@ def hunk_functions(path, block):
     return {"hunks": labels, "list": [{k: f[k] for k in ("kind", "name", "call", "sig")} for f in found]}
 
 
+def hunk_line_numbers(block):
+    """The line numbers one file's diff shows: (those of the old side, those of the new side)."""
+    old, new = set(), set()
+    for hunk in parse_hunks(block):
+        o, n = hunk["old"][0], hunk["new"][0]
+        for line in hunk["lines"]:
+            mark = line[:1]
+            if mark == "\\":
+                continue
+            if mark != "+":
+                old.add(o)
+                o += 1
+            if mark != "-":
+                new.add(n)
+                n += 1
+    return old, new
+
+
 def changed_runs(hunk):
     """The runs of changed lines in a hunk, each {"dels": [(old line number, text)], "adds": [(new line number, text)]}.
     Context lines separate the runs."""

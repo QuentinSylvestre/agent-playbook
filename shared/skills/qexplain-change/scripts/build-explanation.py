@@ -53,6 +53,7 @@ Content files:
                         diagram and fails on an unknown id, listing the valid ones. Mermaid flowchart ids are node
                         ids. Mermaid sequence "highlight" entries are text fragments of a participant, message or note.
     rationales.json     {"path/in/diff": "One sentence on why it changed.", ...}
+    notes.json          optional: [{"path": "path/in/diff", "line": 12, "note": "..."}, ...] with "side": "old" and "end": 14 when needed
     roles.json          {"path/in/diff": "One sentence on what the file does.", ...} (optional; feeds Change summary)
     diagrams/           with --diagrams <dir>: <name>.d2 (D2) or <name>.mmd (Mermaid), never both for one name.
 
@@ -256,6 +257,41 @@ def image_versions(kept, args, selected):
                 sides[side] = {"uri": f"data:{IMAGE_TYPES[ext]};base64,{base64.b64encode(data).decode('ascii')}", "bytes": len(data)}
         out[path] = sides
     return out
+
+
+NOTE_MAX = 600
+
+
+def line_notes(data, kept):
+    """Check the agent's notes on diff lines and return them per file: {path: [{"s": side, "a": first line,
+    "b": last line, "t": text}]}, with the problems found. A note must name a file of the page, a side (new by
+    default, or old), and lines the diff shows on that side: a note on a line the page does not show would vanish."""
+    out, bad, shown = {}, [], {path: qd.hunk_line_numbers(block) for path, block in kept}
+    if not isinstance(data, list):
+        return {}, ["notes.json must be a list of notes"]
+    for i, item in enumerate(data, 1):
+        where = f"note {i}"
+        if not isinstance(item, dict) or not isinstance(item.get("path"), str) or not isinstance(item.get("note"), str):
+            bad.append(f"{where}: needs \"path\" and \"note\" as text, and \"line\" as a number")
+            continue
+        path, side, text = item["path"], item.get("side", "new"), item["note"].strip()
+        first, last = item.get("line"), item.get("end", item.get("line"))
+        where = f"{where} ({qd.safe_path(path)})"
+        if path not in shown:
+            bad.append(f"{where}: this file is not on the page")
+        elif side not in ("new", "old"):
+            bad.append(f"{where}: \"side\" is \"new\" or \"old\"")
+        elif not all(isinstance(n, int) and not isinstance(n, bool) for n in (first, last)) or last < first:
+            bad.append(f"{where}: \"line\" and \"end\" are line numbers, the end not before the line")
+        elif not text or len(text) > NOTE_MAX:
+            bad.append(f"{where}: the note is empty or longer than {NOTE_MAX} characters")
+        else:
+            missing = [n for n in range(first, last + 1) if n not in shown[path][0 if side == "old" else 1]]
+            if missing:
+                bad.append(f"{where}: line {missing[0]} is not shown on the {side} side of the diff")
+            else:
+                out.setdefault(path, []).append({"s": side, "a": first, "b": last, "t": text})
+    return out, bad
 
 
 def script_json(data):
@@ -753,6 +789,7 @@ def main(argv=None):
     ap.add_argument("--maps")
     ap.add_argument("--rationales")
     ap.add_argument("--roles")
+    ap.add_argument("--notes", help="notes.json: notes on lines of the diff, shown read-only on the page")
     ap.add_argument("--diagrams")
     ap.add_argument("--ticket", action="append", default=[], help="a ticket reference to show in the provenance strip")
     ap.add_argument("--link", action="append", default=[], help="label=https://url to show in the provenance strip")
@@ -801,6 +838,10 @@ def main(argv=None):
     roles = read_json(args.roles) if args.roles else {}
     if not isinstance(roles, dict):
         fail("roles.json must map file paths to sentences")
+    notes_text = read(args.notes) if args.notes and "diff" in selected else ""
+    notes, bad_notes = line_notes(read_json(args.notes), kept) if notes_text else ({}, [])
+    if bad_notes:
+        fail("notes.json: " + "; ".join(bad_notes[:6]))
     brief = read(args.brief)
     walkthrough = read(args.walkthrough) if args.walkthrough and "walkthrough" in selected else ""
     maps_text = read(args.maps) if args.maps and "maps" in selected else ""
@@ -846,7 +887,7 @@ def main(argv=None):
         print(f"ALLOWED\t{qd.safe_path(key)}\t{n} match(es)" if n else f"WARN\tallowed match {qd.safe_path(key)} is not in the diff")
     hits = [h for h in diff_hits if qd.hit_key(h) not in allowed]
     written = [("brief", brief), ("walkthrough", walkthrough), ("maps.json", maps_text), ("rationales.json", read(args.rationales)),
-               ("roles.json", read(args.roles) if args.roles else ""), ("title and refs", f"{args.title}\n{args.base}\n{args.head}"),
+               ("roles.json", read(args.roles) if args.roles else ""), ("notes.json", notes_text), ("title and refs", f"{args.title}\n{args.base}\n{args.head}"),
                ("tickets and links", "\n".join(tickets + [f"{a} {b}" for a, b in links])),
                ("provenance", "\n".join(f"{r['label']} {r['branch']} {r['base']} {r['head']}" for r in repos))]
     written += diagrams.source_texts(diagrams.used)
@@ -901,6 +942,8 @@ def main(argv=None):
             "hk": qd.hunk_kinds(kept) if "diff" in selected else {},
             # Per changed picture: its version before and after, embedded. See image_versions.
             "images": image_versions(kept, args, selected),
+            # Per file: the agent's notes on lines of the diff. See line_notes.
+            "notes": notes,
         }) + ";",
     }
     for marker in ("{{TITLE}}", "<!--@PROVENANCE-->", "<!--@MERMAID-->", "<!--@BRIEF-->", "/*@DATA*/"):
@@ -1088,6 +1131,20 @@ def selftest():
         case("a page without the Diff review part loads no highlighter", "highlight.min.js" not in page and "<!--@HLJS-->" not in page, "")
         rc, log, page = run("brief-diff", std)
         case("brief and diff page", rc == 0 and 'id="part-diff"' in page and "diff --git" in page, log[-300:])
+        # Notes on diff lines
+        note_file = os.path.join(content, "notes.json")
+        noted = lambda notes: (open(note_file, "w", encoding="utf-8", newline="\n").write(json.dumps(notes)), run("notes", std + ["--notes", note_file]))[1]
+        n_rc, n_log, n_page = noted([{"path": "src/api/handler.py", "line": 3, "note": "This line is why the change exists."},
+                               {"path": "docs/guide.md", "side": "old", "line": 1, "end": 2, "note": "Unchanged on purpose."}])
+        case("notes on diff lines are checked and written into the page", n_rc == 0 and '"This line is why the change exists."' in n_page and '"s": "old"' in n_page and '"b": 2' in n_page, n_log[-300:])
+        n_rc, n_log, n_page = noted([{"path": "src/api/handler.py", "line": 40, "note": "Not in the diff."}])
+        case("a note on a line the diff does not show stops the build", n_rc != 0 and "line 40 is not shown on the new side" in n_log, n_log[-300:])
+        n_rc, n_log, n_page = noted([{"path": "src/api/handler.py", "side": "old", "line": 3, "note": "Line 3 is new."}])
+        case("a note on the old side cannot point at an added line", n_rc != 0 and "line 3 is not shown on the old side" in n_log, n_log[-300:])
+        n_rc, n_log, n_page = noted([{"path": "src/nowhere.py", "line": 1, "note": "x"}, {"path": "docs/guide.md", "line": "3", "note": "y"}])
+        case("a note on a file that is not on the page, or with a line that is not a number, stops the build", n_rc != 0 and "not on the page" in n_log and "line numbers" in n_log, n_log[-400:])
+        n_rc, n_log, n_page = noted([{"path": "src/api/handler.py", "line": 3, "note": "use pass" + 'word = "Zq7Mv2Lp9Xk4" here'}])
+        case("a note is scanned like every text the agent writes", n_rc != 0 and "credential-shaped" in n_log, n_log[-300:])
         case("the page carries an explanation id made of the repo and the file name", '"id": "repo--brief-diff"' in page, page[page.find("const QX"):][:120])
         case("the Info menu holds the provenance once, with the page path row and no id", page.count('class="prov-row pagepath"') == 1 and 'id="pagepath' not in page, "")
         eid = explanation_id

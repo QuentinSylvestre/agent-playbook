@@ -907,6 +907,32 @@ async function routeLibs(target) {
     });
     log(wm.one === '30>90' && wm.far === null && wm.grown === ', retries', `word marks cover what differs between two lines, grow with an added argument, and are left out when the lines have little in common (${wm.one}; ${wm.grown})`);
     log(wm.pairs > 0 && wm.marked > 0 && wm.same && wm.faithful, `a removed line stands beside the line that replaces it (${wm.pairs} pairs, ${wm.marked} with marks); a line with no counterpart keeps an empty cell opposite (${wm.lone})`);
+    // The agent's notes on diff lines: under their lines, read-only, both sides level, and never in the copied feedback
+    {
+      const an = await page.evaluate(() => {
+        const N = QX.notes || {}, all = Object.entries(N).flatMap(([p, ns]) => ns.map(n => [p, n])); if (!all.length) return null;
+        document.querySelectorAll('.fc.iscol').forEach(c => toggleC(c.dataset.p, false));
+        let placed = 0, level = true, marked = true; const texts = [];
+        all.forEach(([p, n]) => { const panes = card(p).querySelectorAll('.sp .pane'), k = n.s === 'old' ? 0 : 1, rows = [...panes[k].querySelectorAll('tr')], twin = [...panes[1 - k].querySelectorAll('tr')];
+          const last = rows.findIndex(r => r.dataset.ln === String(n.b)), note = rows[last + 1], ghost = twin[last + 1];
+          if (last < 0 || !note || !note.classList.contains('anote') || note.classList.contains('an-ghost') || !note.textContent.includes(n.t)) return;
+          placed++; texts.push(n.t);
+          if (!ghost || !ghost.classList.contains('an-ghost') || getComputedStyle(ghost.querySelector('span')).visibility !== 'hidden' || Math.abs(note.getBoundingClientRect().height - ghost.getBoundingClientRect().height) > 1.5
+            || Math.abs(note.getBoundingClientRect().top - ghost.getBoundingClientRect().top) > 1.5) level = false;
+          for (let ln = n.a; ln <= n.b; ln++) { const r = rows.find(x => x.dataset.ln === String(ln)); if (!r || !r.classList.contains('an-ln')) marked = false; } });
+        const even = [...document.querySelectorAll('.fc .sp')].every(sp => { const [a, b] = sp.querySelectorAll('.pane'); return a.querySelectorAll('tr').length === b.querySelectorAll('tr').length && Math.abs(a.querySelector('table').offsetHeight - b.querySelector('table').offsetHeight) < 3; });
+        const note = document.querySelector('tr.anote:not(.an-ghost)'), was = note.querySelector('td:not(.ln)').className;
+        note.querySelector('td:not(.ln)').click();
+        CM.items.push({ id: 'vcan', kind: 'file', part: 'diff', path: all[0][0], quote: '', text: 'vc beside a note', label: '', t: Date.now(), state: 'open' }); cmChanged();
+        const fb = cmFeedback(); CM.items = CM.items.filter(x => x.id !== 'vcan'); cmChanged();
+        return { n: all.length, placed, level, marked, even, still: note.querySelector('td:not(.ln)').className === was && !note.dataset.ln && !note.dataset.path, leak: texts.some(t => fb.includes(t)), stored: texts.some(t => (localStorage.getItem(CM_KEY) || '').includes(t)) };
+      });
+      if (an) {
+        log(an.placed === an.n && an.marked && an.level && an.even, `each of the agent's ${an.n} notes stands under the lines it is about, which are marked; the other side holds an unseen copy, so both sides stay level`);
+        log(an.still && !an.leak && !an.stored, 'a note is read-only: it is not a line that can be wrapped or commented, and it is neither in the copied feedback nor in the stored comments');
+      }
+      await page.evaluate(() => window.scrollTo(0, 0));
+    }
     // A changed picture is shown before and after, side by side, each with its size; a version not embedded says why
     {
       const im = await page.evaluate(async () => {
@@ -1015,9 +1041,9 @@ async function routeLibs(target) {
       const cards = [...document.querySelectorAll('.fc')].filter(c => c.querySelector('.sp'));
       const col = cards.filter(c => c.querySelector('table.dt [class^="hljs-"]')).map(c => c.dataset.p.split('.').pop());
       let same = true, marks = true;
-      cards.forEach(c => { const f = fmap[c.dataset.p], S = splitDiff(f.lines); c.querySelectorAll('.sp .pane').forEach((pane, k) => {
+      cards.forEach(c => { const S = dsRows(c.dataset.p); c.querySelectorAll('.sp .pane').forEach((pane, k) => {
         const rows = (k ? S.R : S.L), trs = pane.querySelectorAll('tr');
-        rows.forEach((r, i) => { if (r.t === 'h') return; const td = trs[i].querySelector('td:not(.ln)'), txt = td.textContent === ' ' ? '' : td.textContent;
+        rows.forEach((r, i) => { if (r.t === 'h' || r.t === 'n') return; const td = trs[i].querySelector('td:not(.ln)'), txt = td.textContent === ' ' ? '' : td.textContent;
           if (txt !== r.c) same = false;
           // a mark that crosses two colours is in two pieces, so the marked text is compared as one string
           if ((r.w || []).map(([a, b]) => r.c.slice(a, b)).join('') !== [...td.querySelectorAll('.wm')].map(x => x.textContent).join('')) marks = false; }); }); });

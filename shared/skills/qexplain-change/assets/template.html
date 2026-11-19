@@ -238,6 +238,15 @@
   .fnl a { color: var(--accent); }
   .fn-note { margin: 3px 0 0; font-size: 11px; font-style: italic; }
   .hfn { margin-left: 10px; font-style: normal; font-weight: 600; }
+  /* A note the agent attached to lines of the diff. It stands under its lines on its own side; the other side
+     holds the same text, unseen, so both sides keep the same height. */
+  table.dt tr.anote td { white-space: normal; background: rgba(9, 105, 218, 0.07); font-family: -apple-system, "Segoe UI", sans-serif; font-size: 12px; line-height: 1.45; padding: 5px 10px 6px; cursor: default; }
+  table.dt tr.anote td.ln { padding: 5px 6px; color: #0969da; font-size: 9.5px; font-weight: 600; letter-spacing: .02em; }
+  table.dt tr.anote td:not(.ln) { box-shadow: inset 3px 0 0 #0969da; color: var(--text); }
+  table.dt tr.anote.an-ghost td { background: none; box-shadow: none; }
+  table.dt tr.anote.an-ghost td > * { visibility: hidden; }
+  .an-who { margin-right: 6px; font-weight: 600; color: #0969da; }
+  tr.an-ln td.ln { box-shadow: inset 3px 0 0 #0969da; }
   /* A changed picture, before and after. */
   .imvs { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 12px 14px; }
   .imv { margin: 0; min-width: 0; }
@@ -292,6 +301,7 @@
     #nav, #nav-resizer { display: none; }
     #main { margin-left: 0; padding: 12px; }
     .sp { grid-template-columns: 1fr; }
+    table.dt tr.anote.an-ghost { display: none; }
     .pane + .pane { border-left: none; border-top: 2px solid var(--border); }
   }
   /* Comments: highlights and numbered markers sit in a layer over the page, so the page's text is never rewritten. */
@@ -827,13 +837,20 @@ function parseDiff(raw) {
 // The two sides of a file's diff, row by row. A run of removed lines followed by added lines is a replacement: the
 // first removed line stands beside the first added one, and so on, each pair with its word-level marks. Lines left
 // over on either side keep an empty cell opposite.
-function splitDiff(lines, labels, kinds) {
+function splitDiff(lines, labels, kinds, notes) {
   const L = [], R = []; let ln = 1, rn = 1, inHunk = false, dels = [], adds = [], hunk = 0, hk = null;
+  // The agent's notes: a row of lines a note is about is marked, and the note stands after the last of them, on both sides.
+  const N = notes || [], noted = (s, n) => n !== '' && N.some(x => x.s === s && n >= x.a && n <= x.b);
+  const put = (l, r) => {
+    if (noted('old', l.ln)) l.an = true; if (noted('new', r.ln)) r.an = true;
+    L.push(l); R.push(r);
+    N.forEach(x => { if (x.s === 'old' ? l.ln === x.b : r.ln === x.b) { L.push({ t: 'n', ln: '', c: x.t, mine: x.s === 'old', hk }); R.push({ t: 'n', ln: '', c: x.t, mine: x.s === 'new', hk }); } });
+  };
   const flush = () => {
     const k = Math.min(dels.length, adds.length);
-    for (let i = 0; i < k; i++) { const w = wordMarks(dels[i].c, adds[i].c); L.push({ t: 'del', ln: dels[i].ln, c: dels[i].c, w: w && w[0], hk }); R.push({ t: 'add', ln: adds[i].ln, c: adds[i].c, w: w && w[1], hk }); }
-    dels.slice(k).forEach(d => { L.push({ t: 'del', ln: d.ln, c: d.c, hk }); R.push({ t: 'del', ln: '', c: '', hk }); });
-    adds.slice(k).forEach(a => { L.push({ t: 'add', ln: '', c: '', hk }); R.push({ t: 'add', ln: a.ln, c: a.c, hk }); });
+    for (let i = 0; i < k; i++) { const w = wordMarks(dels[i].c, adds[i].c); put({ t: 'del', ln: dels[i].ln, c: dels[i].c, w: w && w[0], hk }, { t: 'add', ln: adds[i].ln, c: adds[i].c, w: w && w[1], hk }); }
+    dels.slice(k).forEach(d => put({ t: 'del', ln: d.ln, c: d.c, hk }, { t: 'del', ln: '', c: '', hk }));
+    adds.slice(k).forEach(a => put({ t: 'add', ln: '', c: '', hk }, { t: 'add', ln: a.ln, c: a.c, hk }));
     dels = []; adds = [];
   };
   for (const line of lines) {
@@ -848,7 +865,7 @@ function splitDiff(lines, labels, kinds) {
     if (!inHunk || line.startsWith('\\')) continue;
     if (line.startsWith('-')) { if (adds.length) flush(); dels.push({ ln: ln++, c: line.slice(1) }); }
     else if (line.startsWith('+')) adds.push({ ln: rn++, c: line.slice(1) });
-    else { flush(); L.push({ t: '', ln: ln++, c: line.slice(1), hk }); R.push({ t: '', ln: rn++, c: line.slice(1), hk }); }
+    else { flush(); put({ t: '', ln: ln++, c: line.slice(1), hk }, { t: '', ln: rn++, c: line.slice(1), hk }); }
   }
   flush();
   return { L, R };
@@ -888,7 +905,10 @@ function renderPane(rows, path) {
       const rest = !at ? esc(r.c) : esc(at[0]) + badge + (r.fn ? '<span class="hfn" title="Where the first change of this hunk stands">' + esc(r.fn) + '</span>' : esc(r.c.slice(at[0].length)));
       h += '<tr class="hunk' + (r.hk ? ' hkh' : '') + '"><td class="ln">&hellip;</td><td>' + rest + (at ? '' : badge) + '</td></tr>'; continue;
     }
-    h += '<tr class="' + r.t + (r.hk ? ' hkrow' : '') + '" data-path="' + esc(path) + '"' + (r.ln !== '' ? ' data-ln="' + r.ln + '"' : '') + '>'
+    if (r.t === 'n') {      // a note of the agent: read-only, not a line of the diff
+      h += '<tr class="anote' + (r.mine ? '' : ' an-ghost') + (r.hk ? ' hkrow' : '') + '"' + (r.mine ? '' : ' aria-hidden="true"') + '><td class="ln">' + (r.mine ? 'note' : '') + '</td><td><span class="an-who">Agent note</span><span>' + esc(r.c) + '</span></td></tr>'; continue;
+    }
+    h += '<tr class="' + r.t + (r.hk ? ' hkrow' : '') + (r.an ? ' an-ln' : '') + '" data-path="' + esc(path) + '"' + (r.ln !== '' ? ' data-ln="' + r.ln + '"' : '') + '>'
       + '<td class="ln">' + r.ln + '</td><td' + (r.w && r.w.length ? ' data-w="' + r.w.map(x => x.join('-')).join(',') + '"' : '') + '>' + (markedHtml(r.c, r.w) || '&nbsp;') + '</td></tr>';
   }
   return h + '</tbody></table>';
@@ -1304,7 +1324,7 @@ window.addEventListener('resize', fitTools);
 function copyRef(which) { const v = which === 'base' ? QX.base : QX.head; copyText(v, 'Copied: ' + v, document.getElementById('hcp-' + which)); }
 // Click a diff cell to toggle the row between truncated and wrapped.
 document.addEventListener('click', e => {
-  const td = e.target.closest('table.dt tr:not(.hunk) td');
+  const td = e.target.closest('table.dt tr:not(.hunk):not(.anote) td');
   if (!td || e.target.closest('.cm-mark') || (window.getSelection() || '').toString()) return;
   td.closest('tr').querySelectorAll('td:not(.ln)').forEach(c => c.classList.toggle('expanded'));
 });
@@ -1338,7 +1358,7 @@ document.addEventListener('keydown', e => {
 // not the page, so a match in a collapsed file counts and opens the file when it is reached. A context line stands on
 // both sides and counts once. Matches are painted with the browser's highlight registry, which adds no element.
 let dsHits = [], dsAt = -1, dsTimer = 0, dsRaf = 0;
-function dsRows(p) { const f = fmap[p]; return f._S || (f._S = splitDiff(f.lines, ((QX.fns || {})[p] || {}).hunks, (QX.hk || {})[p])); }
+function dsRows(p) { const f = fmap[p]; return f._S || (f._S = splitDiff(f.lines, ((QX.fns || {})[p] || {}).hunks, (QX.hk || {})[p], (QX.notes || {})[p])); }
 function dsFind() {
   const q = document.getElementById('dsearch').value.toLowerCase();
   dsHits = []; dsAt = -1;
