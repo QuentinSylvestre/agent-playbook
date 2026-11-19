@@ -159,6 +159,64 @@ async function routeLibs(target) {
   await page.reload(); await wait(1200);
   await page.click('#part-brief .cm-mark'); await wait(150); await page.click('.cm-card .cm-del'); await wait(200);
   log(await page.evaluate(k => document.querySelectorAll('.cm-mark').length === 0 && JSON.parse(localStorage.getItem(k)).items.length === 0, cmKey), 'Delete removes the comment and its marker');
+  // Comments on a whole paragraph or table cell, without selecting text
+  const pAt = await page.evaluate(() => {
+    const p = [...document.querySelectorAll('#part-brief .page p')].find(x => x.textContent.trim().length > 60 && cmBlockOf(x) === x);
+    p.scrollIntoView({ block: 'center' }); window.__p = p; const b = p.getBoundingClientRect(); return { x: b.left + 40, y: b.top + b.height / 2 }; });
+  await page.mouse.move(pAt.x - 5, pAt.y); await page.mouse.move(pAt.x, pAt.y); await wait(200);
+  log(await page.evaluate(() => { const b = document.getElementById('cm-blk-add'); return !!b && !b.hidden && b.getBoundingClientRect().left >= window.__p.getBoundingClientRect().right; }),
+    'the pointer over a paragraph offers a comment button beside it');
+  await page.hover('#cm-blk-add'); await wait(150);
+  log(await page.evaluate(() => { const h = document.getElementById('cm-hint'), b = document.getElementById('cm-blk-add'); if (!h || h.hidden || !b.querySelector('svg')) return false;
+    const a = h.getBoundingClientRect(), p = window.__p.getBoundingClientRect(); return a.top <= p.top && a.bottom >= p.bottom && a.left <= p.left; }),
+    'the pointer over the comment button lights the paragraph it would comment on');
+  await page.click('#cm-blk-add'); await wait(200);
+  log(await page.evaluate(() => { const k = document.querySelector('.cm-card .cm-k'); return !!k && k.textContent === 'Paragraph' && !!document.querySelector('.cm-hl.cm-blk.cm-pending'); }),
+    'the comment button opens a box named for the paragraph, with the paragraph marked');
+  await page.keyboard.type('whole paragraph'); await page.keyboard.press('Enter'); await wait(250);
+  log(await page.evaluate(() => { const c = CM.items[CM.items.length - 1];
+    return CM.items.length === 1 && c.kind === 'block' && c.quote === window.__p.textContent.trim() && c._el === window.__p
+      && document.querySelectorAll('#part-brief .cm-hl.cm-blk').length === 1 && document.querySelectorAll('#part-brief .cm-mark').length === 1; }),
+    'a paragraph comment stores the whole paragraph and draws one box and one marker');
+  await page.reload(); await wait(1200);
+  const pAgain = await page.evaluate(() => { const h = document.querySelector('#part-brief .cm-hl.cm-blk'); if (!h) return null;
+    h.scrollIntoView({ block: 'center' }); const b = h.getBoundingClientRect(); return { x: b.left + 40, y: b.top + b.height / 2 }; });
+  log(!!pAgain, 'after a reload the paragraph comment is placed on its paragraph again');
+  if (pAgain) {
+    await page.mouse.move(pAgain.x - 5, pAgain.y); await page.mouse.move(pAgain.x, pAgain.y); await wait(200);
+    log(await page.evaluate(() => document.getElementById('cm-blk-add').hidden), 'a paragraph that already has a comment offers no second button');
+    await page.mouse.click(pAgain.x, pAgain.y); await wait(200);
+    log(await page.evaluate(() => { const t = document.querySelector('.cm-card textarea'); return !!t && t.value === 'whole paragraph'; }), 'clicking a commented paragraph opens its comment');
+    await page.evaluate(() => document.querySelector('.cm-card .cm-del').click()); await wait(200);
+  }
+  const cell = await page.evaluate(() => {
+    const td = [...document.querySelectorAll('td')].find(x => cmBlockOf(x) && x.cellIndex > 0 && !x.closest('table').querySelector('[colspan], [rowspan]') && x.closest('table').rows[0].querySelector('th'));
+    if (!td) return null;
+    const t = x => x.textContent.replace(/\s+/g, ' ').trim();
+    return { got: cmCellLabel(td), want: t(td.parentElement.cells[0]) + ' → ' + t(td.closest('table').rows[0].cells[td.cellIndex]), name: cmBlockName(td),
+      merged: (() => { const c = td.closest('table').cloneNode(true); c.rows[0].cells[0].setAttribute('colspan', '2'); return cmCellLabel(c.rows[1].cells[1]); })() };
+  });
+  if (cell) {
+    log(cell.got === cell.want && cell.name === 'Table cell (' + cell.want + ')', `a table cell is named by its row and column: ${cell.got}`);
+    log(cell.merged === '', 'a table with merged cells gets no row and column label');
+  }
+  const tdAt = await page.evaluate(() => { const td = [...document.querySelectorAll('#part-brief .page td')].find(x => cmBlockOf(x) === x && x.textContent.trim());
+    if (!td) return null; td.scrollIntoView({ block: 'center' }); window.__td = td; const b = td.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; });
+  if (tdAt) {
+    await page.mouse.move(tdAt.x - 5, tdAt.y); await page.mouse.move(tdAt.x, tdAt.y); await wait(200);
+    log(await page.evaluate(() => { const b = document.getElementById('cm-blk-add'), t = document.getElementById('cm-tbl-add'); if (b.hidden || t.hidden) return false;
+      const k = b.getBoundingClientRect(), c = window.__td.getBoundingClientRect(), q = t.getBoundingClientRect(), tr = window.__td.closest('table').getBoundingClientRect();
+      return Math.abs((k.top + k.bottom) / 2 - (c.top + c.bottom) / 2) < 1.5 && q.bottom <= tr.top + 1; }),
+      'over a table cell: a button centred on the cell, and a second one above the table');
+    await page.click('#cm-tbl-add'); await wait(200);
+    const tk = await page.evaluate(() => document.querySelector('.cm-card .cm-k') ? document.querySelector('.cm-card .cm-k').textContent : '');
+    await page.keyboard.type('whole table'); await page.keyboard.press('Enter'); await wait(250);
+    await page.reload(); await wait(1200);
+    log(tk === 'Table' && await page.evaluate(() => { const c = CM.items[CM.items.length - 1]; return !!c && c.tag === 'table' && !!c._el && c._el.tagName === 'TABLE' && document.querySelectorAll('#part-brief .cm-hl.cm-blk').length === 1; }),
+      'a comment on a whole table is stored for the table and placed on it again after a reload');
+  }
+  await page.evaluate(k => { localStorage.removeItem(k); }, cmKey);
+  await page.reload(); await wait(1200);
   await page.evaluate(() => { navigator.clipboard.writeText = window.__w; document.execCommand = window.__x; });
   log(has('brief'), `parts present: ${info.parts.join(', ')}`);
 
