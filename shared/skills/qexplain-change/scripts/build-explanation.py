@@ -191,6 +191,73 @@ def changed_functions(kept, args, selected):
     return out, bool(heads)
 
 
+# Pictures the page can show before and after. A picture is embedded as a data: address and shown through an image
+# element only, never as markup, so an SVG cannot run a script. Raster pictures cannot be scanned for credentials;
+# the limits below are their only guard. SVG is text and is scanned like any text the page carries.
+IMAGE_TYPES = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg", "gif": "image/gif", "webp": "image/webp", "svg": "image/svg+xml"}
+IMAGE_CAP = 256 * 1024        # one picture
+IMAGE_BUDGET = 2 * 1024 * 1024  # every picture of one page together
+
+
+def looks_like(ext, data):
+    """Whether the bytes are the kind of picture their file name says."""
+    if ext == "png":
+        return data.startswith(b"\x89PNG\r\n\x1a\n")
+    if ext in ("jpg", "jpeg"):
+        return data.startswith(b"\xff\xd8\xff")
+    if ext == "gif":
+        return data[:6] in (b"GIF87a", b"GIF89a")
+    if ext == "webp":
+        return data[:4] == b"RIFF" and data[8:12] == b"WEBP"
+    return ext == "svg" and b"<svg" in data[:4096].lower()
+
+
+def image_versions(kept, args, selected):
+    """Per changed picture: {"before": version, "after": version}. A version is {"uri", "bytes"}, or {"note"} when
+    the picture is not shown, or None when the file does not exist on that side. Both versions are read from git by
+    the ids on the file's index line, so a page built from a diff file has none."""
+    if "diff" not in selected or args.diff_file:
+        return {}
+    targets = [qd.parse_target(t) for t in args.target] if args.target else [(None, args.repo, args.diff_args)]
+    repos = {label: (repo, range_ends(repo, diff_args)[1]) for label, repo, diff_args in targets}
+    out, spent = {}, 0
+    for path, block in kept:
+        ext = qd.ext_of(path)
+        ids = re.search(r"^index ([0-9a-f]{4,64})\.\.([0-9a-f]{4,64})", block, re.M)
+        label, inner = (path.split("/", 1) + [""])[:2] if args.target else (None, path)
+        if ext not in IMAGE_TYPES or not ids or label not in repos:
+            continue
+        repo, head = repos[label]
+        sides = {}
+        for side, blob in (("before", ids.group(1)), ("after", ids.group(2))):
+            if not blob.strip("0"):
+                sides[side] = None
+                continue
+            proc = subprocess.run(["git", "-C", repo, "cat-file", "blob", blob], capture_output=True)
+            data = proc.stdout if proc.returncode == 0 else None
+            if data is None and side == "after" and head is None:  # an uncommitted version is only in the working tree
+                try:
+                    with open(os.path.join(repo, inner), "rb") as fh:
+                        data = fh.read()
+                except OSError:
+                    data = None
+            if data is None:
+                sides[side] = {"note": "This version could not be read from the repo."}
+            elif len(data) > IMAGE_CAP:
+                sides[side] = {"note": f"Not shown: {len(data) // 1024} KiB, over the {IMAGE_CAP // 1024} KiB limit for a picture on this page."}
+            elif spent + len(data) > IMAGE_BUDGET:
+                sides[side] = {"note": f"Not shown: the pictures of this page together would pass {IMAGE_BUDGET // (1024 * 1024)} MiB."}
+            elif not looks_like(ext, data):
+                sides[side] = {"note": f"Not shown: the file is not a readable .{ext} picture."}
+            elif ext == "svg" and qd.scan_content_file(path, data.decode("utf-8", "replace")):
+                sides[side] = {"note": "Not shown: this SVG holds credential-shaped text."}
+            else:
+                spent += len(data)
+                sides[side] = {"uri": f"data:{IMAGE_TYPES[ext]};base64,{base64.b64encode(data).decode('ascii')}", "bytes": len(data)}
+        out[path] = sides
+    return out
+
+
 def script_json(data):
     # "<" never appears raw, so no "</script>" or "<!--" inside the data can end the script early.
     text = json.dumps(data, ensure_ascii=False, indent=1)
@@ -832,6 +899,8 @@ def main(argv=None):
             "fns": fns, "callers": callers_searched,
             # Per file and hunk: a hunk that is only a move, only spacing or one word replaced. See qd.hunk_kinds.
             "hk": qd.hunk_kinds(kept) if "diff" in selected else {},
+            # Per changed picture: its version before and after, embedded. See image_versions.
+            "images": image_versions(kept, args, selected),
         }) + ";",
     }
     for marker in ("{{TITLE}}", "<!--@PROVENANCE-->", "<!--@MERMAID-->", "<!--@BRIEF-->", "/*@DATA*/"):
@@ -954,6 +1023,46 @@ def selftest():
         fns, searched = changed_functions(fkept, space(diff_file="x.diff"), {"diff"})
         case("a page built from a diff file names the functions and lists no callers", not searched and "callers" not in fns["a.py"]["list"][0], str(fns))
         case("a page without the Diff review part carries no function data", changed_functions(fkept, space(diff_args="HEAD~1..HEAD"), {"brief"}) == ({}, False), "")
+
+        # A changed picture, before and after
+        import struct
+        import zlib
+
+        def png(width, colour):
+            chunk = lambda tag, data: struct.pack(">I", len(data)) + tag + data + struct.pack(">I", zlib.crc32(tag + data) & 0xFFFFFFFF)
+            return (b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", struct.pack(">IIBBBBB", width, 4, 8, 2, 0, 0, 0))
+                    + chunk(b"IDAT", zlib.compress((b"\x00" + bytes(colour) * width) * 4)) + chunk(b"IEND", b""))
+        imrepo = os.path.join(root, "imrepo")
+        os.makedirs(imrepo)
+        igit = lambda *a: subprocess.run(["git", "-c", "user.name=Selftest", "-c", "user.email=selftest@example.invalid", "-c", "core.autocrlf=false", "-C", imrepo] + list(a),
+                                         capture_output=True, check=True)
+        iw = lambda name, data: open(os.path.join(imrepo, name), "wb").write(data)
+        igit("init", "-q", "-b", "main")
+        for name, data in (("a.png", png(8, (10, 20, 30))), ("gone.png", png(8, (1, 2, 3))), ("big.png", png(8, (0, 0, 0)) + os.urandom(IMAGE_CAP)),
+                           ("fake.png", b"this is text, not a picture\n"), ("s.svg", b"<svg xmlns='http://www.w3.org/2000/svg'><rect width='4' height='4'/></svg>\n"),
+                           ("k.svg", b"<svg xmlns='http://www.w3.org/2000/svg'><text>a</text></svg>\n"), ("notes.txt", b"one\n")):
+            iw(name, data)
+        igit("add", "-A")
+        igit("commit", "-q", "-m", "seed")
+        for name, data in (("a.png", png(12, (200, 20, 30))), ("new.png", png(6, (9, 9, 9))), ("big.png", png(8, (0, 0, 0)) + os.urandom(IMAGE_CAP + 10)),
+                           ("fake.png", b"still text, still not a picture\n"), ("s.svg", b"<svg xmlns='http://www.w3.org/2000/svg'><rect width='9' height='4'/></svg>\n"),
+                           ("k.svg", b"<svg xmlns='http://www.w3.org/2000/svg'><text>password = \"Zx81-kq77-Lm42-pp09\"</text></svg>\n"), ("notes.txt", b"two\n")):
+            iw(name, data)
+        os.remove(os.path.join(imrepo, "gone.png"))
+        igit("add", "-A")
+        igit("commit", "-q", "-m", "change")
+        ikept = qd.split_files(qd.capture(imrepo, "HEAD~1..HEAD"))
+        ins = lambda **kw: argparse.Namespace(**{"target": None, "repo": imrepo, "diff_args": "HEAD~1..HEAD", "diff_file": None, **kw})
+        im = image_versions(ikept, ins(), {"diff"})
+        shown = lambda v: bool(v) and v.get("uri", "").startswith("data:image/")
+        case("a changed picture carries both versions, read from git", shown(im.get("a.png", {}).get("before")) and shown(im["a.png"]["after"]) and im["a.png"]["before"]["uri"] != im["a.png"]["after"]["uri"]
+             and base64.b64decode(im["a.png"]["after"]["uri"].split(",", 1)[1]) == png(12, (200, 20, 30)), str(sorted(im)))
+        case("a new picture has no version before, a removed one none after", im["new.png"]["before"] is None and shown(im["new.png"]["after"]) and shown(im["gone.png"]["before"]) and im["gone.png"]["after"] is None, "")
+        case("a picture over the size limit, a file that is not the picture its name says, and an SVG with credential-shaped text are named, not shown",
+             all("note" in im[n][s] for n in ("big.png", "fake.png") for s in ("before", "after")) and "limit" in im["big.png"]["after"]["note"]
+             and shown(im["k.svg"]["before"]) and "credential" in im["k.svg"]["after"].get("note", "") and shown(im["s.svg"]["after"]), str({k: {s: (v or {}).get("note") for s, v in d.items()} for k, d in im.items()}))
+        case("a text file is not a picture, and a page built from a diff file or without the Diff part embeds none",
+             "notes.txt" not in im and image_versions(ikept, ins(diff_file="x.diff"), {"diff"}) == {} and image_versions(ikept, ins(), {"brief"}) == {}, "")
 
         content = os.path.join(root, "content")
         diag = os.path.join(content, "diagrams")

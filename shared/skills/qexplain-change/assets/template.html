@@ -238,6 +238,14 @@
   .fnl a { color: var(--accent); }
   .fn-note { margin: 3px 0 0; font-size: 11px; font-style: italic; }
   .hfn { margin-left: 10px; font-style: normal; font-weight: 600; }
+  /* A changed picture, before and after. */
+  .imvs { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; padding: 12px 14px; }
+  .imv { margin: 0; min-width: 0; }
+  .imv figcaption { margin-bottom: 6px; font-size: 11px; font-weight: 600; color: var(--muted); }
+  .imv figcaption span { margin-left: 8px; font-weight: 400; }
+  .imv img { display: block; max-width: 100%; max-height: 420px; border: 1px solid var(--border); background: repeating-conic-gradient(rgba(128,128,128,.14) 0% 25%, transparent 0% 50%) 50% / 16px 16px; }
+  .imv-none { padding: 16px; border: 1px dashed var(--border); border-radius: 4px; font-size: 12px; color: var(--muted); }
+  @media (max-width: 700px) { .imvs { grid-template-columns: 1fr; } }
   .hkb { margin-left: 10px; padding: 0 6px; border: 1px solid currentColor; border-radius: 8px; font: 600 10px/1.5 -apple-system, "Segoe UI", sans-serif; font-style: normal; white-space: nowrap; }
   body.hk-hide tr.hkrow { display: none; }
   body.hk-hide .hkb::after { content: ", lines hidden"; }
@@ -998,7 +1006,8 @@ function buildFiles() {
       + '<div class="rat">' + esc(QX.rationales[p] || 'No rationale recorded.') + '</div>' + fnBlock(p)
       + '<div class="db' + (col ? ' col' : '') + '">';
     const hasHunks = f.lines.some(l => l.startsWith('@@'));
-    if (f.binary) h += '<div class="file-msg">Binary file. No textual diff.</div>';
+    h += imgBlock(p);      // a picture is shown before and after; an SVG also has its text diff below
+    if (f.binary) h += (QX.images || {})[p] ? '' : '<div class="file-msg">Binary file. No textual diff.</div>';
     else if (!hasHunks && f.renamedFrom) h += '<div class="file-msg">Renamed from ' + esc(f.renamedFrom) + ', no content change.</div>';
     else if (!hasHunks) h += '<div class="file-msg">No textual diff.</div>';
     else {
@@ -1116,6 +1125,17 @@ function hkInit() {
   if (!b) return;
   b.hidden = !n; b.dataset.n = n; b.textContent = 'Hide moves and reformatting (' + n + ')';
 }
+// --- A changed picture, before and after. The build reads both versions from git and embeds them, each under a size
+// limit; a version that is not embedded says why in its place.
+function fmtBytes(n) { return n < 1024 ? n + ' B' : n < 1048576 ? (n / 1024).toFixed(n < 10240 ? 1 : 0) + ' KiB' : (n / 1048576).toFixed(1) + ' MiB'; }
+function imgBlock(p) {
+  const im = (QX.images || {})[p]; if (!im) return '';
+  const side = (v, name) => '<figure class="imv"><figcaption>' + name + (v && v.bytes ? '<span>' + fmtBytes(v.bytes) + '</span>' : '') + '</figcaption>'
+    + (!v ? '<div class="imv-none">' + (name === 'Before' ? 'Not there before: a new file.' : 'Removed.') + '</div>' : v.note ? '<div class="imv-none">' + esc(v.note) + '</div>'
+      : '<img alt="' + name + ': ' + esc(p) + '" src="' + esc(v.uri) + '" onload="imgSize(this)">') + '</figure>';
+  return '<div class="imvs">' + side(im.before, 'Before') + side(im.after, 'After') + '</div>';
+}
+function imgSize(img) { const s = document.createElement('span'); s.className = 'imv-px'; s.textContent = img.naturalWidth + ' x ' + img.naturalHeight + ' px'; img.previousElementSibling.appendChild(s); }
 const card = p => document.querySelector('.fc[data-p="' + CSS.escape(p) + '"]');
 const navEl = p => document.querySelector('.ni[data-p="' + CSS.escape(p) + '"]');
 function toggleR(p) {

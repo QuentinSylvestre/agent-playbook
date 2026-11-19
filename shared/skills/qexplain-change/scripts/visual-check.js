@@ -907,6 +907,27 @@ async function routeLibs(target) {
     });
     log(wm.one === '30>90' && wm.far === null && wm.grown === ', retries', `word marks cover what differs between two lines, grow with an added argument, and are left out when the lines have little in common (${wm.one}; ${wm.grown})`);
     log(wm.pairs > 0 && wm.marked > 0 && wm.same && wm.faithful, `a removed line stands beside the line that replaces it (${wm.pairs} pairs, ${wm.marked} with marks); a line with no counterpart keeps an empty cell opposite (${wm.lone})`);
+    // A changed picture is shown before and after, side by side, each with its size; a version not embedded says why
+    {
+      const im = await page.evaluate(async () => {
+        const I = QX.images || {}, paths = Object.keys(I); if (!paths.length) return null;
+        document.querySelectorAll('.fc.iscol').forEach(c => toggleC(c.dataset.p, false));
+        await Promise.all([...document.querySelectorAll('.imv img')].map(i => i.complete ? 0 : new Promise(r => { i.onload = i.onerror = r; })));
+        await new Promise(r => setTimeout(r, 100));
+        let ok = true, drawn = 0, notes = 0, absent = 0; const sizes = [];
+        paths.forEach(p => { const c = card(p), figs = c.querySelectorAll('.imvs .imv'); if (figs.length !== 2 || c.querySelector('.file-msg')) { ok = false; return; }
+          [['before', 'Before'], ['after', 'After']].forEach(([k, name], n) => { const v = I[p][k], f = figs[n], img = f.querySelector('img'), cap = f.querySelector('figcaption').textContent;
+            if (!cap.startsWith(name)) ok = false;
+            if (v && v.uri) { if (!img || !img.naturalWidth || img.src !== v.uri || !/ px$/.test(cap) || getComputedStyle(img).display === 'none') ok = false; else { drawn++; sizes.push(img.naturalWidth + 'x' + img.naturalHeight); } }
+            else if (v) { if (img || f.querySelector('.imv-none').textContent !== v.note) ok = false; notes++; }
+            else { if (img || !f.querySelector('.imv-none')) ok = false; absent++; } });
+          const b = figs[0].getBoundingClientRect(), a = figs[1].getBoundingClientRect(); if (innerWidth > 800 && !(Math.abs(a.top - b.top) < 2 && a.left > b.right)) ok = false; });
+        return { n: paths.length, ok, drawn, notes, absent, sizes: sizes.join(', '), inline: document.querySelectorAll('.imvs svg').length };
+      });
+      if (im) log(im.ok && im.inline === 0 && im.drawn + im.notes + im.absent === im.n * 2,
+        `each changed picture shows its version before and after side by side, through image elements only (${im.n} pictures: ${im.drawn} drawn at ${im.sizes}; ${im.notes} named and not shown; ${im.absent} absent on one side)`);
+      await page.evaluate(() => window.scrollTo(0, 0));
+    }
     // Hunks that hold no real edit carry a label; a button hides their lines, never by default, and a jump shows them again
     {
       const hk = await page.evaluate(() => {
