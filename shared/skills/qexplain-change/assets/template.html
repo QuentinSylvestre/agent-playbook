@@ -260,6 +260,13 @@
   tr.cm-dl.cm-dl-on td.ln { box-shadow: inset 3px 0 0 rgba(9, 105, 218, 0.9), inset 0 0 0 999px rgba(9, 105, 218, 0.15); }
   .cm-mark.cm-dmark { left: 3px; top: 2px; width: 15px; height: 15px; line-height: 15px; font-size: 9.5px; }
   .cm-mark.cm-fmark { position: static; flex: none; }
+  #cm-page-marks { display: inline-flex; align-items: center; gap: 3px; }
+  #cm-page.cm-on { border-color: #0969da; color: #0969da; }
+  .cm-mark.cm-tmark { display: inline-block; margin-left: 6px; vertical-align: 1px; }
+  .cm-tadd { display: none; margin-left: 7px; vertical-align: -3px; width: 22px; height: 18px; align-items: center; justify-content: center; border: 1px solid var(--border-strong); border-radius: 5px; color: var(--text-light); }
+  .part-btn.active .cm-tadd { display: inline-flex; }
+  .cm-tadd:hover { border-color: #b26a00; color: #b26a00; }
+  .part-btn.cm-on { box-shadow: inset 0 0 0 2px rgba(9, 105, 218, 0.55); border-radius: 4px 4px 0 0; }
   .fh.cm-fh-on { box-shadow: inset 3px 0 0 rgba(9, 105, 218, 0.9); }
   .cbtn { flex: none; display: flex; align-items: center; justify-content: center; width: 26px; height: 22px; padding: 0; background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 4px; cursor: pointer; }
   .cbtn[hidden] { display: none; }
@@ -293,6 +300,8 @@
 
 <div class="part-bar" id="top-bar">
   <div class="top-tools" id="top-tools">
+    <span id="cm-page-marks"></span>
+    <button class="theme-toggle" id="cm-page" type="button" onclick="cmPage()" title="Comment on the explanation as a whole">General comment</button>
     <button class="theme-toggle" id="info-toggle" type="button" onclick="toggleInfo()" aria-expanded="false" aria-controls="info-pop" title="Repository, range, build and the path of this page">Info</button>
     <button class="theme-toggle sketch-toggle" id="sketch-toggle" onclick="toggleSketch()" title="Switch the diagrams between sketch and classic style" hidden>Classic style</button>
     <button class="theme-toggle" id="theme-toggle" onclick="toggleTheme()" title="Toggle dark/light mode">Theme</button>
@@ -1063,6 +1072,8 @@ function cmResolve() {
   CMX = {}; cmRoots().forEach(r => { CMX[r.part] = { root: r.root, ix: cmIndex(r.root) }; });
   CM.items.forEach(c => {
     c._pieces = null; c._el = null; c._at = -1; c._state = 'notfound';
+    if (c.part === 'page') { c._pieces = []; c._state = 'anchored'; c._at = c.t; return; }
+    if (c.kind === 'part') { if (PART_KEYS.includes(c.part)) { c._pieces = []; c._state = 'anchored'; c._at = -1; } return; }
     if (c.part === 'diff') { cmResolveDiff(c); return; }
     const e = CMX[c.part]; if (!e) return;
     const at = cmFind(e.ix, c); if (at === null) return;
@@ -1082,7 +1093,7 @@ function cmDraw() {
     if (root.offsetParent === null) return;   // the part is not on screen: nothing can be measured
     const layer = document.createElement('div'); layer.className = 'cm-layer';
     const base = root.getBoundingClientRect(), taken = [];
-    CM.items.filter(c => c.part === part && c._pieces).sort((x, y) => x._n - y._n).forEach(c => {
+    CM.items.filter(c => c.part === part && c._pieces && c.kind !== 'part').sort((x, y) => x._n - y._n).forEach(c => {
       const rects = cmRectsOf(c._el, c._pieces);
       if (!rects.length) return;              // inside a sub-tab that is not showing
       rects.forEach(b => {
@@ -1100,7 +1111,7 @@ function cmDraw() {
       layer.appendChild(m);
     });
     // The text being commented on stays marked while the box is open: the box takes the focus, and with it the selection.
-    if (cmDraft && cmDraft.part === part) cmRectsOf(cmDraft.el, cmDraft.pieces).forEach(b => {
+    if (cmDraft && cmDraft.part === part && cmDraft.kind !== 'part') cmRectsOf(cmDraft.el, cmDraft.pieces).forEach(b => {
       const d = document.createElement('div'); d.className = 'cm-hl cm-pending' + (cmDraft.el ? ' cm-blk' : '');
       d.style.cssText = 'left:' + (b.left - base.left) + 'px;top:' + (b.top - base.top) + 'px;width:' + b.width + 'px;height:' + b.height + 'px';
       layer.appendChild(d);
@@ -1108,6 +1119,8 @@ function cmDraw() {
     root.appendChild(layer);
   });
   cmDrawDiff();
+  cmDrawParts();
+  cmDrawPage();
 }
 let cmRaf = 0;
 function cmRefresh() { if (!cmRaf) cmRaf = requestAnimationFrame(() => { cmRaf = 0; cmDraw(); }); }
@@ -1119,6 +1132,62 @@ function cmBoxes(pieces) {
   pieces.forEach(r => Array.from(r.getClientRects()).forEach(b => { if (b.width > 0.5 && b.height > 0.5) out.push(b); }));
   return out;
 }
+// --- A comment on one part as a whole: the "/" key comments on the part that is showing. Its marker stands in the
+// part's own button, so it is visible from every part.
+function cmPartBtn(key) { return document.querySelector('.part-btn[data-part="' + key + '"]'); }
+function cmPartName(key) { const b = cmPartBtn(key); return b ? (b.dataset.label || b.textContent.trim()) : key; }
+function cmPartTitle(key) { return 'The whole "' + cmPartName(key) + '" part'; }
+function cmPart() {
+  const b = document.querySelector('.part-btn.active'); if (!b) return;
+  cmOpen({ sel: { part: b.dataset.part, kind: 'part', quote: '', pieces: [], el: [b] } });
+}
+function cmDrawParts() {
+  document.querySelectorAll('.part-btn').forEach(b => {
+    if (!b.dataset.label) b.dataset.label = b.textContent.trim();
+    b.querySelectorAll('.cm-tmark').forEach(m => m.remove());
+    // The tab that is showing carries a button for a comment on the whole part (the "/" key does the same).
+    if (!b.querySelector('.cm-tadd')) {
+      const a = document.createElement('span'); a.className = 'cm-tadd'; a.setAttribute('role', 'button'); a.innerHTML = CM_ICON;
+      a.title = 'Comment on this whole part (press /)'; a.setAttribute('aria-label', a.title);
+      a.addEventListener('click', e => { e.stopPropagation(); cmPart(); });
+      b.appendChild(a);
+    }
+    b.classList.toggle('cm-on', !!(cmDraft && cmDraft.kind === 'part' && cmDraft.part === b.dataset.part));
+  });
+  CM.items.filter(c => c.kind === 'part' && c._pieces).sort((x, y) => x._n - y._n).forEach(c => {
+    const b = cmPartBtn(c.part); if (!b) return;
+    c._el = [b];
+    const m = document.createElement('span'); m.dataset.cid = c.id; m.textContent = c._n;
+    m.title = 'Comment ' + c._n + ' on this part: ' + c.text.slice(0, 120);
+    m.className = 'cm-mark cm-fmark cm-tmark' + (c.id === cmActive ? ' cm-active' : '');
+    if (c.id === cmActive) b.classList.add('cm-on');
+    b.appendChild(m);
+  });
+}
+// --- Comments on the explanation as a whole: the button in the top bar. Their markers stand beside that button.
+function cmPage() { cmOpen({ sel: { part: 'page', kind: 'page', quote: '', pieces: [], el: [document.getElementById('cm-page')] } }); }
+function cmDrawPage() {
+  const box = document.getElementById('cm-page-marks'), btn = document.getElementById('cm-page'); if (!box || !btn) return;
+  box.innerHTML = '';
+  let on = !!(cmDraft && cmDraft.part === 'page');
+  CM.items.filter(c => c.part === 'page').sort((x, y) => x._n - y._n).forEach(c => {
+    c._el = [btn];
+    const m = document.createElement('button'); m.type = 'button'; m.dataset.cid = c.id; m.textContent = c._n;
+    m.title = 'Comment ' + c._n + ' on the whole explanation: ' + c.text.slice(0, 120);
+    m.className = 'cm-mark cm-fmark' + (c.id === cmActive ? ' cm-active' : '');
+    if (c.id === cmActive) on = true;
+    box.appendChild(m);
+  });
+  btn.classList.toggle('cm-on', on);
+  fitTools();
+}
+document.addEventListener('keydown', e => {
+  if (e.key !== '/' || e.ctrlKey || e.metaKey || e.altKey || e.isComposing) return;
+  const t = e.target;
+  if (t && (/^(TEXTAREA|INPUT|SELECT)$/.test(t.tagName) || t.isContentEditable)) return;
+  if (!document.getElementById('copybox').hidden || !document.getElementById('dg-overlay').hidden) return;
+  e.preventDefault(); cmPart();
+});
 // --- Comments in the Diff review part. A line comment is kept by file, side (old or new), line number and line text;
 // a file comment by its path. After a rebuild a line comment stays where its text still stands at its number, moves
 // when its text stands at exactly one other place in the file, and is "not found" otherwise.
@@ -1163,7 +1232,7 @@ function cmDrawDiff() {
   main.querySelectorAll('.cm-dl').forEach(r => r.classList.remove('cm-dl', 'cm-dl-on'));
   main.querySelectorAll('.cm-fh-on').forEach(r => r.classList.remove('cm-fh-on'));
   main.querySelectorAll('.cbtn').forEach(b => { b.hidden = false; });
-  CM.items.filter(c => c.part === 'diff' && c._pieces).sort((x, y) => x._n - y._n).forEach(c => {
+  CM.items.filter(c => c.part === 'diff' && c._pieces && c.kind !== 'part').sort((x, y) => x._n - y._n).forEach(c => {
     c._el = cmDiffEls(c); if (!c._el.length) return;
     const on = c.id === cmActive, m = document.createElement('button');
     m.type = 'button'; m.dataset.cid = c.id; m.textContent = c._n; m.title = 'Comment ' + c._n + ': ' + c.text.slice(0, 120);
@@ -1178,7 +1247,7 @@ function cmDrawDiff() {
     const cell = c._el[0].cells[0]; m.style.left = (3 + 9 * cell.querySelectorAll('.cm-dmark').length) + 'px';
     cell.appendChild(m);
   });
-  if (cmDraft && cmDraft.part === 'diff') {
+  if (cmDraft && cmDraft.part === 'diff' && cmDraft.kind !== 'part') {
     if (cmDraft.kind === 'file') cmDraft.el[0].classList.add('cm-fh-on');
     else cmDraft.el.forEach(r => r.classList.add('cm-dl', 'cm-dl-on'));
   }
@@ -1310,7 +1379,7 @@ function cmSpan(bs) {
 }
 // The comment whose highlight is under a point; the shortest quote wins where two overlap.
 function cmAt(x, y) {
-  const hits = CM.items.filter(c => c._pieces && cmRectsOf(c._el, c._pieces).some(b => x >= b.left && x <= b.right && y >= b.top && y <= b.bottom));
+  const hits = CM.items.filter(c => c._pieces && c.kind !== 'part' && cmRectsOf(c._el, c._pieces).some(b => x >= b.left && x <= b.right && y >= b.top && y <= b.bottom));
   return hits.sort((a, b) => a.quote.length - b.quote.length)[0] || null;
 }
 function cmOverText(e) {
@@ -1370,7 +1439,7 @@ function cmOpen(target) {
     + (c ? '<button type="button" class="cm-del">Delete</button>' : '') + '<button type="button" class="cm-cancel">Cancel</button><button type="button" class="cm-save">Save</button></span></div>';
   card.querySelector('.cm-q').textContent = quote.length > 160 ? quote.slice(0, 157) + '...' : quote;
   const el = (c ? c._el : target.sel.el) || null;
-  card.querySelector('.cm-k').textContent = src.part === 'diff' ? cmDiffTitle(src) : el ? cmBlockName(el) : '';
+  card.querySelector('.cm-k').textContent = src.kind === 'part' ? cmPartTitle(src.part) : src.part === 'page' ? 'The whole explanation' : src.part === 'diff' ? cmDiffTitle(src) : el ? cmBlockName(el) : '';
   const ta = card.querySelector('.cm-text'); ta.value = first;
   const dirty = () => ta.value.trim() !== first.trim();
   const save = () => {
@@ -1379,7 +1448,7 @@ function cmOpen(target) {
     if (c) c.text = text;
     else {
       const s = target.sel, base = { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text, t: Date.now(), state: 'open' };
-      CM.items.push(Object.assign(base, s.part === 'diff'
+      CM.items.push(Object.assign(base, s.kind === 'part' ? { kind: 'part', part: s.part, quote: '' } : s.part === 'page' ? { kind: 'page', part: 'page', quote: '' } : s.part === 'diff'
         ? { kind: s.kind, part: 'diff', path: s.path, side: s.side, ln: s.ln, ln2: s.ln2, lines: s.lines, quote: s.quote }
         : { kind: s.el ? 'block' : 'text', tag: s.el && s.el.tagName === 'TABLE' ? 'table' : undefined, part: s.part, section: s.section, quote: s.quote, prefix: s.prefix, suffix: s.suffix }));
     }

@@ -159,6 +159,38 @@ async function routeLibs(target) {
   await page.reload(); await wait(1200);
   await page.click('#part-brief .cm-mark'); await wait(150); await page.click('.cm-card .cm-del'); await wait(200);
   log(await page.evaluate(k => document.querySelectorAll('.cm-mark').length === 0 && JSON.parse(localStorage.getItem(k)).items.length === 0, cmKey), 'Delete removes the comment and its marker');
+  // A comment on the part that is showing ("/"), and a comment on the whole explanation (the top-bar button)
+  await page.click('.part-btn.active .cm-tadd'); await wait(200);
+  log(await page.evaluate(() => { const k = document.querySelector('.cm-card .cm-k'), b = document.querySelector('.part-btn.active');
+    return !!k && k.textContent === 'The whole "' + b.dataset.label + '" part' && document.querySelectorAll('.cm-tadd').length === PART_KEYS.length
+      && [...document.querySelectorAll('.part-btn:not(.active) .cm-tadd')].every(x => getComputedStyle(x).display === 'none'); }),
+    'the tab that is showing carries a comment button for the whole part');
+  await page.evaluate(() => document.querySelector('.cm-card .cm-cancel').click()); await wait(100);
+  await page.keyboard.press('/'); await wait(200);
+  log(await page.evaluate(() => { const k = document.querySelector('.cm-card .cm-k'), b = document.querySelector('.part-btn.active'), c = document.querySelector('.cm-card');
+    return !!k && k.textContent === 'The whole "' + b.dataset.label + '" part' && b.dataset.label.length > 2 && b.classList.contains('cm-on')
+      && c.getBoundingClientRect().top >= b.getBoundingClientRect().bottom - 3 && document.activeElement === c.querySelector('textarea'); }),
+    'the "/" key opens a comment on the part that is showing, under its tab');
+  await page.keyboard.type('part a/b'); await wait(50);
+  log(await page.evaluate(() => document.querySelector('.cm-card textarea').value) === 'part a/b', 'a "/" typed in the box is text, and does not open another box');
+  await page.keyboard.press('Enter'); await wait(250);
+  await selectProse(); await wait(250); await page.click('#cm-add'); await page.keyboard.type('prose'); await page.keyboard.press('Enter'); await wait(250);
+  log(await page.evaluate(() => { const pt = CM.items.find(c => c.kind === 'part'), pr = CM.items.find(c => c.kind === 'text'), m = document.querySelector('.part-btn.active .cm-tmark');
+    return !!pt && pt.part === PART_KEYS[0] && !!pr && pt._n === 1 && pr._n === 2 && !!m && m.textContent === '1' && !document.querySelector('#part-brief .cm-layer .cm-hl.cm-blk'); }),
+    'a part comment is numbered before the comments inside its part, with its marker on the tab');
+  await page.click('#cm-page'); await wait(200);
+  const gk = await page.evaluate(() => (document.querySelector('.cm-card .cm-k') || {}).textContent || '');
+  await page.keyboard.type('general'); await page.keyboard.press('Enter'); await wait(250);
+  log(gk === 'The whole explanation' && await page.evaluate(() => { const g = CM.items.find(c => c.kind === 'page'), pt = CM.items.find(c => c.kind === 'part'), m = document.querySelector('#cm-page-marks .cm-mark');
+    return !!g && g._n === 1 && pt._n === 2 && !!m && m.textContent === '1'; }), 'the top-bar button comments on the whole explanation, numbered before every part');
+  await page.reload(); await wait(1200);
+  await page.evaluate(() => { if (PART_KEYS.length > 1) switchPart(PART_KEYS[1], false); }); await wait(300);
+  await page.click('.part-btn .cm-tmark'); await wait(400);
+  log(await page.evaluate(() => { const t = document.querySelector('.cm-card textarea'); return !!t && t.value === 'part a/b' && document.querySelector('.part-btn.active').dataset.part === PART_KEYS[0]; }),
+    'after a reload the marker on a tab goes to that part and reopens its comment');
+  await page.evaluate(() => { document.querySelector('.cm-card .cm-cancel').click(); CM.items = []; cmSave(); cmResolve(); cmDraw(); });
+  log(await page.evaluate(() => { const tools = document.getElementById('top-tools').getBoundingClientRect(), last = [...document.querySelectorAll('.part-btn')].pop().getBoundingClientRect();
+    return getComputedStyle(document.getElementById('top-tools')).position !== 'fixed' || last.right <= tools.left; }), 'the part buttons stay clear of the tools with the comment button added');
   // Comments on a whole paragraph or table cell, without selecting text
   const pAt = await page.evaluate(() => {
     const p = [...document.querySelectorAll('#part-brief .page p')].find(x => x.textContent.trim().length > 60 && cmBlockOf(x) === x);
