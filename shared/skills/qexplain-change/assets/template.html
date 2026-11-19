@@ -252,6 +252,20 @@
   .cm-badd:hover, .cm-badd:focus-visible { background: #b26a00; color: #fff; }
   #cm-hint { position: fixed; z-index: 380; pointer-events: none; background: rgba(9, 105, 218, 0.10); box-shadow: inset 3px 0 0 rgba(9, 105, 218, 0.9); border-radius: 2px; }
   #cm-hint[hidden] { display: none; }
+  /* Diff review: a commented line is tinted, its marker stands in the line-number cell; a file comment's marker stands in the file header. */
+  table.dt td.ln { position: relative; }
+  tr.cm-dl td { box-shadow: inset 0 0 0 999px rgba(255, 193, 7, 0.17); }
+  tr.cm-dl td.ln { box-shadow: inset 3px 0 0 rgba(214, 143, 0, 0.9), inset 0 0 0 999px rgba(255, 193, 7, 0.17); }
+  tr.cm-dl.cm-dl-on td { box-shadow: inset 0 0 0 999px rgba(9, 105, 218, 0.15); }
+  tr.cm-dl.cm-dl-on td.ln { box-shadow: inset 3px 0 0 rgba(9, 105, 218, 0.9), inset 0 0 0 999px rgba(9, 105, 218, 0.15); }
+  .cm-mark.cm-dmark { left: 3px; top: 2px; width: 15px; height: 15px; line-height: 15px; font-size: 9.5px; }
+  .cm-mark.cm-fmark { position: static; flex: none; }
+  .fh.cm-fh-on { box-shadow: inset 3px 0 0 rgba(9, 105, 218, 0.9); }
+  .cbtn { flex: none; display: flex; align-items: center; justify-content: center; width: 26px; height: 22px; padding: 0; background: transparent; border: 1px solid var(--border); color: var(--muted); border-radius: 4px; cursor: pointer; }
+  .cbtn[hidden] { display: none; }
+  .cbtn:hover { border-color: #b26a00; color: #b26a00; }
+  .cm-card .cm-q:empty { display: none; }
+  .cm-card .cm-k { overflow-wrap: anywhere; }
   .cm-card .cm-k { font-size: 11px; font-weight: 600; color: var(--text-light); margin-bottom: 3px; }
   .cm-card .cm-k:empty { display: none; }
   .cm-mark { position: absolute; pointer-events: auto; width: 18px; height: 18px; padding: 0; border: none; border-radius: 9px; background: #b26a00; color: #fff; font: 600 10.5px/18px -apple-system, "Segoe UI", sans-serif; text-align: center; cursor: pointer; }
@@ -733,10 +747,11 @@ function buildFiles() {
   GROUPS.forEach(g => g.files.forEach(p => {
     const f = fmap[p], rv = !!ST[p], col = !!(ST[p] || ST[p + '__col']), q = jsq(p);
     h += '<div class="fc' + (rv ? ' rv' : '') + (col ? ' iscol' : '') + '" data-p="' + esc(p) + '" data-g="' + g.f + '">'
-      + '<div class="fh" onclick="toggleC(\'' + q + '\')"><button class="colbtn" title="Collapse">&#9660;</button>'
+      + '<div class="fh" onclick="if(!event.target.closest(\'.cm-mark\'))toggleC(\'' + q + '\')"><button class="colbtn" title="Collapse">&#9660;</button>'
       + '<span class="ft" title="' + esc(p) + '">' + esc(p) + '</span><div class="fstats">'
       + (f.add ? '<span class="b ba">+' + f.add + '</span>' : '') + (f.del ? '<span class="b bd">-' + f.del + '</span>' : '')
       + (f.isNew ? '<span class="b bn">NEW</span>' : '') + (f.isDel ? '<span class="b bd">DEL</span>' : '') + '</div>'
+      + '<button class="cbtn" type="button" title="Comment on this file" aria-label="Comment on this file" onclick="event.stopPropagation();cmFile(\'' + q + '\')">' + CM_ICON + '</button>'
       + '<button class="rbtn" onclick="event.stopPropagation();toggleR(\'' + q + '\')">' + (rv ? 'Reviewed' : 'Mark reviewed') + '</button></div>'
       + '<div class="rat">' + esc(QX.rationales[p] || 'No rationale recorded.') + '</div>'
       + '<textarea class="notearea" placeholder="Add a file note" oninput="ST[\'' + q + '__n\']=this.value;saveS()">' + esc(ST[p + '__n'] || '') + '</textarea>'
@@ -754,6 +769,7 @@ function buildFiles() {
   }));
   document.getElementById('fc').innerHTML = h;
   upProg(); syncNavToScroll();
+  if (cmReady) { cmResolve(); cmDraw(); }
 }
 const card = p => document.querySelector('.fc[data-p="' + CSS.escape(p) + '"]');
 const navEl = p => document.querySelector('.ni[data-p="' + CSS.escape(p) + '"]');
@@ -922,7 +938,7 @@ function copyRef(which) { const v = which === 'base' ? QX.base : QX.head; copyTe
 // Click a diff cell to toggle the row between truncated and wrapped.
 document.addEventListener('click', e => {
   const td = e.target.closest('table.dt tr:not(.hunk) td');
-  if (!td || (window.getSelection() || '').toString()) return;
+  if (!td || e.target.closest('.cm-mark') || (window.getSelection() || '').toString()) return;
   td.closest('tr').querySelectorAll('td:not(.ln)').forEach(c => c.classList.toggle('expanded'));
 });
 // Selecting text in the diff copies it with a "// file: <path>, line: <n>" header.
@@ -1047,6 +1063,7 @@ function cmResolve() {
   CMX = {}; cmRoots().forEach(r => { CMX[r.part] = { root: r.root, ix: cmIndex(r.root) }; });
   CM.items.forEach(c => {
     c._pieces = null; c._el = null; c._at = -1; c._state = 'notfound';
+    if (c.part === 'diff') { cmResolveDiff(c); return; }
     const e = CMX[c.part]; if (!e) return;
     const at = cmFind(e.ix, c); if (at === null) return;
     c._at = at; c._pieces = cmPieces(e.ix, at, at + c.quote.length);
@@ -1090,6 +1107,7 @@ function cmDraw() {
     });
     root.appendChild(layer);
   });
+  cmDrawDiff();
 }
 let cmRaf = 0;
 function cmRefresh() { if (!cmRaf) cmRaf = requestAnimationFrame(() => { cmRaf = 0; cmDraw(); }); }
@@ -1101,12 +1119,104 @@ function cmBoxes(pieces) {
   pieces.forEach(r => Array.from(r.getClientRects()).forEach(b => { if (b.width > 0.5 && b.height > 0.5) out.push(b); }));
   return out;
 }
+// --- Comments in the Diff review part. A line comment is kept by file, side (old or new), line number and line text;
+// a file comment by its path. After a rebuild a line comment stays where its text still stands at its number, moves
+// when its text stands at exactly one other place in the file, and is "not found" otherwise.
+const cmSides = {};
+function cmDiffSide(path, side) {
+  if (!cmSides[path]) {
+    const f = fmap[path], sp = f ? splitDiff(f.lines) : { L: [], R: [] }, num = rows => rows.filter(r => r.t !== 'h' && r.ln !== '');
+    cmSides[path] = { old: num(sp.L), new: num(sp.R) };
+  }
+  return cmSides[path][side] || [];
+}
+function cmResolveDiff(c) {
+  if (!fmap[c.path]) return;
+  c._at = ordered.indexOf(c.path) * 1e6;
+  if (c.kind === 'file') { c._pieces = []; c._state = 'anchored'; c._at -= 1; return; }
+  const rows = cmDiffSide(c.path, c.side), n = c.lines.length;
+  const fits = i => i >= 0 && i + n <= rows.length && c.lines.every((t, k) => rows[i + k].c === t);   // a range may run across hunks
+  let i = rows.findIndex(r => r.ln === c.ln), state = 'anchored';
+  if (!fits(i)) {
+    const all = []; for (let k = 0; k + n <= rows.length; k++) if (fits(k)) all.push(k);
+    if (all.length !== 1) return;
+    i = all[0]; state = 'moved';
+  }
+  c._ln = rows[i].ln; c._ln2 = rows[i + n - 1].ln; c._pieces = []; c._state = state; c._at += i + (c.side === 'new' ? 0.5 : 0);
+}
+function cmDiffEls(c) {
+  const cd = card(c.path); if (!cd) return [];
+  if (c.kind === 'file') return [cd.querySelector('.fh')];
+  const pane = cd.querySelectorAll('.sp .pane')[c.side === 'old' ? 0 : 1]; if (!pane) return [];
+  const out = [];
+  for (let n = c._ln; n <= c._ln2; n++) { const r = pane.querySelector('tr[data-ln="' + n + '"]'); if (r) out.push(r); }
+  return out;
+}
+function cmDiffTitle(s) {
+  if (s.kind === 'file') return 'File ' + s.path;
+  const a = s._ln || s.ln, b = s._ln2 || s.ln2;
+  return s.path + ', ' + (a === b ? 'line ' + a : 'lines ' + a + ' to ' + b) + (s.side === 'old' ? ', old side' : ', new side');
+}
+function cmDrawDiff() {
+  const main = document.getElementById('main'); if (!main) return;
+  main.querySelectorAll('.cm-dmark, .cm-fmark').forEach(m => m.remove());
+  main.querySelectorAll('.cm-dl').forEach(r => r.classList.remove('cm-dl', 'cm-dl-on'));
+  main.querySelectorAll('.cm-fh-on').forEach(r => r.classList.remove('cm-fh-on'));
+  main.querySelectorAll('.cbtn').forEach(b => { b.hidden = false; });
+  CM.items.filter(c => c.part === 'diff' && c._pieces).sort((x, y) => x._n - y._n).forEach(c => {
+    c._el = cmDiffEls(c); if (!c._el.length) return;
+    const on = c.id === cmActive, m = document.createElement('button');
+    m.type = 'button'; m.dataset.cid = c.id; m.textContent = c._n; m.title = 'Comment ' + c._n + ': ' + c.text.slice(0, 120);
+    if (c.kind === 'file') {
+      m.className = 'cm-mark cm-fmark' + (on ? ' cm-active' : '');
+      const btn = c._el[0].querySelector('.cbtn'); btn.hidden = true; btn.before(m);
+      c._el[0].classList.toggle('cm-fh-on', on);
+      return;
+    }
+    c._el.forEach(r => { r.classList.add('cm-dl'); if (on) r.classList.add('cm-dl-on'); });
+    m.className = 'cm-mark cm-dmark' + (on ? ' cm-active' : '');
+    const cell = c._el[0].cells[0]; m.style.left = (3 + 9 * cell.querySelectorAll('.cm-dmark').length) + 'px';
+    cell.appendChild(m);
+  });
+  if (cmDraft && cmDraft.part === 'diff') {
+    if (cmDraft.kind === 'file') cmDraft.el[0].classList.add('cm-fh-on');
+    else cmDraft.el.forEach(r => r.classList.add('cm-dl', 'cm-dl-on'));
+  }
+}
+// The numbered rows of one pane, as a comment target. The line texts come from the diff itself, not from the page.
+function cmReadRows(rows, quote) {
+  rows = rows.filter(r => r.dataset.ln); if (!rows.length) return null;
+  const pane = rows[0].closest('.pane'), side = pane && pane.previousElementSibling ? 'new' : 'old', path = rows[0].dataset.path;
+  const ln = +rows[0].dataset.ln, model = cmDiffSide(path, side), i = model.findIndex(r => r.ln === ln); if (i < 0) return null;
+  const lines = rows.map((r, k) => (model[i + k] ? model[i + k].c : ''));
+  if (quote && quote === lines[0].trim()) quote = '';
+  return { part: 'diff', kind: 'line', path, side, ln, ln2: +rows[rows.length - 1].dataset.ln, lines, quote: quote || '', pieces: [], el: rows };
+}
+// A selection inside one pane comments on the lines it touches, across hunks too.
+function cmReadDiffSelection(sel) {
+  const rowOf = node => { const el = node && (node.nodeType === 3 ? node.parentElement : node); return el && el.closest ? el.closest('#main tr[data-path]') : null; };
+  const a = rowOf(sel.anchorNode), f = rowOf(sel.focusNode);
+  if (!a || !f || a.parentElement !== f.parentElement) return null;
+  let first = a, last = f; if (a.compareDocumentPosition(f) & Node.DOCUMENT_POSITION_PRECEDING) { first = f; last = a; }
+  const rows = [];
+  for (let r = first; r; r = r.nextElementSibling) { if (r.dataset.ln) rows.push(r); if (r === last) break; }
+  const s = cmReadRows(rows, rows.length === 1 ? sel.toString().trim() : ''); if (!s) return null;
+  const bs = Array.from(sel.getRangeAt(0).getClientRects()).filter(b => b.width > 0.5 && b.height > 0.5);
+  s.box = bs[bs.length - 1] || rows[rows.length - 1].getBoundingClientRect();
+  return s;
+}
+// The comment button in a file's header: opens the file's comment, or starts one.
+function cmFile(p) {
+  const c = CM.items.find(x => x.part === 'diff' && x.kind === 'file' && x.path === p);
+  cmOpen(c ? { c } : { sel: { part: 'diff', kind: 'file', path: p, quote: '', pieces: [], el: [card(p).querySelector('.fh')] } });
+}
 // A comment on a whole block (a paragraph, a list item, a table cell) is drawn as one box around the block.
 const CM_BLOCKS = 'p, li, td, th';
 function cmRectsOf(el, pieces) {
   if (!el) return cmBoxes(pieces);
+  if (Array.isArray(el)) return el.map(x => x.getBoundingClientRect()).filter(b => b.width > 0.5 && b.height > 0.5);
   const b = el.getBoundingClientRect(); if (b.width <= 0.5 || b.height <= 0.5) return [];
-  if (/^(TD|TH|TABLE)$/.test(el.tagName)) return [b];
+  if (/^(TD|TH|TABLE|TR)$/.test(el.tagName)) return [b];
   // A paragraph's box stands a little clear of its text, so the bar on its left does not touch the first letter.
   return [{ left: b.left - 8, right: b.right + 4, top: b.top - 2, bottom: b.bottom + 2, width: b.width + 12, height: b.height + 4 }];
 }
@@ -1130,6 +1240,7 @@ function cmBlockName(el) {
   return el.tagName === 'TABLE' ? 'Table' : el.tagName === 'LI' ? 'List item' : 'Paragraph';
 }
 function cmReadBlock(el) {
+  if (el.tagName === 'TR') return cmReadRows([el], '');
   const hit = cmRoots().find(r => r.root.contains(el)); if (!hit) return null;
   const ix = cmIndex(hit.root), range = document.createRange(); range.selectNodeContents(el);
   const off = cmRangeOffsets(ix, range, 1); if (!off) return null;
@@ -1174,6 +1285,7 @@ function cmHoverBlock(e) {
   const sel = document.getSelection();
   let blk = t && t.closest && (!sel || sel.isCollapsed) ? cmBlockOf(t) : null;
   if (blk && (blk.offsetParent === null || !blk.textContent.trim())) blk = null;
+  if (!blk && t && t.closest && diffActive() && (!sel || sel.isCollapsed)) blk = t.closest('#main tr[data-ln]');
   if (!blk) {
     if (cmHover) {
       const rs = [cmHover, b.hidden ? null : b, tb.hidden ? null : tb, tb._el].filter(Boolean).map(x => x.getBoundingClientRect());
@@ -1185,7 +1297,8 @@ function cmHoverBlock(e) {
   cmHover = blk;
   const has = el => CM.items.some(c => c._el === el);
   const r = blk.getBoundingClientRect(), cell = /^T[DH]$/.test(blk.tagName), table = cell ? blk.closest('table') : null;
-  if (has(blk)) { b.hidden = true; b._el = null; }
+  if (blk.tagName === 'TR') { const pr = blk.closest('.pane').getBoundingClientRect(); cmPlace(b, blk, 'line', Math.min(pr.right, window.innerWidth) - 28, r.top + (r.height - 20) / 2); }
+  else if (has(blk)) { b.hidden = true; b._el = null; }
   else cmPlace(b, blk, cell ? 'table cell' : blk.tagName === 'LI' ? 'list item' : 'paragraph', cell ? r.right - 26 : r.right + 4, cell ? r.top + (r.height - 20) / 2 : r.top + 2);
   if (table && !has(table)) { const q = table.getBoundingClientRect(); cmPlace(tb, table, 'table', q.right - 22, q.top - 23); }
   else { tb.hidden = true; tb._el = null; }
@@ -1208,6 +1321,7 @@ function cmOverText(e) {
 function cmReadSelection() {
   const sel = document.getSelection();
   if (!sel || sel.isCollapsed || !sel.rangeCount) return null;
+  if (diffActive()) return cmReadDiffSelection(sel);
   const range = sel.getRangeAt(0);
   const hit = cmRoots().find(r => r.root.offsetParent !== null && range.intersectsNode(r.root));
   if (!hit) return null;
@@ -1246,23 +1360,29 @@ function cmOffer() {
 function cmClose() { if (cmCard) { cmCard.remove(); cmCard = null; } if (cmDraft || cmActive) { cmDraft = null; cmActive = null; cmDraw(); } }
 function cmNudge() { if (!cmCard) return; cmCard.classList.remove('cm-nudge'); void cmCard.offsetWidth; cmCard.classList.add('cm-nudge'); }
 function cmOpen(target) {
+  if (cmCard && cmCard._dirty()) { cmNudge(); return; }   // never replace a box that holds unsaved text
   cmClose(); cmAddButton().hidden = true; cmHideBlockAdd();
-  const c = target.c || null, quote = c ? c.quote : target.sel.quote, first = c ? c.text : '';
+  const c = target.c || null, src = c || target.sel, first = c ? c.text : '';
+  const quote = src.part === 'diff' ? (src.quote || (src.lines || []).join('\n')) : src.quote;
   const card = document.createElement('div'); card.className = 'cm-card'; card.setAttribute('role', 'dialog'); card.setAttribute('aria-label', c ? 'Edit comment' : 'New comment');
   card.innerHTML = '<div class="cm-k"></div><div class="cm-q"></div><textarea class="cm-text" rows="3" placeholder="Your comment" aria-label="Comment"></textarea>'
     + '<div class="cm-row"><span class="cm-hint">Enter saves. Shift+Enter adds a line.</span><span class="cm-acts">'
     + (c ? '<button type="button" class="cm-del">Delete</button>' : '') + '<button type="button" class="cm-cancel">Cancel</button><button type="button" class="cm-save">Save</button></span></div>';
   card.querySelector('.cm-q').textContent = quote.length > 160 ? quote.slice(0, 157) + '...' : quote;
   const el = (c ? c._el : target.sel.el) || null;
-  card.querySelector('.cm-k').textContent = el ? cmBlockName(el) : '';
+  card.querySelector('.cm-k').textContent = src.part === 'diff' ? cmDiffTitle(src) : el ? cmBlockName(el) : '';
   const ta = card.querySelector('.cm-text'); ta.value = first;
   const dirty = () => ta.value.trim() !== first.trim();
   const save = () => {
     const text = ta.value.trim();
     if (!text) { cmNudge(); ta.focus(); return; }
     if (c) c.text = text;
-    else CM.items.push({ id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), kind: target.sel.el ? 'block' : 'text', tag: target.sel.el && target.sel.el.tagName === 'TABLE' ? 'table' : undefined, part: target.sel.part,
-      section: target.sel.section, quote: target.sel.quote, prefix: target.sel.prefix, suffix: target.sel.suffix, text, t: Date.now(), state: 'open' });
+    else {
+      const s = target.sel, base = { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text, t: Date.now(), state: 'open' };
+      CM.items.push(Object.assign(base, s.part === 'diff'
+        ? { kind: s.kind, part: 'diff', path: s.path, side: s.side, ln: s.ln, ln2: s.ln2, lines: s.lines, quote: s.quote }
+        : { kind: s.el ? 'block' : 'text', tag: s.el && s.el.tagName === 'TABLE' ? 'table' : undefined, part: s.part, section: s.section, quote: s.quote, prefix: s.prefix, suffix: s.suffix }));
+    }
     cmSave(); cmResolve(); cmDraw(); cmClose();
     const sel = document.getSelection(); if (sel) sel.removeAllRanges();
     const saved = c || CM.items[CM.items.length - 1];
@@ -1285,7 +1405,7 @@ function cmOpen(target) {
   card._dirty = dirty;
   document.body.appendChild(card); cmCard = card;
   const pieces = c ? c._pieces : target.sel.pieces;
-  if (c) cmActive = c.id; else cmDraft = { part: target.sel.part, pieces, el };
+  if (c) cmActive = c.id; else cmDraft = { part: target.sel.part, kind: target.sel.kind, pieces, el };
   cmDraw();
   const h = card.offsetHeight, w = card.offsetWidth;
   let box = cmSpan(cmRectsOf(el, pieces)) || { left: 8, top: 8, bottom: 8 };
@@ -1297,7 +1417,9 @@ function cmOpen(target) {
   card.style.top = (window.innerHeight - box.bottom < h + 16 && box.top > h + 16 ? box.top - h - 8 : Math.min(window.innerHeight - h - 8, box.bottom + 8)) + 'px';
   ta.focus(); ta.setSelectionRange(ta.value.length, ta.value.length);
 }
+let cmReady = false;
 function cmInit() {
+  cmReady = true;
   cmResolve(); cmDraw();
   if (window.ResizeObserver) { const ro = new ResizeObserver(cmRefresh); cmRoots().forEach(r => ro.observe(r.root)); }
   window.addEventListener('resize', cmRefresh);

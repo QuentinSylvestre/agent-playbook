@@ -392,6 +392,62 @@ async function routeLibs(target) {
       if ((await page.evaluate(() => navigator.clipboard.readText().catch(() => ''))).length) copied++;
     }
     log(copied === 2, `both hash pills copy (${copied}/2)`);
+    // Comments on a diff line, a range of lines, and a file
+    await page.evaluate(() => { CM.items = []; cmSave(); cmResolve(); cmDraw(); });
+    const rowAt = await page.evaluate(() => { const r = document.querySelector('.fc:not(.iscol):not(.hide) .sp .pane:nth-child(2) tr.add[data-ln]'); if (!r) return null;
+      r.scrollIntoView({ block: 'center' }); window.__r = r; return true; });
+    if (rowAt) {
+      await wait(300);
+      const rb = await page.evaluate(() => { const b = window.__r.cells[1].getBoundingClientRect(); return { x: b.left + 30, y: b.top + b.height / 2 }; });
+      await page.mouse.move(rb.x - 5, rb.y); await page.mouse.move(rb.x, rb.y); await wait(200);
+      log(await page.evaluate(() => { const b = document.getElementById('cm-blk-add'); if (b.hidden) return false; const k = b.getBoundingClientRect(), r = window.__r.getBoundingClientRect();
+        return Math.abs((k.top + k.bottom) / 2 - (r.top + r.bottom) / 2) < 1.5; }), 'the pointer over a diff line offers a comment button level with it');
+      await page.click('#cm-blk-add'); await wait(200);
+      const title = await page.evaluate(() => (document.querySelector('.cm-card .cm-k') || {}).textContent || '');
+      await page.keyboard.type('line comment'); await page.keyboard.press('Enter'); await wait(250);
+      const lc = await page.evaluate(() => { const c = CM.items[0], r = window.__r; return !!c && { kind: c.kind, side: c.side, okLn: c.ln === +r.dataset.ln && c.path === r.dataset.path,
+        okText: c.lines.length === 1 && c.lines[0] === r.cells[1].textContent.replace(/^\u00a0$/, ''), row: r.classList.contains('cm-dl'), mark: !!r.querySelector('.cm-dmark'), table: getComputedStyle(r).display === 'table-row' && getComputedStyle(r.cells[1]).display === 'table-cell', wrapped: r.cells[1].classList.contains('expanded') }; });
+      log(/, line \d+, new side$/.test(title) && lc && lc.kind === 'line' && lc.side === 'new' && lc.okLn && lc.okText && lc.row && lc.mark && lc.table,
+        `a diff line comment stores file, side, line and text, and marks the line: ${title}`);
+      await page.click('.cm-dmark'); await wait(200);
+      log(await page.evaluate(() => { const t = document.querySelector('.cm-card textarea'); return !!t && t.value === 'line comment' && window.__r.classList.contains('cm-dl-on') && window.__r.cells[1].classList.contains('expanded') === false; }) || (lc && lc.wrapped),
+        'the marker in the line-number cell reopens the comment and does not wrap the row');
+      await page.keyboard.press('Escape'); await wait(100);
+      const moved = await page.evaluate(() => { const c = CM.items[0], at = c.ln; c.ln = 987654; cmResolve();
+        const out = { state: c._state, ln: c._ln, at }; c.lines = ['a line that is not in this diff']; cmResolve(); out.gone = c._state; return out; });
+      log((moved.state === 'moved' && moved.ln === moved.at || moved.state === 'notfound') && moved.gone === 'notfound',
+        `a line comment whose number is stale is re-found by its text or not placed (${moved.state}); changed text is not found`);
+      await page.evaluate(() => { CM.items = []; cmSave(); cmResolve(); cmDraw(); });
+      const two = await page.evaluate(() => { const rows = [...window.__r.parentElement.querySelectorAll('tr[data-ln]')], i = rows.indexOf(window.__r), n = rows[i + 1];
+        if (!n || n.previousElementSibling !== window.__r) return false;
+        const r = document.createRange(); r.setStart(window.__r.cells[1].firstChild, 0); r.setEnd(n.cells[1].firstChild, 1);
+        const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); return true; });
+      if (two) {
+        await wait(250); await page.click('#cm-add'); await wait(200);
+        log(await page.evaluate(() => / lines \d+ to \d+, new side$/.test((document.querySelector('.cm-card .cm-k') || {}).textContent || '') && document.querySelectorAll('tr.cm-dl-on').length === 2),
+          'a selection across two diff lines comments on that range of lines');
+        await page.evaluate(() => { document.querySelector('.cm-card .cm-cancel').click(); getSelection().removeAllRanges(); });
+      }
+      const across = await page.evaluate(() => { const body = [...document.querySelectorAll('.fc .sp .pane:nth-child(2) tbody')].find(x => x.querySelectorAll('tr.hunk').length > 1);
+        if (!body) return null;
+        const h2 = body.querySelectorAll('tr.hunk')[1]; let a = h2.previousElementSibling, z = h2.nextElementSibling;
+        while (a && !a.dataset.ln) a = a.previousElementSibling; while (z && !z.dataset.ln) z = z.nextElementSibling;
+        if (!a || !z) return null;
+        const r = document.createRange(); r.setStart(a.cells[1].firstChild, 0); r.setEnd(z.cells[1].firstChild, 1);
+        const s = getSelection(); s.removeAllRanges(); s.addRange(r); const got = cmReadDiffSelection(s); s.removeAllRanges();
+        if (!got) return { ok: false };
+        const c = Object.assign({ id: 'x', text: 't', t: 1, state: 'open' }, got); delete c.el; delete c.pieces; cmResolveDiff(c);
+        return { ok: got.ln === +a.dataset.ln && got.ln2 === +z.dataset.ln && got.lines.length === 2 && c._state === 'anchored' && c._ln2 === got.ln2, gap: got.ln2 - got.ln }; });
+      if (across) log(across.ok && across.gap > 1, `a selection across two hunks comments on the lines of both (${across.gap} lines apart)`);
+      const wasCol = await page.evaluate(() => window.__r.closest('.fc').classList.contains('iscol'));
+      await page.evaluate(() => window.__r.closest('.fc').querySelector('.cbtn').click()); await wait(200);
+      const ft = await page.evaluate(() => (document.querySelector('.cm-card .cm-k') || {}).textContent || '');
+      await page.keyboard.type('file comment'); await page.keyboard.press('Enter'); await wait(250);
+      log(await page.evaluate(([ft, wasCol]) => { const fc = window.__r.closest('.fc'), c = CM.items[0];
+        return ft === 'File ' + fc.dataset.p && !!c && c.kind === 'file' && c.path === fc.dataset.p && !!fc.querySelector('.fh .cm-fmark') && fc.querySelector('.cbtn').hidden && fc.classList.contains('iscol') === wasCol; }, [ft, wasCol]),
+        'the file header button comments on the file and leaves the card open');
+      await page.evaluate(() => { CM.items = []; cmSave(); cmResolve(); cmDraw(); });
+    }
     const noteText = 'visual-check note';
     await page.evaluate(() => { const b = document.querySelector('.fbtn'); if (b) b.click(); });
     const noteBox = await page.$('.fc:not(.iscol):not(.hide) .notearea');
