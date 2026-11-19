@@ -135,8 +135,14 @@ EDGE_PALETTE = {
 
 
 def fail(msg):
+    """Stop with nothing written. Every message says what is wrong and what to do next."""
     print(f"ERROR\t{msg}", file=sys.stderr)
     sys.exit(2)
+
+
+def step(msg):
+    """One line per stage, so a reader of the output knows what the build is doing while it works."""
+    print(f"STEP\t{msg}", flush=True)
 
 
 def read(path):
@@ -144,14 +150,14 @@ def read(path):
         with open(path, "r", encoding="utf-8-sig") as fh:
             return fh.read()
     except (OSError, UnicodeError) as exc:
-        fail(f"cannot read {path} as UTF-8: {exc}")
+        fail(f"cannot read {path} as UTF-8: {exc}. Check the path, and save the file as UTF-8")
 
 
 def read_json(path):
     try:
         return json.loads(read(path))
     except json.JSONDecodeError as exc:
-        fail(f"{path} is not valid JSON: {exc}")
+        fail(f"{path} is not valid JSON: {exc}. Fix the file at that line and column; a trailing comma and a single quote are the usual causes")
 
 
 def capture_diff(args):
@@ -163,8 +169,10 @@ def capture_diff(args):
                      for label, repo, diff_args in (qd.parse_target(t) for t in args.target)]
             return "\n".join(p.rstrip("\n") for p in parts if p.strip()) + "\n"
         return qd.capture(args.repo, args.diff_args)
-    except (ValueError, RuntimeError) as exc:
+    except ValueError as exc:
         fail(str(exc))
+    except RuntimeError as exc:
+        fail(f"{exc}. Check that --repo is a git repository and that each revision exists there (git rev-parse <revision>)")
 
 
 def changed_functions(kept, args, selected):
@@ -508,7 +516,7 @@ def render_d2(exe, name, source):
                 except subprocess.TimeoutExpired:
                     fail(f"d2 took more than {D2_TIMEOUT} seconds on diagram {name!r}. Simplify the diagram")
                 except OSError as exc:
-                    fail(f"cannot run d2 ({exc})")
+                    fail(f"cannot run d2 ({exc}). Check that d2 starts from a terminal (d2 --version), or set QEXPLAIN_D2 to its full path")
                 if proc.returncode != 0:
                     tail = proc.stderr.decode("utf-8", "replace").strip()[-600:]
                     fail(f"d2 could not render diagram {name!r} ({theme}, {style}). The build adds a {class_prelude(theme).count(chr(10))}-line class block first, so subtract "
@@ -594,7 +602,7 @@ class Diagrams:
         self.d2_exe, self.d2_version = None, None
         if folder:
             if not os.path.isdir(folder):
-                fail(f"--diagrams {folder} is not a folder")
+                fail(f"--diagrams {folder} is not a folder. Pass the folder that holds your .d2 and .mmd files")
             for fn in sorted(os.listdir(folder)):
                 stem, ext = os.path.splitext(fn)
                 if ext in (".d2", ".mmd"):
@@ -618,7 +626,7 @@ class Diagrams:
             kind, text = self.sources[name]
             if kind == "d2":
                 for why in qd.d2_refusals(text):
-                    fail(f"diagram {name}.d2 refused: {why}")
+                    fail(f"diagram {name}.d2 refused: {why}. Remove it from the source and build again")
                 # Credential-shaped text is a refusal too: it must stop the build whether or not d2 is installed.
                 hits = qd.scan_content_file(f"diagram {name}.d2", text)
                 if hits:
@@ -711,7 +719,8 @@ def check_views(maps, diagrams):
             fail(f"map view key {key!r} is not one of {', '.join(VIEW_ORDER)}")
         sub = v.get("subsystem") or None
         if (key, sub) in seen:
-            fail(f"map view {key!r} appears twice" + (f" in subsystem {sub!r}" if sub else ""))
+            fail(f"map view {key!r} appears twice" + (f" in subsystem {sub!r}" if sub else "")
+                 + ". Keep one, or give each its own \"subsystem\" so they stand under different sub-tabs")
         seen.add((key, sub))
         if not v.get("label"):
             fail(f"map view {key!r} needs a label")
@@ -870,32 +879,37 @@ def main(argv=None):
         fail(f"unknown part {', '.join(sorted(unknown))}; the parts are {', '.join(PART_ORDER)}")
     for part, flag in (("walkthrough", args.walkthrough), ("maps", args.maps)):
         if part in selected and not flag:
-            fail(f"the {part} part is selected but --{part} was not given")
+            fail(f"the {part} part is selected but --{part} was not given. Pass --{part} <file>, or take {part} out of --parts")
         if part not in selected and flag:
             print(f"WARN\t--{part} was given but the {part} part is not in --parts; it is ignored")
     tickets, links = [t.strip() for t in args.ticket if t.strip()], parse_links(args.link)
 
+    step("reading the diff")
     raw = capture_diff(args)
     if not raw.strip():
-        fail("the diff is empty")
+        fail("the diff is empty: nothing differs between the two ends of the range. Check the revisions with git rev-parse, "
+             "and the path filter if you gave one. If the range is right, tell the user there is nothing to explain")
     kept, left_out, unused = qd.filter_files(qd.split_files(raw), args.exclude)
     if not kept:
         fail("no file can be shown: every file was left out, or the input holds no diff. "
              "Check the LEFT-OUT lines from measure-change.py and tell the user this change has no page")
     kept, unmatched = qd.mask_files(kept, args.mask_credential)
     if unmatched:
-        fail("--mask-credential matched nothing: " + ", ".join(qd.safe_path(k) for k in unmatched))
+        fail("--mask-credential matched nothing: " + ", ".join(qd.safe_path(k) for k in unmatched)
+             + ". Copy each <path>:<side>:<line> exactly as measure-change.py printed it")
     for key in args.mask_credential:
         print(f"MASKED\t{qd.safe_path(key)}")
     raw = "\n".join(block for _, block in kept) + "\n"
     if unused:
-        fail("--exclude matched nothing, so a file meant to stay out may be on the page: " + ", ".join(unused))
+        fail("--exclude matched nothing, so a file meant to stay out may be on the page: " + ", ".join(unused)
+             + ". Write the glob against the path as the diff shows it, or drop the flag if the file is no longer in the change")
+    step(f"reading your content files ({len(kept)} files on the page, {len(left_out)} left out)")
     rationales = read_json(args.rationales)
     if not isinstance(rationales, dict):
-        fail("rationales.json must map file paths to sentences")
+        fail('rationales.json must map file paths to sentences. Write it as {"path/as/in/the/diff": "One sentence on why it changed."}')
     roles = read_json(args.roles) if args.roles else {}
     if not isinstance(roles, dict):
-        fail("roles.json must map file paths to sentences")
+        fail('roles.json must map file paths to sentences. Write it as {"path/as/in/the/diff": "One sentence on what the file does."}')
     notes_text = read(args.notes) if args.notes and "diff" in selected else ""
     notes, bad_notes = line_notes(read_json(args.notes), kept) if notes_text else ({}, [])
     if bad_notes:
@@ -906,6 +920,7 @@ def main(argv=None):
     maps = read_json(args.maps) if maps_text else None
 
     # Diagrams: names, refusals, the d2 lookup, then rendering.
+    step("checking and drawing the diagrams (a D2 diagram is drawn four times, which can take a while)")
     diagrams = Diagrams(args.diagrams)
     for m in PLACEHOLDER.finditer(brief):
         diagrams.need(m.group(1), "brief.html")
@@ -934,6 +949,7 @@ def main(argv=None):
     prov = provenance_html(repos, plans, diagrams.d2_version or "not used", tickets, links, left_out, "diff" not in selected)
 
     # Credential scan: the diff, then everything the agent wrote.
+    step("scanning the diff and your files for credential-shaped text")
     diff_hits = qd.scan_files(kept)
     for key in args.allow_credential:
         matched = [h for h in diff_hits if qd.hit_key(h) == key]
@@ -962,6 +978,7 @@ def main(argv=None):
              "path:side:line, or reword your own text" + hint)
 
     # Fragments
+    step("filling the page")
     marks, bad_marks = changed_marks([("brief.html", brief), ("walkthrough.html", walkthrough)])
     if bad_marks:
         fail("; ".join(bad_marks[:4]))
@@ -1015,7 +1032,7 @@ def main(argv=None):
     }
     for marker in ("{{TITLE}}", "<!--@PROVENANCE-->", "<!--@MERMAID-->", "<!--@BRIEF-->", "/*@DATA*/"):
         if marker not in page:
-            fail(f"template is missing the {marker} slot")
+            fail(f"template is missing the {marker} slot: assets/template.html is damaged. Restore it from the config repo (git checkout -- on that file)")
     # One pass, so text inside a filled slot is never mistaken for another slot.
     page = re.sub("|".join(re.escape(m) for m in slots), lambda m: slots[m.group(0)], page)
 
@@ -1040,7 +1057,7 @@ def main(argv=None):
     print(f"WROTE\t{args.out}\t{len(paths)} files, {changed} changed lines, parts: {', '.join(p for p in PART_ORDER if p in selected)}, "
           f"{len(diagrams.rendered)} diagrams, {os.path.getsize(args.out) // 1024} KiB")
 
-    sys.stdout.flush()
+    step("checking the page with the validator")
     return subprocess.run([sys.executable, "-I", VALIDATOR, args.out]).returncode
 
 
@@ -1198,6 +1215,25 @@ def selftest():
         case("a page without the Diff review part loads no highlighter", "highlight.min.js" not in page and "<!--@HLJS-->" not in page, "")
         rc, log, page = run("brief-diff", std)
         case("brief and diff page", rc == 0 and 'id="part-diff"' in page and "diff --git" in page, log[-300:])
+        case("the build prints a line for each stage, in order", [line.split("\t")[1].split(" (")[0] for line in log.replace("\r", "").split("\n") if line.startswith("STEP\t")]
+             == ["reading the diff", "reading your content files", "checking and drawing the diagrams", "scanning the diff and your files for credential-shaped text", "filling the page",
+                 "checking the page with the validator"], log[-500:])
+        # Refusals say what to do next
+        bad_json = os.path.join(content, "bad.json")
+        open(bad_json, "w", encoding="utf-8").write('{"a": 1,}')
+        list_json = os.path.join(content, "list.json")
+        open(list_json, "w", encoding="utf-8").write('["a"]')
+        brief_arg = ["--brief", os.path.join(content, "brief.html")]
+        for name, extra, base_args, want in (
+                ("an empty diff", std, ["--repo", repo, "--diff-args", "HEAD..HEAD"], "tell the user there is nothing to explain"),
+                ("a revision that does not exist", std, ["--repo", repo, "--diff-args", "no-such-rev..HEAD"], "git rev-parse"),
+                ("a part selected without its file", std + ["--parts", "brief,maps"], None, "take maps out of --parts"),
+                ("a content file that is not valid JSON", brief_arg + ["--rationales", bad_json], None, "Fix the file at that line and column"),
+                ("a rationales file of the wrong shape", brief_arg + ["--rationales", list_json], None, '{"path/as/in/the/diff"'),
+                ("a diagrams folder that is not a folder", std + ["--diagrams", bad_json], None, "Pass the folder that holds"),
+                ("an exclude that matches nothing", std + ["--exclude", "no/such/*.zzz"], None, "Write the glob against the path")):
+            r_rc, r_log, _ = run("refusal", extra, base_args=base_args)
+            case(f"a refusal names the next action: {name}", r_rc == 2 and "ERROR\t" in r_log and want in r_log, r_log[-300:])
         # Blocks marked as changed in a rebuild
         marked_brief = os.path.join(content, "brief-marked.html")
         marked = lambda attr: (open(marked_brief, "w", encoding="utf-8", newline="\n").write(SELF_BRIEF.replace("{DIAGRAM}", "").replace(
