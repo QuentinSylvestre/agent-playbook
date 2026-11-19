@@ -1245,6 +1245,9 @@ async function routeLibs(target) {
     log(sw <= 391, `no sideways page scroll at 390px on ${part} (${sw}px)`);
   }
   await phone.screenshot({ path: path.join(out, '7-phone.png') });
+  // A refusal by the content security policy is a console error, so it is among the page errors below.
+  const csp = await page.evaluate(() => (document.querySelector('meta[http-equiv="Content-Security-Policy"]') || { content: '' }).content);
+  log(/default-src 'none'/.test(csp) && /connect-src 'none'/.test(csp) && !/unsafe-eval/.test(csp), 'the page declares a content security policy that allows nothing by default, no network call and no evaluated code; every check above ran under it');
   log(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.slice(0, 4).join(' | ') : ''));
   await browser.close();
   console.log(`\nScreenshots in ${out}. Look at them: a check can pass while the page still looks wrong.`);

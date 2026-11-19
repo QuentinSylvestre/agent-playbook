@@ -92,6 +92,8 @@ VALIDATOR = os.path.join(HERE, "validate-explanation.py")
 VIEW_ORDER = ["system", "dataflow", "deps", "actions", "sequence"]
 PART_ORDER = ["brief", "walkthrough", "maps", "summary", "diff"]
 MERMAID_URL = "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js"
+# The page's content security policy (assets/template.html) allows scripts from the host of these two addresses and
+# from no other. A script from another host needs that policy changed too; the self-test checks the two agree.
 # Syntax colours for the Diff review part: the common build (36 languages). Loaded with async, so a page with no
 # network is not held back and shows its diff uncoloured.
 HLJS_URL = "https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.11.1/highlight.min.js"
@@ -1215,6 +1217,11 @@ def selftest():
         case("a page without the Diff review part loads no highlighter", "highlight.min.js" not in page and "<!--@HLJS-->" not in page, "")
         rc, log, page = run("brief-diff", std)
         case("brief and diff page", rc == 0 and 'id="part-diff"' in page and "diff --git" in page, log[-300:])
+        policy = re.search(r'<meta http-equiv="Content-Security-Policy" content="([^"]+)">', page)
+        policy = policy.group(1) if policy else ""
+        case("the page declares a content security policy: nothing by default, scripts from the pinned scripts' host only, no evaluated code, no network calls",
+             "default-src 'none'" in policy and "connect-src 'none'" in policy and "unsafe-eval" not in policy
+             and all("https://" + url.split("/")[2] in policy.split("script-src")[1].split(";")[0] for url in (MERMAID_URL, HLJS_URL)), policy)
         case("the build prints a line for each stage, in order", [line.split("\t")[1].split(" (")[0] for line in log.replace("\r", "").split("\n") if line.startswith("STEP\t")]
              == ["reading the diff", "reading your content files", "checking and drawing the diagrams", "scanning the diff and your files for credential-shaped text", "filling the page",
                  "checking the page with the validator"], log[-500:])
