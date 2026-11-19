@@ -907,6 +907,36 @@ async function routeLibs(target) {
     });
     log(wm.one === '30>90' && wm.far === null && wm.grown === ', retries', `word marks cover what differs between two lines, grow with an added argument, and are left out when the lines have little in common (${wm.one}; ${wm.grown})`);
     log(wm.pairs > 0 && wm.marked > 0 && wm.same && wm.faithful, `a removed line stands beside the line that replaces it (${wm.pairs} pairs, ${wm.marked} with marks); a line with no counterpart keeps an empty cell opposite (${wm.lone})`);
+    // Syntax colours: applied when the highlighter is there, the text and the word marks unchanged; plain without it
+    await wait(1200);
+    const hl = await page.evaluate(() => {
+      if (!window.hljs) return null;
+      document.querySelectorAll('.fc').forEach(c => hlCard(c));
+      const cards = [...document.querySelectorAll('.fc')].filter(c => c.querySelector('.sp'));
+      const col = cards.filter(c => c.querySelector('table.dt [class^="hljs-"]')).map(c => c.dataset.p.split('.').pop());
+      let same = true, marks = true;
+      cards.forEach(c => { const f = fmap[c.dataset.p], S = splitDiff(f.lines); c.querySelectorAll('.sp .pane').forEach((pane, k) => {
+        const rows = (k ? S.R : S.L), trs = pane.querySelectorAll('tr');
+        rows.forEach((r, i) => { if (r.t === 'h') return; const td = trs[i].querySelector('td:not(.ln)'), txt = td.textContent === ' ' ? '' : td.textContent;
+          if (txt !== r.c) same = false;
+          // a mark that crosses two colours is in two pieces, so the marked text is compared as one string
+          if ((r.w || []).map(([a, b]) => r.c.slice(a, b)).join('') !== [...td.querySelectorAll('.wm')].map(x => x.textContent).join('')) marks = false; }); }); });
+      const kw = document.querySelector('table.dt .hljs-keyword'), plain = document.querySelector('table.dt tr:not(.hunk) td:not(.ln)');
+      return { version: hljs.versionString, col, same, marks, differs: !!kw && getComputedStyle(kw).color !== getComputedStyle(plain).color, cut: hlLines('<span class="a">x\n<span class="b">y</span>\nz</span>!').join('~') };
+    });
+    if (hl) {
+      log(hl.col.length > 0 && hl.differs && hl.same && hl.marks, `the diff has syntax colours (highlight.js ${hl.version}; files coloured: ${hl.col.join(', ')}); every line reads the same as before and keeps its word marks`);
+      log(hl.cut === '<span class="a">x</span>~<span class="a"><span class="b">y</span></span>~<span class="a">z</span>!', 'a coloured stretch that runs over several lines is cut into lines that each keep its colour');
+    } else console.log('NOTE\thighlight.js was not loaded (no network?); syntax colours not checked');
+    {
+      const off = await page.context().newPage(); const errs = [];
+      off.on('pageerror', e => errs.push(String(e.message || e)));
+      await off.route('**/highlight.min.js', r => r.abort());
+      await off.goto(page.url().split('#')[0] + '#diff'); await off.waitForTimeout(1500);
+      const plain = await off.evaluate(() => ({ hl: !!window.hljs, rows: document.querySelectorAll('.fc table.dt tr[data-ln]').length, coloured: document.querySelectorAll('table.dt [class^="hljs-"]').length, marks: document.querySelectorAll('table.dt .wm').length }));
+      await off.close();
+      log(!plain.hl && plain.rows > 0 && plain.coloured === 0 && plain.marks > 0 && !errs.length, `without the highlighter the diff still renders, uncoloured, with its word marks and no page error (${plain.rows} rows)`);
+    }
     const addRow = await page.$('.fc:not(.iscol) tr.add td:not(.ln)');
     if (addRow) {
       const addBg = await addRow.evaluate(t => getComputedStyle(t).backgroundColor);

@@ -91,6 +91,9 @@ VALIDATOR = os.path.join(HERE, "validate-explanation.py")
 VIEW_ORDER = ["system", "dataflow", "deps", "actions", "sequence"]
 PART_ORDER = ["brief", "walkthrough", "maps", "summary", "diff"]
 MERMAID_URL = "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js"
+# Syntax colours for the Diff review part: the common build (36 languages). Loaded with async, so a page with no
+# network is not held back and shows its diff uncoloured.
+HLJS_URL = "https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.11.1/highlight.min.js"
 D2_TIMEOUT = 60
 PLACEHOLDER = re.compile(r"""<div\s+data-diagram=["']([A-Za-z0-9._-]+)["']\s*>\s*</div>""")
 SECTION = re.compile(r"""<section\s+data-subsystem=["']([^"']+)["']\s*>(.*?)</section>""", re.S)
@@ -784,6 +787,7 @@ def main(argv=None):
         "{{HEAD_REF}}": html.escape(head_text),
         "<!--@PROVENANCE-->": prov,
         "<!--@MERMAID-->": f'<script src="{MERMAID_URL}"></script>' if mermaid_used else "",
+        "<!--@HLJS-->": f'<script async src="{HLJS_URL}"></script>' if "diff" in selected else "",
         "<!--@BRIEF-->": brief_out,
         "<!--@WALKTHROUGH-->": walk_out,
         "<!--@MAPS-->": maps_out,
@@ -917,6 +921,7 @@ def selftest():
         # Part combinations without D2
         rc, log, page = run("brief-only", std + ["--parts", "brief"])
         case("brief-only page builds and validates", rc == 0 and 'id="part-diff"' not in page and 'data-part="diff"' not in page and '"rawDiff": ""' in page, log[-300:])
+        case("a page without the Diff review part loads no highlighter", "highlight.min.js" not in page and "<!--@HLJS-->" not in page, "")
         rc, log, page = run("brief-diff", std)
         case("brief and diff page", rc == 0 and 'id="part-diff"' in page and "diff --git" in page, log[-300:])
         case("the page carries an explanation id made of the repo and the file name", '"id": "repo--brief-diff"' in page, page[page.find("const QX"):][:120])

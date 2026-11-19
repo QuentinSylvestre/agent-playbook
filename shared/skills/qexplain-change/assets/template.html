@@ -16,6 +16,7 @@
   try { if (localStorage.getItem('qexplain-change-sketch') === 'classic') document.documentElement.setAttribute('data-sketch', 'classic'); } catch (e) {}
 </script>
 <!--@MERMAID-->
+<!--@HLJS-->
 <style>
   /* ---- Theme variables ---- */
   :root {
@@ -231,6 +232,17 @@
   tr.add td { background: var(--add-bg); } tr.add td.ln { color: var(--add-fg); }
   tr.del td { background: var(--del-bg); } tr.del td.ln { color: var(--del-fg); }
   tr.hunk td { background: var(--hunk-bg); color: var(--hunk-fg); font-style: italic; }
+  /* Syntax colours for the diff, from highlight.js when its script could be loaded. Without it the diff is plain. */
+  #part-diff, [data-theme="dark"] #part-diff { --hl-key:#ff7b72; --hl-str:#a5d6ff; --hl-com:#8b949e; --hl-num:#79c0ff; --hl-fn:#d2a8ff; --hl-type:#ffa657; --hl-attr:#7ee787; }
+  html:not([data-theme="dark"]) #part-diff { --hl-key:#cf222e; --hl-str:#0a3069; --hl-com:#6e7781; --hl-num:#0550ae; --hl-fn:#8250df; --hl-type:#953800; --hl-attr:#116329; }
+  table.dt .hljs-keyword, table.dt .hljs-selector-tag, table.dt .hljs-doctag { color: var(--hl-key); }
+  table.dt .hljs-string, table.dt .hljs-regexp, table.dt .hljs-code { color: var(--hl-str); }
+  table.dt .hljs-comment, table.dt .hljs-quote, table.dt .hljs-meta { color: var(--hl-com); font-style: italic; }
+  table.dt .hljs-number, table.dt .hljs-literal, table.dt .hljs-symbol, table.dt .hljs-bullet, table.dt .hljs-variable { color: var(--hl-num); }
+  table.dt .hljs-title, table.dt .hljs-section, table.dt .hljs-selector-id, table.dt .hljs-selector-class { color: var(--hl-fn); }
+  table.dt .hljs-type, table.dt .hljs-built_in { color: var(--hl-type); }
+  table.dt .hljs-attr, table.dt .hljs-attribute, table.dt .hljs-name, table.dt .hljs-tag { color: var(--hl-attr); }
+  table.dt .hljs-strong { font-weight: 600; } table.dt .hljs-emphasis { font-style: italic; }
   /* The part of a changed line that differs from the line it replaces. */
   tr.del .wm { background: rgba(248, 81, 73, 0.36); border-radius: 2px; }
   tr.add .wm { background: rgba(46, 160, 67, 0.40); border-radius: 2px; }
@@ -837,7 +849,7 @@ function renderPane(rows, path) {
   for (const r of rows) {
     if (r.t === 'h') { h += '<tr class="hunk"><td class="ln">&hellip;</td><td>' + esc(r.c) + '</td></tr>'; continue; }
     h += '<tr class="' + r.t + '" data-path="' + esc(path) + '"' + (r.ln !== '' ? ' data-ln="' + r.ln + '"' : '') + '>'
-      + '<td class="ln">' + r.ln + '</td><td>' + (markedHtml(r.c, r.w) || '&nbsp;') + '</td></tr>';
+      + '<td class="ln">' + r.ln + '</td><td' + (r.w && r.w.length ? ' data-w="' + r.w.map(x => x.join('-')).join(',') + '"' : '') + '>' + (markedHtml(r.c, r.w) || '&nbsp;') + '</td></tr>';
   }
   return h + '</tbody></table>';
 }
@@ -965,9 +977,66 @@ function buildFiles() {
     h += '</div></div>';
   }));
   document.getElementById('fc').innerHTML = h;
-  upProg(); syncNavToScroll();
+  upProg(); syncNavToScroll(); hlScan();
   if (cmReady) { cmResolve(); cmDraw(); cmDrawPanel(); }
 }
+// --- Syntax colours. highlight.js is loaded from a pinned outside script, only on a page that has this part. When it
+// is not there (no network), nothing here runs and the diff stays plain. A file is coloured when it comes near the
+// screen. Each side of a hunk is coloured as one text, so a comment or a string that runs over several lines keeps
+// its colour; what begins before the hunk is unknown, as in any diff.
+const HL_NAMES = { makefile: 'makefile', gnumakefile: 'makefile' };
+function hlLang(p) {
+  const base = p.split('/').pop().toLowerCase(), name = HL_NAMES[base] || (base.includes('.') ? base.split('.').pop() : '');
+  return name && hljs.getLanguage(name) ? name : '';
+}
+// highlight.js gives one text with spans that may run over line ends: cut it into lines, each with its own spans.
+function hlLines(html) {
+  const out = [], open = []; let cur = '';
+  html.split(/(<span class="[^"]*">|<\/span>|\n)/).forEach(tok => {
+    if (tok === '\n') { out.push(cur + '</span>'.repeat(open.length)); cur = open.join(''); }
+    else if (tok === '</span>') { open.pop(); cur += tok; }
+    else { if (tok.startsWith('<span class="')) open.push(tok); cur += tok; }
+  });
+  out.push(cur + '</span>'.repeat(open.length));
+  return out;
+}
+// Puts the word-level marks back on a coloured cell: character ranges, wrapped piece by piece from the end backwards.
+function hlMark(td, ranges) {
+  const walker = document.createTreeWalker(td, NodeFilter.SHOW_TEXT), nodes = []; let n, at = 0;
+  while ((n = walker.nextNode())) { nodes.push([n, at]); at += n.data.length; }
+  ranges.slice().reverse().forEach(([s, e]) => nodes.slice().reverse().forEach(([node, start]) => {
+    const a = Math.max(s, start) - start, b = Math.min(e - start, node.data.length);
+    if (b <= a) return;
+    const r = document.createRange(), wm = document.createElement('span'); wm.className = 'wm';
+    r.setStart(node, a); r.setEnd(node, b); r.surroundContents(wm);
+  }));
+}
+function hlCard(c) {
+  if (c._hl || !window.hljs) return;
+  c._hl = true;
+  const lang = hlLang(c.dataset.p); if (!lang) return;
+  c.querySelectorAll('.sp .pane').forEach(pane => {
+    let run = [];
+    const flush = () => {
+      const cells = run; run = [];
+      const text = cells.map(td => td.textContent === ' ' ? '' : td.textContent).join('\n');
+      if (!cells.length || text.length > 200000) return;
+      let lines;
+      try { lines = hlLines(hljs.highlight(text, { language: lang, ignoreIllegals: true }).value); } catch (e) { return; }
+      if (lines.length !== cells.length) return;
+      cells.forEach((td, i) => { td.innerHTML = lines[i] || '&nbsp;'; if (td.dataset.w) hlMark(td, td.dataset.w.split(',').map(x => x.split('-').map(Number))); });
+    };
+    pane.querySelectorAll('tr').forEach(tr => { if (tr.classList.contains('hunk')) flush(); else if (tr.dataset.ln) run.push(tr.querySelector('td:not(.ln)')); });
+    flush();
+  });
+}
+let hlObs = null;
+function hlScan() {
+  if (!window.hljs || !window._diffBuilt) return;
+  if (!hlObs && window.IntersectionObserver) hlObs = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) { hlObs.unobserve(e.target); hlCard(e.target); } }), { rootMargin: '600px 0px' });
+  document.querySelectorAll('.fc').forEach(c => { if (!c._hl) { if (hlObs) hlObs.observe(c); else hlCard(c); } });
+}
+window.addEventListener('load', hlScan);      // the script is loaded without holding the page back, so it can come after the diff is built
 const card = p => document.querySelector('.fc[data-p="' + CSS.escape(p) + '"]');
 const navEl = p => document.querySelector('.ni[data-p="' + CSS.escape(p) + '"]');
 function toggleR(p) {
