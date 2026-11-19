@@ -166,6 +166,31 @@ def capture_diff(args):
         fail(str(exc))
 
 
+def changed_functions(kept, args, selected):
+    """Per file: the label of each hunk, the declarations it changes, and for each function its callers by name.
+    Callers need a repo, so a page built from a diff file has none; the page says so."""
+    if "diff" not in selected:
+        return {}, False
+    targets = [qd.parse_target(t) for t in args.target] if args.target else ([(None, args.repo, args.diff_args)] if args.diff_args else [])
+    heads = {label: (repo, range_ends(repo, diff_args)[1]) for label, repo, diff_args in targets}
+    out, searched = {}, 0
+    for path, block in kept:
+        info = qd.hunk_functions(path, block)
+        if not info["list"] and not any(info["hunks"]):
+            continue
+        label, inner = (path.split("/", 1) + [""])[:2] if args.target else (None, path)
+        for fn in info["list"]:
+            if label not in heads or not fn["call"] or len(fn["call"]) < 3 or searched >= 80:
+                continue
+            searched += 1
+            repo, head = heads[label]
+            hits, total = qd.find_callers(repo, head, fn["call"])
+            fn["callers"] = [[f"{label}/{p}" if label else p, line] for p, line in hits]
+            fn["more"] = total - len(hits)
+        out[path] = info
+    return out, bool(heads)
+
+
 def script_json(data):
     # "<" never appears raw, so no "</script>" or "<!--" inside the data can end the script early.
     text = json.dumps(data, ensure_ascii=False, indent=1)
@@ -780,6 +805,7 @@ def main(argv=None):
     summary_out = summary_html(kept, rationales, roles, labelled, "diff" in selected) if "summary" in selected else ""
 
     mermaid_used = bool(diagrams.mermaid)
+    fns, callers_searched = changed_functions(kept, args, selected)
     page = strip_parts(read(TEMPLATE), selected)
     slots = {
         "{{TITLE}}": html.escape(args.title),
@@ -802,6 +828,8 @@ def main(argv=None):
             "paths": [path for path, _ in kept],
             # Per file, a hash of its hunk lines: a reviewed mark holds only while the patch it was made on is the same.
             "patch": {path: qd.patch_hash(block) for path, block in kept} if "diff" in selected else {},
+            # Per file: a label per hunk and the functions it changes, with callers found by name. See changed_functions.
+            "fns": fns, "callers": callers_searched,
         }) + ";",
     }
     for marker in ("{{TITLE}}", "<!--@PROVENANCE-->", "<!--@MERMAID-->", "<!--@BRIEF-->", "/*@DATA*/"):
@@ -899,6 +927,31 @@ def selftest():
         p = prov("HEAD~1")
         case("provenance of a single revision runs to the working tree", p["base"] == first and "uncommitted" in p["head"], str(p))
         case("provenance counts the commits", prov("HEAD~1..HEAD")["commits"] == "1" and prov("HEAD^!")["commits"] == "1", "")
+
+        # The functions a change touches, and their callers by name
+        fnrepo = os.path.join(root, "fnrepo")
+        os.makedirs(os.path.join(fnrepo, "secrets"))
+        fgit = lambda *a: subprocess.run(["git", "-c", "user.name=Selftest", "-c", "user.email=selftest@example.invalid", "-C", fnrepo] + list(a),
+                                         capture_output=True, check=True)
+        fw = lambda name, text: open(os.path.join(fnrepo, name), "w", encoding="utf-8", newline="\n").write(text)
+        fgit("init", "-q", "-b", "main")
+        fw("a.py", "import os\n\n\nclass Tool:\n    def helper(self, x):\n        return x\n\n    def other(self):\n        return self.helper(1)\n")
+        fw("b.py", "from a import Tool\nvalue = Tool().helper(2)\n# helper is only named here\nprint(my_helper(3), helper_more(4))\n")
+        fw("secrets/k.py", "x = helper(5)\n")
+        fgit("add", "-A")
+        fgit("commit", "-q", "-m", "seed")
+        fw("a.py", "import os\n\n\nclass Tool:\n    def helper(self, x):\n        return x + 1\n\n    def other(self):\n        return self.helper(1)\n")
+        fgit("commit", "-q", "-am", "change helper")
+        fkept = qd.filter_files(qd.split_files(qd.capture(fnrepo, "HEAD~1..HEAD")), [])[0]
+        space = lambda **kw: argparse.Namespace(**{"target": None, "repo": fnrepo, "diff_args": None, "diff_file": None, **kw})
+        fns, searched = changed_functions(fkept, space(diff_args="HEAD~1..HEAD"), {"diff"})
+        one = (fns.get("a.py") or {"hunks": [], "list": [{}]})
+        case("a hunk inside a method is labelled with the method, and the method is listed", one["hunks"] == ["def helper(self, x)"] and [f.get("name") for f in one["list"]] == ["helper"], str(one))
+        case("callers are the places that call the name: not its definition, a longer name, a mention in a comment or a secret-named file",
+             searched and one["list"][0].get("callers") == [["a.py", 9], ["b.py", 2]] and one["list"][0].get("more") == 0, str(one))
+        fns, searched = changed_functions(fkept, space(diff_file="x.diff"), {"diff"})
+        case("a page built from a diff file names the functions and lists no callers", not searched and "callers" not in fns["a.py"]["list"][0], str(fns))
+        case("a page without the Diff review part carries no function data", changed_functions(fkept, space(diff_args="HEAD~1..HEAD"), {"brief"}) == ({}, False), "")
 
         content = os.path.join(root, "content")
         diag = os.path.join(content, "diagrams")

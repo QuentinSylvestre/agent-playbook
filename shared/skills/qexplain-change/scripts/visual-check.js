@@ -907,6 +907,32 @@ async function routeLibs(target) {
     });
     log(wm.one === '30>90' && wm.far === null && wm.grown === ', retries', `word marks cover what differs between two lines, grow with an added argument, and are left out when the lines have little in common (${wm.one}; ${wm.grown})`);
     log(wm.pairs > 0 && wm.marked > 0 && wm.same && wm.faithful, `a removed line stands beside the line that replaces it (${wm.pairs} pairs, ${wm.marked} with marks); a line with no counterpart keeps an empty cell opposite (${wm.lone})`);
+    // The functions a file's hunks change, and their callers: shown as the build found them, with the limits said
+    {
+      const fn = await page.evaluate(() => {
+        const F = QX.fns || {}, paths = Object.keys(F), want = { labels: 0, fns: 0, callers: 0 }, got = { labels: 0, fns: 0, callers: 0 }; let plain = true, notes = true, inDiff = null;
+        paths.forEach(p => { const c = card(p); if (!c) return;
+          want.labels += F[p].hunks.filter(Boolean).length; got.labels += c.querySelectorAll('.sp .pane:first-child tr.hunk .hfn').length;
+          F[p].hunks.forEach((lab, i) => { const row = c.querySelectorAll('.sp .pane:first-child tr.hunk')[i]; if (!row) return;
+            if (lab ? row.querySelector('.hfn').textContent !== lab : !/^@@ /.test(row.querySelector('td:not(.ln)').textContent)) plain = false; });
+          want.fns += F[p].list.length; got.fns += c.querySelectorAll('.fnl li').length;
+          F[p].list.forEach(f => { want.callers += (f.callers || []).length; (f.callers || []).forEach(([cp, ln]) => { if (!inDiff && fmap[cp] && card(cp).querySelector('.sp .pane:nth-child(2) tr[data-ln="' + ln + '"]')) inDiff = [cp, ln]; }); });
+          got.callers += c.querySelectorAll('.fnl li a, .fnl li > span:not(.fn-from):not(.fn-none)').length;
+          if (F[p].list.length && !/keyword and indentation/.test((c.querySelector('.fn-note') || { textContent: '' }).textContent)) notes = false;
+          if (F[p].list.length && QX.callers !== /by name across the repo/.test(c.querySelector('.fn-note').textContent)) notes = false; });
+        return { n: paths.length, want, got, plain, notes, inDiff, searched: !!QX.callers };
+      });
+      if (fn.n) {
+        log(JSON.stringify(fn.want) === JSON.stringify(fn.got) && fn.plain && fn.notes,
+          `hunks carry the function they change, and each file lists its changed functions with their callers and a note on the limits (${fn.got.labels} labels, ${fn.got.fns} functions, ${fn.got.callers} callers; callers searched: ${fn.searched})`);
+        if (fn.inDiff) {
+          await page.evaluate(([p, ln]) => { toggleC(p, true); const li = [...document.querySelectorAll('.fnl li a')].find(a => a.textContent === p + ':' + ln); li.closest('details').open = true; li.click(); }, fn.inDiff); await wait(400);
+          log(await page.evaluate(([p, ln]) => { const c = card(p), tr = c.querySelector('.sp .pane:nth-child(2) tr[data-ln="' + ln + '"]'), b = tr.getBoundingClientRect(); return !c.classList.contains('iscol') && b.top > 0 && b.bottom < innerHeight && tr.classList.contains('fn-hit'); }, fn.inDiff),
+            `a caller that is in this change is a link: it opens its file and goes to the line (${fn.inDiff[0]}:${fn.inDiff[1]})`);
+          await page.evaluate(() => window.scrollTo(0, 0));
+        }
+      }
+    }
     // Search inside the diff: "f" goes to the box, the count is exact, Enter walks the matches and opens a collapsed file
     {
       const word = await page.evaluate(() => { const count = q => ordered.reduce((n, p) => { let inH = false; fmap[p].lines.forEach(l => { if (l.startsWith('@@')) { inH = true; return; } if (!inH || !/^[-+ ]/.test(l)) return;

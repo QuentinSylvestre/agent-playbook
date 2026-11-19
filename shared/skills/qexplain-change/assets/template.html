@@ -229,6 +229,16 @@
   .colbtn { background: transparent; border: none; color: var(--muted); cursor: pointer; font-size: 15px; line-height: 1; padding: 2px 4px; transition: transform .15s; }
   .fc.iscol > .fh > .colbtn { transform: rotate(-90deg); }
   .rat { padding: 8px 14px 6px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); }
+  /* The functions a file's hunks change, with their callers. */
+  .fnl { padding: 5px 14px 6px; font-size: 12px; color: var(--muted); border-bottom: 1px solid var(--border); }
+  .fnl summary { cursor: pointer; }
+  .fnl code { font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace; font-size: 11.5px; color: var(--text); background: none; padding: 0; }
+  .fnl ul { margin: 5px 0 4px 1.2rem; padding: 0; }
+  .fnl li { margin: 2px 0; overflow-wrap: anywhere; }
+  .fnl a { color: var(--accent); }
+  .fn-note { margin: 3px 0 0; font-size: 11px; font-style: italic; }
+  .hfn { margin-left: 10px; font-style: normal; font-weight: 600; }
+  tr.fn-hit td { animation: cm-flash-row 0.5s 3; }
   .db.col { display: none; }
   .sp { display: grid; grid-template-columns: 1fr 1fr; }
   .pane { overflow-x: auto; }
@@ -803,8 +813,8 @@ function parseDiff(raw) {
 // The two sides of a file's diff, row by row. A run of removed lines followed by added lines is a replacement: the
 // first removed line stands beside the first added one, and so on, each pair with its word-level marks. Lines left
 // over on either side keep an empty cell opposite.
-function splitDiff(lines) {
-  const L = [], R = []; let ln = 1, rn = 1, inHunk = false, dels = [], adds = [];
+function splitDiff(lines, labels) {
+  const L = [], R = []; let ln = 1, rn = 1, inHunk = false, dels = [], adds = [], hunk = 0;
   const flush = () => {
     const k = Math.min(dels.length, adds.length);
     for (let i = 0; i < k; i++) { const w = wordMarks(dels[i].c, adds[i].c); L.push({ t: 'del', ln: dels[i].ln, c: dels[i].c, w: w && w[0] }); R.push({ t: 'add', ln: adds[i].ln, c: adds[i].c, w: w && w[1] }); }
@@ -818,7 +828,7 @@ function splitDiff(lines) {
       const m = line.match(/@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/);
       if (m) { ln = +m[1]; rn = +m[2]; }
       inHunk = true;
-      const h = { t: 'h', ln: '', c: line }; L.push(h); R.push(h); continue;
+      const h = { t: 'h', ln: '', c: line, fn: (labels || [])[hunk++] || '' }; L.push(h); R.push(h); continue;      // fn: the function the hunk changes, from the build
     }
     if (!inHunk || line.startsWith('\\')) continue;
     if (line.startsWith('-')) { if (adds.length) flush(); dels.push({ ln: ln++, c: line.slice(1) }); }
@@ -857,7 +867,10 @@ function markedHtml(c, w) {
 function renderPane(rows, path) {
   let h = '<table class="dt"><colgroup><col class="lnc"><col></colgroup><tbody>';
   for (const r of rows) {
-    if (r.t === 'h') { h += '<tr class="hunk"><td class="ln">&hellip;</td><td>' + esc(r.c) + '</td></tr>'; continue; }
+    if (r.t === 'h') {      // with a label from the build, it stands in place of the text git prints after the second @@
+      const at = r.fn && r.c.match(/^@@ [^@]+ @@/);
+      h += '<tr class="hunk"><td class="ln">&hellip;</td><td>' + (at ? esc(at[0]) + '<span class="hfn" title="Where the first change of this hunk stands">' + esc(r.fn) + '</span>' : esc(r.c)) + '</td></tr>'; continue;
+    }
     h += '<tr class="' + r.t + '" data-path="' + esc(path) + '"' + (r.ln !== '' ? ' data-ln="' + r.ln + '"' : '') + '>'
       + '<td class="ln">' + r.ln + '</td><td' + (r.w && r.w.length ? ' data-w="' + r.w.map(x => x.join('-')).join(',') + '"' : '') + '>' + (markedHtml(r.c, r.w) || '&nbsp;') + '</td></tr>';
   }
@@ -973,7 +986,7 @@ function buildFiles() {
       + (stale ? '<span class="b bs" title="' + RV_STALE + '">changed since your review</span>' : '') + '</div>'
       + '<button class="cbtn" type="button" title="Comment on this file" aria-label="Comment on this file" onclick="event.stopPropagation();cmFile(\'' + q + '\')">' + CM_ICON + '</button>'
       + '<button class="rbtn" onclick="event.stopPropagation();toggleR(\'' + q + '\')">' + (rv ? 'Reviewed' : 'Mark reviewed') + '</button></div>'
-      + '<div class="rat">' + esc(QX.rationales[p] || 'No rationale recorded.') + '</div>'
+      + '<div class="rat">' + esc(QX.rationales[p] || 'No rationale recorded.') + '</div>' + fnBlock(p)
       + '<div class="db' + (col ? ' col' : '') + '">';
     const hasHunks = f.lines.some(l => l.startsWith('@@'));
     if (f.binary) h += '<div class="file-msg">Binary file. No textual diff.</div>';
@@ -1048,6 +1061,34 @@ function hlScan() {
   document.querySelectorAll('.fc').forEach(c => { if (!c._hl) { if (hlObs) hlObs.observe(c); else hlCard(c); } });
 }
 window.addEventListener('load', hlScan);      // the script is loaded without holding the page back, so it can come after the diff is built
+// --- The functions a file's hunks change, and where each is called. The build finds both: functions by keyword and
+// indentation in the diff, callers by name across the repo. The block says so, because neither is a code analysis.
+function fnBlock(p) {
+  const info = (QX.fns || {})[p]; if (!info || !info.list.length) return '';
+  const place = ([cp, ln]) => fmap[cp]
+    ? '<a href="#" onclick="event.preventDefault();fnGo(\'' + jsq(cp) + '\',' + ln + ')" title="In this change: go to the line">' + esc(cp) + ':' + ln + '</a>' : '<span>' + esc(cp) + ':' + ln + '</span>';
+  const item = f => {
+    const cs = f.callers || [];
+    const where = !f.call || !f.callers ? '' : !cs.length ? ' <span class="fn-none">no caller found by name</span>'
+      : ' <span class="fn-from">called from</span> ' + cs.map(place).join(', ') + (f.more ? ' and ' + f.more + ' more' : '');
+    return '<li><code title="' + esc(f.sig) + '">' + esc(f.name) + '</code>' + where + '</li>';
+  };
+  const names = info.list.slice(0, 4).map(f => '<code>' + esc(f.name) + '</code>').join(', ') + (info.list.length > 4 ? ' and ' + (info.list.length - 4) + ' more' : '');
+  const note = 'Functions are found by keyword and indentation' + (QX.callers
+    ? ', and callers by name across the repo. Neither is a code analysis: a function with the same name elsewhere is listed too, and a call through a variable is not.'
+    : '. Callers are not listed: this page was built from a diff file, without the repo.');
+  return '<details class="fnl"><summary>Changes ' + names + '</summary><ul>' + info.list.map(item).join('') + '</ul><p class="fn-note">' + note + '</p></details>';
+}
+// Goes to a line of a file of this change: the row when the diff shows it, the file otherwise.
+function fnGo(p, ln) {
+  const c = card(p); if (!c) return;
+  if (c.classList.contains('hide')) { document.getElementById('search').value = ''; setF('all', document.querySelector('.fbtn')); }
+  if (c.classList.contains('iscol')) toggleC(p, false);
+  const pane = c.querySelectorAll('.sp .pane')[1], tr = pane && pane.querySelector('tr[data-ln="' + ln + '"]');
+  if (!tr) { jumpTo(p); return; }
+  tr.scrollIntoView({ block: 'center' }); setActive(p);
+  tr.classList.add('fn-hit'); setTimeout(() => tr.classList.remove('fn-hit'), 1600);
+}
 const card = p => document.querySelector('.fc[data-p="' + CSS.escape(p) + '"]');
 const navEl = p => document.querySelector('.ni[data-p="' + CSS.escape(p) + '"]');
 function toggleR(p) {
@@ -1250,7 +1291,7 @@ document.addEventListener('keydown', e => {
 // not the page, so a match in a collapsed file counts and opens the file when it is reached. A context line stands on
 // both sides and counts once. Matches are painted with the browser's highlight registry, which adds no element.
 let dsHits = [], dsAt = -1, dsTimer = 0, dsRaf = 0;
-function dsRows(p) { const f = fmap[p]; return f._S || (f._S = splitDiff(f.lines)); }
+function dsRows(p) { const f = fmap[p]; return f._S || (f._S = splitDiff(f.lines, ((QX.fns || {})[p] || {}).hunks)); }
 function dsFind() {
   const q = document.getElementById('dsearch').value.toLowerCase();
   dsHits = []; dsAt = -1;

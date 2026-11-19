@@ -134,6 +134,22 @@ def selftest():
     check(qd.patch_hash(two) != qd.patch_hash(two.replace(" c\n", " d\n")), "a changed context line changes the patch hash")
     bin1 = "diff --git a/i.png b/i.png\nindex aaa..bbb 100644\nBinary files a/i.png and b/i.png differ\n"
     check(qd.patch_hash(bin1) != qd.patch_hash(bin1.replace("bbb", "ccc")), "a binary file is hashed on its index line")
+    # The function a hunk changes
+    go = ("diff --git a/r.go b/r.go\n--- a/r.go\n+++ b/r.go\n@@ -10,8 +10,9 @@ type Reporter struct {\n \tseen map[string]int\n }\n \n+// a comment above\n"
+          " func (r *Reporter) Report(b Batch) error {\n \tif b.ID == \"\" {\n-\t\treturn nil\n+\t\treturn ErrNoListener\n \t}\n \treturn nil\n"
+          "@@ -40,2 +41,6 @@ func (r *Reporter) Online() []string {\n \treturn out\n }\n+\n+func isStale(last int) bool {\n+\treturn last > 90\n+}\n")
+    got = qd.hunk_functions("r.go", go)
+    check(got["hunks"] == ["func (r *Reporter) Report(b Batch) error", "func isStale(last int) bool"],
+          "a hunk is labelled with the function that holds its first changed line, not the one git names above it")
+    check([f["name"] for f in got["list"]] == ["Reporter.Report", "isStale"] and [f["call"] for f in got["list"]] == ["Report", "isStale"],
+          "a comment added above a function belongs to no function; a method is named with its receiver and called by its bare name")
+    py = ("diff --git a/t.py b/t.py\n--- a/t.py\n+++ b/t.py\n@@ -20,8 +20,10 @@ def run(self, send):\n         sent = 0\n         for f in self.frames:\n+            if f is None:\n+                continue\n             send(f)\n"
+          "         return sent\n \n \n def main():\n-    parser = make()\n+    parser = build()\n")
+    got = qd.hunk_functions("t.py", py)
+    check(got["hunks"] == ["def run(self, send)"] and [f["name"] for f in got["list"]] == ["run", "main"], "a Python hunk that runs into the next function lists both; a line back at the left margin ends the first")
+    check(qd.hunk_functions("a.yml", "diff --git a/a.yml b/a.yml\n@@ -1 +1 @@ top:\n-a: 1\n+a: 2\n") == {"hunks": [""], "list": []}, "a language with no rule gets no label")
+    check(qd.read_decl("ts", "export const load = async (id: string) => {")["call"] == "load" and qd.read_decl("go", "type Batch struct {")["call"] == ""
+          and qd.read_decl("py", "    x = def_value(1)") is None, "declarations are read by keyword; a type has no callers")
     # Classification
     for name, want in (("pkg/test_foo.py", "test"), ("src/FooTest.java", "test"), ("web/__fixtures__/x.json", "test"),
                        ("go.sum", "generated"), ("dist/app.min.js", "generated"), ("src/latest.java", "src"), ("a.go", "src")):

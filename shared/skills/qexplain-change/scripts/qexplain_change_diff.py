@@ -19,6 +19,7 @@ import re
 import shlex
 import shutil
 import subprocess
+import tempfile
 
 # Always left out, matched against the file name, ignoring case.
 SECRET_FILES = [
@@ -114,8 +115,15 @@ def capture(repo, diff_args, label=None):
     prefix = f"{label}/" if label else ""
     # -M -C keep a rename's two names in one block, so the filter sees where the content came from.
     forced = ["--no-color", "--no-ext-diff", "--no-textconv", "-M", "-C", f"--src-prefix=a/{prefix}", f"--dst-prefix=b/{prefix}"]
-    cmd = ["git", "-C", repo, "-c", "core.quotepath=off", "diff", "--unified=3"] + forced + tokens
-    proc = subprocess.run(cmd, capture_output=True)
+    # Git's own per-language rules for the text after the second @@ (see FUNCNAME_DRIVERS).
+    fd, attrs = tempfile.mkstemp(suffix=".gitattributes")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as fh:
+            fh.write("".join(f"*.{ext} diff={driver}\n" for ext, driver in sorted(FUNCNAME_DRIVERS.items())))
+        cmd = ["git", "-C", repo, "-c", "core.quotepath=off", "-c", f"core.attributesFile={attrs}", "diff", "--unified=3"] + forced + tokens
+        proc = subprocess.run(cmd, capture_output=True)
+    finally:
+        os.remove(attrs)
     if proc.returncode != 0:
         raise RuntimeError("git diff failed: " + proc.stderr.decode("utf-8", "replace").strip())
     return proc.stdout.decode("utf-8", "replace")
@@ -277,6 +285,115 @@ def patch_hash(block):
         marks = ("index ", "Binary files ", "rename from ", "rename to ", "copy from ", "copy to ", "new file", "deleted file", "old mode", "new mode")
         text = "\n".join(line for line in block.split("\n")[1:] if line.startswith(marks))
     return hashlib.sha256(text.encode("utf-8", "replace")).hexdigest()[:16]
+
+
+# Git names the place a hunk sits in after the second @@. Its default rule takes the nearest earlier line that starts
+# in column 0, which is often "import (" or a class when the change is in one of its methods. Git also ships rules per
+# language; they are switched on for the capture through a throwaway attributes file, so the repo is not touched and
+# its own .gitattributes still wins.
+FUNCNAME_DRIVERS = {"go": "golang", "py": "python", "rs": "rust", "java": "java", "kt": "kotlin", "kts": "kotlin", "cs": "csharp", "rb": "ruby",
+                    "php": "php", "c": "cpp", "h": "cpp", "cc": "cpp", "cpp": "cpp", "hpp": "cpp", "sh": "bash", "bash": "bash", "md": "markdown",
+                    "css": "css", "scss": "css", "ex": "elixir", "exs": "elixir", "pl": "perl", "pm": "perl", "m": "objc"}
+
+# Declarations this skill reads itself, to follow a hunk line by line: (pattern, kind). The name is the last group.
+# Keyword and indentation only; this is not a parser.
+_JS = [(re.compile(r"^\s*(?:export\s+)?(?:default\s+)?(?:async\s+)?function\*?\s+(\w+)"), "func"),
+       (re.compile(r"^\s*(?:export\s+)?(?:default\s+)?(?:abstract\s+)?class\s+(\w+)"), "type"),
+       (re.compile(r"^\s*(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?(?:\([^)]*\)|\w+)\s*(?::\s*[^=]+)?=>"), "func")]
+DECLS = {
+    "go": [(re.compile(r"^func\s+\(\s*\w*\s*\*?\s*([\w.]+)[^)]*\)\s*(\w+)\s*[(\[]"), "method"), (re.compile(r"^func\s+(\w+)\s*[(\[]"), "func"),
+           (re.compile(r"^type\s+(\w+)\b"), "type")],
+    "py": [(re.compile(r"^\s*(?:async\s+)?def\s+(\w+)\s*\("), "func"), (re.compile(r"^\s*class\s+(\w+)\b"), "type")],
+    "rs": [(re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:(?:const|async|unsafe)\s+)*fn\s+(\w+)"), "func"),
+           (re.compile(r"^\s*(?:pub(?:\([^)]*\))?\s+)?(?:struct|enum|trait)\s+(\w+)"), "type")],
+    "kt": [(re.compile(r"^\s*(?:[\w@]+\s+)*fun\s+(?:<[^>]+>\s*)?(?:[\w<>?, ]+\.)?(\w+)\s*\("), "func"),
+           (re.compile(r"^\s*(?:[\w@]+\s+)*(?:class|interface|object)\s+(\w+)"), "type")],
+    "js": _JS, "jsx": _JS, "mjs": _JS, "cjs": _JS, "ts": _JS, "tsx": _JS,
+}
+DECLS["kts"] = DECLS["kt"]
+
+
+def ext_of(path):
+    base = path.rsplit("/", 1)[-1]
+    return base.rsplit(".", 1)[-1].lower() if "." in base else ""
+
+
+def read_decl(ext, text):
+    """The declaration a source line opens, or None: kind (func, method, type), name as shown, call (the bare name a
+    caller writes; empty for a type), sig (the line as a label) and indent."""
+    for pattern, kind in DECLS.get(ext, ()):
+        m = pattern.match(text)
+        if m:
+            call = m.group(m.lastindex)
+            name = f"{m.group(1)}.{call}" if kind == "method" else (f"type {call}" if kind == "type" and ext == "go" else call)
+            sig = re.sub(r"\s*[{:]\s*$", "", text.strip())
+            return {"kind": kind, "name": name, "call": "" if kind == "type" else call, "sig": sig[:117] + "..." if len(sig) > 120 else sig,
+                    "indent": len(text) - len(text.lstrip())}
+    return None
+
+
+def hunk_functions(path, block):
+    """What one file's hunks change, read from the diff alone: {"hunks": [label per hunk, "" when unknown],
+    "list": [each declaration that holds a changed line, in order]}. A hunk starts in the place git names after its
+    second @@; from there the hunk's own lines are followed: a declaration opens a new place, and a line back at the
+    declaration's indentation (Python) or its closing brace (other languages) ends it. Lines changed outside any
+    declaration, such as a comment above a function, belong to none."""
+    ext, labels, found = ext_of(path), [], []
+    for hunk in parse_hunks(block):
+        cur = read_decl(ext, hunk["text"]) if ext in DECLS else None
+        if cur:
+            cur["indent"] = None  # git strips the line; its indentation is not known
+        first = None
+        for line in hunk["lines"]:
+            mark, text = line[:1], line[1:]
+            if mark == "\\" or not text.strip():
+                continue
+            indent = len(text) - len(text.lstrip())
+            decl = read_decl(ext, text)
+            if decl:
+                cur = decl
+            if mark in "+-" and cur:
+                first = first or cur
+                if not any(f["name"] == cur["name"] and f["kind"] == cur["kind"] for f in found):
+                    found.append(cur)
+            if decl or not cur:
+                continue
+            level = cur["indent"] if cur["indent"] is not None else 0
+            if ext == "py":
+                if indent <= level:
+                    cur = None
+            elif indent == level and re.match(r"^\}[;,)]*$", text.strip()):
+                cur = None
+        if first:
+            labels.append(first["sig"])
+        elif ext in FUNCNAME_DRIVERS and ext not in DECLS and hunk["text"].strip():
+            labels.append(hunk["text"].strip()[:120])  # a language git has a rule for and this skill does not follow
+        else:
+            labels.append("")
+    return {"hunks": labels, "list": [{k: f[k] for k in ("kind", "name", "call", "sig")} for f in found]}
+
+
+def find_callers(repo, rev, call, limit=8):
+    """Places where a name is called, by name alone: the tracked files of the repo (at rev, or the working tree when
+    rev is None) are searched for the name as a whole word followed by an opening parenthesis. Declarations of that
+    name, generated files and files with secret-looking names are left out. Returns ([(path, line)], total found).
+    This is a text search: another function with the same name matches too, and a call through a variable does not."""
+    cmd = ["git", "-C", repo, "-c", "core.quotepath=off", "grep", "-z", "-n", "-I", "-w", "-F", "-e", call] + ([rev] if rev else []) + ["--"]
+    proc = subprocess.run(cmd, capture_output=True)
+    if proc.returncode not in (0, 1):
+        return [], 0
+    used = re.compile(r"(?<![\w.])" + re.escape(call) + r"\s*\(|\." + re.escape(call) + r"\s*\(")
+    hits = []
+    for row in proc.stdout.decode("utf-8", "replace").split("\n"):
+        parts = row.split("\0", 2)
+        if len(parts) != 3 or not parts[1].isdigit():
+            continue
+        path = parts[0][len(rev) + 1:] if rev and parts[0].startswith(rev + ":") else parts[0]
+        decl = read_decl(ext_of(path), parts[2])
+        if (decl and decl["call"] == call) or not used.search(parts[2]) or secret_named(path) or GENERATED_PATH.search(path):
+            continue
+        hits.append((path, int(parts[1])))
+    return hits[:limit], len(hits)
 
 
 def normalise(pattern):
