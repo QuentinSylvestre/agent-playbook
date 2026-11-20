@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{LANG}}">
 <head>
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' https://cdn.jsdelivr.net; style-src 'unsafe-inline'; img-src data: blob:; font-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
@@ -1929,7 +1929,7 @@ function cmMmParts(dg) {
 // the part that fits carries an id the diagram did not have before. A part found this way is shown as moved. Messages
 // are read from the source text, so the answer is the same before and after the diagram is drawn.
 function cmSeq(src) {
-  const out = [], norm = s => s.replace(/<br\s*\/?>/gi, ' ').replace(/\s+/g, ' ').trim();
+  const out = [], norm = s => mmDec(s).replace(/<br\s*\/?>/gi, ' ').replace(/\s+/g, ' ').trim();
   String(src || '').split('\n').forEach(l => {
     const m = /^\s*(.+?)\s*(?:<<-->>|<<->>|--?>>|--?>|--?x|--?\))\s*[+-]?\s*(.+?)\s*:\s*(.*)$/.exec(l);
     if (m && !/^\s*(%%|note\b|participant\b|actor\b|title\b)/i.test(l)) out.push({ a: m[1], b: m[2], text: norm(m[3]) });
@@ -1980,11 +1980,26 @@ function cmMmPos(src, p, parts) {
   }
   return null;
 }
+// Mermaid draws #35; as #. Source text is read the same way before it is compared with drawn text.
+function mmDec(s) { return String(s || '').replace(/#(\d{1,7});/g, (m, n) => { try { return String.fromCodePoint(+n); } catch (e) { return m; } }); }
+// Why Mermaid would draw other text than a source says, or '' when it would not. The build refuses the same two
+// shapes (mermaid_hash_problems in build-explanation.py); this is for a source the reader edits on the page.
+function mmHashBad(text) {
+  const lines = String(text || '').split('\n'), seq = /^(?:\s*(?:%%[^\n]*|---[\s\S]*?---)\s*)*sequenceDiagram\b/.test(text);
+  for (let i = 0; i < lines.length; i++) {
+    const l = lines[i]; if (/^\s*(%%|style\b|classDef\b|linkStyle\b)/.test(l)) continue;
+    if (seq && l.replace(/#(?:\d+|[A-Za-z][A-Za-z0-9]*);/g, '').includes('#')) return 'Line ' + (i + 1) + ': in a sequence diagram the text after # is not drawn. Write #35; for the # sign.';
+    const m = !seq && /#([A-Za-z_][A-Za-z0-9_]*);/.exec(l);
+    if (m && !MM_ENTITIES.includes(m[1])) return 'Line ' + (i + 1) + ': #' + m[1] + '; is drawn as &' + m[1] + ';. Write #35; for the # sign.';
+  }
+  return '';
+}
+const MM_ENTITIES = ['quot', 'amp', 'lt', 'gt', 'nbsp', 'apos', 'colon', 'semi', 'num', 'lpar', 'rpar', 'lbrack', 'rbrack', 'lbrace', 'rbrace', 'percnt', 'equals', 'plus', 'comma', 'period', 'sol', 'bsol', 'verbar', 'ast', 'quest', 'excl', 'dollar', 'commat', 'hyphen', 'lowbar'];
 function cmMmRe(id) { return new RegExp('(^|[^\\w-])' + String(id).replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([^\\w-]|$)'); }
 function cmMmInSrc(src, c) {
   if (c.dwhat === 'node') return cmMmRe(c.did).test(src);
   if (c.dwhat === 'connection') return !!c.dends && cmMmRe(c.dends[0]).test(src) && cmMmRe(c.dends[1]).test(src);
-  return !!c.dlabel && src.includes(c.dlabel);
+  return !!c.dlabel && mmDec(src).includes(c.dlabel);
 }
 // The line of the Mermaid source a comment's part comes from, for the copied feedback.
 function cmMmLine(c) {
@@ -1994,7 +2009,7 @@ function cmMmLine(c) {
   let i = -1;
   if (c.dwhat === 'node') i = lines.findIndex(l => cmMmRe(c._did || c.did).test(l));
   else if (c.dwhat === 'connection') { const ends = c._dends || c.dends; i = ends ? lines.findIndex(l => cmMmRe(ends[0]).test(l) && cmMmRe(ends[1]).test(l)) : -1; }
-  else i = lines.findIndex(l => l.includes(c._dlabel || c.dlabel));
+  else i = lines.findIndex(l => mmDec(l).includes(c._dlabel || c.dlabel));
   return i < 0 ? '' : 'Source line ' + (i + 1) + ': ' + lines[i].trim();
 }
 // A part known by its text is named by that text alone; a part with an id is named by its label and its id.
@@ -2467,6 +2482,8 @@ function dgSrcSet(dg, text, keep) {
   const old = CM.edits[name], ed = CM.edits[name] = { text, kind: info.kind, base: old && !keep && old.base !== cmHash(orig) ? old.base : cmHash(orig), bad: '' };
   if (info.kind !== 'mermaid' || ed.base !== cmHash(orig)) { done(false); return; }      // D2, or an edit still waiting for "keep or discard"
   if (typeof mermaid === 'undefined') { done(false); return; }      // nothing can check or draw the text here: it is kept as written
+  const hashBad = mmHashBad(text);
+  if (hashBad) { ed.bad = hashBad; done(false); return; }      // Mermaid would parse it and draw other text than it says
   Promise.resolve().then(() => mermaid.parse(text)).then(() => dg._seq === seq && dgSrcApply(info.mid, text),
     e => { if (dg._seq === seq && CM.edits[name]) CM.edits[name].bad = String((e && e.message) || e).split('\n').filter(Boolean).slice(0, 2).join(' ').slice(0, 200); return false; }).then(done);
 }

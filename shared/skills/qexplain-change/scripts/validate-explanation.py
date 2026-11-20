@@ -97,6 +97,7 @@ class Doc(HTMLParser):
         self.brief_seen = False
         self.brief_headings = []       # heading ids in document order
         self.brief_sections = []       # [id, words] for each id-bearing heading
+        self.brief_open = set()        # data-open values inside the open-items section
         self.svg_depth = 0
         self.skip_depth = 0            # inside <style> or <script>
 
@@ -141,6 +142,8 @@ class Doc(HTMLParser):
         if self.brief_depth and tag in HEADINGS and el_id and not self.svg_depth:
             self.brief_headings.append(el_id)
             self.brief_sections.append([el_id, []])
+        if self.brief_depth and a.get("data-open") and self.brief_sections and self.brief_sections[-1][0] == "open-items":
+            self.brief_open.add(a["data-open"])
 
         if tag == "pre":
             self.pre_depth += 1
@@ -214,9 +217,13 @@ def check_brief(doc):
     if "verified" in by_id and len(by_id["verified"]) < 5:
         problems.append('the "verified" section needs text after its heading: what was and was not verified')
     if "open-items" in by_id:
+        # Marked by attribute, so the page can be in any language. The English wording alone still passes.
         text = " ".join(by_id["open-items"])
-        if not ("No open items recorded" in text or ("Before production" in text and "Backlog" in text)):
-            problems.append('"open-items" needs the lists "Before production" and "Backlog", or the line "No open items recorded"')
+        marked = "none" in doc.brief_open or {"before-production", "backlog"} <= doc.brief_open
+        if not (marked or "No open items recorded" in text or ("Before production" in text and "Backlog" in text)):
+            problems.append('"open-items" needs its two lists marked data-open="before-production" and data-open="backlog", '
+                            'or one line marked data-open="none" (the English titles "Before production" and "Backlog", '
+                            'or the line "No open items recorded", also pass)')
     return "; ".join(problems)
 
 
@@ -455,6 +462,13 @@ def selftest():
     expect("two change sections", fixture(brief=two), "brief-sections", "PASS")
     expect("open-items none line", fixture(brief=GOOD_BRIEF.split('<h2 id="open-items">')[0] + '<h2 id="open-items">Open items</h2><p>No open items recorded</p>'), "brief-sections", "PASS")
     expect("open-items without lists", fixture(brief=GOOD_BRIEF.split('<h2 id="open-items">')[0] + '<h2 id="open-items">Open items</h2><p>Some things remain.</p>'), "brief-sections", "FAIL")
+    head_fr = GOOD_BRIEF.split('<h2 id="open-items">')[0] + '<h2 id="open-items">Points ouverts</h2>'
+    expect("open-items in another language, lists marked", fixture(brief=head_fr + '<h3 data-open="before-production">Avant la production</h3><ul><li>Rien</li></ul>'
+                                                                   '<h3 data-open="backlog">Plus tard</h3><ul><li>Rien</li></ul>'), "brief-sections", "PASS")
+    expect("open-items in another language, none marked", fixture(brief=head_fr + '<p data-open="none">Aucun point ouvert.</p>'), "brief-sections", "PASS")
+    expect("open-items with one list marked", fixture(brief=head_fr + '<h3 data-open="backlog">Plus tard</h3><ul><li>Rien</li></ul>'), "brief-sections", "FAIL")
+    expect("open-items marks outside the section do not count", fixture(brief=GOOD_BRIEF.replace('<p>The change.</p>', '<p data-open="none">The change.</p>').split('<h2 id="open-items">')[0]
+                                                                         + '<h2 id="open-items">Points ouverts</h2><p>Il en reste.</p>'), "brief-sections", "FAIL")
     expect("svg ids are not headings", fixture(brief=GOOD_BRIEF.replace("<p>The change.</p>", '<svg><g id="zz"></g></svg><p>The change.</p>')), "brief-sections", "PASS")
     expect("brief nested divs", fixture(brief="<div><div>" + GOOD_BRIEF + "</div></div>"), "brief-sections", "PASS")
     expect("ids outside brief are ignored", fixture(("brief", "walkthrough"), body_extra='<h2 id="whatever">x</h2>'), "brief-sections", "PASS")

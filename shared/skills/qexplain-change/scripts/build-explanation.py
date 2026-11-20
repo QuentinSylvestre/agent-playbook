@@ -39,6 +39,9 @@ replaces the value on the page and keeps the rest of the file, so prefer it for 
 --user-confirmed-credential is for a match the user has personally said is not a live credential.
 Text in the content files, diagram sources, --ticket, --link, title and refs cannot be allowed; reword it.
 
+--lang is the language code of the prose you wrote (default en). It sets the page's lang attribute and nothing
+else: the page's own labels stay in English.
+
 Content files:
     brief.html          HTML fragment, placed in the Brief panel. Heading ids are fixed and checked by the
                         validator: intent, context, change-<name> (one or more), then optional decisions,
@@ -75,6 +78,7 @@ import argparse
 import base64
 import datetime
 import html
+import html.entities
 import io
 import contextlib
 import json
@@ -108,6 +112,10 @@ PLACEHOLDER = re.compile(r"""<div\s+data-diagram=["']([A-Za-z0-9._-]+)["']\s*>\s
 SECTION = re.compile(r"""<section\s+data-subsystem=["']([^"']+)["']\s*>(.*?)</section>""", re.S)
 SEQ_D2 = re.compile(r"^\s*shape\s*:\s*sequence_diagram", re.M)
 SEQ_MMD = re.compile(r"\A(?:\s*(?:%%[^\n]*|---.*?---)\s*)*sequenceDiagram\b", re.S)
+LANG_CODE = re.compile(r"\A[A-Za-z]{2,3}(?:-[A-Za-z0-9]{2,8}){0,3}\Z")
+MMD_ENTITY = re.compile(r"#(?:\d+|[A-Za-z][A-Za-z0-9]*);")
+MMD_NAMED = re.compile(r"#([A-Za-z_][A-Za-z0-9_]*);")
+MMD_STYLE_LINE = re.compile(r"\s*(?:%%|style\b|classDef\b|linkStyle\b)")
 EDGE_ID = re.compile(r"^(?:(?P<pre>.+)\.)?\((?P<a>.+?) (?:->|<->|<-|--) (?P<b>.+?)\)\[\d+\]$")
 
 # D2 class palette, written out per theme. The agent writes "class: new", never a colour.
@@ -606,6 +614,26 @@ def resolve_tour_step(ids, wanted, view_key, step_no):
     return sorted(ids[i] for i in mark), sorted(ids[i] for i in mark | containers)
 
 
+def mermaid_hash_problems(text):
+    """Lines of a Mermaid source that Mermaid parses without an error and draws with other text than they say.
+
+    Seen on Mermaid 11.17.2: in a sequence diagram the text after a # is not drawn (a message, a note, a participant
+    name); in the other diagrams #word; is drawn as &word;. #35; is drawn as # everywhere. The page applies the same
+    two rules to a source the reader edits (mmHashBad in the template)."""
+    seq, out = bool(SEQ_MMD.search(text)), []
+    for n, line in enumerate(text.split("\n"), 1):
+        if MMD_STYLE_LINE.match(line):
+            continue
+        if seq:
+            if "#" in MMD_ENTITY.sub("", line):
+                out.append(f"line {n}: in a sequence diagram the text after # is not drawn")
+        else:
+            for name in MMD_NAMED.findall(line):
+                if name + ";" not in html.entities.html5:
+                    out.append(f"line {n}: #{name}; is drawn as &{name};")
+    return out
+
+
 class Diagrams:
     """The folder of diagram sources, with rendering and the checks every source passes before it is used."""
 
@@ -642,6 +670,11 @@ class Diagrams:
         """Refusals first (they need no d2), then the d2 lookup."""
         for name in self.used:
             kind, text = self.sources[name]
+            if kind == "mermaid":
+                bad = mermaid_hash_problems(text)
+                if bad:
+                    fail(f"diagram {name}.mmd refused: Mermaid would draw other text than the source says, with no error ("
+                         + "; ".join(bad[:6]) + "). Write #35; where you mean the # sign, for example User#35;save")
             if kind == "d2":
                 for why in qd.d2_refusals(text):
                     fail(f"diagram {name}.d2 refused: {why}. Remove it from the source and build again")
@@ -878,9 +911,12 @@ def main(argv=None):
     ap.add_argument("--diagrams")
     ap.add_argument("--ticket", action="append", default=[], help="a ticket reference to show in the Info menu")
     ap.add_argument("--link", action="append", default=[], help="label=https://url to show in the Info menu")
+    ap.add_argument("--lang", default="en", help="language code of the prose you wrote, for the page's lang attribute (en, fr, pt-BR)")
     args = ap.parse_args(argv)
     if args.selftest:
         return selftest()
+    if not LANG_CODE.match(args.lang):
+        fail(f"--lang {args.lang!r} is not a language code. Pass the code of the language the prose is written in, such as en, fr or pt-BR")
     for need in ("out", "title", "brief", "rationales"):
         if not getattr(args, need):
             ap.error(f"--{need} is required")
@@ -1037,6 +1073,7 @@ def main(argv=None):
     page = strip_parts(read(TEMPLATE), selected)
     slots = {
         "{{TITLE}}": html.escape(args.title),
+        "{{LANG}}": args.lang,
         "{{BASE_REF}}": html.escape(base_text),
         "{{HEAD_REF}}": html.escape(head_text),
         "<!--@PROVENANCE-->": prov,
@@ -1425,6 +1462,27 @@ def selftest():
         case("all parts with Mermaid-only diagrams", rc == 0 and MERMAID_URL in page and "cytoscape" not in page.lower() and 'class="sub-btn' in page, log[-400:])
         case("summary rows link to the diff", page.count('data-file="') == len(SELF_FILES) and "What src/api/handler.py does." in page, "")
         case("tickets and links are in the provenance", "PSS-1" in page and 'href="https://example.invalid/plan"' in page, "")
+        case("without --lang the page says it is in English", '<html lang="en">' in page and "{{LANG}}" not in page, page[:80])
+        rc, log, page = run("lang-fr", std + ["--parts", "brief", "--lang", "fr"])
+        case("--lang sets the page's lang attribute", rc == 0 and '<html lang="fr">' in page, log[-200:] + page[:80])
+        rc, log, page = run("lang-bad", std + ["--parts", "brief", "--lang", 'fr"><script>'])
+        case("a --lang that is not a language code stops the build", rc == 2 and page == "" and "is not a language code" in log, log[-200:])
+        # A # that Mermaid parses without an error and draws as other text
+        hp = mermaid_hash_problems
+        case("a # in a sequence message, a note or a participant name is refused, with its line",
+             hp("sequenceDiagram\n  A->>B: User#save called\n") == ["line 2: in a sequence diagram the text after # is not drawn"]
+             and len(hp("sequenceDiagram\n  participant A as User#save\n  A->>B: hi\n  Note right of A: see #field\n")) == 2, str(hp("sequenceDiagram\n  A->>B: User#save called\n")))
+        case("#35; and a named entity pass in a sequence diagram, and so does a # in a comment line",
+             hp("%% set by #12\nsequenceDiagram\n  %% see #field\n  A->>B: User#35;save #quot;now#quot;\n") == [], str(hp("sequenceDiagram\n  A->>B: User#35;save\n")))
+        case("in a flowchart a # in a label passes and #word; is refused unless it is an entity",
+             hp('flowchart TD\n  A["Device#owner"] --> B["#my_field"]\n  C["say #quot;hi#quot; #35;1"]\n') == []
+             and hp('flowchart TD\n  A["#owner_id; set"]\n') == ["line 2: #owner_id; is drawn as &owner_id;"], str(hp('flowchart TD\n  A["#owner_id; set"]\n')))
+        case("a colour in a style line is not taken for text", hp("flowchart TD\n  A --> B\n  classDef new fill:#e6ffec,stroke:#abc;\n  style A fill:#fed;\n") == [], "")
+        w("flow.mmd", "sequenceDiagram\n  Client->>Server: User#save\n  Server-->>Client: response\n", diag)
+        rc, log, page = run("mermaid-hash", allp)
+        case("a Mermaid source that would be drawn with other text stops the build, which says what to write",
+             rc == 2 and page == "" and "flow.mmd refused" in log and "line 2" in log and "#35;" in log, log[-300:])
+        w("flow.mmd", SELF_MMD_SEQ, diag)
         # Refusals and failures that need no d2
         rc, log, page = run("bad-cred", ["--brief", os.path.join(content, "brief.html"), "--rationales", os.path.join(content, "rationales.json"), "--ticket", "pass" + 'word = "Zq7Mv2Lp9Xk4"'])
         case("credential-shaped ticket is refused", rc == 2 and page == "", log[-200:])

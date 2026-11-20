@@ -487,6 +487,14 @@ async function routeLibs(target) {
       const badFb = await page.evaluate(() => cmFeedback());
       log(!!s.ed && s.ed.bad.length > 3 && s.drawn.includes(sq.msg + ' EDITED') && /^Does not parse: /.test(s.st) && badFb.includes('does not parse as Mermaid'),
         `a source that does not parse is reported and the diagram keeps its last good drawing: ${s.st.slice(0, 90)}`);
+      if (/^\s*sequenceDiagram/.test(sq.src)) {      // Mermaid parses a # here and leaves out the text after it
+        const cut = sq.src.replace(sq.msg, sq.msg + ' Api#call'), kept = sq.src.replace(sq.msg, sq.msg + ' Api#35;call');
+        await typeSrc(sq.id, cut); await wait(2200); s = await srcState(sq.id);
+        log(!!s.ed && /text after # is not drawn/.test(s.ed.bad) && !s.drawn.includes(sq.msg + ' Api'), `a # that a sequence diagram would cut the text at is reported, and nothing is redrawn from it: ${s.st.slice(0, 90)}`);
+        await typeSrc(sq.id, kept); await wait(2200); s = await srcState(sq.id);
+        const read = await page.evaluate(src => cmSeq(src).map(m => m.text), kept);
+        log(!!s.ed && s.ed.bad === '' && s.drawn.includes(sq.msg + ' Api#call') && read.includes(sq.msg + ' Api#call'), 'written as #35; the # is drawn, and the message is read from the source as it is drawn');
+      }
       await typeSrc(sq.id, edited); await wait(2200);
       const fb = await page.evaluate(() => cmFeedback());
       log(fb.includes('1. Diagram "' + sq.name + '" (Mermaid): the reader edited its source. Replace the source with the text below.') && edited.trim().split('\n').every(l => fb.includes('   | ' + l)) && fb.trimEnd().endsWith(await page.evaluate(() => CM_ASK)),
