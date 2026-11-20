@@ -8,12 +8,14 @@
  * screenshots for you to look at. It checks only the parts that are present.
  *
  * Usage:
- *   node visual-check.js <artifact.html> [--out <screenshot-dir>] [--libs <dir>] [--chromium <path>]
+ *   node visual-check.js <artifact.html> [--out <screenshot-dir>] [--libs <dir>] [--chromium <path>] [--python <exe>]
  *
  *   --out       where screenshots go (default: a temp directory, printed at the end)
  *   --libs      offline mode: serve cdn.jsdelivr.net/npm/<pkg>@<ver>/<path> from
  *               <dir>/<pkg>-<ver>/package/<path> (the layout `npm pack` + untar produces)
  *   --chromium  browser executable, when Playwright's own download is not installed
+ *   --python    the interpreter the SKILL.md names: the any-order cases of group 13 call the build with it.
+ *               Without it (or QEXPLAIN_PYTHON) those cases are not run, and a NOTE line says so
  *
  * Needs Node and the `playwright` package (set PLAYWRIGHT_MODULE to its path if it is
  * not resolvable). Without them, run the same checklist by hand in a browser (Claude in
@@ -67,6 +69,18 @@
  *      "Side by side" shows both under their names and is kept across pages. "Enlarge", or a click
  *      on the picture, opens the full window: the focus moves into it and stays there, the arrow
  *      keys switch a pair, Escape closes it and returns the focus. On paper a pair prints both.
+ *  11. The way back: a file link under a Brief section opens the file in Diff review and shows a
+ *      "Back to ..." button in its header. The button and the browser's Back return to the same
+ *      place. A link to a file the filter hides, or that is collapsed, shows it.
+ *  12. Comments in the file: open a page whose file holds comments and they are in the list, with a
+ *      message saying how many were taken. Delete one, reload: it stays deleted. "Save to file" in the
+ *      comments panel asks for the file the first time (choose the page itself) and writes the comments
+ *      into it; in a browser without that dialog the button reads "Download with comments". The test
+ *      cannot answer the browser's file dialog, so it writes through a stand-in: try the real dialog by hand.
+ *  13. Replies: "Reply" under a comment opens a box; the reply stands under the comment with its
+ *      author. An agent's replies arrive through the build (--replies) and show under their comments
+ *      when the page is opened. An owner, a reviewer and their agents change one file in several
+ *      orders, and both people end with the same comments and replies, none twice, none brought back.
  *
  * Exit codes: 0 every check OK, 1 at least one BAD, 2 could not run.
  */
@@ -1603,6 +1617,117 @@ async function routeLibs(target) {
       && dt.split(OPEN).length === 2 && !/<html[^>]*data-theme/.test(dt) && dt.startsWith('<!DOCTYPE html>') && d1.ids === 'cs1,rs1' && d1.later && d1.panels === 1 && d1.id === id && d1.parts === (await page.evaluate(() => PART_KEYS.length)),
       'in a browser that cannot write the file, the button downloads the page as built, under its own name, with one block of comments; the copy opens as the same explanation with the comments, and does not carry the theme of the browser that saved it');
     await pr.context().close();
+  }
+  // ---------- Replies: shown under the comment they answer, written by a reader or by an agent ----------
+  {
+    const { src, setInner, blk, id, put, fresh, open, cm } = CMF;
+    const T = Date.now() - 50000;
+    const rp = (rid, re, text, extra) => Object.assign({ id: rid, re, kind: 'reply', part: 'page', quote: '', text, t: T, state: 'open' }, extra || {});
+    const fR = put('cm-file-replies.html', setInner(src, blk({ v: 1, id, items: [cm('c1', 'the first comment', { by: 'Long' }), rp('r1', 'c1', 'Addressed: <i>reworded</i>', { by: "Long's agent", agent: true, t: T + 1 }),
+      rp('r2', 'r1', 'a reply to the reply', { t: T + 2 }), rp('r9', 'nope', 'Deferred: about a comment this page never had', { by: 'Agent', agent: true })], gone: {}, edits: {} })));
+    const p = await fresh(); await open(p, fR);
+    const view = () => p.evaluate(() => { cmPanel(true); const it = document.querySelector('#cm-panel .cm-it[data-cid="c1"]'), orphan = document.querySelector('#cm-panel .cm-it[data-cid="r9"]');
+      return { tops: [...document.querySelectorAll('#cm-panel .cm-pl > .cm-it')].map(e => e.dataset.cid).join(), by: it && (it.querySelector('.cm-by') || {}).textContent, text: it && it.querySelector('.cm-it-t').textContent,
+        thread: it ? [...it.querySelectorAll('.cm-rp')].map(e => e.querySelector('b').textContent + '|' + e.querySelector('.cm-rp-t').textContent + '|' + e.classList.contains('cm-rp-agent')) : [],
+        tags: it ? it.querySelectorAll('.cm-rp i').length : -1, orphan: orphan && orphan.querySelector('.cm-it-w').textContent, count: document.querySelector('#cm-panel-btn .cm-count').textContent,
+        nums: CM.items.map(c => c.id + ':' + c._n).join(), marks: document.querySelectorAll('.cm-mark').length, fb: cmFeedback(), toast: document.getElementById('toast').textContent, gone: Object.keys(CM.gone).sort().join() }; });
+    const v1 = await view();
+    log(v1.tops === 'c1,r9' && v1.by === 'Long' && v1.thread.join(';') === "Long's agent|Addressed: <i>reworded</i>|true;Reader|a reply to the reply|false" && v1.tags === 0 && v1.count === '2' && v1.nums === 'c1:1,r1:0,r2:0,r9:2',
+      'replies stand under the comment they answer, in the order written, each with its author, an agent\'s one marked as such and shown as text; a reply to a reply joins the same comment; replies carry no number and are not counted');
+    log(v1.orphan === 'A reply to a comment that is not on this page', 'a reply whose comment is not on this page is shown as a comment of its own, and says what it is');
+    await p.fill('#cm-panel .cm-name', '  Quentin   S '); await p.dispatchEvent('#cm-panel .cm-name', 'change');
+    await p.click('#cm-panel .cm-it[data-cid="c1"] button[data-act="reply"]'); await p.fill('#cm-panel .cm-it[data-cid="c1"] .cm-it-ta', 'No: still unclear'); await p.keyboard.press('Enter'); await wait(300);
+    const v2 = await view(), mine = await p.evaluate(() => { const r = CM.items[CM.items.length - 1]; return { re: r.re, by: r.by, kind: r.kind, name: lsGet('qexplain-change-name') }; });
+    log(mine.re === 'c1' && mine.by === 'Quentin S' && mine.name === 'Quentin S' && v2.text === 'the first comment' && v2.thread.length === 3 && v2.thread[2] === 'Quentin S|No: still unclear|false' && /Reply saved/.test(v2.toast),
+      'Reply opens a box under the comment; the reply is saved under it with the name the reader gave, and the comment itself is not changed');
+    log(/\n1\. .*\n   Comment by Long: the first comment\n   Reply by Long's agent: Addressed: <i>reworded<\/i>\n   Reply by Reader: a reply to the reply\n   Reply by Quentin S: No: still unclear\n   Id: c1\n/.test(v2.fb) && /   Id: r9\n/.test(v2.fb) && /replies\.json/.test(v2.fb),
+      'the feedback text gives each comment with its author, its replies in order and its id, and says how an agent puts its replies on the page');
+    await p.evaluate(() => cmOpen({ c: CM.items.find(x => x.id === 'c1') })); await wait(200);
+    const card = await p.evaluate(() => ({ thread: document.querySelectorAll('.cm-card .cm-thread .cm-rp').length, del: document.querySelectorAll('.cm-card .cm-thread button').length }));
+    await p.click('.cm-card .cm-reply'); await wait(200);
+    const box = await p.evaluate(() => ({ card: !!document.querySelector('.cm-card'), edit: cmEdit, ta: !!document.querySelector('#cm-panel .cm-it[data-cid="c1"] .cm-it-ta') }));
+    await p.keyboard.press('Escape'); await wait(150);
+    log(card.thread === 3 && card.del === 0 && !box.card && box.edit === 'reply:c1' && box.ta, 'the comment box shows the replies, and its Reply button opens the reply box in the list');
+    await p.click('#cm-panel .cm-it[data-cid="c1"] .cm-rp button[data-rid="r1"]'); await wait(300);
+    const v3 = await view();
+    log(v3.thread.length === 2 && v3.gone === 'r1', 'a reply can be deleted on its own, and the deletion is recorded');
+    await p.evaluate(() => cmPanelAct('resolve', 'c1')); const v4 = await view();
+    await p.evaluate(() => { cmPanelAct('reopen', 'c1'); cmPanelAct('del', 'c1'); }); const v5 = await view();
+    log(!/Id: c1\n/.test(v4.fb) && v5.tops === 'r9' && v5.gone.split(',').length === 4 && await p.evaluate(() => CM.items.map(c => c.id).join()) === 'r9',
+      'a resolved comment leaves the feedback with its replies; a deleted comment takes its replies with it, each recorded as deleted');
+    await p.context().close();
+  }
+  // ---------- Any order: an owner, a reviewer and their two agents change the comments of one file ----------
+  // The agents are the build itself (--comments-only), so this part needs Python: --python <exe>, or QEXPLAIN_PYTHON.
+  {
+    const py = opt('--python') || process.env.QEXPLAIN_PYTHON || '';
+    if (!py) console.log('NOTE\tthe any-order cases were not run: they call the build, which needs --python <exe> (or QEXPLAIN_PYTHON)');
+    else {
+      const { src, setInner, blocks, id, put, fresh, open } = CMF, build = path.join(__dirname, 'build-explanation.py');
+      const scenario = async (name, steps) => {
+        const F = put('cm-order-' + name + '.html', setInner(src, ''));
+        const people = {};
+        const who = async n => { if (!people[n]) { const p = await fresh(); await p.exposeFunction('__fsRead', () => fs.readFileSync(F, 'utf8')); await p.exposeFunction('__fsWrite', t => { fs.writeFileSync(F, t); }); await open(p, F); people[n] = p; } return people[n]; };
+        const api = {
+          comment: async (n, cid, text) => (await who(n)).evaluate(([cid, text]) => { CM.items.push({ id: cid, kind: 'page', part: 'page', quote: '', text, t: Date.now(), state: 'open' }); cmChanged(); }, [cid, text]),
+          reply: async (n, rid, re, text) => (await who(n)).evaluate(([rid, re, text]) => { CM.items.push({ id: rid, re, kind: 'reply', part: 'page', quote: '', text, t: Date.now(), state: 'open' }); cmChanged(); }, [rid, re, text]),
+          del: async (n, cid) => (await who(n)).evaluate(cid => { cmGone(CM.items.find(x => x.id === cid)); cmChanged(); }, cid),
+          save: async n => { const p = await who(n); await p.evaluate(async () => { cmHandle = { name: 'the file', getFile: async () => ({ text: () => window.__fsRead() }), createWritable: async () => ({ write: t => window.__fsWrite(t), close: async () => {} }) }; await cmSaveFile(); }); },
+          reopen: async n => { const p = await who(n); await open(p, F); return p.evaluate(() => typeof cmTaken === 'number' ? cmTaken : -1); },
+          // An agent answers from the feedback text it was given: it knows comment ids, and writes into the file through the build.
+          agent: (by, replies) => { const j = path.join(out, 'cm-order-replies.json'); fs.writeFileSync(j, JSON.stringify({ by, replies }));
+            const r = require('child_process').spawnSync(py, ['-I', build, '--comments-only', '--out', F, '--replies', j], { encoding: 'utf8' }); return r.status + ' ' + (r.stdout || '') + (r.stderr || ''); },
+          state: async n => (await who(n)).evaluate(() => ({ ids: CM.items.map(c => c.id).sort(), tops: cmTops().map(c => c.id).sort().join(), under: cmTops().map(c => c.id + ': ' + cmReplies(c).map(r => r.text).join(' / ')).sort() })),
+          fileIds: () => blocks(fs.readFileSync(F, 'utf8')).flatMap(b => b.items.map(c => c.id)), F,
+        };
+        let verdict; try { verdict = await steps(api); } catch (e) { verdict = [false, 'failed: ' + String(e.message).split('\n')[0]]; }
+        for (const p of Object.values(people)) await p.context().close();
+        return verdict;
+      };
+      const uniq = a => new Set(a).size === a.length;
+      const same = (x, y) => JSON.stringify(x) === JSON.stringify(y);
+      // 1. Owner saves, reviewer comments and replies and saves, the owner's agent replies, each side reopens.
+      let [ok, why] = await scenario('1', async s => {
+        await s.comment('owner', 'a', 'owner asks'); await s.save('owner');
+        await s.reopen('reviewer'); await s.comment('reviewer', 'b', 'reviewer asks'); await s.reply('reviewer', 'rb', 'a', 'reviewer answers'); await s.save('reviewer');
+        const out1 = s.agent('Owner', [{ to: 'a', text: 'Addressed: fixed' }]);
+        await s.reopen('owner'); const o = await s.state('owner'); await s.save('owner'); await s.reopen('reviewer'); const r = await s.state('reviewer');
+        return [/^0 /.test(out1) && o.tops === 'a,b' && o.under[0] === "a: reviewer answers / Addressed: fixed" && same(o, r) && uniq(o.ids) && o.ids.length === 4 && blocks(fs.readFileSync(s.F, 'utf8')).length === 1, JSON.stringify([o, r])];
+      });
+      log(ok, 'any order 1: owner saves, reviewer comments, replies and saves, the owner\'s agent replies, then both reopen: both hold the same two comments and two replies, none twice' + (ok ? '' : ' ' + why));
+      // 2. The owner's comment reaches the agent by the clipboard only: the agent replies in the file before anyone saved.
+      [ok, why] = await scenario('2', async s => {
+        await s.comment('owner', 'a', 'owner asks, by the clipboard');
+        s.agent('', [{ to: 'a', text: 'Rejected: by design' }]);
+        await s.reopen('reviewer'); const early = await s.state('reviewer');
+        await s.comment('reviewer', 'b', 'reviewer asks'); await s.save('reviewer');
+        const took = await s.reopen('owner'); const o = await s.state('owner'); await s.save('owner'); await s.reopen('reviewer'); const r = await s.state('reviewer');
+        return [early.tops.split(',').length === 1 && early.ids.length === 1 && took === 2 && o.tops === 'a,b' && o.under[0] === 'a: Rejected: by design' && same(o, r) && uniq(r.ids), JSON.stringify([early, took, o, r])];
+      });
+      log(ok, 'any order 2: an agent replies in the file to a comment it got by the clipboard, before anyone saved; the reviewer sees the reply on its own, and once the owner saves, both see it under the comment' + (ok ? '' : ' ' + why));
+      // 3. Both agents reply, the reviewer deletes a comment, an agent sends its replies again.
+      [ok, why] = await scenario('3', async s => {
+        await s.comment('owner', 'a', 'first'); await s.comment('owner', 'b', 'second'); await s.save('owner');
+        s.agent('Reviewer', [{ to: 'b', text: 'Deferred: later' }]); s.agent('Owner', [{ to: 'a', text: 'Addressed' }]);
+        await s.reopen('reviewer'); const before = await s.state('reviewer'); await s.del('reviewer', 'b'); await s.save('reviewer');
+        await s.reopen('owner'); const o = await s.state('owner');
+        const again = s.agent('Reviewer', [{ to: 'b', text: 'Deferred: later' }]) + s.agent('Owner', [{ to: 'a', text: 'Addressed' }]);
+        const took = await s.reopen('owner'); const o2 = await s.state('owner'); const r = await s.state('reviewer');
+        return [before.under.join() === 'a: Addressed,b: Deferred: later' && o.tops === 'a' && o.ids.length === 2 && (again.match(/is unchanged/g) || []).length === 2 && took === 0 && same(o, o2) && same(o, r) && uniq(s.fileIds()),
+          JSON.stringify([before, o, again.slice(0, 200), took, o2, r])];
+      });
+      log(ok, 'any order 3: both agents reply, the reviewer deletes a comment and saves: the comment and its reply are gone for the owner too, and the same replies sent again add nothing and bring nothing back' + (ok ? '' : ' ' + why));
+      // 4. Two people change the same comment and each other's: the later change wins on both sides, whoever saves first.
+      [ok, why] = await scenario('4', async s => {
+        await s.comment('owner', 'a', 'v1'); await s.save('owner'); await s.reopen('reviewer');
+        await (await s.reopen('owner'), s.del('owner', 'a')); await wait(20);
+        await (await s.reopen('reviewer')); const r0 = await s.state('reviewer');
+        await s.save('owner'); await s.save('reviewer'); await s.reopen('owner'); await s.reopen('reviewer');
+        const o = await s.state('owner'), r = await s.state('reviewer');
+        return [r0.tops === 'a' && o.tops === '' && same(o, r), JSON.stringify([r0, o, r])];
+      });
+      log(ok, 'any order 4: the owner deletes a comment the reviewer still holds; whoever saves first, the comment ends deleted on both sides' + (ok ? '' : ' ' + why));
+    }
   }
   const phone = await browser.newPage({ viewport: { width: 390, height: 800 } }); watch(phone);
   await routeLibs(phone);

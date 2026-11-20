@@ -407,6 +407,17 @@
   .cm-tag { flex: none; border: 1px solid var(--border-strong); border-radius: 8px; padding: 0 6px; font-size: 10.5px; white-space: nowrap; }
   .cm-it-t { white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0; }
   .cm-it-a { display: flex; gap: 6px; justify-content: flex-end; flex-wrap: wrap; }
+  /* A reply stands under the comment it answers, set in from it. An agent's reply has its own edge colour. */
+  .cm-by { color: var(--muted); font-size: 11px; margin-top: 4px; }
+  .cm-rp { margin: 6px 0 6px 10px; padding: 3px 0 3px 8px; border-left: 3px solid var(--border-strong); }
+  .cm-rp.cm-rp-agent { border-left-color: var(--accent); }
+  .cm-rp-h { display: flex; align-items: baseline; gap: 6px; color: var(--muted); font-size: 11px; }
+  .cm-rp-h b { color: var(--text); font-weight: 600; }
+  .cm-rp-h button { margin-left: auto; border: 0; background: none; color: var(--muted); font-size: 11px; cursor: pointer; padding: 0 2px; }
+  .cm-rp-h button:hover { color: #b3261e; text-decoration: underline; }
+  .cm-rp-t { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .cm-card .cm-thread { max-height: 9em; overflow: auto; font-size: 12px; margin-bottom: 6px; }
+  .cm-name { flex: 1 1 6rem; min-width: 0; font: inherit; font-size: 12px; padding: 2px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); }
   .cm-it-a button, .cm-ph button, .cm-pf button { padding: 2px 9px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--btn-bg); color: var(--text); font-size: 11.5px; cursor: pointer; }
   .cm-it-a button:hover, .cm-ph button:hover, .cm-pf button:hover { border-color: #b26a00; }
   .cm-it-a .cm-del { color: #c0392b; }
@@ -1837,7 +1848,7 @@ function cmClean(saved) {
   const str = v => typeof v === 'string';
   saved.items = saved.items.filter(c => c && typeof c === 'object' && str(c.id) && str(c.text) && str(c.part) && (c.kind !== 'line' && c.tk !== 'src' || Array.isArray(c.lines)))
     .map(c => { if (!str(c.quote)) c.quote = ''; if (!str(c.prefix)) c.prefix = ''; if (!str(c.suffix)) c.suffix = ''; if (c.pic !== undefined && !str(c.pic)) delete c.pic; return c; });
-  saved.items.forEach(c => { ['t', 'm'].forEach(k => { if (c[k] !== undefined && !(typeof c[k] === 'number' && isFinite(c[k]))) delete c[k]; }); ['by', 're'].forEach(k => { if (c[k] !== undefined && !str(c[k])) delete c[k]; }); });
+  saved.items.forEach(c => { ['t', 'm'].forEach(k => { if (c[k] !== undefined && !(typeof c[k] === 'number' && isFinite(c[k]))) delete c[k]; }); ['by', 're'].forEach(k => { if (c[k] !== undefined && !str(c[k])) delete c[k]; }); if (c.agent !== undefined && c.agent !== true) delete c.agent; });
   if (!saved.edits || typeof saved.edits !== 'object') saved.edits = {};
   if (!saved.gone || typeof saved.gone !== 'object' || Array.isArray(saved.gone)) saved.gone = {};
   Object.keys(saved.gone).forEach(k => { if (!(typeof saved.gone[k] === 'number' && isFinite(saved.gone[k]))) delete saved.gone[k]; });
@@ -1858,7 +1869,28 @@ CM.gone = CM.gone || {};
 const CM_OPEN = '<' + '!--qx-comments--' + '>', CM_SHUT = '<' + '!--/qx-comments--' + '>';
 const cmWhen = c => c.m || c.t || 0;                    // when a comment was last changed
 function cmTouch(c) { c.m = Date.now(); return c; }
-function cmGone(c) { CM.gone[c.id] = Date.now(); CM.items = CM.items.filter(x => x !== c); }
+// ---- Replies ----
+// A reply is a comment that names the comment it answers (re) and who wrote it (by). It is stored, merged and deleted
+// like any comment; it has no place of its own on the page and no number: it is shown under the comment it answers.
+// A reply to a reply belongs to the first comment of the chain. A reply whose comment is unknown here is shown as a
+// comment on the whole explanation, so that it is never lost from sight.
+function cmRoot(c) { let p = c, i = 0; while (p && p.re && i++ < 8) { const id = p.re; p = CM.items.find(x => x.id === id); } return p && p !== c && !p.re ? p : null; }
+function cmTops() { return CM.items.filter(c => !cmRoot(c)); }
+function cmReplies(c) { return CM.items.filter(x => x.re && cmRoot(x) === c).sort((a, b) => (a.t || 0) - (b.t || 0)); }
+const CM_NAME_KEY = 'qexplain-change-name';
+function cmName() { return String(lsGet(CM_NAME_KEY) || '').replace(/\s+/g, ' ').trim().slice(0, 60); }
+function cmBy(c) { return c.by || (c.agent ? 'Agent' : 'Reader'); }
+function cmNewId() { return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
+function cmThreadHtml(c, canDelete) {
+  return cmReplies(c).map(r => '<div class="cm-rp' + (r.agent ? ' cm-rp-agent' : '') + '"><div class="cm-rp-h"><b>' + esc(cmBy(r)) + '</b>'
+    + (canDelete ? '<button type="button" data-act="rdel" data-rid="' + esc(r.id) + '" title="Delete this reply">Delete</button>' : '') + '</div><div class="cm-rp-t">' + esc(r.text) + '</div></div>').join('');
+}
+// A deleted comment takes its replies with it. A deleted reply does not: what answered it now answers what it answered.
+function cmGone(c) {
+  const t = Date.now(), all = [c].concat(c.re ? [] : cmReplies(c));
+  if (c.re) CM.items.forEach(x => { if (x.re === c.id) { x.re = c.re; x.m = t; } });
+  all.forEach(x => { CM.gone[x.id] = t; }); CM.items = CM.items.filter(x => !all.includes(x));
+}
 function cmGoneEdit(name) { CM.gone['edit:' + name] = Date.now(); delete CM.edits[name]; }
 // Merges what a block holds into the store. Returns how many things it changed. A time in the future is read as now:
 // a wrong clock on another machine must not win every later merge.
@@ -1871,7 +1903,7 @@ function cmMerge(src) {
     if (CM.gone[c.id] && CM.gone[c.id] >= cmWhen(c)) return;
     const i = CM.items.findIndex(x => x.id === c.id);
     // A later copy that says the same is not a change: the same file opened twice takes nothing the second time.
-    const mine = CM.items[i], same = mine && mine.text === c.text && mine.state === c.state && (mine.label || '') === (c.label || '');
+    const mine = CM.items[i], same = mine && mine.text === c.text && mine.state === c.state && (mine.label || '') === (c.label || '') && (mine.re || '') === (c.re || '');
     if (i < 0) { CM.items.push(c); n++; } else if (cmWhen(c) > cmWhen(mine) && !same) { CM.items[i] = c; n++; }
   });
   const had = CM.items.length;
@@ -1978,7 +2010,7 @@ function cmResolve() {
   CMX = {}; cmRoots().forEach(r => { CMX[r.part] = { root: r.root, ix: cmIndex(r.root) }; });
   CM.items.forEach(c => {
     c._pieces = null; c._el = null; c._at = -1; c._state = 'notfound';
-    if (c.state === 'resolved') return;
+    if (c.state === 'resolved' || cmRoot(c)) return;
     if (c.part === 'page') { c._pieces = []; c._state = 'anchored'; c._at = c.t; return; }
     if (c.kind === 'dg') { cmResolveDg(c); return; }
     if (c.kind === 'part') { if (PART_KEYS.includes(c.part)) { c._pieces = []; c._state = 'anchored'; c._at = -1; } return; }
@@ -1995,7 +2027,7 @@ function cmResolve() {
   });
   // Numbers follow the document, so the markers on the page and the copied feedback read in the same order.
   CM.items.forEach(c => { c._n = 0; });
-  CM.items.filter(c => c.state !== 'resolved').sort((x, y) => (x._pieces ? 0 : 1) - (y._pieces ? 0 : 1) || PART_KEYS.indexOf(x.part) - PART_KEYS.indexOf(y.part) || x._at - y._at || x.t - y.t)
+  cmTops().filter(c => c.state !== 'resolved').sort((x, y) => (x._pieces ? 0 : 1) - (y._pieces ? 0 : 1) || PART_KEYS.indexOf(x.part) - PART_KEYS.indexOf(y.part) || x._at - y._at || x.t - y.t)
     .forEach((c, i) => { c._n = i + 1; });
 }
 function cmDraw() {
@@ -2812,6 +2844,7 @@ function cmKeys(ta, save, escape) {
 function cmExcerpt(s, n) { s = String(s || '').replace(/\s+/g, ' ').trim(); return s.length > n ? s.slice(0, n - 3) + '...' : s; }
 // Where a comment stands, in words a reader and an agent can both follow.
 function cmWhere(c, bare) {
+  if (c.re) return 'A reply to a comment that is not on this page';
   if (c.part === 'page') return 'The whole explanation';
   if (c.kind === 'part') return cmPartName(c.part) + ', the whole part';
   if (c.part === 'diff') return cmDiffTitle(c);
@@ -2830,7 +2863,7 @@ const CM_LABELS = [
   ['unclear', 'Unclear', 'Rewrite this so that it is plain on a first read.'],
   ['cut', 'Cut', 'Remove this, or say why it should stay.'],
 ];
-const CM_ASK = 'Reply to every numbered comment with its number and one of: addressed, deferred, rejected, and one line on what you changed or why. Rebuild the explanation page if anything changed.';
+const CM_ASK = 'Reply to every numbered comment with its number and one of: addressed, deferred, rejected, and one line on what you changed or why. Rebuild the explanation page if anything changed. To put your replies on the page, under the comments, write them in replies.json by comment id and pass it to the build (--replies): the skill says how. A comment that already has replies shows them: answer the last one.';
 function cmLabel(k) { return CM_LABELS.find(l => l[0] === k) || null; }
 function cmLabsHtml(cur) {
   return '<div class="cm-labs" role="group" aria-label="Label">' + CM_LABELS.map(l => '<button type="button" class="cm-lab' + (l[0] === cur ? ' on' : '') + '" data-lab="' + l[0]
@@ -2867,7 +2900,7 @@ function cmKeepIds(open) {
   return L.length ? ['Diagram comments find their parts again by id. When you rework one of these diagrams, keep the ids below unless a comment asks you to remove the part:'].concat(L, '') : [];
 }
 function cmFeedback() {
-  const open = CM.items.filter(c => c.state !== 'resolved').sort((x, y) => x._n - y._n);
+  const open = cmTops().filter(c => c.state !== 'resolved').sort((x, y) => x._n - y._n);
   if (!open.length && !dgSrcNames().length) return '';
   const L = ['Feedback on the change explanation "' + baseTitle + '"'], path = pagePath(), used = [];
   if (path) L.push('Page: ' + path);
@@ -2887,7 +2920,9 @@ function cmFeedback() {
       c.lines.slice(0, 12).forEach(t => L.push('   | ' + t));
       if (c.lines.length > 12) L.push('   | ... (' + (c.lines.length - 12) + ' more lines)');
     } else if (c.quote) L.push('   Quote: "' + cmExcerpt(c.quote, 400) + '"');
-    L.push('   Comment: ' + ind(c.text), '');
+    L.push('   Comment' + (c.by || c.agent ? ' by ' + cmBy(c) : '') + ': ' + ind(c.text));
+    cmReplies(c).forEach(r => L.push('   Reply by ' + cmBy(r) + ': ' + ind(r.text)));
+    L.push('   Id: ' + c.id, '');
   });
   dgSrcNames().forEach((name, i) => {
     const ed = CM.edits[name], gone = !dgSrcFirst(name), d2 = ed.kind !== 'mermaid';
@@ -2903,7 +2938,7 @@ function cmFeedback() {
   L.push(CM_ASK);
   return L.join('\n') + '\n';
 }
-function cmOpenCount() { return CM.items.filter(c => c.state !== 'resolved').length + dgSrcNames().length; }
+function cmOpenCount() { return cmTops().filter(c => c.state !== 'resolved').length + dgSrcNames().length; }
 function cmCopy(btn) {
   const text = cmFeedback();
   if (!text) { showToast('No open comments to copy'); return; }
@@ -3005,12 +3040,16 @@ function cmItemHtml(c) {
       : c._state === 'moved' ? '<span class="cm-tag" title="The text this comment was about now stands in another place">moved</span>' : '') + '</div>';
   if (editing) return h + '<textarea class="cm-it-ta" aria-label="Comment">' + esc(cmEditText !== null ? cmEditText : c.text) + '</textarea>' + cmLabsHtml(cmEditLab !== null ? cmEditLab : c.label || '')
     + '<div class="cm-it-a"><span class="cm-hint">Enter saves. Shift+Enter adds a line.</span><button type="button" data-act="cancel">Cancel</button><button type="button" class="cm-save" data-act="save">Save</button></div></div>';
-  return h + (c.pic ? cmPicHtml(c.pic) : '') + '<div class="cm-it-t">' + esc(c.text) + '</div><div class="cm-it-a">'
-    + (done ? '<button type="button" data-act="reopen">Reopen</button>' : '<button type="button" data-act="edit">Edit</button><button type="button" data-act="resolve">Resolve</button>')
+  const replying = cmEdit === 'reply:' + c.id;
+  h += (c.pic ? cmPicHtml(c.pic) : '') + (c.by || c.agent ? '<div class="cm-by">' + esc(cmBy(c)) + '</div>' : '') + '<div class="cm-it-t">' + esc(c.text) + '</div>' + cmThreadHtml(c, !done);
+  if (replying) return h + '<textarea class="cm-it-ta" aria-label="Reply" placeholder="Your reply">' + esc(cmEditText || '') + '</textarea>'
+    + '<div class="cm-it-a"><span class="cm-hint">Enter saves. Shift+Enter adds a line.</span><button type="button" data-act="cancel">Cancel</button><button type="button" class="cm-save" data-act="save">Save</button></div></div>';
+  return h + '<div class="cm-it-a">'
+    + (done ? '<button type="button" data-act="reopen">Reopen</button>' : '<button type="button" data-act="reply">Reply</button><button type="button" data-act="edit">Edit</button><button type="button" data-act="resolve">Resolve</button>')
     + '<button type="button" class="cm-del" data-act="del">Delete</button></div></div>';
 }
 function cmDrawPanel() {
-  const open = CM.items.filter(c => c.state !== 'resolved').sort((x, y) => x._n - y._n), done = CM.items.filter(c => c.state === 'resolved');
+  const open = cmTops().filter(c => c.state !== 'resolved').sort((x, y) => x._n - y._n), done = cmTops().filter(c => c.state === 'resolved');
   const cnt = document.querySelector('#cm-panel-btn .cm-count'); if (cnt) cnt.textContent = (open.length + dgSrcNames().length) || '';
   fitTools();
   if (!cmPanelOpen()) return;
@@ -3046,16 +3085,19 @@ function cmPanelMark() {
 }
 function cmPanelAct(act, id) {
   const c = CM.items.find(x => x.id === id), list = document.querySelector('#cm-panel .cm-pl'), ta = list.querySelector('.cm-it-ta');
-  if (act === 'new' || act === 'edit') {
-    if (ta && ta.value.trim() !== (cmEdit === 'new' ? '' : (CM.items.find(x => x.id === cmEdit) || {}).text)) { ta.focus(); return; }   // finish the one in hand first
-    cmEdit = act === 'new' ? 'new' : id; cmEditText = cmEditLab = null; if (ta) ta.remove(); cmDrawPanel(); return;
+  const replyTo = typeof cmEdit === 'string' && cmEdit.indexOf('reply:') === 0 ? cmEdit.slice(6) : null;
+  if (act === 'new' || act === 'edit' || act === 'reply') {
+    if (ta && ta.value.trim() !== (cmEdit === 'new' || replyTo ? '' : (CM.items.find(x => x.id === cmEdit) || {}).text)) { ta.focus(); return; }   // finish the one in hand first
+    cmEdit = act === 'new' ? 'new' : act === 'reply' ? 'reply:' + id : id; cmEditText = cmEditLab = null; if (ta) ta.remove(); cmDrawPanel(); return;
   }
   if (act === 'cancel') { cmEdit = null; cmEditText = cmEditLab = null; if (ta) ta.remove(); cmDrawPanel(); return; }
   if (act === 'save') {
     const text = ta ? ta.value.trim() : ''; if (!text) { if (ta) ta.focus(); return; }
-    if (id === 'new') CM.items.push({ id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), kind: 'page', part: 'page', quote: '', text, label: cmLabOf(list), t: Date.now(), state: 'open' });
+    // A reply is saved under the comment it answers, whichever control asked for the save.
+    if (replyTo) { if (CM.items.some(x => x.id === replyTo)) CM.items.push({ id: cmNewId(), re: replyTo, by: cmName() || undefined, kind: 'reply', part: 'page', quote: '', text, t: Date.now(), state: 'open' }); }
+    else if (id === 'new') CM.items.push({ id: cmNewId(), by: cmName() || undefined, kind: 'page', part: 'page', quote: '', text, label: cmLabOf(list), t: Date.now(), state: 'open' });
     else if (c) { c.text = text; c.label = cmLabOf(list); cmTouch(c); }
-    cmEdit = null; cmEditText = cmEditLab = null; ta.remove(); cmChanged(); cmAutoCopy('Comment saved'); return;
+    cmEdit = null; cmEditText = cmEditLab = null; ta.remove(); cmChanged(); cmAutoCopy(replyTo ? 'Reply saved' : 'Comment saved'); return;
   }
   if (!c) return;
   if (cmActive === c.id) cmClose();
@@ -3088,15 +3130,20 @@ function cmJump(c) {
 function cmPanelInit() {
   const p = document.createElement('aside'); p.id = 'cm-panel'; p.hidden = true; p.setAttribute('aria-label', 'Comments');
   p.innerHTML = '<div class="cm-ph"><strong>Comments</strong><button type="button" data-act="new" title="Comment on the explanation as a whole">General comment</button>'
-    + '<button type="button" data-act="close" title="Close the list">Close</button></div><div class="cm-pl"></div><div class="cm-prev" hidden></div>'
+    + '<button type="button" data-act="close" title="Close the list">Close</button></div>'
+    + '<div class="cm-ph"><input class="cm-name" type="text" maxlength="60" placeholder="Your name (optional)" aria-label="Your name" title="Shown beside your comments and replies when the page is shared. Kept in this browser."></div>'
+    + '<div class="cm-pl"></div><div class="cm-prev" hidden></div>'
     + '<div class="cm-pf"><button type="button" data-act="preview" aria-expanded="false" title="Show the exact text that will be copied">Preview</button>'
     + '<button type="button" data-act="savefile" title="' + (PAGE_SRC === null ? 'Save the comments into the file of this page, so that they travel with it. The first time, the browser asks which file: choose this page (its path is under Info).' : 'Download a copy of this page with the comments in it') + '">' + (PAGE_SRC === null ? 'Save to file' : 'Download with comments') + '</button>'
     + '<button type="button" class="cm-save" data-act="copy" title="Copy every open comment as one text for an agent">Copy feedback</button></div>';
   document.body.appendChild(p); cmLabsWire(p);
+  const nm = p.querySelector('.cm-name'); nm.value = cmName();
+  nm.addEventListener('change', () => { lsSet(CM_NAME_KEY, nm.value.replace(/\s+/g, ' ').trim().slice(0, 60)); nm.value = cmName(); });
   p.addEventListener('click', e => {
     const b = e.target.closest('button[data-act]'), it = e.target.closest('.cm-it');
     if (b && b.dataset.act === 'copy') { cmCopy(b); return; }
     if (b && b.dataset.act === 'savefile') { cmSaveFile(); return; }
+    if (b && b.dataset.act === 'rdel') { const r = CM.items.find(x => x.id === b.dataset.rid); if (r) { cmGone(r); cmChanged(); cmAutoCopy('Reply deleted'); } return; }
     if (b && b.dataset.act === 'pic') { const pc = CM.items.find(x => x.id === (it || {}).dataset.cid); if (pc && pc.pic) cmCopyPic(pc.pic); return; }
     if (b && b.dataset.act === 'preview') { const v = p.querySelector('.cm-prev'); v.hidden = !v.hidden; b.setAttribute('aria-expanded', v.hidden ? 'false' : 'true'); return; }
     if (it && it.dataset.src) { if (b && b.dataset.act === 'srcdrop') dgSrcDrop(it.dataset.src); else dgSrcJump(it.dataset.src); return; }
@@ -3387,12 +3434,13 @@ function cmOpen(target) {
   const card = document.createElement('div'); card.className = 'cm-card'; card.setAttribute('role', 'dialog'); card.setAttribute('aria-label', c ? 'Edit comment' : 'New comment');
   card.innerHTML = '<div class="cm-k"></div><div class="cm-q"></div><textarea class="cm-text" rows="3" placeholder="Your comment" aria-label="Comment"></textarea>'
     + '<div class="cm-row"><span class="cm-hint">Enter saves. Shift+Enter adds a line.</span><span class="cm-acts">'
-    + (c ? '<button type="button" class="cm-del">Delete</button>' : '') + '<button type="button" class="cm-cancel">Cancel</button><button type="button" class="cm-save">Save</button></span></div>';
+    + (c ? '<button type="button" class="cm-del">Delete</button><button type="button" class="cm-reply" title="Answer in the list of comments">Reply</button>' : '') + '<button type="button" class="cm-cancel">Cancel</button><button type="button" class="cm-save">Save</button></span></div>';
   card.querySelector('.cm-q').textContent = quote.length > 160 ? quote.slice(0, 157) + '...' : quote;
   if (src.pic) { card.querySelector('.cm-q').insertAdjacentHTML('afterend', cmPicHtml(src.pic)); card.querySelector('.cm-pic button').addEventListener('click', () => cmCopyPic(src.pic)); }
   const el = (c ? c._el : target.sel.el) || null;
   card.querySelector('.cm-k').textContent = src.kind === 'dg' ? cmDgTitle(src) : src.kind === 'part' ? cmPartTitle(src.part) : src.part === 'diff' ? cmDiffTitle(src) : el ? cmBlockName(el) : '';
   const ta = card.querySelector('.cm-text'); ta.value = first;
+  if (c && (cmReplies(c).length || c.by || c.agent)) ta.insertAdjacentHTML('beforebegin', '<div class="cm-thread">' + (c.by || c.agent ? '<div class="cm-by">' + esc(cmBy(c)) + '</div>' : '') + cmThreadHtml(c, false) + '</div>');
   ta.insertAdjacentHTML('afterend', cmLabsHtml(c ? c.label || '' : '')); cmLabsWire(card);
   const lab = () => cmLabOf(card), dirty = () => ta.value.trim() !== first.trim() || lab() !== (c ? c.label || '' : '');
   const save = () => {
@@ -3400,7 +3448,7 @@ function cmOpen(target) {
     if (!text) { cmNudge(); ta.focus(); return; }
     if (c) { c.text = text; c.label = lab(); cmTouch(c); }
     else {
-      const s = target.sel, base = { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text, label: lab(), t: Date.now(), state: 'open' };
+      const s = target.sel, base = { id: cmNewId(), by: cmName() || undefined, text, label: lab(), t: Date.now(), state: 'open' };
       CM.items.push(Object.assign(base, s.kind === 'dg' ? { kind: 'dg', part: s.part, dname: s.dname, dn: s.dn, tk: s.tk, did: s.did, dlabel: s.dlabel, dwhat: s.dwhat, dends: s.dends, dsrc: s.dsrc, dpos: s.dpos || undefined, dparts: s.dparts, dbox: s.dbox, pic: s.pic || undefined, lines: s.lines, ln: s.ln, ctx: s.ctx, quote: s.quote || '' }
         : s.kind === 'part' ? { kind: 'part', part: s.part, quote: '' } : s.part === 'diff'
         ? { kind: s.kind, part: 'diff', path: s.path, side: s.side, ln: s.ln, ln2: s.ln2, lines: s.lines, quote: s.quote }
@@ -3414,6 +3462,7 @@ function cmOpen(target) {
   cmKeys(ta, save, () => { if (dirty()) cmNudge(); else cmClose(); });
   card.querySelector('.cm-save').addEventListener('click', save);
   card.querySelector('.cm-cancel').addEventListener('click', cmClose);
+  if (c) card.querySelector('.cm-reply').addEventListener('click', () => { if (dirty()) { cmNudge(); return; } cmClose(); cmPanel(true); cmPanelAct('reply', c.id); });
   if (c) card.querySelector('.cm-del').addEventListener('click', () => {
     cmGone(c); cmSave(); cmResolve(); cmDraw(); cmClose(); cmDrawPanel(); cmAutoCopy('Comment deleted');
   });
