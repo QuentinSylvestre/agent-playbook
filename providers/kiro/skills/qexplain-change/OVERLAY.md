@@ -23,3 +23,8 @@ Copy each figure with the name its source gives it. Do not turn "accepted by the
 - State the page's language to the user before you write, even when the project's rules say documents keep the project's language: this page follows the conversation.
 - Before any screenshot, look for the repo's procedure (`docs/howtos/index.md`) and follow it step by step, cleanup included.
 - Never write about a screen you did not capture. If a capture failed, say so in `verified`.
+
+### On replies to comments
+
+- Copy each comment id from its `Id:` line, character for character. Never write an id from memory or from the comment's number.
+- When the build prints a WARN that a reply was not added, say so in your report. Do not run the build again with the same file.
