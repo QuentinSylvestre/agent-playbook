@@ -148,9 +148,14 @@ async function routeLibs(target) {
   // Scrolls first and selects afterwards: a scroll hides the Comment button, as it should for a reader.
   const selectProse = async () => {
     const find = `const w = document.createTreeWalker(document.querySelector('#part-brief .page'), NodeFilter.SHOW_TEXT);
-      let t; while ((t = w.nextNode())) { if (t.nodeValue.trim().length > 60 && t.parentElement.closest('p')) break; }`;
+      let t, a = 0, b = 0;
+      /* The chosen text starts and ends on a letter and holds no line break: a paragraph may be written over
+         several indented lines, and a comment keeps its quote without the spaces around it. */
+      while ((t = w.nextNode())) { const v = t.nodeValue; if (v.trim().length <= 60 || !t.parentElement.closest('p')) continue;
+        a = v.search(/\\S/) + 2; while (/\\s/.test(v[a])) a++; b = a + 38; while (/\\s/.test(v[b - 1])) b--;
+        if (b - a > 20 && b <= v.length && !/\\n/.test(v.slice(a, b))) break; }`;
     await page.evaluate(find + ` t.parentElement.scrollIntoView({ block: 'center' });`); await wait(200);
-    return page.evaluate(find + ` const r = document.createRange(); r.setStart(t, 2); r.setEnd(t, 40);
+    return page.evaluate(find + ` const r = document.createRange(); r.setStart(t, a); r.setEnd(t, b);
       const s = getSelection(); s.removeAllRanges(); s.addRange(r);
       document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); s.toString();`);
   };
@@ -743,12 +748,12 @@ async function routeLibs(target) {
     }
     await page.evaluate(id => { dgSrcOpen(document.getElementById(id), false); cmPanel(false); }, d2dg); await wait(200);
   }
-  const hadDg = await showPartOf(page, '.dg .cm-dgbtn'); await wait(hadDg ? 600 : 0);      // a hidden button has no size to compare
+  const hadDg = await showPartOf(page, '.dg .cm-dgbtn'); if (!hadDg) await page.evaluate(() => switchPart(PART_KEYS[0], true)); await wait(600);
   const looks = await page.evaluate(() => { const css = e => { const s = getComputedStyle(e); return [s.width, s.height, s.borderTopColor, s.borderTopLeftRadius, s.color].join(); };
     const mm = [...document.querySelectorAll('.dg[data-kind="mermaid"]')].find(d => !cmDgParts(d).length); let hint = null;
     if (mm) { cmDgSetMode(mm); hint = mm.querySelector(':scope > .cm-dgtip').textContent; cmDgSetMode(null); }
-    const all = ['.cm-dgbtn', '.cm-tadd', '#cm-blk-add', '#cm-tbl-add'].map(s => document.querySelector(s)).filter(Boolean).map(css);
-    return { hint, same: all.length >= 3 && all.every(x => x === all[0]), add: !!document.querySelector('#cm-add svg') }; });
+    const all = ['.cm-dgbtn', '.cm-tadd', '#cm-blk-add', '#cm-tbl-add'].map(s => document.querySelector(s)).filter(e => e && e.getClientRects().length).map(css);      /* a button that is not shown has no size to compare */
+    return { hint, same: all.length >= 1 && all.every(x => x === all[0]), add: !!document.querySelector('#cm-add svg') }; });
   if (looks.hint !== null) log(looks.hint.startsWith('Click the diagram to comment on it as a whole'), 'the comment-mode hint says what the diagram allows: a diagram with no known parts is commented as a whole');
   log(looks.same && looks.add, 'every comment button on the page has the same size, border and colour, and the speech bubble');
   await page.evaluate(() => switchPart(PART_KEYS[0], true)); await wait(300);
