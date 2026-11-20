@@ -60,7 +60,13 @@
  *      parse keeps the last drawing, a D2 edit is text only. In the source, the pointer offers a
  *      button on a line and a selection offers "Comment"; the commented text is highlighted and
  *      numbered. An edit that unseats a comment says so, and the diagram counts it as "not placed".
- *      The copied text lists the ids to keep.
+ *      The copied text lists the ids to keep. In a sequence diagram a "#" typed in the source is
+ *      reported, because Mermaid would leave out the text after it; "#35;" is drawn as "#".
+ *  10. Screenshots: each figure shows its picture inside the page, with a caption that takes a
+ *      comment. A pair shows the screen as it is now; "Before" shows it as it was, in the same place;
+ *      "Side by side" shows both under their names and is kept across pages. "Enlarge", or a click
+ *      on the picture, opens the full window: the focus moves into it and stays there, the arrow
+ *      keys switch a pair, Escape closes it and returns the focus. On paper a pair prints both.
  *
  * Exit codes: 0 every check OK, 1 at least one BAD, 2 could not run.
  */
@@ -1430,6 +1436,59 @@ async function routeLibs(target) {
     log(found.every(r => !r.escaped.length), 'no block runs out of its column' + (say('escaped') ? ': ' + say('escaped') : ''));
     log(found.every(r => !r.covered.length), 'no text is covered by another element' + (say('covered') ? ': ' + say('covered') : ''));
     await page.evaluate(() => { switchPart(PART_KEYS[0]); window.scrollTo(0, 0); });
+  }
+  // Screenshots in the Brief or the Walkthrough. A pair shows one version, the other, or both; the full window; print.
+  const hasShot = await page.evaluate(() => { const f = document.querySelector('.part-panel .page .shot-pair') || document.querySelector('.part-panel .page .shot'); if (!f) return null;
+    switchPart(f.closest('.part-panel').id.replace(/^part-/, ''), true); lsSet('qexplain-change-shots', 'flip'); shotSbs(false); return { pair: f.classList.contains('shot-pair') }; });
+  if (hasShot) {
+    await wait(500);
+    const FIG = '.part-panel.active .page ' + (hasShot.pair ? '.shot-pair' : '.shot');
+    await page.evaluate(sel => document.querySelector(sel).scrollIntoView({ block: 'center' }), FIG); await wait(700);
+    const shotState = root => page.evaluate(async root => { const f = document.querySelector(root); if (!f) return null;
+      const vis = e => getComputedStyle(e).display !== 'none' && e.getClientRects().length > 0, sides = [...f.querySelectorAll('.shot-side')].filter(vis);
+      await Promise.all(sides.map(s => { const i = s.querySelector('img'); return i.complete ? 0 : new Promise(r => { i.onload = i.onerror = r; }); }));
+      const box = (f.closest('.page') || document.documentElement).getBoundingClientRect();
+      return { sides: sides.map(s => s.classList.contains('shot-before') ? 'before' : 'after'), drawn: sides.every(s => s.querySelector('img').naturalWidth > 0 && /^data:image\//.test(s.querySelector('img').src) && s.querySelector('img').alt.length > 3),
+        labels: sides.map(s => vis(s.querySelector('.shot-lab')) ? s.querySelector('.shot-lab').textContent : ''), pressed: [...f.querySelectorAll('.shot-v')].filter(b => b.getAttribute('aria-pressed') === 'true').map(b => b.dataset.v),
+        sbs: f.classList.contains('sbs'), sbsPressed: (f.querySelector('.shot-sbs') || { getAttribute: () => '' }).getAttribute('aria-pressed'), bar: vis(f.querySelector('.shot-bar')),
+        inside: sides.every(s => s.querySelector('img').getBoundingClientRect().right <= box.right + 1), cap: f.querySelector('figcaption').textContent.trim().length, leftFirst: sides.length < 2 || sides[0].getBoundingClientRect().left <= sides[1].getBoundingClientRect().left }; }, root);
+    const all = await page.evaluate(async () => { const figs = [...document.querySelectorAll('.part-panel .page .shot')];
+      return { n: figs.length, ok: figs.every(f => f.querySelector('figcaption').textContent.trim() && f.querySelector('.shot-side.on img') && f.querySelector('.shot-big')), caption: figs.every(f => cmBlockOf(f.querySelector('figcaption')) === f.querySelector('figcaption')),
+        quiet: figs.every(f => !!f.querySelector('.shot-bar').closest(CM_SKIP) && [...f.querySelectorAll('.shot-lab')].every(l => !!l.closest(CM_SKIP))) }; });
+    let s = await shotState(FIG);
+    log(all.ok && s.drawn && s.inside && s.cap > 3, `each of the ${all.n} screenshot figure(s) has a picture, a caption and an Enlarge button, and the picture stays inside the page`);
+    log(all.caption && all.quiet, 'a screenshot\'s caption takes a comment like a paragraph, and the words of its buttons are not part of the text a comment quotes');
+    if (hasShot.pair) {
+      log(s.sides.join() === 'after' && s.pressed.join() === 'after' && !s.sbs, 'a before-and-after pair first shows the screen as it is now');
+      await page.click(FIG + ' .shot-v[data-v="before"]'); await wait(150); s = await shotState(FIG);
+      log(s.sides.join() === 'before' && s.pressed.join() === 'before' && s.drawn, 'the Before button shows the screen as it was, in the same place');
+      await page.click(FIG + ' .shot-sbs'); await wait(200); s = await shotState(FIG);
+      const kept = await page.evaluate(() => lsGet('qexplain-change-shots'));
+      log(s.sides.join() === 'before,after' && s.labels.join() === 'Before,After' && s.leftFirst && s.sbsPressed === 'true' && s.drawn && s.inside && kept === 'sbs', 'Side by side shows both versions under their names, and the choice is kept');
+      await page.screenshot({ path: path.join(out, '8-shots-side-by-side.png') });
+    }
+    await page.focus(FIG + ' .shot-big'); await page.keyboard.press('Enter'); await wait(300);
+    let ov = await page.evaluate(() => { const o = document.getElementById('shot-ov'); return { open: !o.hidden, copy: o.querySelectorAll('.shot').length, focusIn: o.contains(document.activeElement), enlarge: getComputedStyle(o.querySelector('.shot-big')).display }; });
+    log(ov.open && ov.copy === 1 && ov.focusIn && ov.enlarge === 'none', 'Enlarge, reached with the keyboard, opens the screenshot in the full window and moves the focus into it');
+    await page.screenshot({ path: path.join(out, '8-shots-full-window.png') });
+    if (hasShot.pair) {
+      await page.click('#shot-ov .shot-sbs'); await wait(150); await page.keyboard.press('ArrowLeft'); await wait(120);
+      const left = (await shotState('#shot-ov .shot')).sides.join(); await page.keyboard.press('ArrowRight'); await wait(120);
+      const right = (await shotState('#shot-ov .shot')).sides.join(), inPage = await page.evaluate(sel => document.querySelector(sel).classList.contains('sbs'), FIG);
+      log(left === 'before' && right === 'after' && !inPage, 'in the full window the left and right arrow keys switch between before and after, and the side by side choice made there applies to the page too');
+    }
+    for (let i = 0; i < 5; i++) await page.keyboard.press('Tab');
+    const held = await page.evaluate(() => document.getElementById('shot-ov').contains(document.activeElement));
+    await page.keyboard.press('Escape'); await wait(200);
+    ov = await page.evaluate(sel => ({ open: !document.getElementById('shot-ov').hidden, back: document.activeElement === document.querySelector(sel + ' .shot-big'), empty: !document.querySelector('#shot-ov .shot') }), FIG);
+    log(held && !ov.open && ov.back && ov.empty, 'the Tab key stays inside the full window, and Escape closes it and returns the focus to the Enlarge button');
+    await page.click(FIG + ' .shot-side.on img'); await wait(250);
+    const byClick = await page.evaluate(() => !document.getElementById('shot-ov').hidden); await page.click('#shot-ov-x'); await wait(150);
+    log(byClick && await page.evaluate(() => document.getElementById('shot-ov').hidden), 'a click on a screenshot opens the full window too, and the Close button closes it');
+    await page.emulateMedia({ media: 'print' }); await wait(200); s = await shotState(FIG);
+    await page.emulateMedia({ media: 'screen' }); await wait(100);
+    log(!s.bar && s.drawn && (hasShot.pair ? s.sides.join() === 'before,after' && s.labels.join() === 'Before,After' : s.sides.join() === 'after'), 'on paper the buttons are left out, and a pair prints both versions under their names');
+    await page.evaluate(() => { lsSet('qexplain-change-shots', 'flip'); shotSbs(false); switchPart(PART_KEYS[0], true); window.scrollTo(0, 0); }); await wait(300);
   }
   const phone = await browser.newPage({ viewport: { width: 390, height: 800 } }); watch(phone);
   await routeLibs(phone);

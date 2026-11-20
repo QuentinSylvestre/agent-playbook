@@ -17,3 +17,9 @@ A page is checked only when the browser check ends with `RESULT COMPLETE` and 0 
 ### On the Brief's `verified` section
 
 Copy each figure with the name its source gives it. Do not turn "accepted by the user" into "fixed", or a result recorded on another page into a result on this page. When several plans meet in the range, give each plan one sentence on what it contributed to this range; a plan named only as precedent is not covered.
+
+### On the page's language and on screenshots
+
+- State the page's language to the user before you write, even when the project's rules say documents keep the project's language: this page follows the conversation.
+- Before any screenshot, look for the repo's procedure (`docs/howtos/index.md`) and follow it step by step, cleanup included.
+- Never write about a screen you did not capture. If a capture failed, say so in `verified`.

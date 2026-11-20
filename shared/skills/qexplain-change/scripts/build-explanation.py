@@ -39,6 +39,11 @@ replaces the value on the page and keeps the rest of the file, so prefer it for 
 --user-confirmed-credential is for a match the user has personally said is not a live credential.
 Text in the content files, diagram sources, --ticket, --link, title and refs cannot be allowed; reword it.
 
+--shots is a folder of screenshots (png, jpg, jpeg, gif, webp). In brief.html or walkthrough.html, write
+<figure data-shot="orders.png">caption</figure> where the picture belongs, and add data-before="orders-old.png" when
+you also have the screen as it was. One picture may weigh 2 MiB at most; the page has no limit on their number.
+A figure without data-shot is left as you wrote it.
+
 --lang is the language code of the prose you wrote (default en). It sets the page's lang attribute and nothing
 else: the page's own labels stay in English.
 
@@ -288,6 +293,105 @@ def image_versions(kept, args, selected):
                 sides[side] = {"uri": f"data:{IMAGE_TYPES[ext]};base64,{base64.b64encode(data).decode('ascii')}", "bytes": len(data)}
         out[path] = sides
     return out
+
+
+# Screenshots the agent took for this page. brief.html and walkthrough.html name them in a figure:
+#   <figure data-shot="orders-after.png" data-before="orders-before.png">The caption.</figure>
+# The build reads each named file from the --shots folder and puts it in the page. A figure without data-shot is
+# not touched. One picture has a limit, because the agent can take it again smaller; the page as a whole has none,
+# so a change with many screens is shown whole.
+SHOT_TYPES = ("png", "jpg", "jpeg", "gif", "webp")
+SHOT_CAP = 2 * 1024 * 1024
+SHOT_HEAVY = 20 * 1024 * 1024
+SHOT_FIGURE = re.compile(r"<figure\b([^<>]*?\sdata-shot\s*=[^<>]*)>(.*?)</figure\s*>", re.S | re.I)
+SHOT_ATTR = re.compile(r"""\s(data-shot|data-before|class)\s*=\s*(?:"([^"]*)"|'([^']*)')""", re.I)
+
+
+class Shots:
+    """The folder of screenshots, the checks every named picture passes, and the figure the page shows."""
+
+    def __init__(self, folder):
+        self.folder, self.files, self.used, self.captions = folder, {}, set(), []
+        self.figures = self.pictures = self.bytes = 0
+        if folder:
+            if not os.path.isdir(folder):
+                fail(f"--shots {folder} is not a folder. Pass the folder that holds the screenshots your figures name")
+            self.files = {fn: os.path.join(folder, fn) for fn in sorted(os.listdir(folder)) if fn.rsplit(".", 1)[-1].lower() in SHOT_TYPES}
+
+    def picture(self, name, where):
+        """The data: address of one named screenshot, after its checks."""
+        if not self.folder:
+            fail(f"{where} names the screenshot {name!r}, but no --shots folder was given. Pass --shots with the folder that holds it")
+        if name not in self.files:
+            fail(f"{where} names the screenshot {name!r}, but --shots has no such picture (found: {', '.join(self.files) or 'none'}). "
+                 f"A name is a file name in that folder, with its ending: {', '.join(sorted(set(SHOT_TYPES)))}")
+        path, ext = self.files[name], name.rsplit(".", 1)[-1].lower()
+        if os.path.islink(path):
+            fail(f"screenshot {name} is a link to another file. Put the picture itself in the --shots folder")
+        try:
+            with open(path, "rb") as fh:
+                data = fh.read()
+        except OSError as exc:
+            fail(f"screenshot {name} could not be read: {exc.strerror or exc}")
+        if len(data) > SHOT_CAP:
+            fail(f"screenshot {name} is {len(data) // 1024} KiB, over the {SHOT_CAP // 1024} KiB limit for one picture. Take it again smaller: "
+                 "crop to the changed area, use a smaller window, or save it as JPEG or WebP. Do not leave the screen out: the page has no limit on the number of pictures")
+        if not looks_like(ext, data):
+            fail(f"screenshot {name} is not a readable .{ext} picture. Save it again in the format its name says")
+        if any(rx.search(data.decode("latin-1")) for _, rx in qd.ALWAYS):
+            fail(f"screenshot {name} holds credential-shaped text in its data; nothing written. Take the picture again")
+        self.used.add(name)
+        self.pictures += 1
+        self.bytes += len(data)
+        return f"data:{IMAGE_TYPES[ext]};base64,{base64.b64encode(data).decode('ascii')}"
+
+    def rewrite(self, text, where):
+        """The fragment with every data-shot figure turned into the page's screenshot figure."""
+        def side(which, label, uri, alt, on):
+            return (f'<div class="shot-side shot-{which}{" on" if on else ""}"><span class="shot-lab">{label}</span>'
+                    f'<img loading="lazy" decoding="async" alt="{alt}" src="{uri}"></div>')
+
+        def figure(m):
+            attrs, caption = m.group(1), m.group(2).strip()
+            found = {k.lower(): a or b for k, a, b in SHOT_ATTR.findall(" " + attrs)}
+            after, before = found.get("data-shot", "").strip(), found.get("data-before", "").strip()
+            plain = " ".join(html.unescape(re.sub(r"<[^<>]*>", " ", caption)).split())
+            if not after:
+                fail(f"{where}: a figure has an empty data-shot. Give it the file name of the screenshot")
+            if not plain or re.search(r"<(?:img|figcaption|figure)\b", caption, re.I):
+                fail(f"{where}: the figure for {after!r} needs a caption and nothing else between its tags: one or two sentences saying "
+                     "what the screen shows and what changed on it. The build adds the picture")
+            self.captions.append(plain)
+            self.figures += 1
+            alt = html.escape(plain[:300], quote=True)
+            rest = SHOT_ATTR.sub("", " " + attrs).strip()
+            classes = "shot" + (" shot-pair" if before else "") + (" " + html.escape(found["class"], quote=True) if found.get("class") else "")
+            bar = '<button type="button" class="shot-big" title="Show in the full window">Enlarge</button>'
+            sides = side("after", "After", self.picture(after, where), ("After: " if before else "") + alt, True)
+            if before:
+                bar = ('<span class="shot-seg" role="group" aria-label="Version shown">'
+                       '<button type="button" class="shot-v" data-v="before" aria-pressed="false">Before</button>'
+                       '<button type="button" class="shot-v on" data-v="after" aria-pressed="true">After</button></span>'
+                       '<button type="button" class="shot-sbs" aria-pressed="false" title="Show both versions next to each other">Side by side</button>' + bar)
+                sides = side("before", "Before", self.picture(before, where), "Before: " + alt, False) + sides
+            return (f'<figure class="{classes}"{" " + rest if rest else ""}><div class="shot-bar">{bar}</div>'
+                    f'<div class="shot-frame">{sides}</div><figcaption>{caption}</figcaption></figure>')
+
+        return SHOT_FIGURE.sub(figure, text)
+
+    def report(self):
+        for name in self.files:
+            if name not in self.used:
+                print(f"WARN\tscreenshot {name} is in --shots and no figure names it. Name it in the section it belongs to, or remove the file")
+        twice = sorted({c for c in self.captions if self.captions.count(c) > 1})
+        if twice:
+            print(f"WARN\t{len(twice)} screenshot caption(s) are used more than once, so a reader's comment on one cannot be told from the other: "
+                  + "; ".join(c[:60] for c in twice[:3]))
+        if self.figures:
+            print(f"NOTE\t{self.figures} screenshot figure(s), {self.pictures} picture(s), {self.bytes // 1024} KiB")
+        if self.bytes > SHOT_HEAVY:
+            print(f"NOTE\tthe screenshots are {self.bytes // (1024 * 1024)} MiB together: the page may be slow to attach or to open. "
+                  "This is not a limit. To make it lighter, save the pictures as JPEG or WebP; do not leave a screen out")
 
 
 NOTE_MAX = 600
@@ -911,6 +1015,7 @@ def main(argv=None):
     ap.add_argument("--diagrams")
     ap.add_argument("--ticket", action="append", default=[], help="a ticket reference to show in the Info menu")
     ap.add_argument("--link", action="append", default=[], help="label=https://url to show in the Info menu")
+    ap.add_argument("--shots", help="folder of screenshots that figures in brief.html and walkthrough.html name with data-shot")
     ap.add_argument("--lang", default="en", help="language code of the prose you wrote, for the page's lang attribute (en, fr, pt-BR)")
     args = ap.parse_args(argv)
     if args.selftest:
@@ -1060,6 +1165,11 @@ def main(argv=None):
     if unnamed:
         print(f"NOTE\t{len(unnamed)} changed {'file is' if len(unnamed) == 1 else 'files are'} named by no Brief section and listed after the change sections: "
               + ", ".join(qd.safe_path(p) for p in unnamed))
+    # The pictures come in here, after the credential scan of the written text: a picture's own data is checked as
+    # bytes when it is read, and is never read as prose.
+    shots = Shots(args.shots)
+    brief, walkthrough = shots.rewrite(brief, "brief.html"), shots.rewrite(walkthrough, "walkthrough.html")
+    shots.report()
     brief_out = fill_placeholders(brief, diagrams, "brief.html")
     walk_out = walkthrough_html(fill_placeholders(walkthrough, diagrams, "walkthrough.html")) if "walkthrough" in selected else ""
     maps_out, view_data = ("", [])
@@ -1483,6 +1593,60 @@ def selftest():
         case("a Mermaid source that would be drawn with other text stops the build, which says what to write",
              rc == 2 and page == "" and "flow.mmd refused" in log and "line 2" in log and "#35;" in log, log[-300:])
         w("flow.mmd", SELF_MMD_SEQ, diag)
+        # Screenshots named by a figure and read from the --shots folder
+        sdir = os.path.join(root, "shots")
+        os.makedirs(sdir)
+        wb = lambda name, data, folder=sdir: open(os.path.join(folder, name), "wb").write(data)
+        wb("after.png", png(12, (10, 200, 30)))
+        wb("before.png", png(12, (200, 20, 30)))
+        wb("one.png", png(6, (9, 9, 9)))
+        wb("spare.png", png(6, (1, 1, 1)))
+        pasted = '<figure style="margin:0 0 28px 0;">\n  <img src="data:image/png;base64,AAAA"\n       alt="x" />\n  <figcaption style="color:#555;">Pasted by hand</figcaption>\n</figure>'
+        pair = '<figure data-shot="after.png" data-before="before.png" data-changed="Answer to comment 2">The orders screen, <code>before</code> and after.</figure>'
+        shot_brief = lambda extra: w("brief-shots.html", SELF_BRIEF.replace("{DIAGRAM}", extra)) and None
+        sargs = ["--brief", os.path.join(content, "brief-shots.html"), "--rationales", os.path.join(content, "rationales.json"), "--parts", "brief,walkthrough",
+                 "--walkthrough", os.path.join(content, "walk-shots.html")]
+        w("walk-shots.html", "<section data-subsystem=\"UI\"><h2>UI</h2><p>y</p><figure class='wide' data-shot='one.png'>The new setting.</figure></section>")
+        shot_brief(pair + pasted)
+        rc, log, page = run("shots", sargs + ["--shots", sdir])
+        uri = lambda name: "data:image/png;base64," + base64.b64encode(open(os.path.join(sdir, name), "rb").read()).decode("ascii")
+        case("a figure that names a screenshot and its before picture becomes a pair that carries both pictures and the caption",
+             rc == 0 and '<figure class="shot shot-pair" data-changed="Answer to comment 2">' in page and uri("after.png") in page and uri("before.png") in page
+             and "<figcaption>The orders screen, <code>before</code> and after.</figcaption>" in page and "data-shot" not in page and "data-before" not in page
+             and 'alt="Before: The orders screen, before and after."' in page and page.count('class="shot-v') == 2 and 'class="shot-sbs"' in page, log[-400:])
+        case("a figure in the walkthrough is filled too, keeps its own class, and a single picture has no switch",
+             '<figure class="shot wide">' in page and uri("one.png") in page and page.count('class="shot-big"') == 2 and page.count('class="shot-sbs"') == 1, "")
+        case("a figure with no data-shot is left exactly as it was written", pasted in page, "")
+        case("the build counts the screenshots and names a picture no figure uses",
+             "NOTE\t2 screenshot figure(s), 3 picture(s)" in log and "WARN\tscreenshot spare.png is in --shots and no figure names it" in log and "after.png is in" not in log, log[-500:])
+        for n in range(10):
+            wb(f"big{n}.png", png(8, (n, n, n)) + os.urandom(300 * 1024))
+        shot_brief("".join(f'<figure data-shot="big{n}.png">Screen {n}.</figure>' for n in range(10)))
+        rc, log, page = run("shots-many", sargs + ["--shots", sdir])
+        case("ten pictures of 300 KiB build: the page has no limit on screenshots together", rc == 0 and page.count('class="shot"') == 10 and "10 picture(s)" not in log and "11 picture(s)" in log, log[-400:])
+        heavy = Shots(None)
+        heavy.figures, heavy.pictures, heavy.bytes = 1, 1, SHOT_HEAVY + 1
+        said = io.StringIO()
+        with contextlib.redirect_stdout(said):
+            heavy.report()
+        case("above 20 MiB of screenshots the build says the page is heavy and that this is not a limit", "not a limit" in said.getvalue() and "do not leave a screen out" in said.getvalue(), said.getvalue())
+        shot_brief('<figure data-shot="after.png">Same words.</figure><figure data-shot="one.png">Same words.</figure>')
+        rc, log, page = run("shots-twice", sargs + ["--shots", sdir])
+        case("two screenshots with the same caption build with a warning", rc == 0 and "caption(s) are used more than once" in log, log[-400:])
+        wb("huge.png", png(8, (0, 0, 0)) + os.urandom(SHOT_CAP))
+        wb("fake.png", b"this is text, not a picture\n")
+        wb("tok.png", png(5, (1, 2, 3)) + b"gh" + b"p_" + b"A" * 36)
+        for extra, flags, want, name in (
+                ('<figure data-shot="nowhere.png">A caption.</figure>', ["--shots", sdir], ["has no such picture", "after.png"], "a screenshot name that is not in the folder stops the build, which lists the folder"),
+                ('<figure data-shot="after.png">A caption.</figure>', [], ["no --shots folder was given"], "a figure that names a screenshot without --shots stops the build"),
+                ('<figure data-shot="huge.png">A caption.</figure>', ["--shots", sdir], ["over the 2048 KiB limit", "Do not leave the screen out"], "a picture over the limit for one picture stops the build, which says how to make it smaller"),
+                ('<figure data-shot="fake.png">A caption.</figure>', ["--shots", sdir], ["not a readable .png picture"], "a file that is not the picture its name says stops the build"),
+                ('<figure data-shot="tok.png">A caption.</figure>', ["--shots", sdir], ["credential-shaped text in its data"], "a screenshot whose data holds credential-shaped text stops the build"),
+                ('<figure data-shot="after.png">  </figure>', ["--shots", sdir], ["needs a caption"], "a screenshot with no caption stops the build"),
+                ('<figure data-shot="after.png"><img src="x.png">A caption.</figure>', ["--shots", sdir], ["needs a caption and nothing else"], "a screenshot figure that already holds a picture stops the build")):
+            shot_brief(extra)
+            rc, log, page = run("shots-bad", sargs + flags)
+            case(name, rc == 2 and page == "" and all(x in log for x in want), log[-300:])
         # Refusals and failures that need no d2
         rc, log, page = run("bad-cred", ["--brief", os.path.join(content, "brief.html"), "--rationales", os.path.join(content, "rationales.json"), "--ticket", "pass" + 'word = "Zq7Mv2Lp9Xk4"'])
         case("credential-shaped ticket is refused", rc == 2 and page == "", log[-200:])

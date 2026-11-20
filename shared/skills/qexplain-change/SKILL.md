@@ -105,6 +105,10 @@ One question to the user, with a recommendation and a one-line reason for each p
 
 The Brief is always in. Diff review is always pre-selected. State the `HEAVY` warning here if it fired. Offer the other parts as additions, not as recommendations the table does not make. Then propose the path.
 
+**Language.** Write the page in the language of this conversation, unless the user's instructions name another. Say which language you will use, in one line of this same question: the page may have readers the conversation does not show you. Keep that language when you rebuild the page, because a comment is found again by the text it quotes. Pass its code to the build with `--lang`. Heading ids and the page's own labels stay as they are.
+
+**Screenshots.** When the change alters what a user sees on a screen, ask in this same question whether to add screenshots, and as a separate choice whether to add each screen as it was before. First look for the repo's own procedure for taking them: an index of procedures named in the project's instructions, or `docs/howtos/index.md`. Follow it: it knows the login, the test data and the cleanup. Name the procedure in the question and say what it will do (start an app, create records), and what a "before" picture costs in this project, for example running the base branch. Capture only on a yes. With no procedure, ask how to reach the running app. Never invent a login, and never ask for a password in the chat.
+
 **Artifact path.** Pick the directory by the first rule that matches:
 1. The project resolves to a workspace store for the *project files* artifact class per `shared/skills/qdream/memory-rules.md § Resolution contract`: `<store>/explanations/`.
 2. A `plans/` directory exists at the repo root: `plans/explanations/`.
@@ -135,7 +139,7 @@ Build with the `<python>` from Step 1:
 <python> <config-repo>/shared/skills/qexplain-change/scripts/build-explanation.py --out <path> --title "<title>" \
   --repo <dir> --diff-args "<the git diff arguments that resolve the target>" \
   --parts brief,walkthrough,maps,summary,diff --brief <dir>/brief.html --walkthrough <dir>/walkthrough.html \
-  --maps <dir>/maps.json --diagrams <dir>/diagrams --rationales <dir>/rationales.json --roles <dir>/roles.json [--notes <dir>/notes.json] \
+  --maps <dir>/maps.json --diagrams <dir>/diagrams --rationales <dir>/rationales.json --roles <dir>/roles.json [--notes <dir>/notes.json] [--shots <dir>/shots] [--lang <code>] \
   [--ticket <text>]... [--link <label>=<url>]... [--exclude <glob>]... [--mask-credential <path>:<side>:<line>]... [--allow-credential <path>:<side>:<line>]... [--user-confirmed-credential <path>:<side>:<line>]...
 ```
 
@@ -168,7 +172,7 @@ One fragment, one scrolling page. Heading ids are fixed and the validator checks
 | `deploy` | optional | Migrations, settings, re-runs, other hosts or repos affected |
 | `surface` | optional | A table of the externally visible surface: name, kind, default, new or changed. Written by you while reading; there is no extractor |
 | `verified` | yes | Facts only: what ran and where, what did not run among the environments and paths the plan or code names, where each fact comes from (a test name, a plan section, a command you ran), "not recorded" when no source says. Name a review that ran without restating its findings. List files left out and what you could not explain because of them. Say what you did for this page: which changed files you read in full and which only as a diff, and which checks you ran on the page, with their result lines. When the measuring script printed several `PLAN` lines, say what each plan contributed to this range. No judgement of whether that is enough |
-| `open-items` | yes | Two lists, "Before production" and "Backlog". When nothing is open, one line: "No open items recorded" |
+| `open-items` | yes | Two lists, their headings marked `data-open="before-production"` and `data-open="backlog"`. When nothing is open, one line marked `data-open="none"`. In English: "Before production", "Backlog", "No open items recorded" |
 
 Use `<h2 id="...">` headings. Other heading ids are refused. Keep the brief short: a reviewer reads it in minutes. Use toy data (three records, two users) to show old and new behaviour.
 
@@ -177,6 +181,12 @@ Use `<h2 id="...">` headings. Other heading ids are refused. Keep the brief shor
 For a reader new to the area. Open with a line saying a familiar reader can skip ahead. Two levels: deep background (the domain and machinery the change sits on) and the code walkthrough (grouped, ordered, short excerpts, mechanical churn skipped in one line). For several subsystems, wrap each in `<section data-subsystem="Name">...</section>`: the build makes one sub-tab each.
 
 **Artifact-independence test.** The deep background and the Maps `system` view must make sense with the change closed, as if pasted into the project's documentation. No "this change", "this PR" or "before and after" phrasing there, and no links into the diff. Deltas belong in the Brief, the code walkthrough and the other maps. The `system` view's highlight comes from classes; the page has a Show changes switch that turns it off.
+
+### Screenshots
+
+Put each screenshot where the text explains that screen, in a Brief change section or in the Walkthrough: `<figure data-shot="orders.png">caption</figure>`. Add `data-before="orders-before.png"` when you have the screen as it was; the page then shows the pair with a Before / After switch. The caption says what the screen shows and what changed on it; no two captions are the same. Save the pictures in one folder and pass it as `--shots`.
+
+Capture every screen the change alters. One picture may weigh 2 MiB: if the build refuses one, crop it to the changed area or save it as JPEG or WebP. The page has no limit on their number, so never leave a screen out to make the page lighter. Capture with made-up data: never a screen that shows a real credential or a customer's data, because the build cannot read what a picture shows. In `verified`, name each screen you could not capture and why. Never describe a screen you did not capture as if you had seen it.
 
 ### Diagrams
 
@@ -196,7 +206,7 @@ Put `<div data-diagram="name"></div>` in the brief or walkthrough where a diagra
 - Label connections with example data, not type names.
 - A sequence diagram is written in D2 only when D2 is found.
 
-**Mermaid rules.** Avoid the reserved word `end` as a class name. For change marking in a flowchart use `classDef` names `new`, `changed`, `removed`; the Show changes switch reads them. In sequence diagrams use `Note right of X`, not `Note over X,Y` (a spanning note is as wide as the span whatever its text), no `<br/>` in note text (split a long note into separate `Note right of` lines), and never `#10;`, which renders as a literal space. Mermaid is pinned at 11.17.2 and redrawn when the theme toggles. Do not draw the same diagram in both D2 and Mermaid. Diagrams use a wider band than the prose, capped in height, and open full window on click, so size them for reading.
+**Mermaid rules.** Avoid the reserved word `end` as a class name. For change marking in a flowchart use `classDef` names `new`, `changed`, `removed`; the Show changes switch reads them. In sequence diagrams use `Note right of X`, not `Note over X,Y` (a spanning note is as wide as the span whatever its text), no `<br/>` in note text (split a long note into separate `Note right of` lines), and never `#10;`, which renders as a literal space. Write `#35;` for a `#` sign: a sequence diagram leaves out the text after a bare `#`, and elsewhere `#word;` is drawn as `&word;`. The build refuses both. Mermaid is pinned at 11.17.2 and redrawn when the theme toggles. Do not draw the same diagram in both D2 and Mermaid. Diagrams use a wider band than the prose, capped in height, and open full window on click, so size them for reading.
 
 ### Maps
 
