@@ -390,7 +390,7 @@
   .cm-dglost:hover { border-style: solid; }
   .cm-dglost[hidden] { display: none; }
   .cm-dgtip { display: none; position: absolute; right: 0; bottom: 100%; margin-bottom: 4px; padding: 1px 9px; border-radius: 10px; background: #0969da; color: #fff; font-size: 11px; line-height: 1.6; white-space: nowrap; }
-  .dg.cm-mode > .cm-dgtip { display: block; }
+  .dg.cm-mode > .cm-dgtip { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 3px 8px; max-width: 100%; box-sizing: border-box; }
   .dg.cm-mode .dgv, .dg.cm-mode .mmd, .dg.cm-mode .cm-ovv { cursor: crosshair; }
   .dg.cm-mode .dgv, .dg.cm-mode .mmd { cursor: crosshair; outline: 2px dashed rgba(9, 105, 218, 0.6); outline-offset: -2px; }
   .dg-zb { width: 24px; height: 20px; padding: 0; border: 1px solid var(--border-strong); border-radius: 5px; background: var(--surface); color: var(--text-light); font: 600 12px/1 -apple-system, "Segoe UI", sans-serif; cursor: pointer; opacity: 0.55; }
@@ -522,7 +522,9 @@
   button.cm-it-w:focus-visible { outline: 2px solid #0969da; outline-offset: 2px; }
   .cm-it-a .cm-hint { flex: 1; font-size: 11px; color: var(--text-light); }
   .cm-dgtip { white-space: normal; }
-  .cm-dgpick, .cm-dgpickb { margin-left: 6px; font-size: 11px; max-width: 16rem; }
+  .cm-dgpickr { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; max-width: 100%; }
+  .cm-dgpick, .cm-dgpickb { font-size: 11px; }
+  .cm-dgpick { max-width: 11rem; min-width: 0; }
   /* A reader who asked the system for less motion gets a still outline where the page would flash or shake. */
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
@@ -2111,7 +2113,7 @@ function cmDgSetMode(dg) {
     const go = document.createElement('button'); go.type = 'button'; go.className = 'cm-dgpickb'; go.textContent = 'Comment';
     go.addEventListener('click', e => { e.stopPropagation(); cmOpen({ sel: cmDgSel(dg, pick.value === '' ? null : parts[+pick.value]) }); });
     pick.addEventListener('click', e => e.stopPropagation());
-    tip.append(' ', pick, go);
+    const row = document.createElement('span'); row.className = 'cm-dgpickr'; row.append(pick, go); tip.append(row);      // the list and its button stay on one line
     if (was && was.classList && was.classList.contains('cm-dgbtn') && was.matches(':focus-visible')) pick.focus();      // reached with the keyboard: go on with it
   }
   cmDraw();
