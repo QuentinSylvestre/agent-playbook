@@ -1138,9 +1138,14 @@ def selftest():
         fw("a.py", "import os\n\n\nclass Tool:\n    def helper(self, x):\n        return x\n\n    def other(self):\n        return self.helper(1)\n")
         fw("b.py", "from a import Tool\nvalue = Tool().helper(2)\n# helper is only named here\nprint(my_helper(3), helper_more(4))\n")
         fw("secrets/k.py", "x = helper(5)\n")
+        os.makedirs(os.path.join(fnrepo, "vendor"))
+        fw("vendor/lib.py", "y = helper(7)\n")  # a generated or vendored file is not a caller worth listing
+        long_method = "class Big:\n    def run(self):\n" + "".join(f"        step_{i} = {i}\n" for i in range(1, 12))
+        fw("m.py", long_method)  # a method whose declaration stands above the hunk of its change
         fgit("add", "-A")
         fgit("commit", "-q", "-m", "seed")
         fw("a.py", "import os\n\n\nclass Tool:\n    def helper(self, x):\n        return x + 1\n\n    def other(self):\n        return self.helper(1)\n")
+        fw("m.py", long_method.replace("step_9 = 9", "step_9 = 90"))
         fgit("commit", "-q", "-am", "change helper")
         fkept = qd.filter_files(qd.split_files(qd.capture(fnrepo, "HEAD~1..HEAD")), [])[0]
         space = lambda **kw: argparse.Namespace(**{"target": None, "repo": fnrepo, "diff_args": None, "diff_file": None, **kw})
@@ -1152,6 +1157,8 @@ def selftest():
         fns, searched = changed_functions(fkept, space(diff_file="x.diff"), {"diff"})
         case("a page built from a diff file names the functions and lists no callers", not searched and "callers" not in fns["a.py"]["list"][0], str(fns))
         case("a page without the Diff review part carries no function data", changed_functions(fkept, space(diff_args="HEAD~1..HEAD"), {"brief"}) == ({}, False), "")
+        case("the capture uses git's per-language rule: a change in a method is headed by the method, not by its class",
+             bool(re.search(r"^@@ [^@]+ @@ def run\(self\):$", qd.capture(fnrepo, "HEAD~1..HEAD"), re.M)), qd.capture(fnrepo, "HEAD~1..HEAD")[-300:])
 
         # A changed picture, before and after
         import struct
@@ -1192,6 +1199,18 @@ def selftest():
              and shown(im["k.svg"]["before"]) and "credential" in im["k.svg"]["after"].get("note", "") and shown(im["s.svg"]["after"]), str({k: {s: (v or {}).get("note") for s, v in d.items()} for k, d in im.items()}))
         case("a text file is not a picture, and a page built from a diff file or without the Diff part embeds none",
              "notes.txt" not in im and image_versions(ikept, ins(diff_file="x.diff"), {"diff"}) == {} and image_versions(ikept, ins(), {"brief"}) == {}, "")
+        budget = globals()["IMAGE_BUDGET"]
+        globals()["IMAGE_BUDGET"] = len(png(12, (200, 20, 30))) + 10  # room for one picture, not for two
+        try:
+            tight = image_versions(ikept, ins(), {"diff"})
+        finally:
+            globals()["IMAGE_BUDGET"] = budget
+        told = [v for d in tight.values() for v in d.values() if v and "together would pass" in v.get("note", "")]
+        case("once the pictures of a page pass the page's limit, the next ones are named and not shown", sum(1 for d in tight.values() for v in d.values() if shown(v)) == 1 and len(told) >= 2, str(len(told)))
+        iw("a.png", png(20, (1, 200, 3)))  # changed and not committed: only the working file holds this version
+        loose = image_versions(qd.split_files(qd.capture(imrepo, "HEAD -- a.png")), ins(diff_args="HEAD -- a.png"), {"diff"})
+        case("a picture changed and not committed is read from the working file", shown(loose.get("a.png", {}).get("after"))
+             and base64.b64decode(loose["a.png"]["after"]["uri"].split(",", 1)[1]) == png(20, (1, 200, 3)), str(loose)[:200])
 
         content = os.path.join(root, "content")
         diag = os.path.join(content, "diagrams")
@@ -1217,6 +1236,29 @@ def selftest():
         case("a page without the Diff review part loads no highlighter", "highlight.min.js" not in page and "<!--@HLJS-->" not in page, "")
         rc, log, page = run("brief-diff", std)
         case("brief and diff page", rc == 0 and 'id="part-diff"' in page and "diff --git" in page, log[-300:])
+        # A credential-shaped value on the line git prints after the second @@
+        crepo = os.path.join(root, "crepo")
+        os.makedirs(crepo)
+        cgit = lambda *a: subprocess.run(["git", "-c", "user.name=Selftest", "-c", "user.email=selftest@example.invalid", "-c", "core.autocrlf=false", "-C", crepo] + list(a),
+                                         capture_output=True, check=True)
+        cred_line = 'def login(user, pass' + 'word="Zx81-kq77-Lm42-pp09"):\n'
+        body = "".join(f"    step_{i} = {i}\n" for i in range(1, 12))
+        cgit("init", "-q", "-b", "main")
+        open(os.path.join(crepo, "auth.py"), "w", encoding="utf-8", newline="\n").write(cred_line + body)
+        cgit("add", "-A")
+        cgit("commit", "-q", "-m", "seed")
+        open(os.path.join(crepo, "auth.py"), "w", encoding="utf-8", newline="\n").write(cred_line + body.replace("step_9 = 9", "step_9 = 90"))
+        cgit("commit", "-q", "-am", "change")
+        c_rat = os.path.join(content, "c-rationales.json")
+        open(c_rat, "w", encoding="utf-8").write(json.dumps({"auth.py": "Why."}))
+        c_args = ["--brief", os.path.join(content, "brief.html"), "--rationales", c_rat]
+        c_base = ["--repo", crepo, "--diff-args", "HEAD~1..HEAD"]
+        c_rc, c_log, c_page = run("cred-header", c_args, base_args=c_base)
+        c_key = re.search(r"CREDENTIAL\tauth\.py\tcontext (\d+)", c_log)
+        case("a credential-shaped value on the line git prints after the second @@ stops the build and is named by its own key",
+             c_rc != 0 and bool(c_key) and "Zx81" not in c_log, c_log[-400:])
+        c_rc, c_log, c_page = run("cred-header-masked", c_args + ["--mask-credential", f"auth.py:context:{c_key.group(1) if c_key else 0}"], base_args=c_base)
+        case("masked by that key, the page builds and carries the value neither in the diff nor in a function label", c_rc == 0 and "def login" in c_page and "Zx81" not in c_page, c_log[-400:])
         policy = re.search(r'<meta http-equiv="Content-Security-Policy" content="([^"]+)">', page)
         policy = policy.group(1) if policy else ""
         case("the page declares a content security policy: nothing by default, scripts from the pinned scripts' host only, no evaluated code, no network calls",
@@ -1231,6 +1273,15 @@ def selftest():
         list_json = os.path.join(content, "list.json")
         open(list_json, "w", encoding="utf-8").write('["a"]')
         brief_arg = ["--brief", os.path.join(content, "brief.html")]
+        twice_dir, icon_dir = os.path.join(root, "twice-diagrams"), os.path.join(root, "icon-diagrams")
+        for folder in (twice_dir, icon_dir):
+            os.makedirs(folder)
+        open(os.path.join(twice_dir, "flow.mmd"), "w", encoding="utf-8", newline="\n").write(SELF_MMD_FLOW)
+        twice_json = os.path.join(content, "maps-twice.json")
+        open(twice_json, "w", encoding="utf-8").write(json.dumps({"views": [{"key": "system", "label": "One", "diagram": "flow"}, {"key": "system", "label": "Two", "diagram": "flow"}]}))
+        open(os.path.join(icon_dir, "arch.d2"), "w", encoding="utf-8", newline="\n").write("a: A {icon: https://example.invalid/x.svg}\n")
+        icon_brief = os.path.join(content, "brief-icon.html")
+        open(icon_brief, "w", encoding="utf-8", newline="\n").write(SELF_BRIEF.replace("{DIAGRAM}", '<div data-diagram="arch"></div>'))
         for name, extra, base_args, want in (
                 ("an empty diff", std, ["--repo", repo, "--diff-args", "HEAD..HEAD"], "tell the user there is nothing to explain"),
                 ("a revision that does not exist", std, ["--repo", repo, "--diff-args", "no-such-rev..HEAD"], "git rev-parse"),
@@ -1238,7 +1289,12 @@ def selftest():
                 ("a content file that is not valid JSON", brief_arg + ["--rationales", bad_json], None, "Fix the file at that line and column"),
                 ("a rationales file of the wrong shape", brief_arg + ["--rationales", list_json], None, '{"path/as/in/the/diff"'),
                 ("a diagrams folder that is not a folder", std + ["--diagrams", bad_json], None, "Pass the folder that holds"),
-                ("an exclude that matches nothing", std + ["--exclude", "no/such/*.zzz"], None, "Write the glob against the path")):
+                ("an exclude that matches nothing", std + ["--exclude", "no/such/*.zzz"], None, "Write the glob against the path"),
+                ("a content file that does not exist", ["--brief", os.path.join(content, "no-such-brief.html"), "--rationales", os.path.join(content, "rationales.json")], None, "Check the path, and save the file as UTF-8"),
+                ("a roles file of the wrong shape", std + ["--parts", "brief,summary", "--roles", list_json], None, "One sentence on what the file does"),
+                ("a mask that matches no line", std + ["--mask-credential", "src/api/handler.py:new:9999"], None, "exactly as measure-change.py printed it"),
+                ("a map view given twice", std + ["--parts", "brief,maps", "--maps", twice_json, "--diagrams", twice_dir], None, "Keep one, or give each its own"),
+                ("a D2 construct the build refuses", std + ["--diagrams", icon_dir, "--brief", icon_brief], None, "Remove it from the source and build again")):
             r_rc, r_log, _ = run("refusal", extra, base_args=base_args)
             case(f"a refusal names the next action: {name}", r_rc == 2 and "ERROR\t" in r_log and want in r_log, r_log[-300:])
         # Blocks marked as changed in a rebuild
@@ -1281,6 +1337,11 @@ def selftest():
         case("a note on a file that is not on the page, or with a line that is not a number, stops the build", n_rc != 0 and "not on the page" in n_log and "line numbers" in n_log, n_log[-400:])
         n_rc, n_log, n_page = noted([{"path": "src/api/handler.py", "line": 3, "note": "use pass" + 'word = "Zq7Mv2Lp9Xk4" here'}])
         case("a note is scanned like every text the agent writes", n_rc != 0 and "credential-shaped" in n_log, n_log[-300:])
+        n_rc, n_log, n_page = noted([{"path": "src/api/handler.py", "line": 3, "end": 2, "note": "The end is before the line."}])
+        case("a note whose end is before its line stops the build", n_rc != 0 and "the end not before the line" in n_log, n_log[-300:])
+        n_rc, n_log, n_page = noted([{"path": "src/api/handler.py", "line": 3, "note": "x" * 601}])
+        case("a note of 601 characters stops the build; one of 600 does not", n_rc != 0 and "longer than 600" in n_log
+             and noted([{"path": "src/api/handler.py", "line": 3, "note": "x" * 600}])[0] == 0, n_log[-300:])
         case("the page carries an explanation id made of the repo and the file name", '"id": "repo--brief-diff"' in page, page[page.find("const QX"):][:120])
         case("the Info menu holds the provenance once, with the page path row and no id", page.count('class="prov-row pagepath"') == 1 and 'id="pagepath' not in page, "")
         eid = explanation_id

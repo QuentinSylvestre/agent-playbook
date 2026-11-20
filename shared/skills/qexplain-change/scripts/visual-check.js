@@ -569,6 +569,57 @@ async function routeLibs(target) {
       'a D2 source is edited as text with no redraw; the copied text asks for the diagram to be regenerated, and the panel lists the edit');
     await page.evaluate(() => document.querySelector('#cm-panel .cm-it[data-src] [data-act="srcdrop"]').click()); await wait(300); s = await srcState(d2dg);
     log(!s.ed && !s.marked && s.text === d2src && await page.evaluate(() => document.querySelectorAll('#cm-panel .cm-it[data-src]').length === 0 && cmFeedback() === ''), 'Discard in the panel removes the edit and puts the original text back');
+    // Three rules that must never guess or misfire: a quote that stands twice, a diff line that stands twice, and Enter
+    // pressed while an input method is still composing a character
+    {
+      const ng = await page.evaluate(() => {
+        const part = PART_KEYS.find(k => k !== 'diff'), ix = cmIndex(document.querySelector('#part-' + part + ' .page')), text = ix.text;
+        // a word of the page that stands at least twice, with different text around its two places
+        let word = '', at = [];
+        for (const w of (text.match(/[A-Za-z]{6,}/g) || [])) { const a = text.indexOf(w), b = text.indexOf(w, a + 1); if (b > a && text.slice(a - 32, a) !== text.slice(b - 32, b)) { word = w; at = [a, b]; break; } }
+        const mk = (id, extra) => Object.assign({ id, kind: 'text', part, section: '', quote: word, text: 'vc ' + id, label: '', t: Date.now(), state: 'open' }, extra);
+        if (word) CM.items.push(mk('vcng1', { prefix: 'no such text before it', suffix: 'no such text after it' }),
+          mk('vcng2', { prefix: text.slice(Math.max(0, at[1] - 32), at[1]), suffix: text.slice(at[1] + word.length, at[1] + word.length + 32) }));
+        // a diff line whose text stands at least twice on its side, addressed by a line number that no longer fits
+        let twice = null;
+        if (PART_KEYS.includes('diff')) for (const p of ordered) { const rows = cmDiffSide(p, 'new'), seen = {}; rows.forEach(r => { (seen[r.c] = seen[r.c] || []).push(r.ln); });
+          const k = Object.keys(seen).find(c => seen[c].length > 1), one = Object.keys(seen).find(c => seen[c].length === 1 && c.trim());
+          if (k !== undefined && one !== undefined) { twice = [p, k, one]; break; } }
+        if (twice) CM.items.push({ id: 'vcng3', kind: 'line', part: 'diff', path: twice[0], side: 'new', ln: 987654, ln2: 987654, lines: [twice[1]], quote: '', text: 'vc twice', label: '', t: Date.now(), state: 'open' },
+          { id: 'vcng4', kind: 'line', part: 'diff', path: twice[0], side: 'new', ln: 987654, ln2: 987654, lines: [twice[2]], quote: '', text: 'vc once', label: '', t: Date.now(), state: 'open' });
+        cmChanged();
+        const st = id => { const c = CM.items.find(x => x.id === id); return c ? c._state + (c._pieces ? '@' + Math.round(c._at) : '') : 'none'; };
+        const r = { word, second: at[1], q1: st('vcng1'), q2: st('vcng2'), twice: !!twice, d3: st('vcng3'), d4: (CM.items.find(x => x.id === 'vcng4') || {})._state };
+        CM.items = CM.items.filter(x => !/^vcng/.test(x.id)); cmChanged();
+        return r;
+      });
+      if (ng.word) log(ng.q1 === 'notfound' && ng.q2.split('@')[1] === String(ng.second), `a quote that stands more than once is placed only where the text around it agrees, and nowhere when none does ("${ng.word}": ${ng.q1}, ${ng.q2.split('@')[0]})`);
+      if (ng.twice) log(ng.d3 === 'notfound' && ng.d4 === 'moved', `a diff comment whose line number no longer fits is placed by its text only when that text stands once (stands twice: ${ng.d3}; stands once: ${ng.d4})`);
+      await page.evaluate(() => cmPanel(true)); await wait(200);
+      await page.click('#cm-panel [data-act="new"]'); await wait(200);
+      await page.keyboard.type('vc composing');
+      const mid = await page.evaluate(() => { const ta = document.querySelector('#cm-panel .cm-it-ta'); ta.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true, cancelable: true }));
+        return { open: !!document.querySelector('#cm-panel .cm-it-ta'), saved: CM.items.some(x => x.text === 'vc composing') }; });
+      await page.keyboard.press('Enter'); await wait(300);
+      const end = await page.evaluate(() => { const saved = CM.items.some(x => x.text === 'vc composing'); CM.items = CM.items.filter(x => x.text !== 'vc composing'); cmChanged(); cmPanel(false); return saved; });
+      log(mid.open && !mid.saved && end, 'Enter pressed while an input method is composing a character does not save the comment; the next Enter does');
+    }
+    // A hostile file name on the page: every control of its file works and nothing it carries runs
+    {
+      const hf = await page.evaluate(() => (typeof ordered === 'undefined' ? null : ordered.find(p => /&#39;|[<>"']/.test(p))) || null);
+      if (hf) {
+        await page.evaluate(() => { window.__qxHit = 0; switchPart('diff'); }); await wait(900);
+        const res = await page.evaluate(p => { const c = card(p), n = navEl(p), out = {};
+          n.click(); out.nav = (document.querySelector('.ni.on') || { dataset: {} }).dataset.p === p;
+          c.querySelector('.fh').click(); out.fold = c.classList.contains('iscol'); c.querySelector('.fh').click(); out.unfold = !c.classList.contains('iscol');
+          c.querySelector('.rbtn').click(); out.rv = c.classList.contains('rv'); c.querySelector('.rbtn').click(); out.unrv = !c.classList.contains('rv');
+          c.querySelector('.cbtn').click(); out.box = !!document.querySelector('.cm-card'); cmClose();
+          out.name = c.querySelector('.ft').textContent === p; out.extra = document.querySelectorAll('#fc img[onerror], #nav-inner img').length; out.hit = window.__qxHit; return out; }, hf);
+        log(res.nav && res.fold && res.unfold && res.rv && res.unrv && res.box && res.name && res.extra === 0 && res.hit === 0,
+          `a file whose name holds an entity and quotes is listed under that exact name; its list entry, header, review and comment buttons all work, and nothing in the name runs (${hf.slice(0, 50)})`);
+        await page.evaluate(() => { switchPart(PART_KEYS[0]); window.scrollTo(0, 0); }); await wait(300);
+      } else console.log('NOTE\tno file with a hostile name on this page; the file-name check ran on the escape function only');
+    }
     // A save the browser refuses is said in a message that stays, and goes when a later save works
     {
       const sv = await page.evaluate(async () => {
@@ -623,6 +674,9 @@ async function routeLibs(target) {
       const selRows = await page.evaluate(([id, k]) => { const ta = document.querySelector('#' + id + ' > .dg-src textarea'), L = ta.value.split('\n'), a = L.slice(0, k - 1).join('\n').length + (k > 1 ? 1 : 0);
         ta.scrollTop = 0; ta.focus(); ta.setSelectionRange(a + 1, a + L[k - 1].length + 1 + L[k].length); ta.dispatchEvent(new KeyboardEvent('keyup', { key: 'ArrowDown', shiftKey: true }));
         return new Promise(r => setTimeout(() => r(!document.getElementById('cm-add').hidden && document.getSelection().isCollapsed ? 2 : 0), 80)); }, [d2dg, sl.k]);
+      // the editor scrolls while text is selected in it: the Comment button is placed again, not lost
+      const kept = await page.evaluate(id => { const ta = document.querySelector('#' + id + ' > .dg-src textarea'); ta.dispatchEvent(new Event('scroll')); return !document.getElementById('cm-add').hidden; }, d2dg);
+      log(kept, 'a scroll of the source editor while text is selected in it leaves the Comment button in reach');
       await page.click('#cm-add'); await wait(300);
       const head2 = await cardHead(), pend = await page.evaluate(id => document.querySelectorAll('#' + id + ' .dg-src-hi .cm-hl.cm-pending').length, d2dg);
       const spent = await page.evaluate(id => { const ta = document.querySelector('#' + id + ' > .dg-src textarea'); return ta.selectionStart === ta.selectionEnd; }, d2dg);
