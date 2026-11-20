@@ -2717,7 +2717,9 @@ window.addEventListener('storage', e => {
   if (e.key === CM_KEY && e.newValue) {
     let s = null; try { s = cmClean(JSON.parse(e.newValue)); } catch (err) {}
     if (!s) return;
+    const edits = JSON.stringify(CM.edits || {});
     CM = s; cmResolve(); cmDraw(); cmDrawPanel();
+    if (JSON.stringify(CM.edits) !== edits) showToast('A diagram source was edited in another tab. This tab could not redraw it: reload this tab to see it.');
   } else if (e.key === STORE_KEY) {
     try { ST = JSON.parse(e.newValue || '{}') || {}; } catch (err) { return; }
     if (!window._diffBuilt) return;

@@ -608,7 +608,8 @@ async function routeLibs(target) {
       await page.evaluate(() => { CM.items.push({ id: 'vckb', kind: 'page', part: 'page', quote: '', text: 'vc keyboard', label: '', t: Date.now(), state: 'open' }); cmChanged(); document.getElementById('cm-panel-btn').focus(); });
       await page.keyboard.press('Enter'); await wait(250);
       kb.panelIn = await page.evaluate(() => cmPanelOpen() && !!document.activeElement.closest('#cm-panel'));
-      kb.go = await page.evaluate(() => { const b = document.querySelector('#cm-panel .cm-it[data-cid="vckb"] button.cm-it-w'); return !!b && b.tabIndex === 0; });
+      kb.go = await page.evaluate(() => { const b = document.querySelector('#cm-panel .cm-it[data-cid="vckb"] button.cm-it-w'); if (!b || b.tabIndex !== 0) return false;
+        let n = 0; const real = cmJump; cmJump = c => { if (c && c.id === 'vckb') n++; }; b.click(); cmJump = real; return n === 1; });      // one jump: the button, not the button and its row
       kb.hint = await page.evaluate(() => { cmPanelAct('edit', 'vckb'); return /Enter saves/.test((document.querySelector('#cm-panel .cm-it .cm-hint') || { textContent: '' }).textContent); });
       await page.evaluate(() => { cmPanelAct('cancel', 'vckb'); document.querySelector('#cm-panel [data-act="close"]').focus(); });
       await page.keyboard.press('Enter'); await wait(250);
@@ -785,6 +786,16 @@ async function routeLibs(target) {
   await other.evaluate(() => { CM.items.push({ id: 'vctab', kind: 'page', part: 'page', quote: '', text: 'vc from the other tab', label: '', t: Date.now(), state: 'open' }); cmChanged(); });
   await wait(400);
   await page.evaluate(() => { const c = CM.items.find(x => x.id === 'vcok'); c.state = 'resolved'; cmChanged(); }); await wait(300);
+  // while this tab holds a half-written comment in its list, the other tab marks a file reviewed and saves a diagram edit
+  await page.evaluate(() => { cmPanel(true); cmPanelAct('edit', 'vcpic'); document.querySelector('#cm-panel .cm-it-ta').value = 'vc half written'; });
+  await other.evaluate(() => { switchPart('diff'); toggleR(ordered[0]); CM.edits['vc-no-such-diagram'] = { text: 'graph TD; a-->b', base: 'x' }; cmSave(); });
+  await wait(500);
+  const live = await page.evaluate(() => ({ draft: (document.querySelector('#cm-panel .cm-it-ta') || {}).value, edit: !!CM.edits['vc-no-such-diagram'], told: /another tab/.test(document.getElementById('toast').textContent), rv: isRv(ordered[0]) }));
+  await page.evaluate(() => { switchPart('diff'); }); await wait(300);
+  live.card = await page.evaluate(() => { const c = document.querySelector('.fc'); return !c || (c.classList.contains('rv') && c.querySelector('.rbtn').textContent === 'Reviewed'); });
+  await other.evaluate(() => { toggleR(ordered[0]); delete CM.edits['vc-no-such-diagram']; cmSave(); }); await wait(300);
+  await page.evaluate(() => { cmPanelAct('cancel', 'vcpic'); switchPart('brief'); });
+  log(live.draft === 'vc half written' && live.edit && live.told && live.rv && live.card, `a save in another tab keeps this tab's half-written comment, shows the file it marked reviewed, and says that a diagram edit needs a reload (${Object.entries(live).filter(e => !e[1]).map(e => e[0]).join(', ') || 'all'})`);
   const tabs = await other.evaluate(() => ({ kept: CM.items.some(x => x.id === 'vctab'), seen: (CM.items.find(x => x.id === 'vcok') || {}).state, stored: JSON.parse(localStorage.getItem(CM_KEY)).items.map(x => x.id).join(',') }));
   await other.close();
   log(tabs.kept && tabs.seen === 'resolved' && /vctab/.test(tabs.stored), `two tabs of one explanation do not write over each other: a comment made in one survives a change made in the other (${tabs.stored})`);

@@ -75,6 +75,8 @@ import argparse
 import base64
 import datetime
 import html
+import io
+import contextlib
 import json
 import os
 import re
@@ -199,7 +201,7 @@ def changed_functions(kept, args, selected):
                 continue
             searched += 1
             repo, head = heads[label]
-            hits, total = qd.find_callers(repo, head, fn["call"], skip=getattr(args, "exclude", ()))
+            hits, total = qd.find_callers(repo, head, fn["call"], skip=args.exclude)
             fn["callers"] = [[f"{label}/{p}" if label else p, line] for p, line in hits]
             fn["more"] = total - len(hits)
         out[path] = info
@@ -258,7 +260,7 @@ def image_versions(kept, args, selected):
                         raise OSError("outside the repo")
                     with open(target, "rb") as fh:
                         data = fh.read()
-                except OSError:
+                except (OSError, ValueError):  # ValueError: a path on another drive
                     data = None
             if data is None:
                 sides[side] = {"note": "This version could not be read from the repo."}
@@ -1165,12 +1167,14 @@ def selftest():
         fw("m.py", long_method.replace("step_9 = 9", "step_9 = 90"))
         fgit("commit", "-q", "-am", "change helper")
         fkept = qd.filter_files(qd.split_files(qd.capture(fnrepo, "HEAD~1..HEAD")), [])[0]
-        space = lambda **kw: argparse.Namespace(**{"target": None, "repo": fnrepo, "diff_args": None, "diff_file": None, **kw})
+        space = lambda **kw: argparse.Namespace(**{"target": None, "repo": fnrepo, "diff_args": None, "diff_file": None, "exclude": [], **kw})
         fns, searched = changed_functions(fkept, space(diff_args="HEAD~1..HEAD"), {"diff"})
         one = (fns.get("a.py") or {"hunks": [], "list": [{}]})
         case("a hunk inside a method is labelled with the method, and the method is listed", one["hunks"] == ["def helper(self, x)"] and [f.get("name") for f in one["list"]] == ["helper"], str(one))
         case("callers are the places that call the name: not its definition, a longer name, a mention in a comment or a secret-named file",
              searched and one["list"][0].get("callers") == [["a.py", 9], ["b.py", 2]] and one["list"][0].get("more") == 0, str(one))
+        fns_x, _ = changed_functions(fkept, space(diff_args="HEAD~1..HEAD", exclude=["b.py"]), {"diff"})
+        case("a path the page leaves out is not named as a caller either", (fns_x.get("a.py") or {"list": [{}]})["list"][0].get("callers") == [["a.py", 9]], str(fns_x.get("a.py")))
         fns, searched = changed_functions(fkept, space(diff_file="x.diff"), {"diff"})
         case("a page built from a diff file names the functions and lists no callers", not searched and "callers" not in fns["a.py"]["list"][0], str(fns))
         case("a page without the Diff review part carries no function data", changed_functions(fkept, space(diff_args="HEAD~1..HEAD"), {"brief"}) == ({}, False), "")
@@ -1199,7 +1203,8 @@ def selftest():
         igit("commit", "-q", "-m", "seed")
         for name, data in (("a.png", png(12, (200, 20, 30))), ("new.png", png(6, (9, 9, 9))), ("big.png", png(8, (0, 0, 0)) + os.urandom(IMAGE_CAP + 10)),
                            ("fake.png", b"still text, still not a picture\n"), ("s.svg", b"<svg xmlns='http://www.w3.org/2000/svg'><rect width='9' height='4'/></svg>\n"),
-                           ("k.svg", b"<svg xmlns='http://www.w3.org/2000/svg'><text>password = \"Zx81-kq77-Lm42-pp09\"</text></svg>\n"), ("notes.txt", b"two\n")):
+                           ("k.svg", b"<svg xmlns='http://www.w3.org/2000/svg'><text>password = \"Zx81-kq77-Lm42-pp09\"</text></svg>\n"), ("notes.txt", b"two\n"),
+                           ("tok.png", png(5, (1, 2, 3)) + b"gh" + b"p_" + b"A" * 36)):  # a token-shaped text after the picture's data
             iw(name, data)
         os.remove(os.path.join(imrepo, "gone.png"))
         igit("add", "-A")
@@ -1208,6 +1213,8 @@ def selftest():
         ins = lambda **kw: argparse.Namespace(**{"target": None, "repo": imrepo, "diff_args": "HEAD~1..HEAD", "diff_file": None, **kw})
         im = image_versions(ikept, ins(), {"diff"})
         shown = lambda v: bool(v) and v.get("uri", "").startswith("data:image/")
+        case("a picture whose bytes hold credential-shaped text is named and not shown", "credential-shaped" in ((im.get("tok.png") or {}).get("after") or {}).get("note", "")
+             and not shown((im.get("tok.png") or {}).get("after")), str(im.get("tok.png"))[:200])
         case("a changed picture carries both versions, read from git", shown(im.get("a.png", {}).get("before")) and shown(im["a.png"]["after"]) and im["a.png"]["before"]["uri"] != im["a.png"]["after"]["uri"]
              and base64.b64decode(im["a.png"]["after"]["uri"].split(",", 1)[1]) == png(12, (200, 20, 30)), str(sorted(im)))
         case("a new picture has no version before, a removed one none after", im["new.png"]["before"] is None and shown(im["new.png"]["after"]) and shown(im["gone.png"]["before"]) and im["gone.png"]["after"] is None, "")
@@ -1340,6 +1347,16 @@ def selftest():
              f_rc != 0 and "src/api/missing.py, which is not a file of this page" in f_log and "docs/guide.md" in f_log, f_log[-400:])
         f_rc, f_log, f_page = filed("src/api/handler.py", ["--parts", "brief"])
         case("without the Diff review part the files are named and not linked", f_rc == 0 and 'class="sec-files"' in f_page and "data-file=" not in f_page and "<code title=\"src/api/handler.py\">" in f_page, f_log[-300:])
+        case("data-changed-by is another attribute: it is not counted as a mark",
+             changed_marks([("brief.html", '<p data-changed-by="x">a</p><p data-changed="said why">b</p><p data-changed>c</p>')]) == (2, []), "")
+        w_buf = io.StringIO()
+        with contextlib.redirect_stdout(w_buf):
+            brief_files('<h2 id="change-a" data-files="a.py">A</h2><p data-files="a.py">x</p>', ["a.py"], True)
+        case("data-files outside a change heading is reported, not silently ignored", "WARN\tdata-files stands 1 time(s) outside" in w_buf.getvalue(), w_buf.getvalue()[:200])
+        w_note = os.path.join(content, "notes-unused.json")
+        open(w_note, "w", encoding="utf-8", newline="\n").write("[]")
+        w_rc, w_log, w_page = run("notes-unused", std + ["--notes", w_note, "--parts", "brief"])
+        case("--notes without the Diff review part is reported as ignored", w_rc == 0 and "WARN\t--notes was given but the diff part is not in --parts" in w_log, w_log[-300:])
         # Notes on diff lines
         note_file = os.path.join(content, "notes.json")
         noted = lambda notes: (open(note_file, "w", encoding="utf-8", newline="\n").write(json.dumps(notes)), run("notes", std + ["--notes", note_file]))[1]
