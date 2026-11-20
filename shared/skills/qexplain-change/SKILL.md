@@ -141,7 +141,7 @@ Build with the `<python>` from Step 1:
 
 Leave out the flags of parts not chosen (`--parts` defaults to `brief,diff`). For a PR diff fetched another way, pass `--diff-file <unified diff> --base <text> --head <text>` instead of `--diff-args`; `--base` and `--head` are accepted only there. `--link` refuses a URL with a login or a signature or token in its query. For several repos pass one `--target` per repo, key the JSON files by the labelled paths, and pass the same `--exclude` values you measured with. The scripts accept only revisions, paths, `--cached`, `--merge-base` and `-U<n>` in those arguments; a value starting with a dash needs the `=` form. The build reads branch, base and head SHAs, commit counts and plan slugs from git for the provenance strip. Pass `--ticket` and `--link` for ticket ids and links you know. It prints "not recorded" for the rest.
 
-The build captures the diff as UTF-8, removes excluded files, renders the diagrams, inlines the data safely, warns about any file without a rationale or role, and runs the Step 4 validator. Fix every warning. It prints a `STEP` line as each stage starts and `NOTE` lines that need no action. A refusal (`ERROR`) says what to do next: do that, and do not work around it. It stops with nothing written if it finds credential-shaped text in the diff or in any file you wrote, diagram sources, tickets and links included; reword your own text, it cannot be allowed.
+The build captures the diff as UTF-8, removes excluded files, renders the diagrams, inlines the data safely, warns about any file without a rationale or role, and runs the Step 4 validator. Fix every warning. It prints a `STEP` line as each stage starts, and `NOTE`, `WROTE`, `LEFT-OUT`, `MASKED` and `ALLOWED` lines that report what was done and need no action. A refusal (`ERROR`) says what to do next: do that, and do not work around it. It stops with nothing written if it finds credential-shaped text in the diff or in any file you wrote, diagram sources, tickets and links included; reword your own text, it cannot be allowed.
 
 ### Write so the reader can answer back
 
@@ -229,7 +229,7 @@ The page also keeps the theme (`qexplain-change-theme`) and the sketch or classi
 ### Format rules
 
 - **No extra libraries.** The template loads two pinned scripts from `cdn.jsdelivr.net`: a UMD build of Mermaid, only when a Mermaid diagram is used, and highlight.js, only when the page has the Diff review part. Without network the diff is shown uncoloured. D2 needs no library. Do not add another: the page's content security policy lets a script load from `cdn.jsdelivr.net` only, with an exact version, and a `<script type="module">` is blocked on `file://`. The validator fails an unpinned URL or a module script.
-- **The artifact's own data is inlined.** No `fetch` or XHR in your fragments: the page's policy refuses every network call.
+- **The artifact's own data is inlined.** No `fetch` or XHR in your fragments: the page's policy refuses them.
 - **No ASCII diagrams.** Everything visual is D2, Mermaid or styled HTML.
 - **No emoji** in what you write. The check does not read the diff, so never leave a file out because of one.
 - **Code blocks use `<pre>`.** Wide content goes in `<div class="table-wrap">`. Callouts use `<div class="callout">`.
@@ -286,7 +286,7 @@ A comment on boxed parts can say a picture is kept on the page. Ask the user for
 
 In both cases, rebuild the page when anything changed, with the same output name, so that comments already on the page carry over and show as still in place, moved or not found. Re-run Step 4 on the rebuilt page. Never ask the user to use the comment tools; they are a convenience.
 
-Mark each block you changed in answer: add `data-changed` to its tag, with a reason when it helps (`data-changed="Answer to comment 3: named the caller"`, a sentence or two, at most 300 characters). Remove the marks left by the rebuild before, so the marks always describe the latest rebuild only. The page counts the marked blocks and lets the reader step through them.
+Mark each block you changed in answer: add `data-changed` to its tag, with a reason when it helps (`data-changed="Answer to comment 3: named the caller"`, a sentence or two, at most 300 characters). Remove the marks left by the rebuild before, so the marks always describe the latest rebuild only. The page counts the marked blocks and lets the reader step through them. The marks are read in `brief.html` and `walkthrough.html` only; name any other change (a diagram, a rationale, a note) in your reply.
 
 ## Step 6: Close
 

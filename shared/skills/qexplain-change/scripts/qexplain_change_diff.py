@@ -529,7 +529,7 @@ def hunk_kinds(files):
     return out
 
 
-def find_callers(repo, rev, call, limit=8):
+def find_callers(repo, rev, call, limit=8, skip=()):
     """Places where a name is called, by name alone: the tracked files of the repo (at rev, or the working tree when
     rev is None) are searched for the name as a whole word followed by an opening parenthesis. Declarations of that
     name, generated files and files with secret-looking names are left out. Returns ([(path, line)], total found).
@@ -546,7 +546,8 @@ def find_callers(repo, rev, call, limit=8):
             continue
         path = parts[0][len(rev) + 1:] if rev and parts[0].startswith(rev + ":") else parts[0]
         decl = read_decl(ext_of(path), parts[2])
-        if (decl and decl["call"] == call) or not used.search(parts[2]) or secret_named(path) or GENERATED_PATH.search(path):
+        if (decl and decl["call"] == call) or not used.search(parts[2]) or secret_named(path) or GENERATED_PATH.search(path) \
+                or any(pattern_matches(path, pattern) for pattern in skip):  # a path the page was told to leave out is not named as a caller either
             continue
         hits.append((path, int(parts[1])))
     return hits[:limit], len(hits)

@@ -15,7 +15,7 @@ Usage:
          | --target "<label>=<repo>::<git diff arguments>" ...) \
         --brief <brief.html> --rationales <rationales.json> \
         [--parts brief,walkthrough,maps,summary,diff] [--walkthrough <walkthrough.html>] [--maps <maps.json>] \
-        [--roles <roles.json>] [--diagrams <dir>] [--ticket <text>]... [--link <label>=<url>]... \
+        [--roles <roles.json>] [--notes <notes.json>] [--diagrams <dir>] [--id <text>] [--ticket <text>]... [--link <label>=<url>]... \
         [--base <text>] [--head <text>] [--exclude <glob>]... \
         [--allow-credential <path>:<side>:<line>]... [--mask-credential ...]... [--user-confirmed-credential ...]...
     <python> build-explanation.py --selftest
@@ -97,6 +97,10 @@ MERMAID_URL = "https://cdn.jsdelivr.net/npm/mermaid@11.17.2/dist/mermaid.min.js"
 # Syntax colours for the Diff review part: the common build (36 languages). Loaded with async, so a page with no
 # network is not held back and shows its diff uncoloured.
 HLJS_URL = "https://cdn.jsdelivr.net/npm/@highlightjs/cdn-assets@11.11.1/highlight.min.js"
+# The hash of each file, as the browser checks it (subresource integrity): a file the host changed does not run.
+# A new version needs its new hash: base64 of the SHA-384 of the file, after "sha384-".
+MERMAID_SRI = "sha384-EOXBFmc3gx5mb+vn0vPvvGqACToJD24hhacX5Yx+8NUUQrHIle/Qi5Bg9o3zKwW2"
+HLJS_SRI = "sha384-RH2xi4eIQ/gjtbs9fUXM68sLSi99C7ZWBRX1vDrVv6GQXRibxXLbwO2NGZB74MbU"
 D2_TIMEOUT = 60
 PLACEHOLDER = re.compile(r"""<div\s+data-diagram=["']([A-Za-z0-9._-]+)["']\s*>\s*</div>""")
 SECTION = re.compile(r"""<section\s+data-subsystem=["']([^"']+)["']\s*>(.*?)</section>""", re.S)
@@ -195,7 +199,7 @@ def changed_functions(kept, args, selected):
                 continue
             searched += 1
             repo, head = heads[label]
-            hits, total = qd.find_callers(repo, head, fn["call"])
+            hits, total = qd.find_callers(repo, head, fn["call"], skip=getattr(args, "exclude", ()))
             fn["callers"] = [[f"{label}/{p}" if label else p, line] for p, line in hits]
             fn["more"] = total - len(hits)
         out[path] = info
@@ -248,7 +252,11 @@ def image_versions(kept, args, selected):
             data = proc.stdout if proc.returncode == 0 else None
             if data is None and side == "after" and head is None:  # an uncommitted version is only in the working tree
                 try:
-                    with open(os.path.join(repo, inner), "rb") as fh:
+                    # Only a file that really stands inside the repo: a link that points out of it is not followed.
+                    target = os.path.join(repo, inner)
+                    if os.path.islink(target) or os.path.commonpath([os.path.realpath(target), os.path.realpath(repo)]) != os.path.realpath(repo):
+                        raise OSError("outside the repo")
+                    with open(target, "rb") as fh:
                         data = fh.read()
                 except OSError:
                     data = None
@@ -260,6 +268,9 @@ def image_versions(kept, args, selected):
                 sides[side] = {"note": f"Not shown: the pictures of this page together would pass {IMAGE_BUDGET // (1024 * 1024)} MiB."}
             elif not looks_like(ext, data):
                 sides[side] = {"note": f"Not shown: the file is not a readable .{ext} picture."}
+            elif ext != "svg" and any(rx.search(data.decode("latin-1")) for _, rx in qd.ALWAYS):
+                # Pixels cannot be scanned, but a token of a known form written in a picture's metadata is plain bytes.
+                sides[side] = {"note": "Not shown: this picture's data holds credential-shaped text."}
             elif ext == "svg" and qd.scan_content_file(path, data.decode("utf-8", "replace")):
                 sides[side] = {"note": "Not shown: this SVG holds credential-shaped text."}
             else:
@@ -335,6 +346,9 @@ def brief_files(brief, paths, diff_selected):
         named += files
         if files:
             out.append('<p class="sec-files"><span>Files:</span> ' + ", ".join(link(p) for p in dict.fromkeys(files)) + "</p>")
+    stray = len(re.findall(r"\bdata-files=", brief)) - sum(1 for m in CHANGE_HEAD.finditer(brief) if "data-files=" in m.group(1))
+    if stray:
+        print(f"WARN\tdata-files stands {stray} time(s) outside the h2 heading of a change section; it is read only on <h2 id=\"change-...\">")
     rest = [p for p in paths if p not in set(named)] if any_named else []
     tail = brief[last:]
     if rest:
@@ -346,7 +360,7 @@ def brief_files(brief, paths, diff_selected):
     return "".join(out) + tail, rest
 
 
-CHANGED_MARK = re.compile(r"""<[a-zA-Z][^<>]*\sdata-changed(?:=("[^"]*"|'[^']*'))?[^<>]*>""")
+CHANGED_MARK = re.compile(r"""<[a-zA-Z][^<>]*\sdata-changed(?:=("[^"]*"|'[^']*'))?(?=[\s>/])[^<>]*>""")
 
 
 def changed_marks(parts):
@@ -715,7 +729,7 @@ def check_views(maps, diagrams):
     seen, out, taken = set(), [], set()
     for v in views:
         if not isinstance(v, dict):
-            fail("each map view must be an object")
+            fail(f"maps.json: view {len(seen) + 1} is not an object. Each view is {{\"key\": ..., \"label\": ..., \"diagram\": ...}}")
         key = v.get("key")
         if key not in VIEW_ORDER:
             fail(f"map view key {key!r} is not one of {', '.join(VIEW_ORDER)}")
@@ -860,8 +874,8 @@ def main(argv=None):
     ap.add_argument("--roles")
     ap.add_argument("--notes", help="notes.json: notes on lines of the diff, shown read-only on the page")
     ap.add_argument("--diagrams")
-    ap.add_argument("--ticket", action="append", default=[], help="a ticket reference to show in the provenance strip")
-    ap.add_argument("--link", action="append", default=[], help="label=https://url to show in the provenance strip")
+    ap.add_argument("--ticket", action="append", default=[], help="a ticket reference to show in the Info menu")
+    ap.add_argument("--link", action="append", default=[], help="label=https://url to show in the Info menu")
     args = ap.parse_args(argv)
     if args.selftest:
         return selftest()
@@ -912,10 +926,13 @@ def main(argv=None):
     roles = read_json(args.roles) if args.roles else {}
     if not isinstance(roles, dict):
         fail('roles.json must map file paths to sentences. Write it as {"path/as/in/the/diff": "One sentence on what the file does."}')
+    if args.notes and "diff" not in selected:
+        print("WARN\t--notes was given but the diff part is not in --parts; it is ignored")
     notes_text = read(args.notes) if args.notes and "diff" in selected else ""
     notes, bad_notes = line_notes(read_json(args.notes), kept) if notes_text else ({}, [])
     if bad_notes:
-        fail("notes.json: " + "; ".join(bad_notes[:6]))
+        fail("notes.json: " + "; ".join(bad_notes[:6]) + (f"; and {len(bad_notes) - 6} more" if len(bad_notes) > 6 else "")
+             + ". Correct each note against the diff as the page shows it (path, side, line), or remove it")
     brief = read(args.brief)
     walkthrough = read(args.walkthrough) if args.walkthrough and "walkthrough" in selected else ""
     maps_text = read(args.maps) if args.maps and "maps" in selected else ""
@@ -983,12 +1000,12 @@ def main(argv=None):
     step("filling the page")
     marks, bad_marks = changed_marks([("brief.html", brief), ("walkthrough.html", walkthrough)])
     if bad_marks:
-        fail("; ".join(bad_marks[:4]))
+        fail("; ".join(bad_marks[:4]) + (f"; and {len(bad_marks) - 4} more" if len(bad_marks) > 4 else ""))
     if marks:
         print(f"NOTE\t{marks} {'block is' if marks == 1 else 'blocks are'} marked as changed; the page shows a legend and steps through them")
     brief, unnamed = brief_files(brief, [path for path, _ in kept], "diff" in selected)
     if unnamed:
-        print(f"NOTE\t{len(unnamed)} changed files are named by no Brief section and are listed after the change sections: "
+        print(f"NOTE\t{len(unnamed)} changed {'file is' if len(unnamed) == 1 else 'files are'} named by no Brief section and listed after the change sections: "
               + ", ".join(qd.safe_path(p) for p in unnamed))
     brief_out = fill_placeholders(brief, diagrams, "brief.html")
     walk_out = walkthrough_html(fill_placeholders(walkthrough, diagrams, "walkthrough.html")) if "walkthrough" in selected else ""
@@ -1006,8 +1023,8 @@ def main(argv=None):
         "{{BASE_REF}}": html.escape(base_text),
         "{{HEAD_REF}}": html.escape(head_text),
         "<!--@PROVENANCE-->": prov,
-        "<!--@MERMAID-->": f'<script src="{MERMAID_URL}"></script>' if mermaid_used else "",
-        "<!--@HLJS-->": f'<script async src="{HLJS_URL}"></script>' if "diff" in selected else "",
+        "<!--@MERMAID-->": f'<script src="{MERMAID_URL}" integrity="{MERMAID_SRI}" crossorigin="anonymous"></script>' if mermaid_used else "",
+        "<!--@HLJS-->": f'<script async src="{HLJS_URL}" integrity="{HLJS_SRI}" crossorigin="anonymous"></script>' if "diff" in selected else "",
         "<!--@BRIEF-->": brief_out,
         "<!--@WALKTHROUGH-->": walk_out,
         "<!--@MAPS-->": maps_out,
@@ -1317,7 +1334,7 @@ def selftest():
              f_rc == 0 and '<p class="sec-files"><span>Files:</span> <a href="#part-diff" data-file="src/api/handler.py"' in f_page and f_page.count('class="sec-files"') == 1, f_log[-300:])
         rest_at, verified_at = f_page.find('class="sec-files sec-rest"'), f_page.find('<h2 id="verified"')
         case("files that no section names are listed once, where the change sections end, and the build says so",
-             0 < rest_at < verified_at and all(f_page.count(f'data-file="{p}"') == 1 for p in SELF_FILES) and "NOTE\t3 changed files are named by no Brief section" in f_log, f_log[-400:])
+             0 < rest_at < verified_at and all(f_page.count(f'data-file="{p}"') == 1 for p in SELF_FILES) and "NOTE\t3 changed files are named by no Brief section and listed" in f_log, f_log[-400:])
         f_rc, f_log, f_page = filed("src/api/handler.py, src/api/missing.py")
         case("a Brief section that names a file not on the page stops the build and lists the files of the page",
              f_rc != 0 and "src/api/missing.py, which is not a file of this page" in f_log and "docs/guide.md" in f_log, f_log[-400:])

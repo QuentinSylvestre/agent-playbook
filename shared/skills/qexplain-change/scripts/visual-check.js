@@ -334,7 +334,7 @@ async function routeLibs(target) {
     log(await page.evaluate(z => Math.abs(OV.z - z) < 0.001, ov0.z) && await ovFits(), 'Fit brings the whole diagram back into the window');
     await page.click('#dg-ov-body .cm-dgbtn'); await wait(200);
     log(await page.evaluate(() => { const tip = document.querySelector('#dg-ov-body > .cm-dgtip'), r = tip.getBoundingClientRect(), top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
-      return getComputedStyle(tip).display !== 'none' && r.height > 8 && top === tip; }), 'the comment-mode hint is visible in the full-window view');
+      return getComputedStyle(tip).display !== 'none' && r.height > 8 && tip.contains(top); }), "the comment-mode hint, with its list of parts, is visible in the full-window view");
     const on = await page.evaluate(() => { const body = ovBody(), used = CM.items.filter(c => c.kind === 'dg').map(c => c._did), all = cmDgParts(body);
       const p = all.find(q => !q.edge && !used.includes(q.id) && !all.some(o => o.id.startsWith(q.id + '.'))); const b = p.g.getBoundingClientRect(); return { id: p.id, x: b.left + b.width / 2, y: b.top + b.height / 2 }; });
     await page.mouse.click(on.x, on.y); await wait(300);
@@ -511,7 +511,7 @@ async function routeLibs(target) {
         log(c.st === 'moved' && c.where.includes('"' + sq.msg + ' REWORDED" (was "' + sq.msg + '")') && !/no longer/.test(s.st) && await chipOf() === '',
           `a sequence message reworded in the source keeps its comment, named as it reads now with its old wording: ${c.st} ${c.where.slice(0, 110)}`);
         await typeSrc(sq.id, withLine(() => null)); await wait(2200); c = await dgC('vc follows'); s = await srcState(sq.id);
-        log(!!s.ed && s.ed.bad === '' && c.st === 'notfound' && /With this edit, 1 comment on the diagram no longer finds its part\. Reset brings it back\./.test(s.st) && await chipOf() === '1 not placed',
+        log(!!s.ed && s.ed.bad === '' && c.st === 'notfound' && /With this edit, 1 comment on the diagram no longer finds its part\. Reset brings it back\./.test(s.st) && await chipOf() === '1 not found',
           `an edit that removes a commented part says so in the editor, and the diagram counts the comment as not placed: ${s.st.slice(0, 120)}`);
         await page.click('#' + sq.id + ' .cm-dglost'); await wait(300);
         log(await page.evaluate(() => cmPanelOpen() && document.querySelectorAll('#cm-panel .cm-it.cm-it-lost.cm-it-flash').length === 1), 'a click on "not placed" opens the panel on the comment that lost its part');
@@ -547,7 +547,7 @@ async function routeLibs(target) {
         await page.click('#' + sq.id + ' .dg-src-h [data-s="reset"]'); await wait(2200);
         const again = await page.evaluate(id => { const dg = document.getElementById(id), cs = CM.items.filter(x => /^vc both/.test(x.text));
           return { n: cs.length, ok: cs.every(x => x._state === 'anchored'), rows: dg.querySelectorAll('.dg-src-ln').length, lines: dg.querySelector(':scope > .dg-src textarea').value.split('\n').length, marks: dg.querySelectorAll('.dg-src-g .cm-mark').length }; }, sq.id);
-        log(both && /With this edit, 2 comments on the diagram and its source no longer find their place\. Reset brings them back\./.test(s.st) && lostChip === '2 not placed'
+        log(both && /With this edit, 2 comments on the diagram and its source no longer find their place\. Reset brings them back\./.test(s.st) && lostChip === '2 not found'
           && again.n === 2 && again.ok && again.rows === again.lines && again.marks === 1 && await chipOf() === '',
           `deleting a line that carries a comment on its message and one on the line itself loses both and says so; Reset brings both back and the line numbers match the text again (${again.rows} numbers, ${again.lines} lines): ${s.st.slice(0, 110)}`);
         await dropC();
@@ -603,6 +603,35 @@ async function routeLibs(target) {
       await page.keyboard.press('Enter'); await wait(300);
       const end = await page.evaluate(() => { const saved = CM.items.some(x => x.text === 'vc composing'); CM.items = CM.items.filter(x => x.text !== 'vc composing'); cmChanged(); cmPanel(false); return saved; });
       log(mid.open && !mid.saved && end, 'Enter pressed while an input method is composing a character does not save the comment; the next Enter does');
+      // The keyboard alone: the list of comments, a comment box and the full-window view take the focus and give it back; Escape closes a box from any of its controls
+      const kb = {};
+      await page.evaluate(() => { CM.items.push({ id: 'vckb', kind: 'page', part: 'page', quote: '', text: 'vc keyboard', label: '', t: Date.now(), state: 'open' }); cmChanged(); document.getElementById('cm-panel-btn').focus(); });
+      await page.keyboard.press('Enter'); await wait(250);
+      kb.panelIn = await page.evaluate(() => cmPanelOpen() && !!document.activeElement.closest('#cm-panel'));
+      kb.go = await page.evaluate(() => { const b = document.querySelector('#cm-panel .cm-it[data-cid="vckb"] button.cm-it-w'); return !!b && b.tabIndex === 0; });
+      kb.hint = await page.evaluate(() => { cmPanelAct('edit', 'vckb'); return /Enter saves/.test((document.querySelector('#cm-panel .cm-it .cm-hint') || { textContent: '' }).textContent); });
+      await page.evaluate(() => { cmPanelAct('cancel', 'vckb'); document.querySelector('#cm-panel [data-act="close"]').focus(); });
+      await page.keyboard.press('Enter'); await wait(250);
+      kb.panelOut = await page.evaluate(() => !cmPanelOpen() && document.activeElement.id === 'cm-panel-btn');
+      const dgk = await page.evaluate(() => { const dg = [...document.querySelectorAll('.part-panel.active .dg')].find(d => d.offsetParent !== null && cmDgParts(d).length); if (!dg) return null; dg.scrollIntoView({ block: 'center' }); dg.querySelector('.cm-dgbtn').focus(); return dg.id; });
+      if (dgk) {
+        await page.keyboard.press('Tab'); await page.keyboard.press('Shift+Tab'); await page.keyboard.press('Enter'); await wait(250);      // the Tab keys make the focus one the browser treats as keyboard focus
+        kb.pick = await page.evaluate(id => { const s = document.querySelector('#' + id + ' .cm-dgpick'); return !!s && document.activeElement === s && s.options.length > 1; }, dgk);
+        await page.keyboard.press('ArrowDown'); await page.keyboard.press('Tab'); await page.keyboard.press('Enter'); await wait(300);
+        kb.box = await page.evaluate(() => { const c = document.querySelector('.cm-card'); return !!c && /^(Node|Connection|Message|Participant|Note) /.test(c.querySelector('.cm-k').textContent); });
+        await page.evaluate(() => (document.querySelector('.cm-card .cm-cancel') || document.body).focus());
+        await page.keyboard.press('Escape'); await wait(200);
+        kb.esc = await page.evaluate(() => !document.querySelector('.cm-card'));
+        await page.keyboard.press('Escape'); await wait(150);
+        await page.evaluate(id => document.querySelector('#' + id + ' .dg-zb[data-z="full"]').focus(), dgk);
+        await page.keyboard.press('Enter'); await wait(300);
+        kb.full = await page.evaluate(() => ovOpen() && document.activeElement.id === 'dg-close' && document.getElementById('dg-overlay').getAttribute('role') === 'dialog');
+        const x0 = await page.evaluate(() => OV.x); await page.keyboard.press('ArrowRight'); kb.pan = (await page.evaluate(() => OV.x)) !== x0;
+        await page.keyboard.press('Escape'); await wait(200);
+        kb.back = await page.evaluate(id => !ovOpen() && document.activeElement === document.querySelector('#' + id + ' .dg-zb[data-z="full"]'), dgk);
+      }
+      await page.evaluate(() => { CM.items = CM.items.filter(x => x.id !== 'vckb'); cmChanged(); cmPanel(false); window.scrollTo(0, 0); });
+      log(Object.values(kb).every(Boolean), `with the keyboard alone: the list of comments takes and returns the focus, a comment's place is a button, a diagram part is picked from a list, Escape closes a box from its buttons, and the full-window view opens, moves and closes (${Object.entries(kb).filter(e => !e[1]).map(e => e[0]).join(', ') || 'all'})`);
     }
     // A hostile file name on the page: every control of its file works and nothing it carries runs
     {
@@ -668,7 +697,7 @@ async function routeLibs(target) {
       const dl = d2src.split('\n'), one = dl[sl.k - 1];
       await typeSrc(d2dg, dl.filter((l, i) => i !== sl.k - 1).join('\n') + '\nxx\n' + one + '\nyy\n' + one + '\nzz'); await wait(900); const two = await srcC();
       await typeSrc(d2dg, d2src + '\nxx\n' + one); await wait(900); const dup = await srcC();
-      log(two.st === 'notfound' && /With this edit, 1 comment on the source no longer finds its line\. Reset brings it back\./.test(two.stt) && two.chip === '1 not placed' && dup.st === 'anchored' && dup.ln === sl.k,
+      log(two.st === 'notfound' && /With this edit, 1 comment on the source no longer finds its line\. Reset brings it back\./.test(two.stt) && two.chip === '1 not found' && dup.st === 'anchored' && dup.ln === sl.k,
         `a line that now stands twice, neither time between its old neighbours, is not guessed at and is counted as not placed; between its old neighbours it is found (${two.st}, ${dup.st} line ${dup.ln}): ${two.stt.slice(0, 100)}`);
       await typeSrc(d2dg, d2src); await wait(900);
       const selRows = await page.evaluate(([id, k]) => { const ta = document.querySelector('#' + id + ' > .dg-src textarea'), L = ta.value.split('\n'), a = L.slice(0, k - 1).join('\n').length + (k > 1 ? 1 : 0);
@@ -746,10 +775,19 @@ async function routeLibs(target) {
     'the copied text names a file, quotes diff lines with their numbers, and says when a comment is no longer found');
   await page.evaluate(() => { CM.items.forEach(c => { c.state = 'resolved'; }); cmChanged(); });
   log(await page.evaluate(() => cmFeedback() === '' && document.querySelector('#cm-panel .cm-prev').textContent.startsWith('Nothing to copy')), 'resolved comments are left out of the copied text');
-  await page.evaluate(() => { CM.items = []; cmSave(); const ST2 = JSON.parse(localStorage.getItem(STORE_KEY) || '{}'); ST2[ordered[0] + '__n'] = 'an old note'; localStorage.setItem(STORE_KEY, JSON.stringify(ST2)); });
+  // What the store holds is untrusted: a malformed comment is left out and the rest still works; another tab's save is taken up
+  await page.evaluate(() => { localStorage.setItem(CM_KEY, JSON.stringify({ v: 1, items: [{ id: 'vcok', kind: 'page', part: 'page', quote: '', text: 'vc well formed', label: '', t: 1, state: 'open' },
+    { id: 'vcbad1', kind: 'line', part: 'diff', path: 'x', text: 'no lines' }, { id: 7, text: 'no id' }, null, 'text', { id: 'vcpic', kind: 'page', part: 'page', text: 'vc picture', state: 'open', t: 2, pic: 'x" onerror="window.__qxHit=3' }] })); });
   await page.reload(); await wait(1200);
-  log(await page.evaluate(() => { const c = CM.items[0]; return CM.items.length === 1 && c.kind === 'file' && c.path === ordered[0] && c.text === 'an old note' && c._n === 1
-    && !Object.keys(JSON.parse(localStorage.getItem(STORE_KEY))).some(k => k.slice(-3) === '__n'); }), 'a note from the old per-file note box becomes a file comment, once');
+  const taken = await page.evaluate(() => { cmPanel(true); return { ids: CM.items.map(c => c.id).join(','), listed: document.querySelectorAll('#cm-panel .cm-pl > .cm-it[data-cid]').length, imgs: document.querySelectorAll('#cm-panel .cm-pic img').length, hit: window.__qxHit || 0 }; });
+  log(taken.ids === "vcok,vcpic" && taken.listed === 2 && taken.imgs === 0 && taken.hit === 0, `stored comments that are not well formed are left out, the others are listed, and a stored picture address that is not a picture is not drawn (${taken.ids})`);
+  const other = await page.context().newPage(); await other.goto(page.url()); await other.waitForTimeout(900);
+  await other.evaluate(() => { CM.items.push({ id: 'vctab', kind: 'page', part: 'page', quote: '', text: 'vc from the other tab', label: '', t: Date.now(), state: 'open' }); cmChanged(); });
+  await wait(400);
+  await page.evaluate(() => { const c = CM.items.find(x => x.id === 'vcok'); c.state = 'resolved'; cmChanged(); }); await wait(300);
+  const tabs = await other.evaluate(() => ({ kept: CM.items.some(x => x.id === 'vctab'), seen: (CM.items.find(x => x.id === 'vcok') || {}).state, stored: JSON.parse(localStorage.getItem(CM_KEY)).items.map(x => x.id).join(',') }));
+  await other.close();
+  log(tabs.kept && tabs.seen === 'resolved' && /vctab/.test(tabs.stored), `two tabs of one explanation do not write over each other: a comment made in one survives a change made in the other (${tabs.stored})`);
   await page.evaluate(() => { CM.items = []; cmChanged(); cmPanel(false); });
   // Comments on a whole paragraph or table cell, without selecting text
   const pAt = await page.evaluate(() => {
