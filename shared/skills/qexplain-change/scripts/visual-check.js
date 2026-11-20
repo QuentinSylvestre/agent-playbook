@@ -1519,6 +1519,91 @@ async function routeLibs(target) {
     log(!s.bar && s.drawn && (hasShot.pair ? s.sides.join() === 'before,after' && s.labels.join() === 'Before,After' : s.sides.join() === 'after'), 'on paper the buttons are left out, and a pair prints both versions under their names');
     await page.evaluate(() => { lsSet('qexplain-change-shots', 'flip'); shotSbs(false); switchPart(PART_KEYS[0], true); window.scrollTo(0, 0); }); await wait(300);
   }
+  // ---------- The comments of the file: blocks merged when the page opens, and saved back into the file ----------
+  // Each case opens a copy of the page in a browser of its own, so its store is empty and this page's store is not touched.
+  const CMF = {};
+  {
+    const src = fs.readFileSync(file, 'utf8'), OPEN = '<!--qx-comments-->', SHUT = '<!--/qx-comments-->', toUrl = f => require('url').pathToFileURL(f).href;
+    const inner = t => { const a = t.lastIndexOf(OPEN), b = a < 0 ? -1 : t.indexOf(SHUT, a); return a < 0 || b < 0 ? null : t.slice(a + OPEN.length, b); };
+    const setInner = (t, s) => { const a = t.lastIndexOf(OPEN), b = t.indexOf(SHUT, a); return t.slice(0, a + OPEN.length) + s + t.slice(b); };
+    const blocks = t => [...(inner(t) || '').matchAll(/<script type="application\/json" class="qx-comments">([^<]*)<\/script>/g)].map(m => JSON.parse(m[1]));
+    const blk = d => '<script type="application/json" class="qx-comments">' + JSON.stringify(d).replace(/</g, '\\u003c') + '</script>';
+    const id = await page.evaluate(() => PAGE_ID), firstPath = await page.evaluate(() => (QX.paths || [])[0] || '');
+    const put = (name, text) => { const f = path.join(out, name); fs.writeFileSync(f, text); return f; };
+    const fresh = async (init) => { const c = await browser.newContext({ viewport: { width: 1280, height: 900 } }); await routeLibs(c); if (init) await c.addInitScript(init); const p = await c.newPage(); watch(p); return p; };
+    const open = async (p, f) => { await p.goto(toUrl(f)); await wait(1200); };
+    const T = Date.now() - 100000;
+    const cm = (cid, text, extra) => Object.assign({ id: cid, kind: 'page', part: 'page', quote: '', text, t: T, state: 'open' }, extra || {});
+    Object.assign(CMF, { src, OPEN, SHUT, inner, setInner, blocks, blk, id, put, fresh, open, cm, toUrl });
+    log(src.split(OPEN).length === 2 && src.split(SHUT).length === 2 && inner(src) !== null, 'the page file holds one place for comments, before its script');
+
+    // Merge on open
+    const hostile = 'kept </script><img src=x onerror="window.__x=1"> end';
+    const fA = put('cm-file-a.html', setInner(src, blk({ v: 1, id, items: [cm('ca', hostile), cm('cb', 'to delete'), cm('cf', 'from the future', { m: Date.now() + 9e9 })], gone: {}, edits: {}, rv: firstPath ? { [firstPath]: true } : {} })
+      + blk({ v: 1, id: 'another--page', items: [cm('cz', 'of another page')], gone: {}, edits: {} }) + '<script type="application/json" class="qx-comments">not json</script>'));
+    const pa = await fresh(); await open(pa, fA);
+    const look = () => pa.evaluate(() => { cmPanel(true); return { ids: CM.items.map(x => x.id).sort().join(), toast: document.getElementById('toast').textContent, x: window.__x === undefined,
+      shown: [...document.querySelectorAll('#cm-panel .cm-it-t')].map(e => e.textContent), img: !!document.querySelector('#cm-panel img[src="x"]'), ca: (CM.items.find(x => x.id === 'ca') || {}).text,
+      future: (CM.items.find(x => x.id === 'cf') || { m: Infinity }).m <= Date.now(), rv: Object.keys(ST).filter(k => ST[k]).length }; });
+    const a1 = await look();
+    log(a1.ids === 'ca,cb,cf' && /taken from this file/.test(a1.toast) && a1.future && (!firstPath || a1.rv === 1),
+      `opening a page whose file holds comments takes them into the store and says so ("${a1.toast}"); a block of another explanation and a block that is not data are left out; a time in the future is read as now; a reviewed mark comes too`);
+    log(a1.x && !a1.img && a1.shown.includes(hostile), 'a comment from the file that holds a closing script tag and an image tag is shown as text and runs nothing');
+    await pa.evaluate(() => cmPanelAct('del', 'cb')); await pa.reload(); await wait(1200);
+    const a2 = await look();
+    log(a2.ids === 'ca,cf' && !/taken from this file/.test(a2.toast), 'a comment taken from the file and then deleted stays deleted when the same file is opened again, and nothing is said to be taken');
+    await pa.evaluate(() => { const c = CM.items.find(x => x.id === 'ca'); c.text = 'mine, changed after the file'; cmTouch(c); cmChanged(); }); await pa.reload(); await wait(1200);
+    const a3 = await look();
+    await wait(30);
+    const fB = put('cm-file-b.html', setInner(src, blk({ v: 1, id, items: [cm('ca', 'theirs, changed last', { m: Date.now() }), cm('cb', 'changed after it was deleted here', { m: Date.now() })], gone: { cf: Date.now() }, edits: {} })));
+    await open(pa, fB);
+    const a4 = await look();
+    log(a3.ca === 'mine, changed after the file' && a4.ca === 'theirs, changed last' && a4.ids === 'ca,cb',
+      'for a comment in the file and in the store, the version changed last wins, in both directions; a deletion recorded in the file removes the comment here; a comment changed after it was deleted here comes back');
+    await pa.context().close();
+
+    // Save into the file, through a stand-in for the handle the browser's file dialog gives
+    const fS = put('cm-file-save.html', setInner(src, ''));
+    const ps = await fresh(); await open(ps, fS);
+    await ps.exposeFunction('__fsRead', () => fs.readFileSync(fS, 'utf8')); await ps.exposeFunction('__fsWrite', t => { fs.writeFileSync(fS, t); });
+    const inPlace = await ps.evaluate(() => { CM.items.push({ id: 'cs1', kind: 'page', part: 'page', quote: '', text: 'typed by the reader <b>', t: Date.now(), state: 'open' }); cmChanged(); cmPanel(true);
+      cmHandle = { name: 'cm-file-save.html', getFile: async () => ({ text: () => window.__fsRead() }), createWritable: async () => ({ write: t => window.__fsWrite(t), close: async () => {} }) };
+      return PAGE_SRC === null && document.querySelector('#cm-panel button[data-act="savefile"]').textContent; });
+    // Meanwhile an agent rebuilt the file: new content, and a reply in a block of its own.
+    const later = '<p id="built-later">built after this tab was opened</p>';
+    const reply = { id: 'rs1', re: 'cs1', by: 'Agent', agent: true, text: 'Addressed', t: Date.now(), kind: 'reply', part: 'page', quote: '', state: 'open' };
+    fs.writeFileSync(fS, setInner(src.replace('<div id="toast"', later + '<div id="toast"'), blk({ v: 1, id, saved: Date.now(), items: [reply], gone: {}, edits: {} })));
+    await ps.evaluate(() => cmSaveFile()); await wait(400);
+    const saved = fs.readFileSync(fS, 'utf8'), sb = blocks(saved), feedback = await ps.evaluate(() => cmFeedback());
+    const s1 = await ps.evaluate(() => ({ toast: document.getElementById('toast').textContent, ids: CM.items.map(x => x.id).sort().join() }));
+    log(inPlace === 'Save to file' && sb.length === 1 && sb[0].items.map(x => x.id).sort().join() === 'cs1,rs1' && sb[0].id === id && saved.includes(later) && s1.ids === 'cs1,rs1' && /Comments saved into cm-file-save\.html/.test(s1.toast),
+      'a save writes into the file as it is on disk now: the content an agent built since the tab was opened is kept, its reply is taken into the tab, and the file holds one block with both');
+    log(sb[0].feedback === feedback && /typed by the reader/.test(feedback) && !saved.includes('typed by the reader <b>') && inner(saved).split('<').length === 3,
+      'the block holds the feedback text as it stands, and no text a reader typed can end the block');
+    const refused = await ps.evaluate(async () => { window.__wrote = 0;
+      cmHandle = { name: 'other.html', getFile: async () => ({ text: async () => (await window.__fsRead()).replace(/"id": "[^"]+"/, '"id": "someone-else"').replace(/class="qx-comments">[^<]*</g, 'class="qx-comments">{}<') }), createWritable: async () => { window.__wrote = 1; return { write() {}, close() {} }; } };
+      await cmSaveFile(); const a = [window.__wrote, document.getElementById('toast').textContent, cmHandle === null];
+      cmHandle = { name: 'old.html', getFile: async () => ({ text: async () => '<html><script>const QX = {"id": "' + PAGE_ID + '"};</scr' + 'ipt></html>' }), createWritable: async () => { window.__wrote = 1; return { write() {}, close() {} }; } };
+      await cmSaveFile(); return a.concat([window.__wrote, document.getElementById('toast').textContent]); });
+    log(refused[0] === 0 && /^Refused: other\.html is not the file of this page/.test(refused[1]) && refused[2] && refused[3] === 0 && /^Refused/.test(refused[4]) && fs.readFileSync(fS, 'utf8') === saved,
+      'a file that is another explanation, or has no place for comments, is refused: nothing is written, and the next save asks for the file again');
+    await ps.context().close();
+
+    // Where the page cannot write its file, the same button downloads a copy of the page as built, with the comments
+    const pd = await fresh(() => { try { Object.defineProperty(window, 'showOpenFilePicker', { value: undefined, configurable: true }); } catch (e) {} try { localStorage.setItem('qexplain-change-theme', 'dark'); } catch (e) {} });
+    await open(pd, fS);
+    const dBtn = await pd.evaluate(() => { cmPanel(true); return [PAGE_SRC !== null, document.querySelector('#cm-panel button[data-act="savefile"]').textContent, document.documentElement.getAttribute('data-theme')]; });
+    const [dl] = await Promise.all([pd.waitForEvent('download', { timeout: 10000 }), pd.click('#cm-panel button[data-act="savefile"]')]);
+    const fD = path.join(out, 'cm-file-download.html'); await dl.saveAs(fD);
+    const dt = fs.readFileSync(fD, 'utf8'), db = blocks(dt);
+    await pd.context().close();
+    const pr = await fresh(); await open(pr, fD);
+    const d1 = await pr.evaluate(() => ({ ids: CM.items.map(x => x.id).sort().join(), parts: PART_KEYS.length, later: !!document.getElementById('built-later'), layers: document.querySelectorAll('.cm-layer').length <= PART_KEYS.length, panels: document.querySelectorAll('#cm-panel').length, id: PAGE_ID }));
+    log(dBtn[0] && dBtn[1] === 'Download with comments' && dBtn[2] === 'dark' && dl.suggestedFilename() === 'cm-file-save.html' && db.length === 1 && db[0].items.length === 2
+      && dt.split(OPEN).length === 2 && !/<html[^>]*data-theme/.test(dt) && dt.startsWith('<!DOCTYPE html>') && d1.ids === 'cs1,rs1' && d1.later && d1.panels === 1 && d1.id === id && d1.parts === (await page.evaluate(() => PART_KEYS.length)),
+      'in a browser that cannot write the file, the button downloads the page as built, under its own name, with one block of comments; the copy opens as the same explanation with the comments, and does not carry the theme of the browser that saved it');
+    await pr.context().close();
+  }
   const phone = await browser.newPage({ viewport: { width: 390, height: 800 } }); watch(phone);
   await routeLibs(phone);
   for (const part of info.parts) {

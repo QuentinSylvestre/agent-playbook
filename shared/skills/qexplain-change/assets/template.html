@@ -687,11 +687,17 @@
 </div></div>
 <div id="toast" role="status" aria-live="polite"></div>
 
+<!--qx-comments--><!--@COMMENTS--><!--/qx-comments-->
 <script>
 /*@DATA*/
 
 // ======================= Fixed code below: shared by every artifact =======================
 
+// Where the page cannot write into its own file (another browser than Chrome or Edge, or a page not opened from disk),
+// a save is a download of the page as built with the comments added. Its text is kept for that, taken here, before
+// anything is drawn on the page. The theme the reader chose is not part of it.
+const PAGE_SRC = location.protocol === 'file:' && window.showOpenFilePicker ? null
+  : '<!DOCTYPE html>\n' + document.documentElement.outerHTML.replace(/^<html[^>]*>/, m => m.replace(/ data-(theme|sketch)="[^"]*"/g, ''));
 const VIEWS = QX.views || [];           // [{vid, key, kind: 'd2'|'mermaid', seq, tour: [{caption, highlight, mark, lit}], tokens}]
 const VIEW_BY_ID = Object.fromEntries(VIEWS.map(v => [v.vid, v]));
 const PART_KEYS = Array.from(document.querySelectorAll('.part-btn')).map(b => b.dataset.part);
@@ -1831,13 +1837,66 @@ function cmClean(saved) {
   const str = v => typeof v === 'string';
   saved.items = saved.items.filter(c => c && typeof c === 'object' && str(c.id) && str(c.text) && str(c.part) && (c.kind !== 'line' && c.tk !== 'src' || Array.isArray(c.lines)))
     .map(c => { if (!str(c.quote)) c.quote = ''; if (!str(c.prefix)) c.prefix = ''; if (!str(c.suffix)) c.suffix = ''; if (c.pic !== undefined && !str(c.pic)) delete c.pic; return c; });
+  saved.items.forEach(c => { ['t', 'm'].forEach(k => { if (c[k] !== undefined && !(typeof c[k] === 'number' && isFinite(c[k]))) delete c[k]; }); ['by', 're'].forEach(k => { if (c[k] !== undefined && !str(c[k])) delete c[k]; }); });
   if (!saved.edits || typeof saved.edits !== 'object') saved.edits = {};
+  if (!saved.gone || typeof saved.gone !== 'object' || Array.isArray(saved.gone)) saved.gone = {};
+  Object.keys(saved.gone).forEach(k => { if (!(typeof saved.gone[k] === 'number' && isFinite(saved.gone[k]))) delete saved.gone[k]; });
   Object.keys(saved.edits).forEach(k => { const e = saved.edits[k]; if (!e || !str(e.text)) delete saved.edits[k]; });
   return saved;
 }
 try { const saved = cmClean(JSON.parse(lsGet(CM_KEY) || 'null')); if (saved) CM = saved; } catch (e) {}
 // Edits to diagram sources, by diagram name. A Mermaid edit that still fits its source is in place before the first drawing.
 CM.edits = CM.edits || {};
+// ---- The file is the record ----
+// The page file holds the comments in blocks of data placed before this script: one written by the page each time a
+// reader saves, and one added by the build each time an agent replies. The browser's store is a working copy. Each
+// time the page opens, every block is merged into the store: a comment only one side has is kept, the version changed
+// last wins, and a comment deleted on one side stays deleted unless the other side changed it after the deletion.
+// CM.gone holds the time of each deletion, by comment id ('edit:' and a diagram name for a dropped source edit).
+CM.gone = CM.gone || {};
+// Written in pieces: the text of the page must hold each marker once, and a script must not hold the start of an HTML comment.
+const CM_OPEN = '<' + '!--qx-comments--' + '>', CM_SHUT = '<' + '!--/qx-comments--' + '>';
+const cmWhen = c => c.m || c.t || 0;                    // when a comment was last changed
+function cmTouch(c) { c.m = Date.now(); return c; }
+function cmGone(c) { CM.gone[c.id] = Date.now(); CM.items = CM.items.filter(x => x !== c); }
+function cmGoneEdit(name) { CM.gone['edit:' + name] = Date.now(); delete CM.edits[name]; }
+// Merges what a block holds into the store. Returns how many things it changed. A time in the future is read as now:
+// a wrong clock on another machine must not win every later merge.
+function cmMerge(src) {
+  const now = Date.now(), cap = t => Math.min(t || 0, now);
+  let n = 0;
+  Object.keys(src.gone).forEach(id => { const t = cap(src.gone[id]); if (t > (CM.gone[id] || 0)) CM.gone[id] = t; });
+  src.items.forEach(c => {
+    if (c.m !== undefined) c.m = cap(c.m); if (c.t !== undefined) c.t = cap(c.t);
+    if (CM.gone[c.id] && CM.gone[c.id] >= cmWhen(c)) return;
+    const i = CM.items.findIndex(x => x.id === c.id);
+    // A later copy that says the same is not a change: the same file opened twice takes nothing the second time.
+    const mine = CM.items[i], same = mine && mine.text === c.text && mine.state === c.state && (mine.label || '') === (c.label || '');
+    if (i < 0) { CM.items.push(c); n++; } else if (cmWhen(c) > cmWhen(mine) && !same) { CM.items[i] = c; n++; }
+  });
+  const had = CM.items.length;
+  CM.items = CM.items.filter(c => !(CM.gone[c.id] && CM.gone[c.id] >= cmWhen(c)));
+  n += had - CM.items.length;
+  Object.keys(src.edits).forEach(k => {
+    const e = src.edits[k], g = CM.gone['edit:' + k], at = cap(typeof e.m === 'number' ? e.m : 0), mine = CM.edits[k];
+    if (g && g >= at) return;
+    if (!mine || at > (mine.m || 0)) { e.m = at; CM.edits[k] = e; n++; }
+  });
+  Object.keys(CM.edits).forEach(k => { const g = CM.gone['edit:' + k]; if (g && g >= (CM.edits[k].m || 0)) { delete CM.edits[k]; n++; } });
+  // A file marked as reviewed on either side stays marked. The mark holds the patch it was made on, as in the store.
+  const rv = src.rv && typeof src.rv === 'object' ? src.rv : {};
+  let marks = 0;
+  Object.keys(rv).forEach(p => { const v = rv[p]; if (!/__col$/.test(p) && (v === true || typeof v === 'string') && !ST[p]) { ST[p] = v; marks++; } });
+  if (marks) lsSet(STORE_KEY, JSON.stringify(ST));
+  return n + marks;
+}
+// The blocks found in a text, or on this page. A block that is not well formed, or is of another explanation, is left out.
+function cmBlocks(texts) {
+  return texts.map(t => { try { return cmClean(JSON.parse(t)); } catch (e) { return null; } }).filter(b => b && b.id === PAGE_ID);
+}
+let cmTaken = 0;
+cmBlocks(Array.from(document.querySelectorAll('script.qx-comments')).map(el => el.textContent)).forEach(b => { cmTaken += cmMerge(b); });
+if (cmTaken) cmSave();
 QX.mermaid0 = Object.assign({}, QX.mermaid);
 Object.keys(CM.edits).forEach(n => { const i = (QX.dg || {})[n], ed = CM.edits[n]; if (i && i.kind === 'mermaid' && !ed.bad && ed.base === cmHash(QX.mermaid0[i.mid] || '')) QX.mermaid[i.mid] = ed.text; });
 function cmSave() {
@@ -2614,8 +2673,8 @@ function dgSrcSet(dg, text, keep) {
   const name = dg.dataset.name, info = cmDgInfo(dg), orig = dgSrcOrig(dg), seq = dg._seq = (dg._seq || 0) + 1;
   // Where no redraw follows, the comments are looked up again here: those on the source depend on the text alone.
   const done = redrawn => { if (dg._seq !== seq) return; cmSave(); if (!redrawn) { cmResolve(); cmDraw(); } dgSrcStatus(dg); cmDrawPanel(); };
-  if (text === orig) { delete CM.edits[name]; done(info.kind === 'mermaid' && dgSrcApply(info.mid, orig)); return; }
-  const old = CM.edits[name], ed = CM.edits[name] = { text, kind: info.kind, base: old && !keep && old.base !== cmHash(orig) ? old.base : cmHash(orig), bad: '' };
+  if (text === orig) { cmGoneEdit(name); done(info.kind === 'mermaid' && dgSrcApply(info.mid, orig)); return; }
+  const old = CM.edits[name], ed = CM.edits[name] = { text, m: Date.now(), kind: info.kind, base: old && !keep && old.base !== cmHash(orig) ? old.base : cmHash(orig), bad: '' };
   if (info.kind !== 'mermaid' || ed.base !== cmHash(orig)) { done(false); return; }      // D2, or an edit still waiting for "keep or discard"
   if (typeof mermaid === 'undefined') { done(false); return; }      // nothing can check or draw the text here: it is kept as written
   const hashBad = mmHashBad(text);
@@ -2682,7 +2741,7 @@ function dgSrcOpen(dg, open) {
 }
 function dgSrcDrop(name) {
   const dg = dgSrcFirst(name), info = dg ? cmDgInfo(dg) : null;
-  delete CM.edits[name];
+  cmGoneEdit(name);
   const redrawn = !!info && info.kind === 'mermaid' && dgSrcApply(info.mid, dgSrcOrig(dg));
   document.querySelectorAll('.part-panel .dg').forEach(d => { if (d.dataset.name !== name) return; const ta = d.querySelector(':scope > .dg-src textarea'); if (ta) { ta.value = dgSrcOrig(d); dgSrcRows(d); } dgSrcStatus(d); dgSrcMark(d); });
   cmSave(); if (!redrawn) { cmResolve(); cmDraw(); } cmDrawPanel(); cmAutoCopy('Source edit discarded');
@@ -2879,12 +2938,64 @@ window.addEventListener('storage', e => {
     if (JSON.stringify(CM.edits) !== edits) showToast('A diagram source was edited in another tab. This tab could not redraw it: reload this tab to see it.');
   } else if (e.key === STORE_KEY) {
     try { ST = JSON.parse(e.newValue || '{}') || {}; } catch (err) { return; }
-    if (!window._diffBuilt) return;
-    buildNav();
-    document.querySelectorAll('.fc').forEach(c => { const on = isRv(c.dataset.p); c.classList.toggle('rv', on); c.querySelector('.rbtn').textContent = on ? 'Reviewed' : 'Mark reviewed'; });
-    upProg();
+    rvRedraw();
   }
 });
+function rvRedraw() {
+  if (!window._diffBuilt) return;
+  buildNav();
+  document.querySelectorAll('.fc').forEach(c => { const on = isRv(c.dataset.p); c.classList.toggle('rv', on); c.querySelector('.rbtn').textContent = on ? 'Reviewed' : 'Mark reviewed'; });
+  upProg();
+}
+// ---- Saving into the file ----
+// One block holds everything the store holds, and the feedback text as it stands now, for an agent that is given the
+// file. The less-than sign is written as an escape, so that no text typed by a reader can end the block.
+function cmBlock() {
+  const rv = {}; Object.keys(ST).forEach(p => { if (!/__col$/.test(p) && ST[p]) rv[p] = ST[p]; });
+  const data = { v: 1, id: PAGE_ID, saved: Date.now(), items: CM.items, gone: CM.gone, edits: CM.edits, rv, feedback: cmFeedback() };
+  const json = JSON.stringify(data, (k, v) => (k[0] === '_' ? undefined : v)).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+  return '<scr' + 'ipt type="application/json" class="qx-comments">' + json + '</scr' + 'ipt>';
+}
+// The place of the blocks in a page text: between the two markers, the last pair in the text.
+function cmRegion(text) { const a = text.lastIndexOf(CM_OPEN), b = a < 0 ? -1 : text.indexOf(CM_SHUT, a); return a < 0 || b < 0 ? null : [a + CM_OPEN.length, b]; }
+function cmSamePage(text) { return cmRegion(text) !== null && new RegExp('"id":\\s*' + JSON.stringify(PAGE_ID).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(text); }
+// Takes the blocks a page text holds into the store, then gives that text with one block in their place.
+function cmFileText(text) {
+  const r = cmRegion(text);
+  if (!r) return null;
+  const found = []; text.slice(r[0], r[1]).replace(new RegExp('<scr' + 'ipt type="application/json" class="qx-comments">([^<]*)</scr' + 'ipt>', 'g'), (m, j) => { found.push(j); return m; });
+  let taken = 0; cmBlocks(found).forEach(b => { taken += cmMerge(b); });
+  if (taken) { cmChanged(); rvRedraw(); }
+  return text.slice(0, r[0]) + cmBlock() + text.slice(r[1]);
+}
+// Writes into a file through its handle: the file is read as it is on disk now, so that what an agent built since this
+// tab was opened is kept, and only its blocks are replaced. A file that is not this explanation is never written.
+async function cmWriteTo(h) {
+  const text = await (await h.getFile()).text();
+  if (!cmSamePage(text)) throw new Error('not this page');
+  const out = cmFileText(text);
+  const w = await h.createWritable(); await w.write(out); await w.close();
+}
+let cmHandle = null;
+async function cmSaveFile() {
+  if (PAGE_SRC !== null) {
+    const out = cmFileText(PAGE_SRC);
+    if (out === null) { showToast('Could not save: this page was built before comments could be kept in the file. Rebuild it.'); return; }
+    const a = document.createElement('a'), u = URL.createObjectURL(new Blob([out], { type: 'text/html' }));
+    a.href = u; a.download = fileStem() + '.html'; document.body.appendChild(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 30000);
+    showToast('Downloaded a copy of this page with the comments in it'); return;
+  }
+  try {
+    if (!cmHandle) cmHandle = (await window.showOpenFilePicker({ id: 'qexplain-change', types: [{ description: 'This page', accept: { 'text/html': ['.html', '.htm'] } }] }))[0];
+    await cmWriteTo(cmHandle);
+    showToast('Comments saved into ' + cmHandle.name);
+  } catch (e) {
+    const name = cmHandle ? cmHandle.name : ''; cmHandle = null;
+    if (e && e.name === 'AbortError') showToast('Nothing saved: no file was chosen');
+    else if (e && e.message === 'not this page') showToast('Refused: ' + name + ' is not the file of this page. Nothing was written. Choose ' + fileStem() + '.html');
+    else showToast('Could not save into the file' + (e && e.message ? ': ' + e.message : ''));
+  }
+}
 function cmItemHtml(c) {
   const done = c.state === 'resolved', lost = !done && !c._pieces, editing = cmEdit === c.id;
   const lostDg = lost && c.kind === 'dg' && !!cmDgOf(c);
@@ -2943,14 +3054,14 @@ function cmPanelAct(act, id) {
   if (act === 'save') {
     const text = ta ? ta.value.trim() : ''; if (!text) { if (ta) ta.focus(); return; }
     if (id === 'new') CM.items.push({ id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), kind: 'page', part: 'page', quote: '', text, label: cmLabOf(list), t: Date.now(), state: 'open' });
-    else if (c) { c.text = text; c.label = cmLabOf(list); }
+    else if (c) { c.text = text; c.label = cmLabOf(list); cmTouch(c); }
     cmEdit = null; cmEditText = cmEditLab = null; ta.remove(); cmChanged(); cmAutoCopy('Comment saved'); return;
   }
   if (!c) return;
   if (cmActive === c.id) cmClose();
-  if (act === 'resolve') { c.state = 'resolved'; cmChanged(); cmAutoCopy('Comment resolved'); }
-  else if (act === 'reopen') { c.state = 'open'; cmChanged(); cmAutoCopy('Comment reopened'); }
-  else if (act === 'del') { CM.items = CM.items.filter(x => x !== c); if (cmEdit === c.id) { cmEdit = null; cmEditText = cmEditLab = null; } cmChanged(); cmAutoCopy('Comment deleted'); }
+  if (act === 'resolve') { c.state = 'resolved'; cmTouch(c); cmChanged(); cmAutoCopy('Comment resolved'); }
+  else if (act === 'reopen') { c.state = 'open'; cmTouch(c); cmChanged(); cmAutoCopy('Comment reopened'); }
+  else if (act === 'del') { cmGone(c); if (cmEdit === c.id) { cmEdit = null; cmEditText = cmEditLab = null; } cmChanged(); cmAutoCopy('Comment deleted'); }
 }
 // Goes to what a comment is about: its part, its sub-tab or its file, then the place itself, which flashes.
 function cmJump(c) {
@@ -2979,11 +3090,13 @@ function cmPanelInit() {
   p.innerHTML = '<div class="cm-ph"><strong>Comments</strong><button type="button" data-act="new" title="Comment on the explanation as a whole">General comment</button>'
     + '<button type="button" data-act="close" title="Close the list">Close</button></div><div class="cm-pl"></div><div class="cm-prev" hidden></div>'
     + '<div class="cm-pf"><button type="button" data-act="preview" aria-expanded="false" title="Show the exact text that will be copied">Preview</button>'
+    + '<button type="button" data-act="savefile" title="' + (PAGE_SRC === null ? 'Save the comments into the file of this page, so that they travel with it. The first time, the browser asks which file: choose this page (its path is under Info).' : 'Download a copy of this page with the comments in it') + '">' + (PAGE_SRC === null ? 'Save to file' : 'Download with comments') + '</button>'
     + '<button type="button" class="cm-save" data-act="copy" title="Copy every open comment as one text for an agent">Copy feedback</button></div>';
   document.body.appendChild(p); cmLabsWire(p);
   p.addEventListener('click', e => {
     const b = e.target.closest('button[data-act]'), it = e.target.closest('.cm-it');
     if (b && b.dataset.act === 'copy') { cmCopy(b); return; }
+    if (b && b.dataset.act === 'savefile') { cmSaveFile(); return; }
     if (b && b.dataset.act === 'pic') { const pc = CM.items.find(x => x.id === (it || {}).dataset.cid); if (pc && pc.pic) cmCopyPic(pc.pic); return; }
     if (b && b.dataset.act === 'preview') { const v = p.querySelector('.cm-prev'); v.hidden = !v.hidden; b.setAttribute('aria-expanded', v.hidden ? 'false' : 'true'); return; }
     if (it && it.dataset.src) { if (b && b.dataset.act === 'srcdrop') dgSrcDrop(it.dataset.src); else dgSrcJump(it.dataset.src); return; }
@@ -3285,7 +3398,7 @@ function cmOpen(target) {
   const save = () => {
     const text = ta.value.trim();
     if (!text) { cmNudge(); ta.focus(); return; }
-    if (c) { c.text = text; c.label = lab(); }
+    if (c) { c.text = text; c.label = lab(); cmTouch(c); }
     else {
       const s = target.sel, base = { id: 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), text, label: lab(), t: Date.now(), state: 'open' };
       CM.items.push(Object.assign(base, s.kind === 'dg' ? { kind: 'dg', part: s.part, dname: s.dname, dn: s.dn, tk: s.tk, did: s.did, dlabel: s.dlabel, dwhat: s.dwhat, dends: s.dends, dsrc: s.dsrc, dpos: s.dpos || undefined, dparts: s.dparts, dbox: s.dbox, pic: s.pic || undefined, lines: s.lines, ln: s.ln, ctx: s.ctx, quote: s.quote || '' }
@@ -3302,7 +3415,7 @@ function cmOpen(target) {
   card.querySelector('.cm-save').addEventListener('click', save);
   card.querySelector('.cm-cancel').addEventListener('click', cmClose);
   if (c) card.querySelector('.cm-del').addEventListener('click', () => {
-    CM.items = CM.items.filter(x => x !== c); cmSave(); cmResolve(); cmDraw(); cmClose(); cmDrawPanel(); cmAutoCopy('Comment deleted');
+    cmGone(c); cmSave(); cmResolve(); cmDraw(); cmClose(); cmDrawPanel(); cmAutoCopy('Comment deleted');
   });
   card._dirty = dirty; card._from = from && from !== document.body ? from : null;
   // Escape means the same on every control of the box: close it, unless that would lose text.
@@ -3369,6 +3482,7 @@ window.addEventListener('DOMContentLoaded', () => {
   restoreFromHash();
   revInit();      // before the comments are placed: the legend stands in the page
   cmInit();
+  if (cmTaken) showToast(cmTaken + (cmTaken === 1 ? ' change' : ' changes') + ' to the comments taken from this file');
   if (diffActive()) backShow(backClean(history.state));     // a reload on the entry a link added keeps the way back
 });
 </script>

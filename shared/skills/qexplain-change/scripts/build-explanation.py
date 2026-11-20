@@ -47,6 +47,19 @@ A figure without data-shot is left as you wrote it.
 --lang is the language code of the prose you wrote (default en). It sets the page's lang attribute and nothing
 else: the page's own labels stay in English.
 
+Comments live in the page file, in blocks of data placed before the page's script. The page writes one block when
+a reader saves; this script adds one when you reply. Only the page merges them, each time it opens. A rebuild
+keeps the blocks of the page it replaces (the file at --out), and those of --comments-from <page> when the reader
+gives you the page under another name.
+
+--replies is replies.json, your answers to comments: {"by": "<name of the person you work for>", "replies":
+[{"to": "<comment id>", "text": "Addressed: ..."}, ...]}. "by" is optional. The id of a comment is in the feedback
+text. A reply already in the page is not added twice.
+
+--comments-only adds the replies to the page at --out and changes nothing else in it. Use it when you answer
+comments without changing the page, or when you were given a page and not its content files. It needs only --out
+and --replies.
+
 Content files:
     brief.html          HTML fragment, placed in the Brief panel. Heading ids are fixed and checked by the
                         validator: intent, context, change-<name> (one or more), then optional decisions,
@@ -81,6 +94,7 @@ Exit codes:
 
 import argparse
 import base64
+import hashlib
 import datetime
 import html
 import html.entities
@@ -93,6 +107,7 @@ import shlex
 import subprocess
 import sys
 import tempfile
+import time
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)  # -I leaves the script's folder off the path
@@ -172,6 +187,121 @@ def read(path):
             return fh.read()
     except (OSError, UnicodeError) as exc:
         fail(f"cannot read {path} as UTF-8: {exc}. Check the path, and save the file as UTF-8")
+
+
+# The comments of a page live in the page file, in blocks of data between two markers placed before the page's script.
+# The page writes one block when a reader saves, and this script adds one when an agent replies. Only the page merges
+# them: here a block is copied as it is written, or added, and never read for more than its ids.
+CM_OPEN, CM_SHUT = "<!--qx-comments-->", "<!--/qx-comments-->"
+CM_BLOCK = re.compile(r'<script type="application/json" class="qx-comments">([^<]*)</script>')
+REPLY_MAX = 4000
+
+
+def comments_region(text):
+    """Where the blocks stand in a page text: between the last pair of markers. None when the page has no such place."""
+    a = text.rfind(CM_OPEN)
+    b = text.find(CM_SHUT, a) if a >= 0 else -1
+    return None if a < 0 or b < 0 else (a + len(CM_OPEN), b)
+
+
+def page_blocks(path, page_id):
+    """The comments blocks of the page at path, as written, with their data. A block that cannot be read, or that
+    belongs to another explanation, is left out and said."""
+    if not path or not os.path.isfile(path):
+        return []
+    text = read(path)
+    region = comments_region(text)
+    kept = []
+    for m in CM_BLOCK.finditer(text[region[0]:region[1]] if region else ""):
+        try:
+            data = json.loads(m.group(1))
+        except ValueError:
+            data = None
+        if isinstance(data, dict) and data.get("id") == page_id and isinstance(data.get("items"), list):
+            kept.append((m.group(0), data))
+        else:
+            print(f"WARN\ta comments block of {path} cannot be read or belongs to another explanation; it is left out")
+    return kept
+
+
+def known_ids(blocks):
+    """Every comment id the blocks hold or record as deleted: a reply with one of these ids is in the page already."""
+    ids = set()
+    for _, data in blocks:
+        ids.update(c.get("id") for c in data["items"] if isinstance(c, dict))
+        ids.update(data.get("gone", {}) if isinstance(data.get("gone"), dict) else {})
+    return ids
+
+
+def reply_block(path, page_id, known):
+    """replies.json as one comments block. The id of a reply comes from what it says and to which comment, so the same
+    reply given twice is one reply, and one the reader deleted does not come back."""
+    data = read_json(path)
+    by = ""
+    if isinstance(data, dict):
+        by, data = data.get("by", ""), data.get("replies")
+    shape = ('Write {"by": "<name of the person you work for>", "replies": [{"to": "<comment id>", "text": "..."}]}; '
+             '"by" is optional, and the id of a comment is in the feedback text')
+    if not isinstance(by, str) or not isinstance(data, list) or not data:
+        fail(f"{path} holds no list of replies. {shape}")
+    by = " ".join(by.split())[:60]
+    author = f"{by}'s agent" if by else "Agent"
+    now, items = int(time.time() * 1000), []
+    for i, r in enumerate(data):
+        if not (isinstance(r, dict) and isinstance(r.get("to"), str) and r["to"].strip() and isinstance(r.get("text"), str) and r["text"].strip()):
+            fail(f'{path}: reply {i + 1} needs "to" (a comment id) and "text", both non-empty text. {shape}')
+        to, text = r["to"].strip(), r["text"].strip()
+        if len(text) > REPLY_MAX:
+            fail(f"{path}: reply {i + 1} is {len(text)} characters long; the limit is {REPLY_MAX}. Say it shorter, and put the detail in the page itself")
+        rid = "r" + hashlib.sha1("\n".join((to, author, text)).encode("utf-8")).hexdigest()[:12]
+        if rid in known or any(x["id"] == rid for x in items):
+            print(f"NOTE\treply {i + 1} to {qd.safe_path(to)} is in the page already; not added again")
+            continue
+        items.append({"id": rid, "re": to, "by": author, "agent": True, "text": text, "t": now + i, "kind": "reply", "part": "page", "quote": "", "state": "open"})
+    if not items:
+        return "", 0
+    block = {"v": 1, "id": page_id, "saved": now, "items": items, "gone": {}, "edits": {}}
+    return '<script type="application/json" class="qx-comments">' + script_json(block) + "</script>", len(items)
+
+
+def scan_replies(path):
+    """An agent's replies go into the page: they are scanned like every other text the agent writes."""
+    hits = qd.scan_content_file("replies.json", read(path))
+    if hits:
+        for hit in hits:
+            print(qd.hit_line(hit), file=sys.stderr)
+        fail("credential-shaped text found in replies.json; nothing written. Reword the reply: say what kind of value it is, never quote it")
+
+
+def comments_only(args):
+    """Adds replies to an existing page and changes nothing else in it."""
+    if not args.out or not args.replies:
+        fail("--comments-only needs --out <the page> and --replies <replies.json>")
+    text = read(args.out)
+    region = comments_region(text)
+    at = text.find("const QX = ")
+    try:
+        page_id = json.JSONDecoder().raw_decode(text, at + len("const QX = "))[0]["id"] if at >= 0 and region else None
+    except (ValueError, KeyError, TypeError):
+        page_id = None
+    if not isinstance(page_id, str):
+        fail(f"{args.out} has no place for comments: it was built before comments were kept in the file, or it is not a page "
+             "of this skill. Rebuild it in full, without --comments-only")
+    scan_replies(args.replies)
+    here = page_blocks(args.out, page_id)
+    extra = [b for b in page_blocks(args.comments_from, page_id) if b[0] not in {x[0] for x in here}]
+    new, count = reply_block(args.replies, page_id, known_ids(here + extra))
+    add = "".join(b for b, _ in extra) + new
+    if not add:
+        print(f"NOTE\tnothing to add: {args.out} is unchanged")
+        return 0
+    tmp = args.out + ".tmp"
+    with open(tmp, "w", encoding="utf-8", newline="\n") as fh:
+        fh.write(text[:region[1]] + add + text[region[1]:])
+    os.replace(tmp, args.out)
+    print(f"WROTE\t{args.out}\t{count} repl{'y' if count == 1 else 'ies'} added, {len(extra)} comments block(s) taken from --comments-from; nothing else changed")
+    step("checking the page with the validator")
+    return subprocess.run([sys.executable, "-I", VALIDATOR, args.out]).returncode
 
 
 def read_json(path):
@@ -1016,10 +1146,15 @@ def main(argv=None):
     ap.add_argument("--ticket", action="append", default=[], help="a ticket reference to show in the Info menu")
     ap.add_argument("--link", action="append", default=[], help="label=https://url to show in the Info menu")
     ap.add_argument("--shots", help="folder of screenshots that figures in brief.html and walkthrough.html name with data-shot")
+    ap.add_argument("--replies", help="replies.json: your answers to comments, added to the page as one comments block")
+    ap.add_argument("--comments-from", help="a copy of the page whose comments blocks are also kept, when the reader gives you the page under another name")
+    ap.add_argument("--comments-only", action="store_true", help="add --replies to the page at --out and change nothing else in it")
     ap.add_argument("--lang", default="en", help="language code of the prose you wrote, for the page's lang attribute (en, fr, pt-BR)")
     args = ap.parse_args(argv)
     if args.selftest:
         return selftest()
+    if args.comments_only:
+        return comments_only(args)
     if not LANG_CODE.match(args.lang):
         fail(f"--lang {args.lang!r} is not a language code. Pass the code of the language the prose is written in, such as en, fr or pt-BR")
     for need in ("out", "title", "brief", "rationales"):
@@ -1134,6 +1269,8 @@ def main(argv=None):
                ("tickets and links", "\n".join(tickets + [f"{a} {b}" for a, b in links])),
                ("provenance", "\n".join(f"{r['label']} {r['branch']} {r['base']} {r['head']}" for r in repos))]
     written += diagrams.source_texts(diagrams.used)
+    if args.replies:
+        scan_replies(args.replies)
     for name, text in written:
         hits += qd.scan_content_file(name, text)
     # A value the diff holds behind a CREDENTIAL flag must not come back in the agent's own text, masked or not.
@@ -1181,7 +1318,15 @@ def main(argv=None):
     mermaid_used = bool(diagrams.mermaid)
     fns, callers_searched = changed_functions(kept, args, selected)
     page = strip_parts(read(TEMPLATE), selected)
+    # Comments: the blocks of the page this build replaces are kept as written, then the agent's replies are added.
+    page_id = explanation_id(args.out, repo_names, args.id)
+    carried = page_blocks(args.out, page_id)
+    carried += [b for b in page_blocks(args.comments_from, page_id) if b[0] not in {x[0] for x in carried}]
+    reply_text, reply_count = reply_block(args.replies, page_id, known_ids(carried)) if args.replies else ("", 0)
+    if carried or reply_count:
+        print(f"NOTE\t{len(carried)} comments block(s) kept from the page this build replaces, {reply_count} repl{'y' if reply_count == 1 else 'ies'} added")
     slots = {
+        "<!--@COMMENTS-->": "".join(b for b, _ in carried) + reply_text,
         "{{TITLE}}": html.escape(args.title),
         "{{LANG}}": args.lang,
         "{{BASE_REF}}": html.escape(base_text),
@@ -1194,7 +1339,7 @@ def main(argv=None):
         "<!--@MAPS-->": maps_out,
         "<!--@SUMMARY-->": summary_out,
         "/*@DATA*/": "const QX = " + script_json({
-            "id": explanation_id(args.out, repo_names, args.id), "base": base_text, "head": head_text, "views": view_data, "mermaid": diagrams.mermaid,
+            "id": page_id, "base": base_text, "head": head_text, "views": view_data, "mermaid": diagrams.mermaid,
             "hasD2": any(r["kind"] == "d2" for r in diagrams.rendered.values()),
             # Per diagram name: its kind, and for D2 the id of every object with its class token, and the source.
             "dg": {n: ({"kind": "d2", "ids": r["ids"], "src": diagrams.sources[n][1]} if r["kind"] == "d2" else {"kind": "mermaid", "mid": r["mid"]})
@@ -1213,7 +1358,7 @@ def main(argv=None):
             "notes": notes,
         }) + ";",
     }
-    for marker in ("{{TITLE}}", "<!--@PROVENANCE-->", "<!--@MERMAID-->", "<!--@BRIEF-->", "/*@DATA*/"):
+    for marker in ("{{TITLE}}", "<!--@PROVENANCE-->", "<!--@MERMAID-->", "<!--@BRIEF-->", "<!--@COMMENTS-->", "/*@DATA*/"):
         if marker not in page:
             fail(f"template is missing the {marker} slot: assets/template.html is damaged. Restore it from the config repo (git checkout -- on that file)")
     # One pass, so text inside a filled slot is never mistaken for another slot.
@@ -1553,6 +1698,52 @@ def selftest():
         case("explanation id differs between repos and joins several", eid("a.html", ["one"]) != eid("a.html", ["two"])
              and eid("a.html", ["gw", "se"]) == "gw-se--a", eid("a.html", ["gw", "se"]))
         case("--id overrides the explanation id", eid("a.html", ["one"], "My Review 7") == "my-review-7", "")
+        # Comments blocks: kept over a rebuild, replies added once, a comments-only update, refusals
+        region = lambda t: t[comments_region(t)[0]:comments_region(t)[1]] if comments_region(t) else None
+        rc, log, page = run("cm", std)
+        cm_out, cm_id = os.path.join(root, "cm.html"), "repo--cm"
+        case("a page has one place for comments, empty at first", rc == 0 and page.count(CM_OPEN) == 1 and page.count(CM_SHUT) == 1 and region(page) == "", log[-200:])
+        blk = lambda pid, cid: '<script type="application/json" class="qx-comments">' + script_json({"v": 1, "id": pid, "items": [{"id": cid, "text": "a </script> typed by a reader", "part": "page"}], "gone": {"cgone": 5}, "edits": {}}) + "</script>"
+        mine, other = blk(cm_id, "c1"), blk("another--page", "c2")
+        open(cm_out, "w", encoding="utf-8", newline="\n").write(page.replace(CM_OPEN + CM_SHUT, CM_OPEN + mine + other + CM_SHUT))
+        rc, log, page = run("cm", std)
+        case("a rebuild keeps the comments blocks of the page it replaces as written, and leaves out one of another explanation",
+             rc == 0 and region(page) == mine and "belongs to another explanation" in log and "1 comments block(s) kept" in log, log[-300:])
+        w("replies.json", json.dumps({"by": "  Ada   L ", "replies": [{"to": "c1", "text": "Addressed: <b>done</b> </script><script>x"}, {"to": "c1", "text": "Addressed: <b>done</b> </script><script>x"}]}))
+        rep_arg = ["--replies", os.path.join(content, "replies.json")]
+        rc, log, page = run("cm", std + rep_arg)
+        added = [json.loads(m) for m in CM_BLOCK.findall(region(page) or "")]
+        case("replies are added as one block: the author is the agent of the named person, the text is kept and cannot end the block, the same reply twice is one",
+             rc == 0 and len(added) == 2 and len(added[1]["items"]) == 1 and added[1]["items"][0]["by"] == "Ada L's agent" and added[1]["items"][0]["re"] == "c1"
+             and added[1]["items"][0]["agent"] is True and added[1]["items"][0]["text"].endswith("</script><script>x") and "</script><script>x" not in region(page)
+             and CM_BLOCK.sub("", region(page)) == "" and "in the page already" in log, log[-300:])
+        before = page
+        only = lambda extra: subprocess.run([sys.executable, "-I", os.path.abspath(__file__), "--comments-only", "--out", cm_out] + extra, capture_output=True)
+        text_of = lambda p: p.stdout.decode("utf-8", "replace") + p.stderr.decode("utf-8", "replace")
+        proc = only(rep_arg)
+        case("a reply already in the page is not added again, and the page is not touched", proc.returncode == 0 and "is unchanged" in text_of(proc) and read(cm_out) == before, text_of(proc)[-300:])
+        w("replies2.json", json.dumps([{"to": "c1", "text": "Deferred: later."}, {"to": "cgone", "text": "x"}]))
+        proc = only(["--replies", os.path.join(content, "replies2.json")])
+        after = read(cm_out)
+        r_before, r_after = comments_region(before), comments_region(after)
+        new_items = [c for m in CM_BLOCK.findall(region(after)) for c in json.loads(m)["items"]]
+        case("--comments-only adds the replies and changes nothing else in the page; with no name the author is Agent",
+             proc.returncode == 0 and after[:r_after[0]] == before[:r_before[0]] and after[r_after[1]:] == before[r_before[1]:] and region(after).startswith(region(before))
+             and sum(1 for c in new_items if c.get("by") == "Agent") == 2 and not os.path.exists(cm_out + ".tmp"), text_of(proc)[-300:])
+        for name, body, want in (("no list", json.dumps({"by": "A"}), "holds no list of replies"), ("no id", json.dumps([{"text": "x"}]), 'needs "to"'),
+                                 ("empty text", json.dumps([{"to": "c1", "text": "  "}]), 'needs "to"'), ("too long", json.dumps([{"to": "c1", "text": "y" * 4001}]), "the limit is 4000"),
+                                 ("credential", json.dumps([{"to": "c1", "text": 'pass' + 'word="Zx81-kq77-Lm42-pp09"'}]), "credential-shaped")):
+            w("replies-bad.json", body)
+            proc = only(["--replies", os.path.join(content, "replies-bad.json")])
+            case(f"replies.json refused ({name}), and the page is not touched", proc.returncode == 2 and want in text_of(proc) and read(cm_out) == after, text_of(proc)[-300:])
+        rc, log, _ = run("cm-full-cred", std + ["--replies", os.path.join(content, "replies-bad.json")])
+        case("a full build scans the replies too", rc == 2 and "credential-shaped" in log, log[-200:])
+        old_page = os.path.join(root, "old.html")
+        open(old_page, "w", encoding="utf-8", newline="\n").write(after.replace(CM_OPEN, "<!--gone-->").replace(CM_SHUT, "<!--/gone-->"))
+        proc = subprocess.run([sys.executable, "-I", os.path.abspath(__file__), "--comments-only", "--out", old_page] + rep_arg, capture_output=True)
+        case("--comments-only refuses a page with no place for comments", proc.returncode == 2 and "has no place for comments" in text_of(proc), text_of(proc)[-200:])
+        rc, log, page = run("cm_v2", std + ["--comments-from", cm_out])      # the same explanation, under another file name
+        case("--comments-from keeps the blocks of another copy of the page", rc == 0 and region(page) == region(after), log[-300:])
         rc, log, page = run("with-id", std + ["--id", "Chosen ID"])
         case("--id reaches the page", rc == 0 and '"id": "chosen-id"' in page, log[-200:])
         case("provenance shows branch, both SHAs, plan and commit count", "260101_DEMO_PLAN" in page and "branch main" in page and f"base {first}" in page

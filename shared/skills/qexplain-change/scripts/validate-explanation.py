@@ -227,6 +227,11 @@ def check_brief(doc):
     return "; ".join(problems)
 
 
+# A comments block holds what readers and agents typed about the page. It is data: a script of type application/json
+# is never run. Only a well-formed block is set aside, and its text holds no "<", so nothing can hide inside one.
+COMMENTS_BLOCK = re.compile(r'<script type="application/json" class="qx-comments">[^<]*</script>')
+
+
 def strip_raw_diff(source):
     """Remove the embedded diff, whatever the order of the data keys. The diff is the repo's own text."""
     return RAW_DIFF.sub('"rawDiff": ""', source)
@@ -245,6 +250,7 @@ def strip_data(source):
 
 
 def run_source(source):
+    source = COMMENTS_BLOCK.sub("", source)
     doc = Doc()
     doc.feed(source)
     results = []
@@ -433,6 +439,12 @@ def selftest():
     expect("fetch in the diff passes", fixture(data=in_code), "no-runtime-fetch", "PASS")
     expect("remote url in the diff passes", fixture(data=in_code), "remote-assets-pinned", "PASS")
     expect("fetch outside the data still fails", fixture(data=in_code + " fetch('x')"), "no-runtime-fetch", "FAIL")
+    # a comments block is data: what a reader typed in it is not page code
+    typed = '<script type="application/json" class="qx-comments">{"items": [{"text": "call fetch(x), see javascript:void(0) ' + em + '"}]}</script>'
+    expect("fetch in a comments block passes", fixture(body_extra=typed), "no-runtime-fetch", "PASS")
+    expect("emoji in a comments block passes", fixture(body_extra=typed), "no-emoji", "PASS")
+    expect("a script hidden behind the start of a comments block still fails",
+           fixture(body_extra='<script type="application/json" class="qx-comments">{}<script>fetch("x")</script>'), "no-runtime-fetch", "FAIL")
     # tabs-wired
     expect("tab without panel", fixture(body_extra='<button data-view="a"></button>'), "tabs-wired", "FAIL")
     expect("panel without tab", fixture(body_extra='<div id="view-a"></div>'), "tabs-wired", "FAIL")
