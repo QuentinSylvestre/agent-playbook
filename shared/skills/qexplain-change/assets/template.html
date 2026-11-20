@@ -1781,11 +1781,10 @@ document.addEventListener('click', e => {
   // Where the reader was is kept with a new history entry, so that the Back button and the control in the header both
   // lead back there. Only a link adds an entry: a part chosen by its tab never does.
   const part = (document.querySelector('.part-btn.active') || { dataset: {} }).dataset.part, root = document.getElementById('part-' + part);
-  const from = part && part !== 'diff' && root ? { part, y: Math.round(window.scrollY), link: [...document.querySelectorAll('a[data-file]')].indexOf(a),
-    subs: [...root.querySelectorAll('.sub-btn.active')].map(b => [b.dataset.group, b.dataset.sub]), view: part === 'maps' ? currentVid : null,
+  let from = part && part !== 'diff' && root ? { part, y: Math.round(window.scrollY), link: [...document.querySelectorAll('a[data-file]')].indexOf(a),
     label: cmPartName(part) + (cmSection(root, a) ? ': ' + cmSection(root, a) : '') } : null;
   // The entry being left is marked, so that a return to it is told apart from any other move in the history.
-  if (from) { from.id = Date.now(); try { history.replaceState({ origin: from.id }, ''); history.pushState({ back: from, file: a.dataset.file }, '', '#diff'); } catch (err) {} }
+  if (from) { from.id = Date.now(); try { history.replaceState({ origin: from.id }, ''); history.pushState({ back: from, file: a.dataset.file }, '', '#diff'); } catch (err) { from = null; } }      // no entry, no way back to offer
   switchPart('diff', !from);
   backShow(from);
   fileReveal(a.dataset.file);
@@ -1802,8 +1801,7 @@ function fileReveal(p) {
 function backClean(s) {
   const f = s && s.back;
   if (!f || typeof f !== 'object' || !PART_KEYS.includes(f.part) || f.part === 'diff' || typeof f.y !== 'number' || typeof f.link !== 'number') return null;
-  return { part: f.part, y: f.y, link: f.link, id: f.id, view: typeof f.view === 'string' ? f.view : null, label: typeof f.label === 'string' ? f.label : cmPartName(f.part),
-    subs: (Array.isArray(f.subs) ? f.subs : []).filter(x => Array.isArray(x) && typeof x[0] === 'string' && typeof x[1] === 'string') };
+  return { part: f.part, y: f.y, link: f.link, id: f.id, label: typeof f.label === 'string' ? f.label.slice(0, 200) : cmPartName(f.part) };
 }
 function backShow(from) {
   backFrom = from;
@@ -1813,11 +1811,10 @@ function backShow(from) {
   if (from) { b.textContent = '← Back to ' + from.label; b.title = 'Back to where you were: ' + from.label + ' (the browser\'s Back button does the same)'; }
   if (diffActive()) measureHeader();
 }
-// Back: the part, the sub-tab and the place on the page as they were, and the link that was clicked, which flashes.
+// Back: the part and the place on the page as they were, and the link that was clicked, which flashes. A sub-tab is
+// as the reader left it: going to the Diff review does not change it.
 function backRestore(from) {
   switchPart(from.part, false);
-  from.subs.forEach(([g, id]) => { if (document.getElementById('sub-' + id)) switchSub(g, id); });
-  if (from.part === 'maps' && from.view && VIEW_BY_ID[from.view]) switchMap(from.view, false);
   const a = document.querySelectorAll('a[data-file]')[from.link];
   const place = () => { window.scrollTo(0, from.y); };
   place(); requestAnimationFrame(place);          // the browser may set its own remembered position in between
@@ -1828,7 +1825,7 @@ window.addEventListener('popstate', e => {
   backShow(null);
   if (now) { switchPart('diff', false); backShow(now); if (typeof e.state.file === 'string') { fileReveal(e.state.file); jumpTo(e.state.file); } }   // Forward, onto the entry a link added
   else if (was && e.state && e.state.origin === was.id) backRestore(was);
-  else if (!PART_KEYS.includes(location.hash.replace('#', '').split('/')[0])) switchPart(PART_KEYS[0], false);                                      // the page as first opened
+  else if (!location.hash) switchPart(PART_KEYS[0], false);                                      // the page as first opened
   else restoreFromHash();
 });
 
@@ -1841,17 +1838,23 @@ window.addEventListener('popstate', e => {
 const CM_KEY = 'qexplain-change-comments-' + PAGE_ID;
 const CM_SKIP = 'svg, .dg, script, style, button, textarea, input, select, .sub-bar, .map-bar, .tour-box, .chg, .cm-layer, .rev-bar, .shot-bar, .shot-lab';
 const CM_CTX = 32, CM_MAX_QUOTE = 2000;
+const CM_ID = /^[\w.:+-]{1,80}$/, CM_NO_KEY = ['__proto__', 'constructor', 'prototype'], CM_MAX_ITEMS = 2000, CM_MAX_TEXT = 20000;
 let CM = { v: 1, items: [] };
 // What the store holds is read as untrusted: another local page can write there. Only well-formed comments are taken.
 function cmClean(saved) {
   if (!saved || saved.v !== 1 || !Array.isArray(saved.items)) return null;
   const str = v => typeof v === 'string';
-  saved.items = saved.items.filter(c => c && typeof c === 'object' && str(c.id) && str(c.text) && str(c.part) && (c.kind !== 'line' && c.tk !== 'src' || Array.isArray(c.lines)))
+  // An id goes into the feedback text and into the list of deletions: it is a short word, never free text. The list
+  // and each text have a size the page can draw; what is beyond is left out.
+  const idOk = v => str(v) && CM_ID.test(v) && !CM_NO_KEY.includes(v);
+  saved.items = saved.items.slice(0, CM_MAX_ITEMS).filter(c => c && typeof c === 'object' && idOk(c.id) && str(c.text) && str(c.part) && (c.kind !== 'line' && c.tk !== 'src' || Array.isArray(c.lines)))
     .map(c => { if (!str(c.quote)) c.quote = ''; if (!str(c.prefix)) c.prefix = ''; if (!str(c.suffix)) c.suffix = ''; if (c.pic !== undefined && !str(c.pic)) delete c.pic; return c; });
-  saved.items.forEach(c => { ['t', 'm'].forEach(k => { if (c[k] !== undefined && !(typeof c[k] === 'number' && isFinite(c[k]))) delete c[k]; }); ['by', 're'].forEach(k => { if (c[k] !== undefined && !str(c[k])) delete c[k]; }); if (c.agent !== undefined && c.agent !== true) delete c.agent; });
+  saved.items.forEach(c => { ['t', 'm'].forEach(k => { if (c[k] !== undefined && !(typeof c[k] === 'number' && isFinite(c[k]))) delete c[k]; }); if (c.text.length > CM_MAX_TEXT) c.text = c.text.slice(0, CM_MAX_TEXT); if (c.re !== undefined && !idOk(c.re)) delete c.re;
+    if (c.by !== undefined) { c.by = str(c.by) ? c.by.replace(/\s+/g, ' ').trim().slice(0, 60) : ''; if (!c.by) delete c.by; } if (c.agent !== undefined && c.agent !== true) delete c.agent; });
   if (!saved.edits || typeof saved.edits !== 'object') saved.edits = {};
   if (!saved.gone || typeof saved.gone !== 'object' || Array.isArray(saved.gone)) saved.gone = {};
-  Object.keys(saved.gone).forEach(k => { if (!(typeof saved.gone[k] === 'number' && isFinite(saved.gone[k]))) delete saved.gone[k]; });
+  Object.keys(saved.gone).forEach(k => { if (!(typeof saved.gone[k] === 'number' && isFinite(saved.gone[k])) || CM_NO_KEY.includes(k) || k.length > 200) delete saved.gone[k]; });
+  CM_NO_KEY.forEach(k => { if (Object.prototype.hasOwnProperty.call(saved.edits, k)) delete saved.edits[k]; });
   Object.keys(saved.edits).forEach(k => { const e = saved.edits[k]; if (!e || !str(e.text)) delete saved.edits[k]; });
   return saved;
 }
@@ -1874,7 +1877,13 @@ function cmTouch(c) { c.m = Date.now(); return c; }
 // like any comment; it has no place of its own on the page and no number: it is shown under the comment it answers.
 // A reply to a reply belongs to the first comment of the chain. A reply whose comment is unknown here is shown as a
 // comment on the whole explanation, so that it is never lost from sight.
-function cmRoot(c) { let p = c, i = 0; while (p && p.re && i++ < 8) { const id = p.re; p = CM.items.find(x => x.id === id); } return p && p !== c && !p.re ? p : null; }
+// The comments by id, made again whenever the list is another list or has another length (every change of the list does one or the other).
+let cmIx = null, cmIxOf = null, cmIxLen = -1;
+function cmGet(id) {
+  if (cmIxOf !== CM.items || cmIxLen !== CM.items.length) { cmIx = new Map(CM.items.map(c => [c.id, c])); cmIxOf = CM.items; cmIxLen = CM.items.length; }
+  return cmIx.get(id);
+}
+function cmRoot(c) { let p = c, i = 0; while (p && p.re && i++ < 8) p = cmGet(p.re); return p && p !== c && !p.re ? p : null; }
 function cmTops() { return CM.items.filter(c => !cmRoot(c)); }
 function cmReplies(c) { return CM.items.filter(x => x.re && cmRoot(x) === c).sort((a, b) => (a.t || 0) - (b.t || 0)); }
 const CM_NAME_KEY = 'qexplain-change-name';
@@ -1892,35 +1901,47 @@ function cmGone(c) {
   all.forEach(x => { CM.gone[x.id] = t; }); CM.items = CM.items.filter(x => !all.includes(x));
 }
 function cmGoneEdit(name) { CM.gone['edit:' + name] = Date.now(); delete CM.edits[name]; }
-// Merges what a block holds into the store. Returns how many things it changed. A time in the future is read as now:
-// a wrong clock on another machine must not win every later merge.
+// Merges what a block holds into the store. Returns how many things it changed, and counts them by kind in cmTook.
+// A time well in the future is not believed: it counts as no time at all, so a wrong clock, or a block written to win,
+// can bring a comment this store does not have but can never replace or delete one it has.
+const cmTook = { added: 0, changed: 0, deleted: 0, marks: 0 };
 function cmMerge(src) {
-  const now = Date.now(), cap = t => Math.min(t || 0, now);
+  const now = Date.now(), cap = t => (typeof t === 'number' && t <= now + 300000 ? t : 0);
   let n = 0;
   Object.keys(src.gone).forEach(id => { const t = cap(src.gone[id]); if (t > (CM.gone[id] || 0)) CM.gone[id] = t; });
   src.items.forEach(c => {
     if (c.m !== undefined) c.m = cap(c.m); if (c.t !== undefined) c.t = cap(c.t);
     if (CM.gone[c.id] && CM.gone[c.id] >= cmWhen(c)) return;
+    if (c.re && CM.gone[c.re]) return;                   // a reply to a comment that was deleted here
     const i = CM.items.findIndex(x => x.id === c.id);
     // A later copy that says the same is not a change: the same file opened twice takes nothing the second time.
     const mine = CM.items[i], same = mine && mine.text === c.text && mine.state === c.state && (mine.label || '') === (c.label || '') && (mine.re || '') === (c.re || '');
-    if (i < 0) { CM.items.push(c); n++; } else if (cmWhen(c) > cmWhen(mine) && !same) { CM.items[i] = c; n++; }
+    if (i < 0) { CM.items.push(c); n++; cmTook.added++; } else if (cmWhen(c) > cmWhen(mine) && !same) { CM.items[i] = c; cmIxOf = null; n++; cmTook.changed++; }
   });
   const had = CM.items.length;
-  CM.items = CM.items.filter(c => !(CM.gone[c.id] && CM.gone[c.id] >= cmWhen(c)));
-  n += had - CM.items.length;
+  CM.items = CM.items.filter(c => !(CM.gone[c.id] && CM.gone[c.id] >= cmWhen(c)) && !(c.re && CM.gone[c.re]));
+  n += had - CM.items.length; cmTook.deleted += had - CM.items.length;
   Object.keys(src.edits).forEach(k => {
     const e = src.edits[k], g = CM.gone['edit:' + k], at = cap(typeof e.m === 'number' ? e.m : 0), mine = CM.edits[k];
     if (g && g >= at) return;
     if (!mine || at > (mine.m || 0)) { e.m = at; CM.edits[k] = e; n++; }
   });
   Object.keys(CM.edits).forEach(k => { const g = CM.gone['edit:' + k]; if (g && g >= (CM.edits[k].m || 0)) { delete CM.edits[k]; n++; } });
-  // A file marked as reviewed on either side stays marked. The mark holds the patch it was made on, as in the store.
+  // A file marked as reviewed on either side stays marked, unless the reader took the mark off here. The mark holds the
+  // patch it was made on, as in the store.
   const rv = src.rv && typeof src.rv === 'object' ? src.rv : {};
   let marks = 0;
-  Object.keys(rv).forEach(p => { const v = rv[p]; if (!/__col$/.test(p) && (v === true || typeof v === 'string') && !ST[p]) { ST[p] = v; marks++; } });
+  Object.keys(rv).forEach(p => { const v = rv[p]; if (!/__col$/.test(p) && (v === true || typeof v === 'string') && ST[p] === undefined && !CM_NO_KEY.includes(p)) { ST[p] = v; marks++; } });
   if (marks) lsSet(STORE_KEY, JSON.stringify(ST));
+  cmTook.marks += marks;
   return n + marks;
+}
+// What the merges changed, in words, for the message the reader gets.
+function cmTookText() {
+  const w = (k, one, many) => (cmTook[k] ? [cmTook[k] + ' ' + (cmTook[k] === 1 ? one : many)] : []);
+  const parts = w('added', 'comment or reply added', 'comments or replies added').concat(w('changed', 'changed', 'changed'), w('deleted', 'deleted', 'deleted'), w('marks', 'file marked as reviewed', 'files marked as reviewed'));
+  Object.keys(cmTook).forEach(k => { cmTook[k] = 0; });
+  return parts.join(', ') || 'changes to diagram sources';
 }
 // The blocks found in a text, or on this page. A block that is not well formed, or is of another explanation, is left out.
 function cmBlocks(texts) {
@@ -2987,20 +3008,27 @@ function rvRedraw() {
 // file. The less-than sign is written as an escape, so that no text typed by a reader can end the block.
 function cmBlock() {
   const rv = {}; Object.keys(ST).forEach(p => { if (!/__col$/.test(p) && ST[p]) rv[p] = ST[p]; });
-  const data = { v: 1, id: PAGE_ID, saved: Date.now(), items: CM.items, gone: CM.gone, edits: CM.edits, rv, feedback: cmFeedback() };
-  const json = JSON.stringify(data, (k, v) => (k[0] === '_' ? undefined : v)).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
+  const own = c => { const o = {}; Object.keys(c).forEach(k => { if (k[0] !== '_') o[k] = c[k]; }); return o; };      // a field that starts with _ is of this session only
+  const data = { v: 1, id: PAGE_ID, saved: Date.now(), items: CM.items.map(own), gone: CM.gone, edits: CM.edits, rv, feedback: cmFeedback() };
+  const json = JSON.stringify(data).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');
   return '<scr' + 'ipt type="application/json" class="qx-comments">' + json + '</scr' + 'ipt>';
 }
 // The place of the blocks in a page text: between the two markers, the last pair in the text.
 function cmRegion(text) { const a = text.lastIndexOf(CM_OPEN), b = a < 0 ? -1 : text.indexOf(CM_SHUT, a); return a < 0 || b < 0 ? null : [a + CM_OPEN.length, b]; }
-function cmSamePage(text) { return cmRegion(text) !== null && new RegExp('"id":\\s*' + JSON.stringify(PAGE_ID).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).test(text); }
+// A page text is of this explanation when its own data, which follows the place of the blocks, opens with this id.
+function cmSamePage(text) {
+  const r = cmRegion(text), at = r ? text.indexOf('const QX = ', r[1]) : -1;
+  if (at < 0) return false;
+  const m = /^\s*\{\s*"id":\s*("(?:[^"\\]|\\.)*")/.exec(text.slice(at + 11, at + 400));
+  try { return !!m && JSON.parse(m[1]) === PAGE_ID; } catch (e) { return false; }
+}
 // Takes the blocks a page text holds into the store, then gives that text with one block in their place.
 function cmFileText(text) {
   const r = cmRegion(text);
   if (!r) return null;
   const found = []; text.slice(r[0], r[1]).replace(new RegExp('<scr' + 'ipt type="application/json" class="qx-comments">([^<]*)</scr' + 'ipt>', 'g'), (m, j) => { found.push(j); return m; });
   let taken = 0; cmBlocks(found).forEach(b => { taken += cmMerge(b); });
-  if (taken) { cmChanged(); rvRedraw(); }
+  if (taken) { cmChanged(); rvRedraw(); cmTookText(); }
   return text.slice(0, r[0]) + cmBlock() + text.slice(r[1]);
 }
 // Writes into a file through its handle: the file is read as it is on disk now, so that what an agent built since this
@@ -3094,7 +3122,10 @@ function cmPanelAct(act, id) {
   if (act === 'save') {
     const text = ta ? ta.value.trim() : ''; if (!text) { if (ta) ta.focus(); return; }
     // A reply is saved under the comment it answers, whichever control asked for the save.
-    if (replyTo) { if (CM.items.some(x => x.id === replyTo)) CM.items.push({ id: cmNewId(), re: replyTo, by: cmName() || undefined, kind: 'reply', part: 'page', quote: '', text, t: Date.now(), state: 'open' }); }
+    if (replyTo) {
+      if (!CM.items.some(x => x.id === replyTo)) { showToast('Could not save the reply: its comment is no longer there. Copy your text before you close the box.'); ta.focus(); return; }
+      CM.items.push({ id: cmNewId(), re: replyTo, by: cmName() || undefined, kind: 'reply', part: 'page', quote: '', text, t: Date.now(), state: 'open' });
+    }
     else if (id === 'new') CM.items.push({ id: cmNewId(), by: cmName() || undefined, kind: 'page', part: 'page', quote: '', text, label: cmLabOf(list), t: Date.now(), state: 'open' });
     else if (c) { c.text = text; c.label = cmLabOf(list); cmTouch(c); }
     cmEdit = null; cmEditText = cmEditLab = null; ta.remove(); cmChanged(); cmAutoCopy(replyTo ? 'Reply saved' : 'Comment saved'); return;
@@ -3531,7 +3562,7 @@ window.addEventListener('DOMContentLoaded', () => {
   restoreFromHash();
   revInit();      // before the comments are placed: the legend stands in the page
   cmInit();
-  if (cmTaken) showToast(cmTaken + (cmTaken === 1 ? ' change' : ' changes') + ' to the comments taken from this file');
+  if (cmTaken) showToast('Taken from this file: ' + cmTookText());
   if (diffActive()) backShow(backClean(history.state));     // a reload on the entry a link added keeps the way back
 });
 </script>

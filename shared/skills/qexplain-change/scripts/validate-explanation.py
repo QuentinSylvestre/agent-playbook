@@ -228,8 +228,41 @@ def check_brief(doc):
 
 
 # A comments block holds what readers and agents typed about the page. It is data: a script of type application/json
-# is never run. Only a well-formed block is set aside, and its text holds no "<", so nothing can hide inside one.
-COMMENTS_BLOCK = re.compile(r'<script type="application/json" class="qx-comments">[^<]*</script>')
+# is never run. A block is set aside only when the HTML parser itself sees it as a script element of that type and
+# class, and its text holds no "<". Text that merely looks like a block, in an attribute or inside another script, is
+# page code and is checked like the rest.
+class BlockFinder(HTMLParser):
+    def __init__(self, source):
+        super().__init__(convert_charrefs=True)
+        self.source, self.spans, self.open = source, [], None
+        self.starts = [0] + [m.end() for m in re.finditer("\n", source)]
+
+    def at(self):
+        line, col = self.getpos()
+        return self.starts[line - 1] + col
+
+    def handle_starttag(self, tag, attrs):
+        a = dict(attrs)
+        self.open = self.at() if tag == "script" and a.get("type") == "application/json" and a.get("class") == "qx-comments" else None
+
+    def handle_endtag(self, tag):
+        if tag == "script" and self.open is not None:
+            end = self.source.find(">", self.at()) + 1
+            body = self.source[self.source.find(">", self.open) + 1:self.at()]
+            if end > 0 and "<" not in body:
+                self.spans.append((self.open, end))
+        self.open = None
+
+
+def strip_comments(source):
+    """The page without its comments blocks."""
+    if 'class="qx-comments"' not in source:
+        return source
+    finder = BlockFinder(source)
+    finder.feed(source)
+    for a, b in reversed(finder.spans):
+        source = source[:a] + source[b:]
+    return source
 
 
 def strip_raw_diff(source):
@@ -250,7 +283,7 @@ def strip_data(source):
 
 
 def run_source(source):
-    source = COMMENTS_BLOCK.sub("", source)
+    source = strip_comments(source)
     doc = Doc()
     doc.feed(source)
     results = []
@@ -445,6 +478,13 @@ def selftest():
     expect("emoji in a comments block passes", fixture(body_extra=typed), "no-emoji", "PASS")
     expect("a script hidden behind the start of a comments block still fails",
            fixture(body_extra='<script type="application/json" class="qx-comments">{}<script>fetch("x")</script>'), "no-runtime-fetch", "FAIL")
+    opener = '<script type="application/json" class="qx-comments">'
+    expect("an active link dressed as a block in its attributes still fails",
+           fixture(body_extra=f"<a title='{opener}' href=\"javascript:alert(1)\" data-x='</script>'>x</a>"), "no-active-links", "FAIL")
+    expect("a remote picture dressed as a block in its attributes still fails",
+           fixture(body_extra=f"<img alt='{opener}' src=\"https://evil.example/p.png\" data-x='</script>'>"), "remote-assets-pinned", "FAIL")
+    expect("a fetch behind the text of a block inside a real script still fails",
+           fixture(data='const QX = {"rawDiff": "", "excluded": []}; /*' + opener + '*/ fetch("x") //</script>'), "no-runtime-fetch", "FAIL")
     # tabs-wired
     expect("tab without panel", fixture(body_extra='<button data-view="a"></button>'), "tabs-wired", "FAIL")
     expect("panel without tab", fixture(body_extra='<div id="view-a"></div>'), "tabs-wired", "FAIL")
