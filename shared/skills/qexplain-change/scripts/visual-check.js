@@ -1144,6 +1144,30 @@ async function routeLibs(target) {
         const went = await page.evaluate(p => { const c = card(p), b = c.getBoundingClientRect(); return diffActive() && b.top < innerHeight && b.bottom > 0 && (document.querySelector('.ni.on') || { dataset: {} }).dataset.p === p; }, sf.go);
         log(sf.all && sf.extra === 0 && sf.after && sf.endsChanges && went,
           `the Brief names every file of the page under its sections or in one list after them (${sf.links} links), and a link opens that file's card in Diff review`);
+        // The way back from a file link: the control in the header, the browser's Back, Forward, a reload, a hidden file.
+        const sel = '#part-brief .sec-files a[data-file]';
+        const state = () => bp.evaluate(() => ({ part: document.querySelector('.part-btn.active').dataset.part, y: Math.round(scrollY), len: history.length, hash: location.hash,
+          btn: !document.getElementById('back-btn').hidden, text: document.getElementById('back-btn').textContent, focus: !!document.activeElement && document.activeElement.matches('a[data-file]'),
+          flash: !!document.querySelector('a.back-flash') }));
+        const toLink = async () => { await bp.evaluate(s => { switchPart('brief'); document.querySelector(s).scrollIntoView({ block: 'center' }); }, sel); await wait(300); return state(); };
+        const bp = await ctx.newPage(); watch(bp); await bp.goto(url); await wait(1200);
+        const b0 = await toLink(); await bp.evaluate(() => { switchPart('walkthrough'); switchPart('brief'); }); const noEntry = (await state()).len === b0.len;
+        await bp.click(sel); await wait(900); const b1 = await state();
+        await bp.goBack(); await wait(500); const b2 = await state();
+        await bp.goForward(); await wait(900); const b3 = await state();
+        await bp.reload(); await wait(1500); const b4 = await state();
+        await bp.click('#back-btn'); await wait(500); const b5 = await state();
+        log(noEntry && b1.part === 'diff' && b1.btn && /Back to Brief/.test(b1.text) && b1.len === b0.len + 1 && b1.hash === '#diff'
+          && b2.part === 'brief' && Math.abs(b2.y - b0.y) <= 2 && !b2.btn && b2.focus && b2.flash && b3.part === 'diff' && b3.btn && b4.part === 'diff' && b4.btn && b5.part === 'brief' && Math.abs(b5.y - b0.y) <= 2,
+          `a file link adds one history entry and shows "${b1.text}"; Back returns to the same part and place (${b0.y}px) with the link in focus; Forward and a reload keep the way back; the control does what Back does; a part chosen by its tab adds no entry`);
+        await toLink(); await bp.click(sel); await wait(700);
+        await bp.evaluate(() => switchPart('brief')); const spent = !(await state()).btn;
+        await bp.evaluate(p => { switchPart('diff'); const s = document.getElementById('search'); s.value = 'zzzz-no-such-file'; filterFiles(); toggleC(p, true); }, sf.go);
+        const wasHidden = await bp.evaluate(p => card(p).classList.contains('hide'), sf.go);
+        await toLink(); await bp.click(sel); await wait(900);
+        const shown = await bp.evaluate(p => { const c = card(p), b = c.getBoundingClientRect(); return !c.classList.contains('hide') && !c.classList.contains('iscol') && document.getElementById('search').value === '' && b.top < innerHeight && b.bottom > 0; }, sf.go);
+        log(spent && wasHidden && shown, 'the way back is spent once the reader picks a part by its tab; a link to a file hidden by the search box and collapsed clears the search, opens the file and shows it');
+        await bp.close();
         await page.evaluate(() => window.scrollTo(0, 0));
       }
     }

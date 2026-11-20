@@ -181,6 +181,9 @@
   .kbd { display: inline-block; background: var(--surface); border: 1px solid var(--border); border-radius: 3px; padding: 1px 5px; font-family: monospace; font-size: 10px; color: var(--muted); }
   .nbtn { background: var(--bg); border: 1px solid var(--border); color: var(--muted); padding: 3px 10px; border-radius: 4px; font-size: 11px; cursor: pointer; white-space: nowrap; }
   .nbtn:hover { border-color: var(--accent); color: var(--accent); }
+  /* The way back to the link that opened this file. It names where it leads, and is cut short before it crowds the header. */
+  #back-btn { border-color: var(--accent); color: var(--accent); max-width: min(26rem, 100%); overflow: hidden; text-overflow: ellipsis; }
+  a.back-flash { outline: 2px solid #d68f00; outline-offset: 2px; border-radius: 3px; }
   .hashpill { display: inline-flex; align-items: center; gap: 5px; background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 2px 8px 2px 10px; font-family: monospace; font-size: 11px; max-width: 260px; overflow: hidden; }
   .hashpill span { color: var(--muted); }
   .hashpill b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -654,6 +657,7 @@
 <!--@PART:diff--><div id="part-diff" class="part-panel">
   <div id="header">
     <h1>{{TITLE}}</h1>
+    <button class="nbtn" id="back-btn" type="button" onclick="history.back()" hidden></button>
     <div class="hashpill" title="{{BASE_REF}}"><span>base</span><b>{{BASE_REF}}</b><button class="hcpbtn" id="hcp-base" onclick="copyRef('base')" title="Copy">copy</button></div>
     <div class="hashpill" title="{{HEAD_REF}}"><span>head</span><b>{{HEAD_REF}}</b><button class="hcpbtn" id="hcp-head" onclick="copyRef('head')" title="Copy">copy</button></div>
     <input id="search" type="text" placeholder="Filter files" oninput="filterFiles()">
@@ -701,6 +705,7 @@ function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').
 // escaped for the script alone, a file name holding &#39; or a double quote would end the string or the attribute.
 function jsq(s) { return esc(String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029')); }
 let currentVid = null;
+let backFrom = null;                    // where a file link was clicked, while the way back is open
 
 // ---------------- Part switching and URL hash (#part or #maps/view) ----------------
 // For a printed sheet: what the page is and which part it shows, since the bar that said so is not printed.
@@ -715,6 +720,7 @@ function switchPart(key, saveHash) {
   if (key === 'diff') ensureDiff();
   renderMermaid(document.getElementById('part-' + key), key === 'maps' ? () => renderTourStep(currentVid) : null);
   if (saveHash !== false) updateHash();
+  if (key !== 'diff' && backFrom) backShow(null);      // the reader chose another part: the way back is spent
 }
 function updateHash() {
   const part = (document.querySelector('.part-btn.active') || {}).dataset;
@@ -1755,8 +1761,58 @@ document.addEventListener('click', e => {
   const a = e.target.closest('a[data-file]');
   if (!a) return;
   e.preventDefault();
-  switchPart('diff');
+  // Where the reader was is kept with a new history entry, so that the Back button and the control in the header both
+  // lead back there. Only a link adds an entry: a part chosen by its tab never does.
+  const part = (document.querySelector('.part-btn.active') || { dataset: {} }).dataset.part, root = document.getElementById('part-' + part);
+  const from = part && part !== 'diff' && root ? { part, y: Math.round(window.scrollY), link: [...document.querySelectorAll('a[data-file]')].indexOf(a),
+    subs: [...root.querySelectorAll('.sub-btn.active')].map(b => [b.dataset.group, b.dataset.sub]), view: part === 'maps' ? currentVid : null,
+    label: cmPartName(part) + (cmSection(root, a) ? ': ' + cmSection(root, a) : '') } : null;
+  // The entry being left is marked, so that a return to it is told apart from any other move in the history.
+  if (from) { from.id = Date.now(); try { history.replaceState({ origin: from.id }, ''); history.pushState({ back: from, file: a.dataset.file }, '', '#diff'); } catch (err) {} }
+  switchPart('diff', !from);
+  backShow(from);
+  fileReveal(a.dataset.file);
   jumpTo(a.dataset.file);
+});
+// A file that the search box or a filter hides, or that is collapsed, is brought back before the page goes to it.
+function fileReveal(p) {
+  const cd = card(p);
+  if (!cd) return;
+  if (cd.classList.contains('hide')) { document.getElementById('search').value = ''; setF('all', document.querySelector('.fbtn')); }
+  if (cd.classList.contains('iscol')) toggleC(p, false);
+}
+// What a history entry holds is read as untrusted: only a well-formed origin is taken.
+function backClean(s) {
+  const f = s && s.back;
+  if (!f || typeof f !== 'object' || !PART_KEYS.includes(f.part) || f.part === 'diff' || typeof f.y !== 'number' || typeof f.link !== 'number') return null;
+  return { part: f.part, y: f.y, link: f.link, id: f.id, view: typeof f.view === 'string' ? f.view : null, label: typeof f.label === 'string' ? f.label : cmPartName(f.part),
+    subs: (Array.isArray(f.subs) ? f.subs : []).filter(x => Array.isArray(x) && typeof x[0] === 'string' && typeof x[1] === 'string') };
+}
+function backShow(from) {
+  backFrom = from;
+  const b = document.getElementById('back-btn');
+  if (!b) return;
+  b.hidden = !from;
+  if (from) { b.textContent = '← Back to ' + from.label; b.title = 'Back to where you were: ' + from.label + ' (the browser\'s Back button does the same)'; }
+  if (diffActive()) measureHeader();
+}
+// Back: the part, the sub-tab and the place on the page as they were, and the link that was clicked, which flashes.
+function backRestore(from) {
+  switchPart(from.part, false);
+  from.subs.forEach(([g, id]) => { if (document.getElementById('sub-' + id)) switchSub(g, id); });
+  if (from.part === 'maps' && from.view && VIEW_BY_ID[from.view]) switchMap(from.view, false);
+  const a = document.querySelectorAll('a[data-file]')[from.link];
+  const place = () => { window.scrollTo(0, from.y); };
+  place(); requestAnimationFrame(place);          // the browser may set its own remembered position in between
+  if (a) { a.classList.add('back-flash'); setTimeout(() => a.classList.remove('back-flash'), 1700); a.focus({ preventScroll: true }); }
+}
+window.addEventListener('popstate', e => {
+  const was = backFrom, now = backClean(e.state);
+  backShow(null);
+  if (now) { switchPart('diff', false); backShow(now); if (typeof e.state.file === 'string') { fileReveal(e.state.file); jumpTo(e.state.file); } }   // Forward, onto the entry a link added
+  else if (was && e.state && e.state.origin === was.id) backRestore(was);
+  else if (!PART_KEYS.includes(location.hash.replace('#', '').split('/')[0])) switchPart(PART_KEYS[0], false);                                      // the page as first opened
+  else restoreFromHash();
 });
 
 // ---------------- Start ----------------
@@ -2903,11 +2959,7 @@ function cmJump(c) {
   let anchor = null;
   if (c.kind === 'part') anchor = null;
   else if (c.part === 'diff') {
-    const cd = card(c.path);
-    if (cd) {
-      if (cd.classList.contains('hide')) { document.getElementById('search').value = ''; setF('all', document.querySelector('.fbtn')); }
-      if (cd.classList.contains('iscol')) toggleC(c.path, false);
-    }
+    fileReveal(c.path);
   } else {
     const node = c.kind === 'dg' ? (c._pieces ? c._dg : cmDgOf(c)) : c._el && !Array.isArray(c._el) ? c._el : c._pieces[0] ? c._pieces[0].startContainer.parentElement : null;
     const sub = node && node.closest('.sub-panel'), map = node && node.closest('.map-panel');
@@ -3317,8 +3369,8 @@ window.addEventListener('DOMContentLoaded', () => {
   restoreFromHash();
   revInit();      // before the comments are placed: the legend stands in the page
   cmInit();
+  if (diffActive()) backShow(backClean(history.state));     // a reload on the entry a link added keeps the way back
 });
-window.addEventListener('popstate', restoreFromHash);
 </script>
 </body>
 </html>
