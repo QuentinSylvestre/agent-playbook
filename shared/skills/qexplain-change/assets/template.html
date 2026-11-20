@@ -515,6 +515,10 @@
   /* One look for the text buttons of the comment box and the panel. */
   .cm-acts button, .cm-it-a button, .cm-ph button, .cm-pf button, .cm-pic button, .dg-src-h button, .dg-src-ask button { padding: 3px 10px; border-radius: 4px; font-size: 12px; line-height: 1.4; }
 
+  /* A save the browser refused: said in a message that stays. */
+  #save-warn { position: fixed; z-index: 420; top: calc(var(--part-bar-h) + 8px); left: 50%; transform: translateX(-50%); width: min(44rem, calc(100vw - 24px)); padding: 10px 14px; border: 2px solid #b3261e; border-radius: 6px;
+    background: #fff4f2; color: #1a1a1a; font-size: 13.5px; line-height: 1.45; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.25); }
+  #save-warn[hidden] { display: none; }
   /* ---- With scripts off: the Brief is plain HTML and readable; the message says what is not. ---- */
   .noscript { margin: 0; padding: 10px 15rem 10px 1.5rem; border-bottom: 2px solid #b26a00; background: #fff8e1; color: #1a1a1a; font-size: 14px; line-height: 1.5; }
 
@@ -531,7 +535,7 @@
     html, body { background: #fff !important; }
     body, body.cm-open { padding: 0 !important; }
     .part-bar, .top-tools, #header, #nav, #nav-resizer, #cm-panel, #cm-add, .cm-badd, .cm-card, #cm-hint, #toast, #info-pop, #dg-overlay, #copybox, .cm-layer, .cm-dgl, .cm-mark, .cm-dgbar, .cm-dgtip, .dg-src,
-    .rev-bar, .sub-bar, .map-bar, .tour-box button, .rbtn, .cbtn, .colbtn, .cm-tadd, .dg-src-add, .noscript { display: none !important; }
+    #save-warn, .rev-bar, .sub-bar, .map-bar, .tour-box button, .rbtn, .cbtn, .colbtn, .cm-tadd, .dg-src-add, .noscript { display: none !important; }
     /* The part's name stands at the top of the sheet: the bar that showed it is not printed. */
     .part-panel.active[data-print]::before { content: attr(data-print); display: block; margin: 0 0 12px; padding-bottom: 6px; border-bottom: 1px solid #ccc; font: 600 13px/1.4 -apple-system, "Segoe UI", sans-serif; color: #1a1a1a; }
     .page, body.wide-part .page { max-width: none; padding: 0; }
@@ -639,7 +643,10 @@ function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return n
 function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 function lsDel(k) { try { localStorage.removeItem(k); } catch (e) {} }
 function esc(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
-function jsq(s) { return String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'"); }
+// A text for a quoted JavaScript string inside a double-quoted HTML attribute, as in onclick="f('...')". The browser
+// reads the attribute as HTML first and as script second, so the text is escaped for the script, then for HTML:
+// escaped for the script alone, a file name holding &#39; or a double quote would end the string or the attribute.
+function jsq(s) { return esc(String(s).replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029')); }
 let currentVid = null;
 
 // ---------------- Part switching and URL hash (#part or #maps/view) ----------------
@@ -1003,7 +1010,7 @@ const rvStale = p => typeof ST[p] === 'string' && !!PATCH[p] && ST[p] !== PATCH[
 const RV_STALE = 'The changes in this file are not the ones you marked as reviewed';
 let activeF = 'all', curIdx = -1, navMode = 'group', navLocked = false, navLockTimer = null;
 const baseTitle = document.title;
-function saveS() { lsSet(STORE_KEY, JSON.stringify(ST)); upProg(); }
+function saveS() { const s = JSON.stringify(ST); lsSet(STORE_KEY, s); if (lsGet(STORE_KEY) !== s) saveWarn(true); upProg(); }
 function upProg() {
   const r = ordered.filter(isRv).length;
   document.getElementById('rc').textContent = r;
@@ -1657,11 +1664,26 @@ Object.keys(CM.edits).forEach(n => { const i = (QX.dg || {})[n], ed = CM.edits[n
 function cmSave() {
   const text = () => JSON.stringify(CM, (k, v) => (k[0] === '_' ? undefined : v));
   let s = text(); lsSet(CM_KEY, s);
-  if (lsGet(CM_KEY) === s) return;
+  if (lsGet(CM_KEY) === s) { saveWarn(false); return; }
   // The store is full or closed. Pictures of boxed areas are the heavy part: they go, so that the comments stay.
-  const pics = CM.items.filter(c => c.pic); pics.forEach(c => { delete c.pic; });
+  const pics = CM.items.filter(c => c.pic).map(c => [c, c.pic]); pics.forEach(([c]) => { delete c.pic; });
   s = text(); lsSet(CM_KEY, s);
-  if (pics.length && lsGet(CM_KEY) === s) showToast('Storage is full: the pictures of boxed areas were dropped, the comments are kept');
+  if (lsGet(CM_KEY) === s) { saveWarn(false); if (pics.length) showToast('Storage is full: the pictures of boxed areas were dropped, the comments are kept'); return; }
+  // Nothing could be written. The pictures are of no use to the store, so they stay with the comments on this page,
+  // and the reader is told, in a message that stays, that a reload would lose what they wrote.
+  pics.forEach(([c, pic]) => { c.pic = pic; });
+  saveWarn(true);
+}
+// A save the browser refused must not pass in silence: the message stays until a later save works.
+function saveWarn(on) {
+  let w = document.getElementById('save-warn');
+  if (!on) { if (w) w.hidden = true; return; }
+  if (!w) {
+    w = document.createElement('div'); w.id = 'save-warn'; w.setAttribute('role', 'alert');
+    w.textContent = 'This browser did not save your comments and reviewed marks: its storage is full or blocked. They stay on this page until it is closed or reloaded. Use "Copy feedback" now to keep the comments.';
+    document.body.appendChild(w);
+  }
+  w.hidden = false;
 }
 function cmRoots() {
   return PART_KEYS.filter(k => k !== 'diff').map(k => ({ part: k, root: document.querySelector('#part-' + k + ' .page') })).filter(r => r.root);

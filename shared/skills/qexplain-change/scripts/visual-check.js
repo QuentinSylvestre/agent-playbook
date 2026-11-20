@@ -569,6 +569,31 @@ async function routeLibs(target) {
       'a D2 source is edited as text with no redraw; the copied text asks for the diagram to be regenerated, and the panel lists the edit');
     await page.evaluate(() => document.querySelector('#cm-panel .cm-it[data-src] [data-act="srcdrop"]').click()); await wait(300); s = await srcState(d2dg);
     log(!s.ed && !s.marked && s.text === d2src && await page.evaluate(() => document.querySelectorAll('#cm-panel .cm-it[data-src]').length === 0 && cmFeedback() === ''), 'Discard in the panel removes the edit and puts the original text back');
+    // A save the browser refuses is said in a message that stays, and goes when a later save works
+    {
+      const sv = await page.evaluate(async () => {
+        const real = Storage.prototype.setItem; let refused = 0;
+        Storage.prototype.setItem = function () { refused++; throw new DOMException('quota', 'QuotaExceededError'); };
+        CM.items.push({ id: 'vcsv', kind: 'page', part: 'page', quote: '', text: 'vc not saved', label: '', t: Date.now(), state: 'open', pic: 'data:image/png;base64,AAAA' }); cmChanged();
+        const w = document.getElementById('save-warn'), during = { shown: !!w && !w.hidden, text: w ? w.textContent : '', role: w ? w.getAttribute('role') : '', pic: (CM.items.find(x => x.id === 'vcsv') || {}).pic, stored: (localStorage.getItem(CM_KEY) || '').includes('vc not saved') };
+        saveS(); const marks = !!document.getElementById('save-warn') && !document.getElementById('save-warn').hidden;
+        Storage.prototype.setItem = real;
+        CM.items = CM.items.filter(x => x.id !== 'vcsv'); cmChanged(); saveS();
+        return { during, marks, refused, after: document.getElementById('save-warn').hidden };
+      });
+      log(sv.refused > 0 && sv.during.shown && sv.during.role === 'alert' && /did not save/.test(sv.during.text) && /Copy feedback/.test(sv.during.text) && !sv.during.stored && sv.during.pic === 'data:image/png;base64,AAAA' && sv.marks && sv.after,
+        'when the browser refuses to save, a message that stays says so and what to do, for comments and for reviewed marks; the comment and its picture stay on the page, and the message goes once a save works');
+    }
+    // A file name with quotes, an entity and a tag is shown as text and runs nothing, wherever a path goes into the page
+    {
+      const fx = await page.evaluate(() => {
+        const names = ['a&#39;);window.__qxHit=1;(&#39;.js', 'x"><img src=x onerror="window.__qxHit=2">.py', "o'brien\\dir\nline.go"]; window.__qxHit = 0;
+        const box = document.createElement('div'); box.hidden = true; document.body.appendChild(box);
+        const got = names.map(n => { box.innerHTML = '<a href="#" onclick="window.__qxSeen = \'' + jsq(n) + '\'; return false">x</a>'; window.__qxSeen = null; box.firstChild.click(); return window.__qxSeen === n && box.children.length === 1; });
+        box.remove(); return { got, hit: window.__qxHit };
+      });
+      log(fx.got.every(Boolean) && fx.hit === 0, `a path with quotes, an entity, a tag, a backslash or a line end reaches its click handler as the very same text and runs nothing (${fx.got.join(', ')})`);
+    }
     // Comments on the source itself, made and shown as on the text of the page; a comment is found again by the text of its lines
     await page.evaluate(() => cmPanel(false)); await wait(200);
     const sl = await page.evaluate(id => { const L = document.querySelector('#' + id + ' > .dg-src textarea').value.split('\n'), T = L.map(l => l.trim());
@@ -1203,7 +1228,7 @@ async function routeLibs(target) {
       await page.evaluate(() => { CM.items = []; cmSave(); cmResolve(); cmDraw(); });
       const two = await page.evaluate(() => { const rows = [...window.__r.parentElement.querySelectorAll('tr[data-ln]')], i = rows.indexOf(window.__r), n = rows[i + 1];
         if (!n || n.previousElementSibling !== window.__r) return false;
-        const r = document.createRange(); r.setStart(window.__r.cells[1].firstChild, 0); r.setEnd(n.cells[1].firstChild, 1);
+        const r = document.createRange(); r.setStart(window.__r.cells[1], 0); r.setEnd(n.cells[1], n.cells[1].childNodes.length);      // a cell may start with a marked or coloured span
         const s = getSelection(); s.removeAllRanges(); s.addRange(r); document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true })); return true; });
       if (two) {
         await wait(250); await page.click('#cm-add'); await wait(200);

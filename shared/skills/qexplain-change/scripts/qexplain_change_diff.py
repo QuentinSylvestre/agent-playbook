@@ -445,10 +445,35 @@ def _one_swap(a, b):
     return (x, y) if re.fullmatch(r"\w+", x) and re.fullmatch(r"\w+", y) else None
 
 
+# Languages where indentation is syntax: a line moved in or out is a real edit there.
+INDENT_IS_SYNTAX = {"py", "pyi", "yml", "yaml", "mk", "haml", "pug", "jade", "coffee", "nim", "fs", "fsx", "hs", "sass", "styl", "slim"}
+
+
+def _spacing_only(path, run):
+    """Whether a run of changed lines changes nothing but spacing. Lines are compared one by one, never as one text:
+    a statement that moved, or two words that were joined, is an edit. What may differ is the indentation and the
+    spaces at the end of a line; inside a line, a longer or shorter run of spaces, and only on a line with no quote,
+    since a string keeps its spaces. In a language where indentation is syntax the indentation must be the same.
+    Empty lines added or removed are spacing."""
+    base = path.rsplit("/", 1)[-1]
+    strict = ext_of(path) in INDENT_IS_SYNTAX or base in ("Makefile", "makefile", "GNUmakefile")
+
+    def norm(text):
+        text = text.rstrip() if strict else text.strip()
+        if any(q in text for q in "\"'`"):
+            return text
+        lead = len(text) - len(text.lstrip())
+        return text[:lead] + " ".join(text[lead:].split())
+    dels = [norm(t) for _, t in run["dels"] if t.strip()]
+    adds = [norm(t) for _, t in run["adds"] if t.strip()]
+    return dels == adds
+
+
 def hunk_kinds(files):
     """Hunks that hold no real edit, per file: {path: [None, or {"k": kind, "t": what the page says} per hunk]}.
 
-    spacing: the removed and the added text are the same once every space, tab and line end is taken out.
+    spacing: line by line, nothing differs but indentation, spaces at a line's end, or the length of a run of spaces
+             outside a string (see _spacing_only).
     word:    every changed line is its old line with the same one word replaced by the same other word, on two
              lines or more.
     move:    every run of changed lines is only removed or only added, and the very same lines are added or removed
@@ -471,9 +496,8 @@ def hunk_kinds(files):
             runs = changed_runs(hunk)
             dels = [t for r in runs for _, t in r["dels"]]
             adds = [t for r in runs for _, t in r["adds"]]
-            squash = lambda lines: "".join("".join(t.split()) for t in lines)
             kind = None
-            if runs and squash(dels) == squash(adds):
+            if runs and all(_spacing_only(path, r) for r in runs):
                 kind = {"k": "space", "t": "Only spacing changes in this hunk."}
             if not kind and len(dels) >= 2 and all(len(r["dels"]) == len(r["adds"]) for r in runs):
                 swaps = {_one_swap(d, a) for r in runs for (_, d), (_, a) in zip(r["dels"], r["adds"])}
@@ -487,12 +511,15 @@ def hunk_kinds(files):
                         places = None
                         break
                     sign, other = ("-", "+") if run["dels"] else ("+", "-")
-                    key, _ = _block(run["dels"] or run["adds"])
-                    twin = index.get(key, {}).get(other) if key else None
-                    if not twin:
+                    key, at = _block(run["dels"] or run["adds"])
+                    mine, twins = (index.get(key, {}).get(sign) or [], index.get(key, {}).get(other) or []) if key else ([], [])
+                    # One removed block goes with one added block, in order. A block removed twice and added once
+                    # was moved once and deleted once: the copy with no partner is a real removal.
+                    nth = mine.index((path, at)) if (path, at) in mine else len(twins)
+                    if nth >= len(twins):
                         places = None
                         break
-                    places.append(("added" if sign == "-" else "removed", twin[0]))
+                    places.append(("added" if sign == "-" else "removed", twins[nth]))
                 if places:
                     verb, (where, line) = places[0]
                     kind = {"k": "move", "t": f"Moved: the same lines are {verb} at {safe_path(where)}:{line}."}
@@ -620,6 +647,12 @@ def scan_files(files):
             m = re.match(r"@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@", line)
             if m:
                 old_line, new_line, in_hunk = int(m.group(1)), int(m.group(2)), True
+                # After the second @@ git prints a line of the file from above the hunk, often a declaration. It is
+                # copied into the page and into the function labels, so it is scanned like any line. Its key is
+                # <path>:context:<first new line of the hunk>.
+                for shape, made_up in line_hits(line[m.end():], config_like):
+                    found.append({"path": path, "side": "context", "line": new_line, "kind": shape,
+                                  "made_up": made_up, "test_file": kind == "test"})
                 continue
             if not in_hunk:
                 # Lines before the first hunk are copied into the page too.
@@ -667,6 +700,10 @@ def mask_files(files, keys):
             m = re.match(r"@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@", line)
             if m:
                 old_line, new_line, in_hunk = int(m.group(1)), int(m.group(2)), True
+                key = f"{path}:context:{new_line}"
+                if key in wanted:  # the line git prints after the second @@
+                    lines[i] = line[:m.end()] + mask_line(line[m.end():], config_like)
+                    used.add(key)
                 continue
             if not in_hunk or line.startswith("\\"):
                 continue

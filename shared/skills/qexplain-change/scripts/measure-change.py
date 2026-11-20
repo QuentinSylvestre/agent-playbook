@@ -151,6 +151,21 @@ def selftest():
     check(qd.read_decl("ts", "export const load = async (id: string) => {")["call"] == "load" and qd.read_decl("go", "type Batch struct {")["call"] == ""
           and qd.read_decl("py", "    x = def_value(1)") is None, "declarations are read by keyword; a type has no callers")
     # Hunks that hold no real edit
+    for name, diff in (
+            ("a statement moved past another line", "diff --git a/a.go b/a.go\n@@ -1,2 +1,2 @@\n-x := compute()\n lock.Lock()\n+x := compute()\n"),
+            ("a Python line dedented out of its block", "diff --git a/a.py b/a.py\n@@ -1,3 +1,3 @@\n if ready:\n     start()\n-    report()\n+report()\n"),
+            ("a YAML key dedented to the top level", "diff --git a/a.yml b/a.yml\n@@ -1,2 +1,2 @@\n server:\n-  port: 80\n+port: 80\n"),
+            ("two words joined", "diff --git a/a.go b/a.go\n@@ -1 +1 @@\n-return x if not y else z\n+return x if noty else z\n"),
+            ("a space taken out of a string", 'diff --git a/a.go b/a.go\n@@ -1 +1 @@\n-sep := ", "\n+sep := ","\n'),
+            ("two lines swapped", "diff --git a/a.go b/a.go\n@@ -1,2 +1,2 @@\n-first()\n-second()\n+second()\n+first()\n")):
+        check(qd.hunk_kinds([(diff.split(" b/")[1].split("\n")[0], diff)]) == {}, f"not spacing only: {name}")
+    check(qd.hunk_kinds([("a.go", "diff --git a/a.go b/a.go\n@@ -1,3 +1,3 @@\n type T struct {\n-\tID   string\n-\tName string\n+\tID string\n+\tName   string\n")])["a.go"][0]["k"] == "space"
+          and qd.hunk_kinds([("a.py", "diff --git a/a.py b/a.py\n@@ -1,2 +1,3 @@\n a = 1\n-b = 2   \n+b = 2\n+\n")])["a.py"][0]["k"] == "space",
+          "spacing only: realigned fields in a brace language; trailing spaces and an added empty line in Python")
+    twice = ("diff --git a/m.go b/m.go\n--- a/m.go\n+++ b/m.go\n@@ -1,6 +1,2 @@\n a\n-func old() int {\n-\treturn compute(1) + compute(2)\n-}\n-\n b\n"
+             "@@ -10,6 +6,2 @@\n c\n-func old() int {\n-\treturn compute(1) + compute(2)\n-}\n-\n d\n"
+             "@@ -20,2 +12,6 @@\n x\n y\n+\n+func old() int {\n+\treturn compute(1) + compute(2)\n+}\n")
+    check([k and k["k"] for k in qd.hunk_kinds([("m.go", twice)])["m.go"]] == ["move", None, "move"], "a block removed twice and added once is moved once; the other removal is a real one")
     mv = ("diff --git a/m.go b/m.go\n--- a/m.go\n+++ b/m.go\n@@ -1,8 +1,4 @@\n a\n-func old() int {\n-\treturn compute(1) + compute(2)\n-}\n-\n b\n c\n d\n"
           "@@ -20,3 +16,7 @@\n x\n y\n z\n+\n+func old() int {\n+\treturn compute(1) + compute(2)\n+}\n")
     kinds = qd.hunk_kinds([("m.go", mv)])["m.go"]
@@ -162,8 +177,9 @@ def selftest():
     check(qd.hunk_kinds([("s.go", "diff --git a/s.go b/s.go\n@@ -1,2 +1,2 @@\n-}\n-\n+\n+}\n")]) == {"s.go": [{"k": "space", "t": "Only spacing changes in this hunk."}]}
           and qd.hunk_kinds([("s.go", "diff --git a/s.go b/s.go\n@@ -1,3 +1,3 @@\n a\n-x = 1\n+y = 2\n b\n")]) == {}, "two lines swapped around an empty line are spacing; a small edit is nothing")
     sp = "diff --git a/c.yml b/c.yml\n@@ -1,4 +1,4 @@\n logging:\n-    level: info\n-    format: json\n+  level: info\n+  format: json\n end: 1\n"
-    check(qd.hunk_kinds([("c.yml", sp)])["c.yml"][0]["k"] == "space" and qd.hunk_kinds([("c.yml", sp.replace("+  format: json", "+  format: text"))]) == {},
-          "a re-indented block is spacing only; with one value changed it is not")
+    check(qd.hunk_kinds([("c.css", sp)])["c.css"][0]["k"] == "space" and qd.hunk_kinds([("c.css", sp.replace("+  format: json", "+  format: text"))]) == {}
+          and qd.hunk_kinds([("c.yml", sp)]) == {},
+          "a re-indented block is spacing only where indentation is not syntax; with one value changed it is not, and in YAML it never is")
     wd = "diff --git a/r.py b/r.py\n@@ -1,5 +1,5 @@\n-    listeners = set()\n+    seen_ids = set()\n     for f in frames:\n-        listeners.add(f)\n-    return len(listeners)\n+        seen_ids.add(f)\n+    return len(seen_ids)\n"
     check(qd.hunk_kinds([("r.py", wd)])["r.py"][0] == {"k": "word", "t": 'Only "listeners" replaced by "seen_ids", on 3 lines.'}, "one word replaced by another on every changed line is a rename")
     check(qd.hunk_kinds([("r.py", wd.replace("+    return len(seen_ids)", "+    return len(seen_ids) + 1"))]) == {} and qd.hunk_kinds([("r.py", "diff --git a/r.py b/r.py\n@@ -1 +1 @@\n-a = old\n+a = new\n")]) == {},
@@ -249,6 +265,12 @@ def selftest():
     check("\n" not in qd.safe_path("x\nPLAN\ty"), "a file name cannot forge a report line")
     hdr = "diff --git a/m.go b/m.go\nold mode 100644\n    pass" + 'word="' + fake + '"\n'
     check(qd.scan_files(qd.split_files(hdr)), "text before the first hunk is scanned")
+    ctx = 'diff --git a/a.py b/a.py\n--- a/a.py\n+++ b/a.py\n@@ -4,3 +4,3 @@ def login(user, pass' + 'word="Zx81-kq77-Lm42-pp09"):\n     a = 1\n-    b = 2\n+    b = 3\n     c = 4\n'
+    ctx_hits = qd.scan_files(qd.split_files(ctx))
+    check(len(ctx_hits) == 1 and qd.hit_key(ctx_hits[0]) == "a.py:context:4", "the line git prints after the second @@ is scanned, under its own key")
+    masked, unmatched = qd.mask_files(qd.split_files(ctx), ["a.py:context:4"])
+    check(not unmatched and "Zx81" not in masked[0][1] and not qd.scan_files(masked) and "Zx81" not in str(qd.hunk_functions("a.py", masked[0][1])),
+          "masking that line hides its value from the page and from the function label")
     for name in fails:
         print(f"FAIL\t{name}")
     print(f"selftest: {total[0]} cases, {len(fails)} failed")
