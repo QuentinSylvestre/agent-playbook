@@ -348,7 +348,7 @@ def brief_files(brief, paths, diff_selected):
         named += files
         if files:
             out.append('<p class="sec-files"><span>Files:</span> ' + ", ".join(link(p) for p in dict.fromkeys(files)) + "</p>")
-    stray = len(re.findall(r"\bdata-files=", brief)) - sum(1 for m in CHANGE_HEAD.finditer(brief) if "data-files=" in m.group(1))
+    stray = len(re.findall(r"<[a-zA-Z][^<>]*\sdata-files=", brief)) - sum(1 for m in CHANGE_HEAD.finditer(brief) if "data-files=" in m.group(1))  # in a tag, not in prose
     if stray:
         print(f"WARN\tdata-files stands {stray} time(s) outside the h2 heading of a change section; it is read only on <h2 id=\"change-...\">")
     rest = [p for p in paths if p not in set(named)] if any_named else []
