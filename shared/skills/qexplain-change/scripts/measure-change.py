@@ -33,14 +33,7 @@ import qexplain_change_diff as qd  # noqa: E402
 HEAVY_READING_LINES = 2500
 
 
-def tier(lines):
-    if lines < 75:
-        return "Tiny"
-    if lines < 250:
-        return "Small"
-    if lines <= 800:
-        return "Medium"
-    return "Large"
+tier = qd.tier  # one definition, shared with the build
 
 
 def heavy_reasons(reading, plan_count):
@@ -328,7 +321,7 @@ def main():
         print(f"FILE\t{qd.safe_path(path)}\t{kind}\t+{add} -{rem}")
     total = sum(by_type.values())
     not_read = by_type.get("test", 0) + by_type.get("generated", 0)
-    reading = total - not_read
+    reading = qd.reading_lines(kept)
 
     for pat in unused:
         print(f"WARN\t--exclude {pat} matched nothing; fix it, because the build refuses it")

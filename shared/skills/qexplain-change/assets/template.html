@@ -382,7 +382,9 @@
   .cm-it textarea { display: block; width: 100%; min-height: 70px; resize: vertical; font: inherit; margin: 6px 0; padding: 6px 8px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface); color: var(--text); }
   .cm-it textarea:focus { outline: 2px solid #d68f00; outline-offset: 0; }
   /* Diagram comments: a button on each diagram turns on a comment mode; rings and markers stand in a layer beside the drawing. */
-  .cm-dgbar { position: absolute; top: 6px; right: 6px; z-index: 4; display: flex; align-items: center; gap: 6px; }
+  .dg:not(#dg-ov-body) { padding-top: 32px; }      /* room for the buttons, which otherwise cover the top right of the drawing */
+  @media print { .dg:not(#dg-ov-body) { padding-top: 0; } }
+  .cm-dgbar { position: absolute; top: 4px; right: 6px; z-index: 4; display: flex; align-items: center; gap: 6px; }
   .cm-dgbtn { display: flex; align-items: center; justify-content: center; width: 26px; height: 22px; padding: 0; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--surface); color: var(--text-light); cursor: pointer; }
   .cm-dgbtn:hover { border-color: #b26a00; color: #b26a00; }
   .cm-dgbtn[aria-pressed="true"] { background: #0969da; border-color: #0969da; color: #fff; }
@@ -1184,7 +1186,7 @@ function hlCard(c) {
       let lines;
       try { lines = hlLines(hljs.highlight(text, { language: lang, ignoreIllegals: true }).value); } catch (e) { return; }
       if (lines.length !== cells.length) return;
-      cells.forEach((td, i) => { td.innerHTML = lines[i] || '&nbsp;'; if (td.dataset.w) hlMark(td, td.dataset.w.split(',').map(x => x.split('-').map(Number))); });
+      cells.forEach((td, i) => { td.innerHTML = lines[i] && lines[i].replace(/<[^>]*>/g, '') ? lines[i] : '&nbsp;';   /* an empty coloured span has no height: the row would be shorter than the one opposite */ if (td.dataset.w) hlMark(td, td.dataset.w.split(',').map(x => x.split('-').map(Number))); });
       dsPaintSoon();      // the cells were rewritten: the search's matches are painted again
     };
     pane.querySelectorAll('tr').forEach(tr => { if (tr.classList.contains('hunk')) flush(); else if (tr.dataset.ln) run.push(tr.querySelector('td:not(.ln)')); });

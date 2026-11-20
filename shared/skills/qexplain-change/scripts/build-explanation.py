@@ -911,6 +911,7 @@ def main(argv=None):
     if not kept:
         fail("no file can be shown: every file was left out, or the input holds no diff. "
              "Check the LEFT-OUT lines from measure-change.py and tell the user this change has no page")
+    secret_values = qd.flagged_values(kept)  # read before the masking; compared below, never printed
     kept, unmatched = qd.mask_files(kept, args.mask_credential)
     if unmatched:
         fail("--mask-credential matched nothing: " + ", ".join(qd.safe_path(k) for k in unmatched)
@@ -948,6 +949,12 @@ def main(argv=None):
     for m in PLACEHOLDER.finditer(walkthrough):
         diagrams.need(m.group(1), "walkthrough.html")
     views = check_views(maps, diagrams) if maps is not None else []
+    tier_name = qd.tier(qd.reading_lines(kept))
+    short = [f"{v['key']} ({len(v.get('tour') or [])})" for v in views if len(v.get("tour") or []) < qd.TOUR_MIN[tier_name]]
+    if short and "maps" in selected:
+        fail(f"a map view has fewer tour steps than this change's tier asks ({tier_name}: at least {qd.TOUR_MIN[tier_name]}): "
+             + ", ".join(short) + ". Add steps that each show one thing the reader must see, or leave the view out "
+               "if it has nothing more to show")
     for name in diagrams.sources:
         if name not in diagrams.used:
             print(f"WARN\tdiagram {name} is not used by the brief, the walkthrough or a map view")
@@ -988,6 +995,14 @@ def main(argv=None):
     written += diagrams.source_texts(diagrams.used)
     for name, text in written:
         hits += qd.scan_content_file(name, text)
+    # A value the diff holds behind a CREDENTIAL flag must not come back in the agent's own text, masked or not.
+    quoted = sorted({(name, key) for name, text in written for key, value in secret_values
+                     if key not in allowed and len(value) >= 8 and value in text})
+    if quoted:
+        fail("; ".join(f"{name} holds the value of the credential-shaped match {qd.safe_path(key)}" for name, key in quoted[:6])
+             + (f"; and {len(quoted) - 6} more" if len(quoted) > 6 else "")
+             + ". Nothing written. Remove the value from your text: say what kind of value it is and where it stands, "
+               "never quote it, and leave to the user whether it is a live credential")
     if hits:
         for hit in hits:
             print(qd.hit_line(hit), file=sys.stderr)
@@ -1283,6 +1298,12 @@ def selftest():
              c_rc != 0 and bool(c_key) and "Zx81" not in c_log, c_log[-400:])
         c_rc, c_log, c_page = run("cred-header-masked", c_args + ["--mask-credential", f"auth.py:context:{c_key.group(1) if c_key else 0}"], base_args=c_base)
         case("masked by that key, the page builds and carries the value neither in the diff nor in a function label", c_rc == 0 and "def login" in c_page and "Zx81" not in c_page, c_log[-400:])
+        c_value = "Zx81" + "-kq77-Lm42-pp09"  # the fixture's value, as an agent might quote it in its own text
+        c_brief = os.path.join(content, "brief-quotes-value.html")
+        open(c_brief, "w", encoding="utf-8", newline="\n").write(open(os.path.join(content, "brief.html"), encoding="utf-8").read() + f"\n<p>The fixture value is <code>{c_value}</code>.</p>\n")
+        c_rc, c_log, c_page = run("cred-quoted", ["--brief", c_brief, "--rationales", c_rat, "--mask-credential", f"auth.py:context:{c_key.group(1) if c_key else 0}"], base_args=c_base)
+        case("a brief that quotes the value of a masked match stops the build, which names the file and the match and never the value",
+             c_rc != 0 and c_page == "" and "brief holds the value of the credential-shaped match auth.py:context:" in c_log and "Zx81" not in c_log, c_log[-400:])
         policy = re.search(r'<meta http-equiv="Content-Security-Policy" content="([^"]+)">', page)
         policy = policy.group(1) if policy else ""
         case("the page declares a content security policy: nothing by default, scripts from the pinned scripts' host only, no evaluated code, no network calls",
@@ -1470,7 +1491,7 @@ def selftest():
                  "tour": [{"caption": "The broker", "highlight": ["site.broker"]}, {"caption": "Link", "highlight": ["site.ap", "site.broker"]},
                           {"caption": "Edge", "highlight": ["site.(ap -> broker)[0]"]}]},
                 {"key": "sequence", "label": "Sequence", "diagram": "seq", "subsystem": "Core", "tour": [{"caption": "Call", "highlight": ["(a -> b)[0]"]}]},
-                {"key": "dataflow", "label": "Flow", "diagram": "arch", "subsystem": "Edge site"}]}
+                {"key": "dataflow", "label": "Flow", "diagram": "arch", "subsystem": "Edge site", "tour": [{"caption": "The site", "highlight": ["site.ap"]}]}]}
             w("maps-d2.json", json.dumps(d2maps))
             args = ["--brief", os.path.join(content, "brief-d2.html"), "--rationales", os.path.join(content, "rationales.json"), "--roles", os.path.join(content, "roles.json"),
                     "--parts", "brief,walkthrough,maps,summary,diff", "--walkthrough", os.path.join(content, "walkthrough.html"), "--maps", os.path.join(content, "maps-d2.json"), "--diagrams", good]
@@ -1492,6 +1513,11 @@ def selftest():
             rc, log, page = run("bad-tour", ["--brief", os.path.join(content, "brief.html"), "--rationales", os.path.join(content, "rationales.json"), "--parts", "brief,maps",
                                              "--maps", os.path.join(content, "maps-bad.json"), "--diagrams", good])
             case("an unknown tour id fails and lists the valid ids", rc == 2 and "site.broker" in log and page == "", log[-300:], d2=True)
+            w("maps-short.json", json.dumps({"views": [{"key": "system", "label": "S", "diagram": "arch", "tour": []}]}))
+            rc, log, page = run("short-tour", ["--brief", os.path.join(content, "brief.html"), "--rationales", os.path.join(content, "rationales.json"), "--parts", "brief,maps",
+                                               "--maps", os.path.join(content, "maps-short.json"), "--diagrams", good])
+            case("a map view with fewer tour steps than the tier's lowest number stops the build, which says how many it asks",
+                 rc == 2 and page == "" and "fewer tour steps" in log and "Tiny: at least 1" in log and "system (0)" in log, log[-300:], d2=True)
             w("broken.d2", "a -> {\n", good)
             w("brief-broken.html", SELF_BRIEF.replace("{DIAGRAM}", '<div data-diagram="broken"></div>'), content)
             rc, log, page = run("broken", ["--brief", os.path.join(content, "brief-broken.html"), "--rationales", os.path.join(content, "rationales.json"), "--diagrams", good])

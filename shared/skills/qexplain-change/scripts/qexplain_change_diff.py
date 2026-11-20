@@ -721,6 +721,62 @@ def mask_files(files, keys):
     return out, sorted(wanted - used)
 
 
+def line_values(text, config_like):
+    """The credential-shaped values on one line. For a comparison inside the build only: never printed, never returned
+    to anything that writes."""
+    values = [m.group(0) for _, rx in ALWAYS for m in rx.finditer(text)]
+    shapes = [ASSIGNED, CONNECTION, TAGGED, FLAG_VALUE, SETTER] + ([BARE_ASSIGNED] if config_like else [])
+    values += [m.group(1) for rx in shapes for m in rx.finditer(text) if not is_placeholder(m.group(1))]
+    values += [m.group(1) for m in URL_LOGIN.finditer(text) if not is_placeholder(m.group(1)) and not re.match(r"\d+(/|$)", m.group(1))]
+    return values
+
+
+def flagged_values(files):
+    """[(key, value)] for every credential-shaped value in the diff, keyed like a CREDENTIAL line (<path>:<side>:<line>).
+    Call it before mask_files. The build uses it to refuse a file of the agent's that quotes such a value."""
+    out = []
+    for path, block in files:
+        config_like = file_type(path) in ("config", "other", "generated") or bool(SHELL_PATH.search(path))
+        new_line = old_line = 0
+        in_hunk = False
+        for line in block.split("\n"):
+            m = re.match(r"@@ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@", line)
+            if m:
+                old_line, new_line, in_hunk = int(m.group(1)), int(m.group(2)), True
+                out += [(f"{path}:context:{new_line}", v) for v in line_values(line[m.end():], config_like)]
+                continue
+            if not in_hunk or line.startswith("\\"):
+                continue
+            sign = line[:1]
+            key = f"{path}:{'old' if sign == '-' else 'new'}:{old_line if sign == '-' else new_line}"
+            out += [(key, v) for v in line_values(line[1:], config_like)]
+            if sign != "+":
+                old_line += 1
+            if sign != "-":
+                new_line += 1
+    return out
+
+
+# The tier of a change, from the lines to read outside tests and generated files. One definition: the measuring script
+# prints it and the build holds each map's tour to its lowest number of steps.
+TOUR_MIN = {"Tiny": 1, "Small": 2, "Medium": 3, "Large": 4}
+
+
+def tier(lines):
+    if lines < 75:
+        return "Tiny"
+    if lines < 250:
+        return "Small"
+    if lines <= 800:
+        return "Medium"
+    return "Large"
+
+
+def reading_lines(files):
+    """Added plus removed lines of the files shown, tests and generated files left out."""
+    return sum(sum(counts(block)) for path, block in files if file_type(path) not in ("test", "generated"))
+
+
 def hit_key(hit):
     return f"{hit['path']}:{hit['side']}:{hit['line']}"
 

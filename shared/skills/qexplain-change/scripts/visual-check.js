@@ -79,8 +79,8 @@ const libs = opt('--libs');
 const url = require('url').pathToFileURL(path.resolve(file)).href;
 let storeKey = '';   // 'qexplain-change-diff-' + the explanation id the build wrote into the page
 
-let bad = 0;
-const log = (ok, msg) => { if (!ok) bad++; console.log((ok ? 'OK\t' : 'BAD\t') + msg); };
+let bad = 0, good = 0;
+const log = (ok, msg) => { if (ok) good++; else bad++; console.log((ok ? 'OK\t' : 'BAD\t') + msg); };
 const wait = ms => new Promise(r => setTimeout(r, ms));
 
 async function routeLibs(target) {
@@ -251,6 +251,7 @@ async function routeLibs(target) {
     return getComputedStyle(document.getElementById('top-tools')).position !== 'fixed' || last.right <= tools.left; }), 'the part buttons stay clear of the tools with the comment button added');
   // Comments on a D2 diagram: a node, a connection, the whole diagram; one decision path for a click
   const d2dg = await page.evaluate(() => { const dg = document.querySelector('#part-brief .dg[data-kind="d2"]'); if (!dg) return null; dg.scrollIntoView({ block: 'center' }); return dg.id; });
+  if (!d2dg) console.log('NOTE\tno D2 diagram in the Brief: the checks of comments on a D2 diagram, of its source lines and of the sketch switch did not run');
   if (d2dg) {
     await wait(300);
     const partAt = (edge, nth) => page.evaluate(([id, edge, nth]) => { const dg = document.getElementById(id), all = cmDgParts(dg), ps = all.filter(p => p.edge === edge);
@@ -457,7 +458,8 @@ async function routeLibs(target) {
   const typeSrc = (id, text) => page.evaluate(([id, text]) => { const ta = document.querySelector('#' + id + ' > .dg-src textarea'); ta.value = text; ta.dispatchEvent(new Event('input', { bubbles: true })); }, [id, text]);
   // Points at a line of the source as a reader would, then presses the comment button that appears beside it.
   const srcAdd = async (id, ln) => {
-    const pt = await page.evaluate(([id, ln]) => { const box = document.querySelector('#' + id + ' > .dg-src'), g = dgSrcGeo(box), ta = g.ta; ta.scrollTop = Math.max(0, (ln - 3) * g.lh);
+    const pt = await page.evaluate(([id, ln]) => { const box = document.querySelector('#' + id + ' > .dg-src'); box.scrollIntoView({ block: 'center' });      // a tall diagram leaves its editor below the window
+      const g = dgSrcGeo(box), ta = g.ta; ta.scrollTop = Math.max(0, (ln - 3) * g.lh);
       const r = ta.getBoundingClientRect(); return [r.left + 80, r.top + g.py + (ln - 0.5) * g.lh - ta.scrollTop]; }, [id, ln]);
     await page.mouse.move(pt[0] - 5, pt[1]); await page.mouse.move(pt[0], pt[1]); await wait(120);
     await page.click('#' + id + ' .dg-src-add'); await wait(300);
@@ -1240,7 +1242,7 @@ async function routeLibs(target) {
           return { ok: b.width > 0 && b.left >= t.left - 1 && b.right <= t.right + 1 && b.top > 0 && b.bottom < innerHeight, open: td.classList.contains('expanded') }; }); if (!s.ok) unread++; if (s.open) unfolded++; }
         log(unread === 0, `each of the ${word.n} matches stands inside its cell and on screen when it is reached; ${unfolded} long lines were unfolded for that`);
         await page.keyboard.press('Escape'); await wait(300); const gone = await ds();
-        await page.evaluate(() => { document.getElementById('dsearch').value = 'zz-no-such-text'; dsFind(); }); const none = await ds();
+        await page.evaluate(() => { document.getElementById('dsearch').value = 'zz-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2); dsFind(); });   /* made at run time: no diff can hold it, not even one that holds this file */ const none = await ds();
         await page.evaluate(() => { document.getElementById('dsearch').value = ''; dsFind(); window.scrollTo(0, 0); });
         log(gone.count === '' && gone.all === 0 && gone.cur === 0 && none.count === 'No match', 'Escape empties the search and removes its marks; a text that is not in the diff says "No match"');
       }
@@ -1428,5 +1430,11 @@ async function routeLibs(target) {
   log(errors.length === 0, 'no page errors' + (errors.length ? ': ' + errors.slice(0, 4).join(' | ') : ''));
   await browser.close();
   console.log(`\nScreenshots in ${out}. Look at them: a check can pass while the page still looks wrong.`);
+  // The last line says whether the run reached its end. Only COMPLETE with 0 BAD is a checked page.
+  console.log(`RESULT\tCOMPLETE\t${good} OK, ${bad} BAD`);
   process.exit(bad ? 1 : 0);
-})().catch(e => { console.error('ERROR\t' + e.message); process.exit(2); });
+})().catch(e => {
+  console.error('ERROR\t' + e.message);
+  console.log(`RESULT\tINCOMPLETE\tstopped after ${good} OK, ${bad} BAD: ${String(e.message).split('\n')[0]}. The checks after this point did not run, so the page is not checked.`);
+  process.exit(2);
+});
