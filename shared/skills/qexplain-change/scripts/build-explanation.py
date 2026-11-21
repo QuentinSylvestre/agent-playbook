@@ -238,6 +238,16 @@ def known_ids(blocks):
     return ids
 
 
+NOT_A_PERSON = re.compile(r"(?:(?:the|my|your|an?) )?(?:ai )?(?:agent|assistant)", re.I)
+
+
+def reply_author(by):
+    """The name shown beside an agent's reply. "by" is the person the agent works for; an agent that names itself
+    there (a Kiro run wrote "Agent") gives no name, so the reply is not signed "Agent's agent"."""
+    by = " ".join(by.split())[:60]
+    return "Agent" if not by or NOT_A_PERSON.fullmatch(by) else f"{by}'s agent"
+
+
 def reply_block(path, page_id, known):
     """replies.json as one comments block. The id of a reply comes from what it says and to which comment, so the same
     reply given twice is one reply, and one the reader deleted does not come back."""
@@ -249,8 +259,7 @@ def reply_block(path, page_id, known):
              '"by" is optional, and the id of a comment is in the feedback text')
     if not isinstance(by, str) or not isinstance(data, list) or not data:
         fail(f"{path} holds no list of replies. {shape}")
-    by = " ".join(by.split())[:60]
-    author = f"{by}'s agent" if by else "Agent"
+    author = reply_author(by)
     now, items = int(time.time() * 1000), []
     for i, r in enumerate(data):
         if not (isinstance(r, dict) and isinstance(r.get("to"), str) and r["to"].strip() and isinstance(r.get("text"), str) and r["text"].strip()):
@@ -1759,6 +1768,8 @@ def selftest():
              rc == 0 and len(added) == 2 and len(added[1]["items"]) == 1 and added[1]["items"][0]["by"] == "Ada L's agent" and added[1]["items"][0]["re"] == "c1"
              and added[1]["items"][0]["agent"] is True and added[1]["items"][0]["text"].endswith("</script><script>x") and "</script><script>x" not in region(page)
              and CM_BLOCK.sub("", region(page)) == "" and "in the page already" in log, log[-300:])
+        case("an agent that names itself where the person's name goes is not shown as its own agent",
+             [reply_author(x) for x in ("Agent", " the  AI agent ", "assistant", "", "Agnes", "Ada L")] == ["Agent", "Agent", "Agent", "Agent", "Agnes's agent", "Ada L's agent"])
         before = page
         only = lambda extra: subprocess.run([sys.executable, "-I", os.path.abspath(__file__), "--comments-only", "--out", cm_out] + extra, capture_output=True)
         text_of = lambda p: p.stdout.decode("utf-8", "replace") + p.stderr.decode("utf-8", "replace")
