@@ -228,9 +228,14 @@ def check_brief(doc):
 
 
 # A comments block holds what readers and agents typed about the page. It is data: a script of type application/json
-# is never run. A block is set aside only when the HTML parser itself sees it as a script element of that type and
-# class, and its text holds no "<". Text that merely looks like a block, in an attribute or inside another script, is
-# page code and is checked like the rest.
+# is never run. A block is set aside only when all of this holds: the HTML parser itself sees a script start tag there;
+# the tag is written exactly as the page and the build write it, with no other attribute (a second type, a style or
+# an event handler would make it something else in a browser); its text holds no "<"; and its text is JSON, so that
+# even where a browser would read it as script, it is a value that does nothing. Anything else is page code and is
+# checked like the rest.
+BLOCK_OPENER = '<script type="application/json" class="qx-comments">'
+
+
 class BlockFinder(HTMLParser):
     def __init__(self, source):
         super().__init__(convert_charrefs=True)
@@ -242,16 +247,23 @@ class BlockFinder(HTMLParser):
         return self.starts[line - 1] + col
 
     def handle_starttag(self, tag, attrs):
-        a = dict(attrs)
-        self.open = self.at() if tag == "script" and a.get("type") == "application/json" and a.get("class") == "qx-comments" else None
+        self.open = self.at() if tag == "script" and self.get_starttag_text() == BLOCK_OPENER else None
 
     def handle_endtag(self, tag):
         if tag == "script" and self.open is not None:
             end = self.source.find(">", self.at()) + 1
             body = self.source[self.source.find(">", self.open) + 1:self.at()]
-            if end > 0 and "<" not in body:
+            if end > 0 and "<" not in body and self.source.startswith("</script>", self.at()) and is_json(body):
                 self.spans.append((self.open, end))
         self.open = None
+
+
+def is_json(text):
+    try:
+        json.loads(text)
+        return True
+    except (ValueError, RecursionError):
+        return False
 
 
 def strip_comments(source):
@@ -483,6 +495,15 @@ def selftest():
            fixture(body_extra=f"<a title='{opener}' href=\"javascript:alert(1)\" data-x='</script>'>x</a>"), "no-active-links", "FAIL")
     expect("a remote picture dressed as a block in its attributes still fails",
            fixture(body_extra=f"<img alt='{opener}' src=\"https://evil.example/p.png\" data-x='</script>'>"), "remote-assets-pinned", "FAIL")
+    for name, body, check in (
+            ("a script with a second type before the block's", '<script type="text/javascript" type="application/json" class="qx-comments">fetch("x")</script>', "no-runtime-fetch"),
+            ("a block tag that carries an event handler", '<script type="application/json" class="qx-comments" onmouseover="fetch(\'x\')">{}</script>', "no-runtime-fetch"),
+            ("a block tag that carries a style with a remote picture", '<script type="application/json" class="qx-comments" style="display:block;background:url(https://evil.example/p.png)">{}</script>', "remote-assets-pinned"),
+            ("a block opener after a self-closed script tag", "<script/>/*" + opener + '*/fetch("x")</script>', "no-runtime-fetch"),
+            ("a block opener inside a script kept open by a comment start", '<script>var a="<!--<script>";/*</script>' + opener + '*/fetch("x")//--></script>', "no-runtime-fetch"),
+            ("a block whose text is not JSON", opener + 'fetch("x")</script>', "no-runtime-fetch"),
+            ("a block dressed in an attribute with JSON-shaped text", "<img alt='" + opener + '{"a":"\' onmouseover=fetch(1) x=\'"}</script>\'>', "no-runtime-fetch")):
+        expect(name + " still fails", fixture(body_extra=body), check, "FAIL")
     expect("a fetch behind the text of a block inside a real script still fails",
            fixture(data='const QX = {"rawDiff": "", "excluded": []}; /*' + opener + '*/ fetch("x") //</script>'), "no-runtime-fetch", "FAIL")
     # tabs-wired

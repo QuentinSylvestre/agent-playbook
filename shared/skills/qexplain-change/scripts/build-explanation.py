@@ -107,6 +107,7 @@ import json
 import os
 import re
 import shlex
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -198,7 +199,7 @@ def read(path):
 CM_OPEN, CM_SHUT = "<!--qx-comments-->", "<!--/qx-comments-->"
 CM_BLOCK = re.compile(r'<script type="application/json" class="qx-comments">([^<]*)</script>')
 REPLY_MAX = 4000
-REPLY_TO = re.compile(r"^[\w.:+-]{1,80}$")       # the shape of a comment id, as the page accepts it
+REPLY_TO = re.compile(r"^[\w.:+-]{1,80}$", re.ASCII)       # the shape of a comment id, as the page accepts it
 
 
 def comments_region(text):
@@ -278,7 +279,10 @@ def replies_said(path):
     except (ValueError, RecursionError):
         return ""
     items = data.get("replies") if isinstance(data, dict) else data
-    return "\n".join(str(r.get("text", "")) for r in (items if isinstance(items, list) else []) if isinstance(r, dict))
+    said = [str(data.get("by", ""))] if isinstance(data, dict) else []
+    for r in (items if isinstance(items, list) else []):
+        said += [str(v) for v in r.values()] if isinstance(r, dict) else []
+    return "\n".join(said)
 
 
 def scan_replies(path):
@@ -320,6 +324,7 @@ def comments_only(args):
     try:
         with os.fdopen(handle, "w", encoding="utf-8", newline="") as fh:
             fh.write(text[:region[1]] + add + text[region[1]:])
+        shutil.copymode(args.out, tmp)          # the page keeps who may read it
         os.replace(tmp, args.out)
     finally:
         if os.path.exists(tmp):

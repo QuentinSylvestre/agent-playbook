@@ -1841,36 +1841,49 @@ const CM_CTX = 32, CM_MAX_QUOTE = 2000;
 const CM_ID = /^[\w.:+-]{1,80}$/, CM_NO_KEY = ['__proto__', 'constructor', 'prototype'], CM_MAX_ITEMS = 2000, CM_MAX_TEXT = 20000;
 let CM = { v: 1, items: [] };
 // What the store holds is read as untrusted: another local page can write there. Only well-formed comments are taken.
-function cmClean(saved) {
+function cmClean(saved, fromFile) {
   if (!saved || saved.v !== 1 || !Array.isArray(saved.items)) return null;
   const str = v => typeof v === 'string';
   // An id goes into the feedback text and into the list of deletions: it is a short word, never free text. The list
   // and each text have a size the page can draw; what is beyond is left out.
   const idOk = v => str(v) && CM_ID.test(v) && !CM_NO_KEY.includes(v);
-  saved.items = saved.items.slice(0, CM_MAX_ITEMS).filter(c => c && typeof c === 'object' && idOk(c.id) && str(c.text) && str(c.part) && (c.kind !== 'line' && c.tk !== 'src' || Array.isArray(c.lines)))
+  saved.items = (fromFile ? saved.items.slice(0, CM_MAX_ITEMS) : saved.items).filter(c => c && typeof c === 'object' && idOk(c.id) && str(c.text) && str(c.part) && (c.kind !== 'line' && c.tk !== 'src' || Array.isArray(c.lines)))
     .map(c => { if (!str(c.quote)) c.quote = ''; if (!str(c.prefix)) c.prefix = ''; if (!str(c.suffix)) c.suffix = ''; if (c.pic !== undefined && !str(c.pic)) delete c.pic; return c; });
-  saved.items.forEach(c => { ['t', 'm'].forEach(k => { if (c[k] !== undefined && !(typeof c[k] === 'number' && isFinite(c[k]))) delete c[k]; }); if (c.text.length > CM_MAX_TEXT) c.text = c.text.slice(0, CM_MAX_TEXT); if (c.re !== undefined && !idOk(c.re)) delete c.re;
+  saved.items.forEach(c => { ['t', 'm'].forEach(k => { if (c[k] !== undefined && !(typeof c[k] === 'number' && isFinite(c[k]))) delete c[k]; }); if (c.re !== undefined && !idOk(c.re)) delete c.re;
+    if (fromFile) {          // sizes the page can store and draw
+      if (c.text.length > CM_MAX_TEXT) c.text = c.text.slice(0, CM_MAX_TEXT);
+      ['quote', 'prefix', 'suffix'].forEach(k => { if (c[k].length > CM_MAX_QUOTE) c[k] = c[k].slice(0, CM_MAX_QUOTE); });
+      if (str(c.pic) && c.pic.length > 3000000) delete c.pic;
+      if (Array.isArray(c.lines)) c.lines = c.lines.slice(0, 400).filter(str).map(t => t.slice(0, 2000));
+      Object.keys(c).forEach(k => { if (str(c[k]) && c[k].length > 200000) delete c[k]; });
+    }
     if (c.by !== undefined) { c.by = str(c.by) ? c.by.replace(/\s+/g, ' ').trim().slice(0, 60) : ''; if (!c.by) delete c.by; } if (c.agent !== undefined && c.agent !== true) delete c.agent; });
   if (!saved.edits || typeof saved.edits !== 'object') saved.edits = {};
   if (!saved.gone || typeof saved.gone !== 'object' || Array.isArray(saved.gone)) saved.gone = {};
   Object.keys(saved.gone).forEach(k => { if (!(typeof saved.gone[k] === 'number' && isFinite(saved.gone[k])) || CM_NO_KEY.includes(k) || k.length > 200) delete saved.gone[k]; });
   CM_NO_KEY.forEach(k => { if (Object.prototype.hasOwnProperty.call(saved.edits, k)) delete saved.edits[k]; });
+  if (fromFile) { Object.keys(saved.gone).slice(5000).forEach(k => { delete saved.gone[k]; }); Object.keys(saved.edits).forEach((k, i) => { if (i >= 100 || saved.edits[k].text.length > 200000) delete saved.edits[k]; }); }
+  // No inherited name can be taken for an entry: these two are looked up by ids and names that come from files.
+  saved.gone = Object.assign(Object.create(null), saved.gone); saved.edits = Object.assign(Object.create(null), saved.edits);
   Object.keys(saved.edits).forEach(k => { const e = saved.edits[k]; if (!e || !str(e.text)) delete saved.edits[k]; });
   return saved;
 }
 try { const saved = cmClean(JSON.parse(lsGet(CM_KEY) || 'null')); if (saved) CM = saved; } catch (e) {}
 // Edits to diagram sources, by diagram name. A Mermaid edit that still fits its source is in place before the first drawing.
-CM.edits = CM.edits || {};
+CM.edits = CM.edits || Object.create(null);
 // ---- The file is the record ----
 // The page file holds the comments in blocks of data placed before this script: one written by the page each time a
 // reader saves, and one added by the build each time an agent replies. The browser's store is a working copy. Each
 // time the page opens, every block is merged into the store: a comment only one side has is kept, the version changed
 // last wins, and a comment deleted on one side stays deleted unless the other side changed it after the deletion.
 // CM.gone holds the time of each deletion, by comment id ('edit:' and a diagram name for a dropped source edit).
-CM.gone = CM.gone || {};
+CM.gone = CM.gone || Object.create(null);
 // Written in pieces: the text of the page must hold each marker once, and a script must not hold the start of an HTML comment.
 const CM_OPEN = '<' + '!--qx-comments--' + '>', CM_SHUT = '<' + '!--/qx-comments--' + '>';
-const cmWhen = c => c.m || c.t || 0;                    // when a comment was last changed
+// When a comment was last changed. A time well in the future is not believed: it counts as no time, so a wrong clock,
+// or a block written to win, can bring a comment this store does not have but never replace or delete one it has.
+const cmTime = t => (typeof t === 'number' && t > 0 && t <= Date.now() + 300000 ? t : 0);
+const cmWhen = c => cmTime(c.m) || cmTime(c.t);
 function cmTouch(c) { c.m = Date.now(); return c; }
 // ---- Replies ----
 // A reply is a comment that names the comment it answers (re) and who wrote it (by). It is stored, merged and deleted
@@ -1902,24 +1915,25 @@ function cmGone(c) {
 }
 function cmGoneEdit(name) { CM.gone['edit:' + name] = Date.now(); delete CM.edits[name]; }
 // Merges what a block holds into the store. Returns how many things it changed, and counts them by kind in cmTook.
-// A time well in the future is not believed: it counts as no time at all, so a wrong clock, or a block written to win,
-// can bring a comment this store does not have but can never replace or delete one it has.
 const cmTook = { added: 0, changed: 0, deleted: 0, marks: 0 };
 function cmMerge(src) {
-  const now = Date.now(), cap = t => (typeof t === 'number' && t <= now + 300000 ? t : 0);
+  const cap = cmTime, at = new Map(CM.items.map((c, i) => [c.id, i])), theirs = new Set(src.items.map(c => c.id));
   let n = 0;
   Object.keys(src.gone).forEach(id => { const t = cap(src.gone[id]); if (t > (CM.gone[id] || 0)) CM.gone[id] = t; });
   src.items.forEach(c => {
-    if (c.m !== undefined) c.m = cap(c.m); if (c.t !== undefined) c.t = cap(c.t);
     if (CM.gone[c.id] && CM.gone[c.id] >= cmWhen(c)) return;
-    if (c.re && CM.gone[c.re]) return;                   // a reply to a comment that was deleted here
-    const i = CM.items.findIndex(x => x.id === c.id);
+    if (c.re && CM.gone[c.re] && !at.has(c.re) && !theirs.has(c.re)) return;        // a reply to a comment deleted here, which nobody brings back
+    const i = at.has(c.id) ? at.get(c.id) : -1;
+    if (i < 0 && CM.items.length >= CM_MAX_ITEMS * 3) return;        // a file cannot grow the store without end
     // A later copy that says the same is not a change: the same file opened twice takes nothing the second time.
     const mine = CM.items[i], same = mine && mine.text === c.text && mine.state === c.state && (mine.label || '') === (c.label || '') && (mine.re || '') === (c.re || '');
-    if (i < 0) { CM.items.push(c); n++; cmTook.added++; } else if (cmWhen(c) > cmWhen(mine) && !same) { CM.items[i] = c; cmIxOf = null; n++; cmTook.changed++; }
+    if (i < 0) { at.set(c.id, CM.items.length); CM.items.push(c); n++; cmTook.added++; } else if (cmWhen(c) > cmWhen(mine) && !same) { CM.items[i] = c; cmIxOf = null; n++; cmTook.changed++; }
   });
   const had = CM.items.length;
-  CM.items = CM.items.filter(c => !(CM.gone[c.id] && CM.gone[c.id] >= cmWhen(c)) && !(c.re && CM.gone[c.re]));
+  CM.items = CM.items.filter(c => !(CM.gone[c.id] && CM.gone[c.id] >= cmWhen(c)));
+  // A reply to a comment that was deleted and is no longer there goes with it. One to a comment that came back stays.
+  const left = new Set(CM.items.map(c => c.id));
+  CM.items = CM.items.filter(c => !(c.re && CM.gone[c.re] && !left.has(c.re)));
   n += had - CM.items.length; cmTook.deleted += had - CM.items.length;
   Object.keys(src.edits).forEach(k => {
     const e = src.edits[k], g = CM.gone['edit:' + k], at = cap(typeof e.m === 'number' ? e.m : 0), mine = CM.edits[k];
@@ -1945,7 +1959,7 @@ function cmTookText() {
 }
 // The blocks found in a text, or on this page. A block that is not well formed, or is of another explanation, is left out.
 function cmBlocks(texts) {
-  return texts.map(t => { try { return cmClean(JSON.parse(t)); } catch (e) { return null; } }).filter(b => b && b.id === PAGE_ID);
+  return texts.slice(0, 200).map(t => { try { return cmClean(JSON.parse(t), true); } catch (e) { return null; } }).filter(b => b && b.id === PAGE_ID);
 }
 let cmTaken = 0;
 cmBlocks(Array.from(document.querySelectorAll('script.qx-comments')).map(el => el.textContent)).forEach(b => { cmTaken += cmMerge(b); });
@@ -2957,7 +2971,8 @@ function cmFeedback() {
   cmKeepIds(open).forEach(l => L.push(l));
   if (used.length) { L.push('Labels:'); CM_LABELS.filter(l => used.includes(l)).forEach(l => L.push('- ' + l[1] + ': ' + l[2])); L.push(''); }
   L.push(CM_ASK);
-  return L.join('\n') + '\n';
+  // No value can start a line of its own: a line break inside one is followed by the indent of a continuation.
+  return L.map(x => String(x).replace(/\r?\n(?! {3})/g, '\n   ')).join('\n') + '\n';
 }
 function cmOpenCount() { return cmTops().filter(c => c.state !== 'resolved').length + dgSrcNames().length; }
 function cmCopy(btn) {
