@@ -416,6 +416,7 @@
   .cm-rp-h button { margin-left: auto; border: 0; background: none; color: var(--muted); font-size: 11px; cursor: pointer; padding: 0 2px; }
   .cm-rp-h button:hover { color: #b3261e; text-decoration: underline; }
   .cm-rp-t { white-space: pre-wrap; overflow-wrap: anywhere; }
+  .cm-card .cm-name { display: block; width: 100%; margin-top: 6px; padding: 4px 8px; }
   .cm-card .cm-thread { max-height: 9em; overflow: auto; font-size: 12px; margin-bottom: 6px; }
   .cm-name { flex: 1 1 6rem; min-width: 0; font: inherit; font-size: 12px; padding: 2px 6px; border: 1px solid var(--border); border-radius: 4px; background: var(--bg); color: var(--text); }
   .cm-it-a button, .cm-ph button, .cm-pf button { padding: 2px 9px; border: 1px solid var(--border-strong); border-radius: 4px; background: var(--btn-bg); color: var(--text); font-size: 11.5px; cursor: pointer; }
@@ -1900,7 +1901,10 @@ function cmRoot(c) { let p = c, i = 0; while (p && p.re && i++ < 8) p = cmGet(p.
 function cmTops() { return CM.items.filter(c => !cmRoot(c)); }
 function cmReplies(c) { return CM.items.filter(x => x.re && cmRoot(x) === c).sort((a, b) => (a.t || 0) - (b.t || 0)); }
 const CM_NAME_KEY = 'qexplain-change-name';
-function cmName() { return String(lsGet(CM_NAME_KEY) || '').replace(/\s+/g, ' ').trim().slice(0, 60); }
+const CM_NAME_ASKED = 'qexplain-change-name-asked';
+const cmNameClean = v => String(v || '').replace(/\s+/g, ' ').trim().slice(0, 60);
+function cmName() { return cmNameClean(lsGet(CM_NAME_KEY)); }
+function cmNameSet(v) { lsSet(CM_NAME_KEY, cmNameClean(v)); }
 function cmBy(c) { return c.by || (c.agent ? 'Agent' : 'Reader'); }
 function cmNewId() { return 'c' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
 function cmThreadHtml(c, canDelete) {
@@ -3184,7 +3188,7 @@ function cmPanelInit() {
     + '<button type="button" class="cm-save" data-act="copy" title="Copy every open comment as one text for an agent">Copy feedback</button></div>';
   document.body.appendChild(p); cmLabsWire(p);
   const nm = p.querySelector('.cm-name'); nm.value = cmName();
-  nm.addEventListener('change', () => { lsSet(CM_NAME_KEY, nm.value.replace(/\s+/g, ' ').trim().slice(0, 60)); nm.value = cmName(); });
+  nm.addEventListener('change', () => { cmNameSet(nm.value); nm.value = cmName(); });
   p.addEventListener('click', e => {
     const b = e.target.closest('button[data-act]'), it = e.target.closest('.cm-it');
     if (b && b.dataset.act === 'copy') { cmCopy(b); return; }
@@ -3488,10 +3492,19 @@ function cmOpen(target) {
   const ta = card.querySelector('.cm-text'); ta.value = first;
   if (c && (cmReplies(c).length || c.by || c.agent)) ta.insertAdjacentHTML('beforebegin', '<div class="cm-thread">' + (c.by || c.agent ? '<div class="cm-by">' + esc(cmBy(c)) + '</div>' : '') + cmThreadHtml(c, false) + '</div>');
   ta.insertAdjacentHTML('afterend', cmLabsHtml(c ? c.label || '' : '')); cmLabsWire(card);
+  // The reader's name is asked once, in the box of the first comment written in this browser, and serves every explanation.
+  // An empty answer is an answer: the line does not come back. The name can be changed in the list of comments.
+  let nm = null;
+  if (!c && !cmName() && !lsGet(CM_NAME_ASKED)) {
+    card.querySelector('.cm-row').insertAdjacentHTML('beforebegin', '<input class="cm-name" type="text" maxlength="60" placeholder="Your name (optional, asked once)" aria-label="Your name" title="Shown beside your comments and replies when the page is shared. Kept in this browser, for every explanation.">');
+    nm = card.querySelector('.cm-name');
+    nm.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.isComposing) { e.preventDefault(); e.stopPropagation(); ta.focus(); } });
+  }
   const lab = () => cmLabOf(card), dirty = () => ta.value.trim() !== first.trim() || lab() !== (c ? c.label || '' : '');
   const save = () => {
     const text = ta.value.trim();
     if (!text) { cmNudge(); ta.focus(); return; }
+    if (nm) { cmNameSet(nm.value); lsSet(CM_NAME_ASKED, '1'); const f = document.querySelector('#cm-panel .cm-name'); if (f) f.value = cmName(); }
     if (c) { c.text = text; c.label = lab(); cmTouch(c); }
     else {
       const s = target.sel, base = { id: cmNewId(), by: cmName() || undefined, text, label: lab(), t: Date.now(), state: 'open' };

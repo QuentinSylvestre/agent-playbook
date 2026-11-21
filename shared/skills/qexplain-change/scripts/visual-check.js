@@ -1646,8 +1646,26 @@ async function routeLibs(target) {
     const rp = (rid, re, text, extra) => Object.assign({ id: rid, re, kind: 'reply', part: 'page', quote: '', text, t: T, state: 'open' }, extra || {});
     const fR = put('cm-file-replies.html', setInner(src, blk({ v: 1, id, items: [cm('c1', 'the first comment', { by: 'Long' }), rp('r1', 'c1', 'Addressed: <i>reworded</i>', { by: "Long's agent", agent: true, t: T + 1 }),
       rp('r2', 'r1', 'a reply to the reply', { t: T + 2 }), rp('r9', 'nope', 'Deferred: about a comment this page never had', { by: 'Agent', agent: true })], gone: {}, edits: {} })));
+    {
+      // The name is asked once, in the box of the first comment written in a browser, and is kept for every explanation
+      const look = q => q.evaluate(() => ({ ask: !!document.querySelector('.cm-card .cm-name'), card: !!document.querySelector('.cm-card'), ta: document.activeElement === document.querySelector('.cm-card textarea'),
+        n: CM.items.length, by: (CM.items[CM.items.length - 1] || {}).by, name: lsGet('qexplain-change-name'), asked: lsGet('qexplain-change-name-asked') }));
+      const pn = await fresh(); await open(pn, file);
+      await pn.keyboard.press('/'); await wait(200); const n1 = await look(pn);
+      if (n1.ask) { await pn.fill('.cm-card .cm-name', '  Ann   B '); await pn.focus('.cm-card .cm-name'); await pn.keyboard.press('Enter'); await wait(100); }
+      const n2 = await look(pn);
+      await pn.keyboard.type('named'); await pn.keyboard.press('Enter'); await wait(250); const n3 = await look(pn);
+      await pn.keyboard.press('/'); await wait(200); const n4 = await look(pn); await pn.keyboard.press('Escape');
+      log(n1.ask && n1.ta && n1.n === 0 && n2.card && n2.ta && n2.n === 0 && n3.n === 1 && n3.by === 'Ann B' && n3.name === 'Ann B' && n3.asked === '1' && n4.card && !n4.ask,
+        'the box of the first comment asks for a name; Enter in that line goes to the comment; the comment is saved under the name, kept under a key that belongs to no one page, and the next box does not ask');
+      const pe = await fresh(); await open(pe, file);
+      await pe.keyboard.press('/'); await wait(200); await pe.keyboard.type('unnamed'); await pe.keyboard.press('Enter'); await wait(250); const e1 = await look(pe);
+      await pe.keyboard.press('/'); await wait(200); const e2 = await look(pe); await pe.keyboard.press('Escape');
+      log(e1.n === 1 && e1.by === undefined && !e1.name && e1.asked === '1' && e2.card && !e2.ask, 'a reader who leaves the name empty is not asked again');
+      await pn.context().close(); await pe.context().close();
+    }
     const p = await fresh(); await open(p, fR);
-    const view = () => p.evaluate(() => { cmPanel(true); const it = document.querySelector('#cm-panel .cm-it[data-cid="c1"]'), orphan = document.querySelector('#cm-panel .cm-it[data-cid="r9"]');
+    const view =() => p.evaluate(() => { cmPanel(true); const it = document.querySelector('#cm-panel .cm-it[data-cid="c1"]'), orphan = document.querySelector('#cm-panel .cm-it[data-cid="r9"]');
       return { tops: [...document.querySelectorAll('#cm-panel .cm-pl > .cm-it')].map(e => e.dataset.cid).join(), by: it && (it.querySelector('.cm-by') || {}).textContent, text: it && it.querySelector('.cm-it-t').textContent,
         thread: it ? [...it.querySelectorAll('.cm-rp')].map(e => e.querySelector('b').textContent + '|' + e.querySelector('.cm-rp-t').textContent + '|' + e.classList.contains('cm-rp-agent')) : [],
         tags: it ? it.querySelectorAll('.cm-rp i').length : -1, orphan: orphan && orphan.querySelector('.cm-it-w').textContent, count: document.querySelector('#cm-panel-btn .cm-count').textContent,
