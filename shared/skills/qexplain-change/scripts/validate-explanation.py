@@ -504,6 +504,8 @@ def selftest():
             ("a block whose text is not JSON", opener + 'fetch("x")</script>', "no-runtime-fetch"),
             ("a block dressed in an attribute with JSON-shaped text", "<img alt='" + opener + '{"a":"\' onmouseover=fetch(1) x=\'"}</script>\'>', "no-runtime-fetch")):
         expect(name + " still fails", fixture(body_extra=body), check, "FAIL")
+    expect("a block whose JSON text holds a less-than sign is not set aside",
+           fixture(body_extra=opener + '{"a":"<img src=\'https://evil.example/p.png\'>"}</script>'), "remote-assets-pinned", "FAIL")
     expect("a fetch behind the text of a block inside a real script still fails",
            fixture(data='const QX = {"rawDiff": "", "excluded": []}; /*' + opener + '*/ fetch("x") //</script>'), "no-runtime-fetch", "FAIL")
     # tabs-wired
