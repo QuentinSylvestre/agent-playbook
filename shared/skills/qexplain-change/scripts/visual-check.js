@@ -88,15 +88,25 @@ const fs = require('fs'), os = require('os'), path = require('path');
 
 const args = process.argv.slice(2);
 const opt = name => { const i = args.indexOf(name); return i >= 0 ? args[i + 1] : undefined; };
-const file = args.find((a, i) => !a.startsWith('--') && !(i > 0 && args[i - 1].startsWith('--')));
-if (!file || !fs.existsSync(file)) { console.error('usage: node visual-check.js <artifact.html> [--out dir] [--libs dir] [--chromium path]'); process.exit(2); }
+let file = args.find((a, i) => !a.startsWith('--') && !(i > 0 && args[i - 1].startsWith('--')));if (!file || !fs.existsSync(file)) { console.error('usage: node visual-check.js <artifact.html> [--out dir] [--libs dir] [--chromium path]'); process.exit(2); }
 let chromium;
 try { ({ chromium } = require(process.env.PLAYWRIGHT_MODULE || 'playwright')); }
 catch (e) { console.error('ERROR\tplaywright is not installed or not resolvable (set PLAYWRIGHT_MODULE)'); process.exit(2); }
 const out = opt('--out') || fs.mkdtempSync(path.join(os.tmpdir(), 'qexplain-change-shots-'));
 fs.mkdirSync(out, { recursive: true });
 const libs = opt('--libs');
-const url = require('url').pathToFileURL(path.resolve(file)).href;
+{
+  // A page a reader saved comments into carries them over every rebuild. The checks count comments from none,
+  // so they run on a copy whose comments are taken out; the page itself is never written.
+  const t = fs.readFileSync(file, 'utf8'), OPEN = '<!--qx-comments-->', SHUT = '<!--/qx-comments-->';
+  const a = t.lastIndexOf(OPEN), b = a < 0 ? -1 : t.indexOf(SHUT, a);
+  if (b > a + OPEN.length) {
+    file = path.join(out, 'checked-' + path.basename(file));
+    fs.writeFileSync(file, t.slice(0, a + OPEN.length) + t.slice(b));
+    console.log('NOTE\tthe page holds saved comments; the checks ran on a copy without them: ' + file);
+  }
+}
+const url =require('url').pathToFileURL(path.resolve(file)).href;
 let storeKey = '';   // 'qexplain-change-diff-' + the explanation id the build wrote into the page
 
 let bad = 0, good = 0;
