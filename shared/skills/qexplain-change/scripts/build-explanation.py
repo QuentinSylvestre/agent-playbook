@@ -365,10 +365,15 @@ def capture_diff(args):
         fail(f"{exc}. Check that --repo is a git repository and that each revision exists there (git rev-parse <revision>)")
 
 
-def changed_functions(kept, args, selected):
+def changed_functions(kept, args, selected, uncalled=None):
     """Per file: the label of each hunk, the declarations it changes, and for each function its callers by name.
-    Callers need a repo, so a page built from a diff file has none; the page says so."""
-    if "diff" not in selected:
+    Callers need a repo, so a page built from a diff file has none; the page says so.
+    uncalled, when given, receives (path, name) for each function the change adds whose name stands nowhere but on
+    its declaration, in tests and in documents. It is a second search, apart from the callers the page lists: a path
+    the page leaves out counts as a use, and so does a name passed as a value.
+    The page data is for the Diff review part only; the new functions are searched whatever the parts."""
+    show = "diff" in selected
+    if not show and uncalled is None:
         return {}, False
     targets = [qd.parse_target(t) for t in args.target] if args.target else ([(None, args.repo, args.diff_args)] if args.diff_args else [])
     heads = {label: (repo, range_ends(repo, diff_args)[1]) for label, repo, diff_args in targets}
@@ -378,16 +383,35 @@ def changed_functions(kept, args, selected):
         if not info["list"] and not any(info["hunks"]):
             continue
         label, inner = (path.split("/", 1) + [""])[:2] if args.target else (None, path)
+        fresh = qd.new_functions(inner, block) if uncalled is not None else set()
         for fn in info["list"]:
-            if label not in heads or not fn["call"] or len(fn["call"]) < 3 or searched >= 80:
+            if label not in heads or not fn["call"]:
+                continue
+            # A use in any repo of the page is a use, and a search that failed anywhere settles nothing.
+            if fn["name"] in fresh and len(uncalled) < 40 and all(qd.used_outside_tests(r, h, fn["call"]) is False for r, h in heads.values()):
+                uncalled.append((path, fn["name"]))
+            repo, head = heads[label]
+            if not show or searched >= 80 or len(fn["call"]) < 3:
                 continue
             searched += 1
-            repo, head = heads[label]
             hits, total = qd.find_callers(repo, head, fn["call"], skip=args.exclude)
+            if total is None:
+                continue  # the search failed: the page shows no callers for it, rather than "no caller found"
             fn["callers"] = [[f"{label}/{p}" if label else p, line] for p, line in hits]
             fn["more"] = total - len(hits)
         out[path] = info
-    return out, bool(heads)
+    return (out, bool(heads)) if show else ({}, False)
+
+
+def uncalled_line(uncalled):
+    """What the build prints about the new functions that only their declaration, tests and documents name.
+    It is for the writer of the content; the page does not show it."""
+    names = ", ".join(f"{name} ({qd.safe_path(path)})" for path, name in uncalled[:12]) + (f" and {len(uncalled) - 12} more" if len(uncalled) > 12 else "")
+    count = f"at least {len(uncalled)}" if len(uncalled) >= 40 else str(len(uncalled))  # changed_functions stops looking at 40
+    return (f"WARN\tno use found outside tests for {count} new function{'' if len(uncalled) == 1 else 's'}: {names}. "
+            "The search is by name across the repo: a method that only an interface or a framework reaches, or a name built at run time, is not found. "
+            "For each one, name in the Brief the code that calls it, or say there that only tests call it so far. "
+            "Do not write or draw as working a path that runs through it")
 
 
 # Pictures the page can show before and after. A picture is embedded as a data: address and shown through an image
@@ -1355,7 +1379,10 @@ def main(argv=None):
     summary_out = summary_html(kept, rationales, roles, labelled, "diff" in selected) if "summary" in selected else ""
 
     mermaid_used = bool(diagrams.mermaid)
-    fns, callers_searched = changed_functions(kept, args, selected)
+    uncalled = []
+    fns, callers_searched = changed_functions(kept, args, selected, uncalled)
+    if uncalled:
+        print(uncalled_line(uncalled))
     page = strip_parts(read(TEMPLATE), selected)
     # Comments: the blocks of the page this build replaces are kept as written, then the agent's replies are added.
     page_id = explanation_id(args.out, repo_names, args.id)
@@ -1519,10 +1546,25 @@ def selftest():
         fw("vendor/lib.py", "y = helper(7)\n")  # a generated or vendored file is not a caller worth listing
         long_method = "class Big:\n    def run(self):\n" + "".join(f"        step_{i} = {i}\n" for i in range(1, 12))
         fw("m.py", long_method)  # a method whose declaration stands above the hunk of its change
+        fw("s.py", "def reshaped(a):\n    return a\n")  # nothing calls it, and the change only gives it a parameter
         fgit("add", "-A")
         fgit("commit", "-q", "-m", "seed")
         fw("a.py", "import os\n\n\nclass Tool:\n    def helper(self, x):\n        return x + 1\n\n    def other(self):\n        return self.helper(1)\n")
         fw("m.py", long_method.replace("step_9 = 9", "step_9 = 90"))
+        fw("s.py", "def reshaped(a, b=0):\n    return a\n")
+        fw("n.py", "def fresh_unused(x):\n    return x\n\n\ndef fresh_used(x):\n    return x\n\n\n@route(\"/x\")\ndef fresh_routed(x):\n    return x\n\n\n"
+                   "@route(\n    \"/y\",\n)\nasync def fresh_routed_long(x):\n    return x\n\n\ndef test_fresh(x):\n    return fresh_used(x)\n\n\ndef main():\n    return 0\n\n\n"
+                   "def fresh_tested(x):\n    return x\n\n\ndef fresh_passed(x):\n    return x\n\n\nworker = dict(target=fresh_passed)\n\n\n"
+                   "# fresh_noted is named by the comment above it\ndef fresh_noted(x):\n    return x\n\n\ndef testimonial(x):\n    return x\n\n\n"
+                   "def __enter__(x):\n    return x\n\n\n@route(\"/z\")\n# why this route\ndef fresh_routed_noted(x):\n    return x\n")
+        os.makedirs(os.path.join(fnrepo, "tests"))
+        fw("tests/test_n.py", "from n import fresh_tested\n\n\ndef test_it():\n    assert fresh_tested(1)\n\n\ndef support_only(x):\n    return x\n")
+        fw("NOTES.md", "fresh_unused(x) is planned.\n")  # a document that names a function does not call it
+        fw("r.rs", "#[test]\nfn parses_empty() {\n}\n\nfn fresh_rust() {\n}\n")
+        fw("k.kt", "@Test fun checksThing() {\n}\n\noverride fun onCreate() {\n}\n")
+        fw("g.go", "package g\n\nfunc init() {\n}\n")
+        fw("p.js", "export default function Page() {\n}\n")
+        fgit("add", "n.py", "tests/test_n.py", "NOTES.md", "r.rs", "k.kt", "g.go", "p.js")
         fgit("commit", "-q", "-am", "change helper")
         fkept = qd.filter_files(qd.split_files(qd.capture(fnrepo, "HEAD~1..HEAD")), [])[0]
         space = lambda **kw: argparse.Namespace(**{"target": None, "repo": fnrepo, "diff_args": None, "diff_file": None, "exclude": [], **kw})
@@ -1536,6 +1578,49 @@ def selftest():
         fns, searched = changed_functions(fkept, space(diff_file="x.diff"), {"diff"})
         case("a page built from a diff file names the functions and lists no callers", not searched and "callers" not in fns["a.py"]["list"][0], str(fns))
         case("a page without the Diff review part carries no function data", changed_functions(fkept, space(diff_args="HEAD~1..HEAD"), {"brief"}) == ({}, False), "")
+        # A new function that nothing calls by name
+        def uncalled_of(parts, **kw):
+            found = []
+            changed_functions(fkept, space(**kw), parts, found)
+            return found
+        lone = uncalled_of({"diff"}, diff_args="HEAD~1..HEAD")
+        expected = [("n.py", "fresh_unused"), ("n.py", "fresh_tested"), ("n.py", "fresh_noted"), ("n.py", "testimonial"), ("r.rs", "fresh_rust")]
+        case("a new function that only a test, a document or a comment names is reported; one that is called, one passed as a value, "
+             "one whose declaration only changed, one under a decorator or an attribute, a test, main, init, an override, a default export, "
+             "a name the language calls and a function of a test file are not", lone == expected, str(lone))
+        case("the search covers the whole repository when --repo names a folder inside it",
+             uncalled_of({"diff"}, repo=os.path.join(fnrepo, "tests"), diff_args="HEAD~1..HEAD") == expected, "")
+        # Two repos: a use in the other repo is a use
+        other = os.path.join(root, "fnother")
+        os.makedirs(other)
+        ogit = lambda *a: subprocess.run(["git", "-c", "user.name=Selftest", "-c", "user.email=selftest@example.invalid", "-C", other] + list(a), capture_output=True, check=True)
+        ogit("init", "-q", "-b", "main")
+        open(os.path.join(other, "u.py"), "w", encoding="utf-8", newline="\n").write("value = 1\n")
+        ogit("add", "-A")
+        ogit("commit", "-q", "-m", "seed")
+        open(os.path.join(other, "u.py"), "w", encoding="utf-8", newline="\n").write("value = fresh_unused(1)\n")
+        ogit("commit", "-q", "-am", "use it")
+        both = []
+        changed_functions([("one/" + p, b) for p, b in fkept], space(target=[f"one={fnrepo}::HEAD~1..HEAD", f"two={other}::HEAD~1..HEAD"]), {"diff"}, both)
+        case("with several repos, a use in another repo is a use", both == [("one/" + p, n) for p, n in expected[1:]], str(both))
+        real = qd.used_outside_tests, qd.find_callers
+        qd.used_outside_tests, qd.find_callers = (lambda *a, **k: None), (lambda *a, **k: ([], None))
+        try:
+            failed_fns, _ = changed_functions(fkept, space(diff_args="HEAD~1..HEAD"), {"diff"}, failed_found := [])
+        finally:
+            qd.used_outside_tests, qd.find_callers = real
+        case("when the searches fail, nothing is reported and the page lists no callers", failed_found == [] and "callers" not in failed_fns["n.py"]["list"][0], str(failed_found))
+        many = uncalled_line([("n.py", f"fn_{i}") for i in range(14)])
+        case("the build's line counts every function and names the first twelve", "for 14 new functions: fn_0 (n.py)" in many and "fn_11 (n.py) and 2 more." in many, many[:300])
+        case("the report does not depend on the Diff review part", uncalled_of({"brief"}, diff_args="HEAD~1..HEAD") == lone, "")
+        case("a path the page leaves out still counts as a use", uncalled_of({"diff"}, diff_args="HEAD~1..HEAD", exclude=["n.py"]) == lone, "")
+        case("a page built from a diff file reports no uncalled function: nothing was searched", uncalled_of({"diff"}, diff_file="x.diff") == [], "")
+        case("a search that failed is not a search that found nothing",
+             qd.find_callers(fnrepo, "no-such-revision", "helper") == ([], None) and qd.used_outside_tests(fnrepo, "no-such-revision", "helper") is None,
+             str(qd.find_callers(fnrepo, "no-such-revision", "helper")))
+        line = uncalled_line([("n.py", "fresh_unused")])
+        case("the build's line names the function and its file, and says what to write",
+             line.startswith("WARN\tno use found outside tests for 1 new function: fresh_unused (n.py).") and "Brief" in line, line)
         case("the capture uses git's per-language rule: a change in a method is headed by the method, not by its class",
              bool(re.search(r"^@@ [^@]+ @@ def run\(self\):$", qd.capture(fnrepo, "HEAD~1..HEAD"), re.M)), qd.capture(fnrepo, "HEAD~1..HEAD")[-300:])
 
@@ -1618,6 +1703,8 @@ def selftest():
         case("a page without the Diff review part loads no highlighter", "highlight.min.js" not in page and "<!--@HLJS-->" not in page, "")
         rc, log, page = run("brief-diff", std)
         case("brief and diff page", rc == 0 and 'id="part-diff"' in page and "diff --git" in page, log[-300:])
+        u_rc, u_log, _ = run("uncalled", std + ["--parts", "brief"], base_args=["--repo", fnrepo, "--diff-args", "HEAD~1..HEAD"])
+        case("the build prints the new functions nothing uses, whatever the parts", u_rc == 0 and "WARN\tno use found outside tests for 5 new functions: fresh_unused (n.py)" in u_log, u_log[-400:])
         # A credential-shaped value on the line git prints after the second @@
         crepo = os.path.join(root, "crepo")
         os.makedirs(crepo)

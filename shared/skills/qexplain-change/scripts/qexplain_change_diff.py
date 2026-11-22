@@ -373,6 +373,47 @@ def hunk_functions(path, block):
     return {"hunks": labels, "list": [{k: f[k] for k in ("kind", "name", "call", "sig")} for f in found]}
 
 
+# Names nothing calls by name although they run: a test, an entry point, a method the language calls.
+_RUN_BY_OTHERS = re.compile(r"^(test(_|[A-Z]|$)|Test([A-Z_]|$)|main$|init$|__\w+__$)")
+# A declaration the language or a framework reaches without a call by name: an annotation on its own line, an
+# override, the default export of a module.
+_REACHED_OTHERWISE = re.compile(r"^\s*(@|#\[)|\boverride\b|^\s*export\s+default\b")
+_COMMENT_LINE = re.compile(r"^\s*(//|/\*|\*|#(?![\[!]))")
+
+
+def new_functions(path, block):
+    """The names of the functions one file's diff adds, read from the diff alone: a declaration on an added line, with
+    no declaration of the same name on a removed line (that one only changed). Left out, because a search for uses
+    by name says nothing about them: a test file, a function under a decorator, an annotation or an attribute (a
+    route, a handler, a fixture), an override, a default export, a test, main, init, and a name the language calls
+    itself. A method that only an interface reaches is not left out: nothing in the diff tells it apart."""
+    ext = ext_of(path)
+    if ext not in DECLS or TEST_PATH.search(path) or TEST_CLASS.search(path):
+        return set()
+    added, removed = set(), set()
+    for hunk in parse_hunks(block):
+        marked = None  # the indentation of the decorator that stands above the line being read, on the new side
+        for line in hunk["lines"]:
+            mark, text = line[:1], line[1:]
+            if mark == "\\" or not text.strip():
+                continue
+            decl = read_decl(ext, text)
+            if decl and decl["call"] and mark == "-":
+                removed.add(decl["name"])
+            if mark == "-":
+                continue
+            indent = len(text) - len(text.lstrip())
+            if decl:
+                if decl["call"] and mark == "+" and marked is None and not _RUN_BY_OTHERS.match(decl["call"]) and not _REACHED_OTHERWISE.search(text):
+                    added.add(decl["name"])
+                marked = None
+            elif text.lstrip().startswith(("@", "#[")):
+                marked = indent if marked is None else marked
+            elif marked is not None and not (indent > marked or (indent == marked and text.strip()[0] in ")]}") or _COMMENT_LINE.match(text)):
+                marked = None  # the decorator ended on something that is not a declaration
+    return added - removed
+
+
 def hunk_line_numbers(block):
     """The line numbers one file's diff shows: (those of the old side, those of the new side)."""
     old, new = set(), set()
@@ -529,28 +570,56 @@ def hunk_kinds(files):
     return out
 
 
+def _grep_word(repo, rev, word):
+    """Every line of the tracked files that holds a whole word: [(path from the top of the repository, line number,
+    text)], at rev or in the working tree when rev is None. The whole repository is searched, also when repo names a
+    folder inside it. None when git could not search."""
+    cmd = ["git", "-C", repo, "-c", "core.quotepath=off", "grep", "--full-name", "-z", "-n", "-I", "-w", "-F", "-e", word] + ([rev] if rev else []) + ["--", ":/"]
+    proc = subprocess.run(cmd, capture_output=True)
+    if proc.returncode not in (0, 1):
+        return None
+    rows = []
+    for row in proc.stdout.decode("utf-8", "replace").split("\n"):
+        parts = row.split("\0", 2)
+        if len(parts) == 3 and parts[1].isdigit():
+            rows.append((parts[0][len(rev) + 1:] if rev and parts[0].startswith(rev + ":") else parts[0], int(parts[1]), parts[2]))
+    return rows
+
+
 def find_callers(repo, rev, call, limit=8, skip=()):
     """Places where a name is called, by name alone: the tracked files of the repo (at rev, or the working tree when
     rev is None) are searched for the name as a whole word followed by an opening parenthesis. Declarations of that
-    name, generated files and files with secret-looking names are left out. Returns ([(path, line)], total found).
+    name, generated files and files with secret-looking names are left out. Returns ([(path, line)], total found);
+    the total is None when the search itself failed, which is not the same as finding nothing.
     This is a text search: another function with the same name matches too, and a call through a variable does not."""
-    cmd = ["git", "-C", repo, "-c", "core.quotepath=off", "grep", "-z", "-n", "-I", "-w", "-F", "-e", call] + ([rev] if rev else []) + ["--"]
-    proc = subprocess.run(cmd, capture_output=True)
-    if proc.returncode not in (0, 1):
-        return [], 0
+    rows = _grep_word(repo, rev, call)
+    if rows is None:
+        return [], None
     used = re.compile(r"(?<![\w.])" + re.escape(call) + r"\s*\(|\." + re.escape(call) + r"\s*\(")
     hits = []
-    for row in proc.stdout.decode("utf-8", "replace").split("\n"):
-        parts = row.split("\0", 2)
-        if len(parts) != 3 or not parts[1].isdigit():
-            continue
-        path = parts[0][len(rev) + 1:] if rev and parts[0].startswith(rev + ":") else parts[0]
-        decl = read_decl(ext_of(path), parts[2])
-        if (decl and decl["call"] == call) or not used.search(parts[2]) or secret_named(path) or GENERATED_PATH.search(path) \
+    for path, line, text in rows:
+        decl = read_decl(ext_of(path), text)
+        if (decl and decl["call"] == call) or not used.search(text) or secret_named(path) or GENERATED_PATH.search(path) \
                 or any(pattern_matches(path, pattern) for pattern in skip):  # a path the page was told to leave out is not named as a caller either
             continue
-        hits.append((path, int(parts[1])))
+        hits.append((path, line))
     return hits[:limit], len(hits)
+
+
+def used_outside_tests(repo, rev, call):
+    """Whether a name stands anywhere in the tracked files (at rev, or the working tree when rev is None) other than
+    on its own declaration, in a test file, in a document or on a comment line. Any other mention counts, with or
+    without a parenthesis: a function passed as a value is used. None when the search itself failed.
+    A text search, like find_callers: a mention inside the function's own body counts too."""
+    rows = _grep_word(repo, rev, call)
+    if rows is None:
+        return None
+    for path, _, text in rows:
+        decl = read_decl(ext_of(path), text)
+        if not (decl and decl["call"] == call) and not _COMMENT_LINE.match(text) \
+                and not TEST_PATH.search(path) and not TEST_CLASS.search(path) and not DOC_PATH.search(path):
+            return True
+    return False
 
 
 def normalise(pattern):
