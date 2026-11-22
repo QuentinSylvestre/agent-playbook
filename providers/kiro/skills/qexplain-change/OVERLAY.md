@@ -28,3 +28,4 @@ Copy each figure with the name its source gives it. Do not turn "accepted by the
 
 - Copy each comment id from its `Id:` line, character for character. Never write an id from memory or from the comment's number.
 - When the build prints a WARN that a reply was not added, say so in your report. Do not run the build again with the same file.
+- `by` is the name of the person you work for, never "Agent" and never your own name. Leave it out when you do not know the name.
