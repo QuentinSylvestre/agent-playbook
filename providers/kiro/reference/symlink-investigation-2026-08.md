@@ -52,7 +52,7 @@ This table is **capability**, not as-shipped behaviour. Cells marked † need a 
 **Reaching each †**, each verified with a throwaway probe agent:
 
 - **v3 nested under a symlinked category** — add `skill://~/.kiro/skills/*/*/SKILL.md`.
-- **v3 user-tier steering subfolder** — in `kiro_default.md`, `file://~/.kiro/steering/*.md` → `**/*.md`. (`kiro_default.md` currently declares only the non-recursive form; nothing is nested under `~/.kiro/steering/` as deployed today, so this cell is untested capability, not a live gap.)
+- **v3 user-tier steering subfolder** — in `kiro_default.md`, `file://~/.kiro/steering/*.md` → `**/*.md`. (Superseded 2026-11-24: `kiro_default.md` declares no steering folder; see the next section.) (`kiro_default.md` currently declares only the non-recursive form; nothing is nested under `~/.kiro/steering/` as deployed today, so this cell is untested capability, not a live gap.)
 
 Two consequences:
 
