@@ -1,0 +1,5 @@
+MISSING	memory/topics/kiro-cli.md	providers/kiro/steering/local-data.md:not-always-loaded
+OK	memory/topics/powershell.md	providers/kiro/steering/powershell-syntax.md
+OK	memory/topics/git.md	providers/kiro/steering/always-marked.md
+MISSING	memory/topics/http-testing.md	memory/MEMORY.md:not-always-loaded
+SUMMARY	ok=2	waived=0	missing=2

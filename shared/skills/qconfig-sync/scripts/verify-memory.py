@@ -100,7 +100,9 @@ every backticked span of the last cell is a candidate citer (a " § <anchor>" su
 `AGENTS.md` naming the repo root's AGENTS.md). A row is OK when one candidate (a) matches the citer-path
 allowlist ([A-Za-z0-9._-] segments joined by single `/`, no segment ending in `.`), (b) exists as a file,
 (c) is UTF-8 text, (d) contains the topic path, and (e) is accepted: an inventory.tsv destination of
-~/.claude/CLAUDE.md, ~/.codex/AGENTS.md, ~/.gemini/GEMINI.md or under ~/.kiro/steering/ (four-field rows,
+~/.claude/CLAUDE.md, ~/.codex/AGENTS.md, ~/.gemini/GEMINI.md or under ~/.kiro/steering/ (a steering source whose
+frontmatter sets `inclusion:` to anything but `always` is on demand, and a source under memory/ is never a
+home; four-field rows,
 `#` comments skipped), shared/skills/<name>/SKILL.md, providers/<p>/skills/<name>/SKILL.md with no sibling
 OVERLAY.md, or the root AGENTS.md. A row with no passing citer is still OK when its last cell holds the
 waiver "(no always-loaded home — index only)". Otherwise the detail is "none-cited", or
@@ -577,9 +579,29 @@ def _deploy_model():
     return mod
 
 
-def accepted_sources(inv_lines):
-    """The sources of the inventory rows whose destination loads at session start. A malformed row
-    stops the check (exit 2), as it stops setup."""
+def steering_on_demand(path):
+    """True when a Kiro steering file's frontmatter sets `inclusion:` to anything but `always` (`manual`,
+    `auto`, `fileMatch`): Kiro then does not load it at session start. No frontmatter, or an unreadable
+    file, is always loaded (the file tests themselves report an unreadable citer)."""
+    try:
+        with open(path, "r", encoding="utf-8-sig", errors="replace") as fh:
+            lines = fh.read().splitlines()
+    except OSError:
+        return False
+    if not lines or lines[0].strip() != "---":
+        return False
+    for line in lines[1:]:
+        if line.strip() == "---":
+            return False
+        if line.startswith("inclusion:"):
+            return line[len("inclusion:"):].strip().strip("\"'") not in ("", "always")
+    return False
+
+
+def accepted_sources(inv_lines, repo=None):
+    """The sources of the inventory rows whose destination loads at session start. A Kiro steering row
+    counts only when its source (under `repo`) is not marked on demand. A malformed row stops the check
+    (exit 2), as it stops setup."""
     dm = _deploy_model()
     try:
         entries = dm.parse_manifest("\n".join(inv_lines))
@@ -588,17 +610,22 @@ def accepted_sources(inv_lines):
     out = []
     for e in entries:
         dest, src = e.dest, e.source
-        if not src:
+        # A memory file is never a citation home: the Topics index itself lists every topic path, so accepting
+        # the Kiro memory links (~/.kiro/steering/playbook-*.md -> memory/*.md) would let a row cite the index.
+        if not src or src.startswith("memory/"):
             continue
-        if dest in ACCEPTED_DESTS or (dest.startswith(KIRO_STEERING) and len(dest) > len(KIRO_STEERING)):
+        if dest in ACCEPTED_DESTS:
             out.append(src)
+        elif dest.startswith(KIRO_STEERING) and len(dest) > len(KIRO_STEERING):
+            if repo is None or not steering_on_demand(os.path.join(repo, *src.split("/"))):
+                out.append(src)
     return out
 
 
 def topic_check(ME, repo, mem_data, inv_data):
     """-> ([(line_no, topic, detail)] for every MISSING row, in table order; {every row's topic path}).
     Raises CouldNotRun."""
-    inv = accepted_sources(read_lines(inv_data))
+    inv = accepted_sources(read_lines(inv_data), repo)
     mem_lines = read_lines(mem_data)
     secs = ME.sections(mem_data.decode("utf-8"))
     start = next((no for name, no in secs if name == "Topics"), None)
@@ -1034,7 +1061,7 @@ def selftest():
 
         # --- the 13 former verify-topics fixture cases ---
         cases = topic_fixture_cases()
-        chk("expected.tsv lists 14 cases", len(cases) == 14, str(len(cases)))
+        chk("expected.tsv lists 15 cases", len(cases) == 15, str(len(cases)))
         for case, want, transform, errsub in cases:
             d = prepare_topic_case(tmp, case, transform)
             rc, pairs, err = run_topics(d)

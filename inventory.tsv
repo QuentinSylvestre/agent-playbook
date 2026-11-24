@@ -59,15 +59,14 @@ symlink-file	~/.gemini/AUTHORING.md	shared/AUTHORING.md	gemini
 
 # --- Kiro (always-copy, both modes) ---
 # AUTHORING.md is deliberately NOT a kiro steering entry: Kiro
-# auto-loads everything under ~/.kiro/steering/, which would make this lazily-read
-# authoring reference always-resident. kiro-always copies it outside steering.
+# loads every ~/.kiro/steering/ file without `inclusion:` frontmatter at every session start,
+# which would make this lazily-read authoring reference always-resident. kiro-always copies it
+# outside steering.
 copy-file	~/.kiro/AUTHORING.md	shared/AUTHORING.md	kiro-always
-# The agent definition is a template: its `resources` list carries a double-quoted
-# "file://{{PLAYBOOK_ROOT}}/memory/*.md" entry so the two global tiers (user
-# MEMORY.md and HIGHER_ORDER.md) load from wherever this repo lives on the machine
-# (see the template-file note above). The workspace-relative file://memory/*.md
-# loads only an in-workspace memory/ on a workspace-root start; project memory is
-# in the store repo since plan 261016 (see kiro-guidelines.md).
+# The agent definition is a template (see the template-file note above). Its `resources`
+# list declares nothing Kiro already loads by itself (steering folders, the workspace
+# AGENTS.md, memory): kiro-cli caps declared resources at 32 files and 99,000 characters,
+# 50,000 per file, and a duplicate copy used up that budget (kiro-guidelines.md).
 template-file	~/.kiro/agents/kiro_default.md	providers/kiro/agents/kiro_default.md	kiro-always
 # The read-only child for the /qdream sweep. It has no placeholder, so it is a plain
 # copy. Kiro exposes it as the tool subagent_qdream_child (providers/kiro/skills/qdream).
@@ -90,3 +89,8 @@ symlink-file	~/.kiro/steering/kiro-governance-discipline.md	providers/kiro/steer
 symlink-file	~/.kiro/steering/session-tab-title.md	providers/kiro/steering/session-tab-title.md	kiro
 symlink-file	~/.kiro/steering/subagent-session-recovery.md	providers/kiro/steering/subagent-session-recovery.md	kiro
 symlink-file	~/.kiro/steering/mcp-troubleshooting.md	providers/kiro/steering/mcp-troubleshooting.md	kiro
+# User memory and the higher-order tier, delivered in full at every session start: Kiro loads
+# every ~/.kiro/steering/ file itself, links included, with no size cap (the resources cap does
+# not apply). Same sources and no-source SKIP as the Claude rules links above.
+symlink-file	~/.kiro/steering/playbook-user-memory.md	memory/MEMORY.md	kiro
+symlink-file	~/.kiro/steering/playbook-higher-order.md	memory/HIGHER_ORDER.md	kiro

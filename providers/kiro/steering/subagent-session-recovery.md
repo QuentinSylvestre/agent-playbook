@@ -1,3 +1,8 @@
+---
+inclusion: auto
+name: subagent-session-recovery
+description: "Read when a kiro-cli sub-agent or workflow step hangs, is interrupted or returns no deliverable, to recover its output from the session files."
+---
 ## Subagent Session Recovery
 
 Reference for extracting deliverables from interrupted or hung kiro-cli v3 subagent sessions. Format details: see `kiro-cli-local-data.md`. For a retired v2 subagent session, see `providers/kiro/reference/kiro-cli-v2-local-data.md`.

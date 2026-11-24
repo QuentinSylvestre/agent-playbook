@@ -1,3 +1,8 @@
+---
+inclusion: auto
+name: kiro-cli-local-data
+description: "Read when reading kiro-cli's own local data: session folders, session.json fields, the workspace hash, the session index, or KIRO_* environment variables."
+---
 ## Kiro-CLI Local Data
 
 > **Also read `memory/topics/kiro-cli.md` in the config repo** when *driving* kiro-cli rather than

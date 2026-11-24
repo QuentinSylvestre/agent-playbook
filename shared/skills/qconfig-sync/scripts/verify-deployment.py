@@ -24,8 +24,8 @@ Inventory sources:
     overlay-bearing skills as copy-dir-recursive plus one merge-file row per
     merged target. Steering is symlinked on every platform (mode `kiro`);
     Windows copy mode was retired 2026-09-20.
-  - The Claude memory rows (~/.claude/rules/playbook-user-memory.md and
-    playbook-higher-order.md) link to <repo>/memory/MEMORY.md and HIGHER_ORDER.md,
+  - The memory rows (playbook-user-memory.md and playbook-higher-order.md, under
+    ~/.claude/rules/ and ~/.kiro/steering/) link to <repo>/memory/MEMORY.md and HIGHER_ORDER.md,
     behind the repo's gitignored memory link. While that source is absent (no
     user memory in the store repo yet) setup makes no link, and the row is
     SKIP no-source=<path>; a link into the repo left there (dangling) is
@@ -872,12 +872,7 @@ class Verifier(object):
             dest, source = self.expand_dest(raw_dest), self.expand_source(raw_source)
             if mode == "gemini" and self.win and kind not in (KIND_SYMLINK_FILE, KIND_SYMLINK_DIR):
                 continue   # the .ps1 checks only the two symlink kinds here; the .sh checks every row
-            if raw_source.startswith("memory/") and not os.path.exists(source):
-                if self.engine_link(dest):
-                    # setup removes a link it made once the source is gone; one still there is dangling
-                    self.emit("MISSING", dest, "target=" + self._link_text(dest), "dangling-no-source=" + source)
-                else:
-                    self.emit("SKIP", dest, "no-source=" + source)
+            if self.memory_source_absent(raw_source, dest, source):
                 continue
             side = SIDE_LINKS.get(raw_dest)
             gemini = raw_dest == GEMINI_INSTRUCTIONS
@@ -887,6 +882,18 @@ class Verifier(object):
             self.check_symlink(dest, source)
             if side:
                 self.check_double_load(dest, self.join(self.home, side), gemini)
+
+    def memory_source_absent(self, raw_source, dest, source):
+        """A row whose source is in the gitignored memory/ and absent (no user memory yet): SKIP, or
+        MISSING when a link setup made is still there, dangling. True when the row is handled."""
+        if not (raw_source.startswith("memory/") and not os.path.exists(source)):
+            return False
+        if self.engine_link(dest):
+            # setup removes a link it made once the source is gone; one still there is dangling
+            self.emit("MISSING", dest, "target=" + self._link_text(dest), "dangling-no-source=" + source)
+        else:
+            self.emit("SKIP", dest, "no-source=" + source)
+        return True
 
     def _is_link(self, path):
         return os.path.islink(path) or bool(self.win and _ps_link_type(path))
@@ -1057,8 +1064,12 @@ class Verifier(object):
                     self.check_seed_file(dest, source)
                 else:
                     self.check_copy_file(dest, source)
-            for _kind, dest, source in self._mode_rows("kiro"):
-                self.check_symlink(dest, source)
+            for _kind, raw_dest, raw_source, m in self.manifest:
+                if m != "kiro":
+                    continue
+                dest, source = self.expand_dest(raw_dest), self.expand_source(raw_source)
+                if not self.memory_source_absent(raw_source, dest, source):
+                    self.check_symlink(dest, source)
             for skill in self.list_skills(self.shared_skills):
                 overlay_dir = self.join(self.kiro_overlay_root, skill)
                 dest = self.join(self.kiro_top, "skills/" + skill)
@@ -1302,6 +1313,7 @@ def _st_build(base, links):
                     "symlink-file\t~/.codex/AGENTS.md\tshared/AGENTS.md\tcodex",
                     "symlink-file\t~/.gemini/GEMINI.md\tshared/AGENTS.md\tgemini"]
         inv.append("symlink-file\t~/.kiro/steering/agents.md\tshared/AGENTS.md\tkiro")
+        inv.append("symlink-file\t~/.kiro/steering/playbook-user-memory.md\tmemory/MEMORY.md\tkiro")
     _w(os.path.join(repo, "inventory.tsv"), "\n".join(inv) + "\n")
     _w(os.path.join(repo, "setup.sh"), b"#!/bin/sh\n")
     _w(os.path.join(repo, "setup.ps1"), b"# stub\n")
@@ -1570,21 +1582,27 @@ def _st_cases(tmp, links, skip_reason):
         # The memory rows: no source (no user memory yet) -> SKIP; the link to it -> OK; no link -> MISSING.
         repo, home, env = fresh()
         rc, out, _ = _st_run(repo, env)
-        check(rc == 0 and has(out, "SKIP", ".claude/rules/playbook-user-memory.md", "no-source="),
-              "a memory row whose source is absent -> SKIP no-source=")
+        check(rc == 0 and has(out, "SKIP", ".claude/rules/playbook-user-memory.md", "no-source=")
+              and has(out, "SKIP", ".kiro/steering/playbook-user-memory.md", "no-source="),
+              "a memory row whose source is absent -> SKIP no-source=, the Claude rules row and the Kiro steering row")
         _w(os.path.join(repo, "memory", "MEMORY.md"), b"# Memory\n")
         rc, out, _ = _st_run(repo, env)
-        check(rc == 1 and has(out, "MISSING", ".claude/rules/playbook-user-memory.md"),
-              "a memory row whose source exists but has no link -> MISSING")
+        check(rc == 1 and has(out, "MISSING", ".claude/rules/playbook-user-memory.md")
+              and has(out, "MISSING", ".kiro/steering/playbook-user-memory.md"),
+              "a memory row whose source exists but has no link -> MISSING (Claude and Kiro)")
         mklink(os.path.join(repo, "memory", "MEMORY.md"), os.path.join(home, ".claude", "rules", "playbook-user-memory.md"))
+        mklink(os.path.join(repo, "memory", "MEMORY.md"), os.path.join(home, ".kiro", "steering", "playbook-user-memory.md"))
         rc, out, _ = _st_run(repo, env)
-        check(rc == 0 and has(out, "OK", ".claude/rules/playbook-user-memory.md"), "a memory rules link -> OK")
+        check(rc == 0 and has(out, "OK", ".claude/rules/playbook-user-memory.md")
+              and has(out, "OK", ".kiro/steering/playbook-user-memory.md"), "a memory link -> OK (Claude and Kiro)")
         # ... and the source gone again (no user memory): the link setup made is dangling -> MISSING, not SKIP.
         os.remove(os.path.join(repo, "memory", "MEMORY.md"))
         rc, out, _ = _st_run(repo, env)
         check(rc == 1 and has(out, "MISSING", ".claude/rules/playbook-user-memory.md", "target=")
-              and not has(out, "SKIP", ".claude/rules/playbook-user-memory.md"),
-              "a dangling memory rules link -> MISSING, not SKIP no-source= (rc=%d)" % rc)
+              and not has(out, "SKIP", ".claude/rules/playbook-user-memory.md")
+              and has(out, "MISSING", ".kiro/steering/playbook-user-memory.md", "target=")
+              and not has(out, "SKIP", ".kiro/steering/playbook-user-memory.md"),
+              "a dangling memory link -> MISSING, not SKIP no-source= (Claude and Kiro; rc=%d)" % rc)
         # The real layout: the repo's memory is a link to the store repo's user/memory, outside the repo.
         repo, home, env = fresh()
         store_mem = os.path.join(os.path.dirname(repo), "stores", "user", "memory")
@@ -1853,6 +1871,8 @@ def selftest():
             ("a co-existence link beside the instruction-file link is never reported", Verifier, "check_double_load",
              lambda self, dest, side, gemini: None),
             ("a dangling memory rules link reads as no source", Verifier, "engine_link", lambda self, path: False),
+            ("a memory row with no source is never skipped", Verifier, "memory_source_absent",
+             lambda self, raw_source, dest, source: False),
             ("a memory row with no source is checked anyway", Verifier, "check_link_row",
              lambda self, mode: [self.check_symlink(d, src) for _k, d, src in self._mode_rows(mode)]),
         ]

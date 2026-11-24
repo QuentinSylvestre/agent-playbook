@@ -1984,6 +1984,8 @@ def deploy_kiro():
         if e.mode != "kiro":
             continue
         dest = dm.expand_dest(e.dest, HOME, KIRO_IDE, WIN)
+        if memory_source_missing(e.source, pj(REPO, e.source), dest):
+            continue
         need_dir(parent(dest))
         link_file(pj(REPO, e.source), dest)
 

@@ -1,3 +1,8 @@
+---
+inclusion: auto
+name: mcp-troubleshooting
+description: "Read when an MCP server fails to connect, authenticate or list its tools in kiro-cli or the Kiro IDE, or before editing an mcp.json file."
+---
 ## MCP Troubleshooting
 
 ### Agent-level mcpServers override global mcp.json

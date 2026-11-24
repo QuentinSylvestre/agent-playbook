@@ -21,3 +21,4 @@ inventory-utf16	2	-	inventory.tsv is not UTF-8 text
 malformed-row	2	-	malformed Topics row (expected 3 cells, found 2)
 dot-segments	1	-	-
 empty-table	0	-	-
+on-demand-steering	1	-	-

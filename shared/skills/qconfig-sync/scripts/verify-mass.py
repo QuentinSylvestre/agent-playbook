@@ -41,18 +41,29 @@ the repo sources and inventory.tsv, never the live home, so the numbers are the 
           (agent-playbook.md, and the links to memory/MEMORY.md and memory/HIGHER_ORDER.md).
   codex   the ~/.codex/AGENTS.md target.
   gemini  the ~/.gemini/GEMINI.md target, or ~/.gemini/AGENT-PLAYBOOK.md when the inventory deploys it.
-  kiro    every ~/.kiro/steering/*.md row, the agent definition providers/kiro/agents/kiro_default.md, and the
-          `file://{{PLAYBOOK_ROOT}}/...` resources of that definition expanded under the repo (the two
-          memory/*.md tiers). Workspace-relative resources (`file://AGENTS.md`, `file://memory/*.md`) are not
-          counted: the workspace is unknown here.
+  kiro    every ~/.kiro/steering/*.md row whose source has no `inclusion:` frontmatter or `inclusion: always`
+          (the memory links included; a `manual`, `auto` or `fileMatch` row is listed as `<file>=<inclusion>`
+          and adds 0), the agent definition providers/kiro/agents/kiro_default.md, and any
+          `file://{{PLAYBOOK_ROOT}}/...` resources of that definition expanded under the repo.
+          Workspace-relative resources (`file://README.md`) are not counted: the workspace is unknown here.
+
+Kiro resource cap (counts toward the exit code). One line after the TOTAL lines:
+  RESOURCES\\tkiro\\t<C> chars in <F> files\\t(limits ...; not counted: <entries>)
+kiro-cli loads an agent's declared `resources:` in declaration order up to 32 files and 99,000 characters,
+50,000 per file (measured on kiro-cli 3.5.0), and cuts the rest; steering Kiro loads itself is not capped.
+An `OVER\\tkiro-resources\\t<why>\\t<detail>` line, and exit 1, for a declaration that repeats what Kiro loads
+itself (`file://AGENTS.md`, a steering folder, `file://memory/`, the playbook memory glob), a declared
+playbook file over 50,000 characters, or a total over the file or character limit. Characters are Python
+string length after UTF-8 decoding with a BOM dropped.
 A file named by the inventory but absent from the repo (memory/ is a link that CI does not have) prints as
 `<file>=missing` and adds 0. Skills: shared/skills/* with a SKILL.md (not `synced`), plus for Kiro the
 providers/kiro/skills/* folders with a SKILL.md and no OVERLAY.md. A failure computing them prints a WARN
 line, never an error.
 
 Exit codes:
-  0   all measured files at or under their word budget.
-  1   one or more measured files over budget (raise the ceiling in-diff if the growth is deliberate).
+  0   all measured files at or under their word budget, and no OVER kiro-resources line.
+  1   one or more measured files over budget (raise the ceiling in-diff if the growth is deliberate), or an
+      OVER kiro-resources line (fix the agent template's `resources:`; no ceiling to raise).
   2   precondition failure (repo-root argument missing, repo path invalid, or a measured file missing),
       or the venv guard did not pass, or an unexpected error (for example a measured file unreadable):
       "verify-mass.py: guard did not run: <reason>" on stderr, after any rows already printed.
@@ -190,6 +201,12 @@ def _run(argv, budgets, totals, out, err):
         out.append(REMEDIATION)
     if totals:
         out.extend(total_lines(repo))
+        try:
+            rlines, rover = kiro_resource_check(repo)
+        except Exception as exc:
+            rlines, rover = ["WARN\tRESOURCES not computed (%s: %s)" % (type(exc).__name__, exc)], 0
+        out.extend(rlines)
+        over += rover
     return (1 if over else 0), out, err
 
 
@@ -200,15 +217,42 @@ AGENT_TEMPLATE_DEST = "~/.kiro/agents/kiro_default.md"
 PLAYBOOK_ROOT_PREFIX = "file://{{PLAYBOOK_ROOT}}/"
 
 
+KIRO_STEERING = "~/.kiro/steering/"
+# kiro-cli's cap on an agent's declared `resources:` (measured on 3.5.0, server code BoundedReader): 32 files and
+# 100,000 characters less the 1,000 it keeps for its notice, and 50,000 per file. Steering Kiro loads itself is not capped.
+KIRO_RESOURCE_FILES, KIRO_RESOURCE_CHARS, KIRO_RESOURCE_FILE_CHARS = 32, 99000, 50000
+# Declarations that repeat what Kiro already loads itself: they spend the capped budget on a second copy.
+KIRO_SELF_LOADED = ("file://AGENTS.md", "file://.kiro/steering/", "file://~/.kiro/steering/", "file://memory/",
+                    PLAYBOOK_ROOT_PREFIX + "memory/")
+
+
 def _always_loaded(client, dest):
-    """True when the client reads the file at `dest` (an inventory destination) at every session start."""
+    """True when the client reads the file at `dest` (an inventory destination) at every session start. For a
+    Kiro steering row this is the deploy-path half; `steering_inclusion` decides the frontmatter half."""
     if client == "claude":
         return dest == "~/.claude/CLAUDE.md" or (dest.startswith("~/.claude/rules/") and dest.endswith(".md"))
     if client == "codex":
         return dest == "~/.codex/AGENTS.md"
     if client == "gemini":
         return dest in ("~/.gemini/GEMINI.md", "~/.gemini/AGENT-PLAYBOOK.md")
-    return (dest.startswith("~/.kiro/steering/") and dest.endswith(".md")) or dest == AGENT_TEMPLATE_DEST
+    return (dest.startswith(KIRO_STEERING) and dest.endswith(".md")) or dest == AGENT_TEMPLATE_DEST
+
+
+def steering_inclusion(path):
+    """A Kiro steering file's `inclusion:` frontmatter value, or "always" when it has none. Kiro loads only
+    `always` steering at session start; `manual`, `auto` and `fileMatch` load on request or on a match."""
+    try:
+        lines = _read(path).splitlines()
+    except OSError:
+        return "always"
+    if not lines or lines[0].strip() != "---":
+        return "always"
+    for line in lines[1:]:
+        if line.strip() == "---":
+            break
+        if line.startswith("inclusion:"):
+            return line[len("inclusion:"):].strip().strip("\"'") or "always"
+    return "always"
 
 
 def _load_deploy_model():
@@ -261,13 +305,9 @@ def description_words(skill_md):
     return 0
 
 
-def _agent_resources(repo, template):
-    """-> [repo-relative file] the agent template's `resources:` list loads from the playbook checkout: each
-    `file://{{PLAYBOOK_ROOT}}/<glob>` entry, expanded under the repo (a glob without `**` matches one level).
-    Entries relative to the workspace or the home folder are not counted: the workspace is unknown here, and
-    the steering ones are already counted through the inventory."""
-    import glob
-    found = []
+def _declared_resources(template):
+    """-> [entry] the agent template's `resources:` list, in declaration order, quotes dropped."""
+    entries = []
     inside = False
     for line in _read(template).splitlines():
         if line.strip() == "---" and inside:
@@ -279,13 +319,66 @@ def _agent_resources(repo, template):
             break
         item = line.strip()
         if inside and item.startswith("- "):
-            item = item[2:].strip().strip("\"'")
-            if item.startswith(PLAYBOOK_ROOT_PREFIX):
-                pattern = os.path.join(repo, *item[len(PLAYBOOK_ROOT_PREFIX):].split("/"))
-                for path in sorted(glob.glob(pattern)):
-                    if os.path.isfile(path):
-                        found.append(os.path.relpath(path, repo).replace(os.sep, "/"))
-    return found
+            entries.append(item[2:].strip().strip("\"'"))
+    return entries
+
+
+def _expand_root(repo, entry):
+    """-> [repo-relative file] a `file://{{PLAYBOOK_ROOT}}/<glob>` entry expanded under the repo (a glob without
+    `**` matches one level), sorted; [] for any other entry."""
+    import glob
+    if not entry.startswith(PLAYBOOK_ROOT_PREFIX):
+        return []
+    pattern = os.path.join(repo, *entry[len(PLAYBOOK_ROOT_PREFIX):].split("/"))
+    return [os.path.relpath(p, repo).replace(os.sep, "/") for p in sorted(glob.glob(pattern)) if os.path.isfile(p)]
+
+
+def _agent_resources(repo, template):
+    """-> [repo-relative file] the agent template's `resources:` list loads from the playbook checkout: each
+    `file://{{PLAYBOOK_ROOT}}/<glob>` entry, expanded under the repo. Entries relative to the workspace or the
+    home folder are not counted: the workspace is unknown here."""
+    return [rel for entry in _declared_resources(template) for rel in _expand_root(repo, entry)]
+
+
+def kiro_resource_check(repo):
+    """-> (lines, over) for the Kiro agent template's declared `resources:`. One `RESOURCES` line reports the
+    characters and files the playbook-rooted entries declare, in declaration order, against kiro-cli's limits.
+    An `OVER` line, and exit 1, for: an entry repeating what Kiro loads itself (a steering folder, the workspace
+    AGENTS.md, memory), a declared file over the per-file limit, or the total over the file or character
+    limit. Workspace-relative and home entries other than those are reported as not counted."""
+    template = None
+    for dest, source, _mode in _manifest(repo):
+        if dest == AGENT_TEMPLATE_DEST:
+            template = os.path.join(repo, *source.split("/"))
+    if template is None or not os.path.isfile(template):
+        return ["WARN\tRESOURCES not computed (no %s row or source)" % AGENT_TEMPLATE_DEST], 0
+    lines, over, chars, files, uncounted = [], 0, 0, 0, []
+    for entry in _declared_resources(template):
+        if entry.startswith(KIRO_SELF_LOADED):
+            why = ("memory reaches Kiro through steering links, or is read" if "memory/" in entry
+                   else "Kiro loads it itself")
+            lines.append("OVER\tkiro-resources\tduplicate\t%s (%s; the declaration spends the capped budget)" % (entry, why))
+            over += 1
+            continue
+        if entry.startswith("skill://"):
+            continue
+        rels = _expand_root(repo, entry)
+        if not rels:
+            uncounted.append(entry)
+        for rel in rels:
+            n = len(_read(os.path.join(repo, *rel.split("/"))))
+            chars, files = chars + n, files + 1
+            if n > KIRO_RESOURCE_FILE_CHARS:
+                lines.append("OVER\tkiro-resources\tfile\t%s=%d chars (limit %d per file)" % (rel, n, KIRO_RESOURCE_FILE_CHARS))
+                over += 1
+    if chars > KIRO_RESOURCE_CHARS or files > KIRO_RESOURCE_FILES:
+        lines.append("OVER\tkiro-resources\ttotal\t%d chars in %d files (limits %d chars, %d files)"
+                     % (chars, files, KIRO_RESOURCE_CHARS, KIRO_RESOURCE_FILES))
+        over += 1
+    lines.insert(0, "RESOURCES\tkiro\t%d chars in %d files\t(limits %d chars, %d files, %d per file; not counted: %s)"
+                 % (chars, files, KIRO_RESOURCE_CHARS, KIRO_RESOURCE_FILES, KIRO_RESOURCE_FILE_CHARS,
+                    ", ".join(uncounted) if uncounted else "none"))
+    return lines, over
 
 
 def total_lines(repo):
@@ -311,6 +404,11 @@ def total_lines(repo):
                 return 0
             for dest, source, mode in manifest:
                 if mode in CLIENT_MODES[client] and _always_loaded(client, dest):
+                    if client == "kiro" and dest.startswith(KIRO_STEERING):
+                        inclusion = steering_inclusion(os.path.join(repo, *source.split("/")))
+                        if inclusion != "always":
+                            parts.append("%s=%s" % (dest[len(CLIENT_DIR[client]):], inclusion))
+                            continue
                     total += add(dest[len(CLIENT_DIR[client]):], source)
                     if dest == AGENT_TEMPLATE_DEST:
                         for rel in _agent_resources(repo, os.path.join(repo, *source.split("/"))):
@@ -376,11 +474,15 @@ def selftest():
                "symlink-file\t~/.gemini/GEMINI.md\tshared/AGENTS.md\tgemini\n"
                "template-file\t~/.kiro/agents/kiro_default.md\tproviders/kiro/agents/kiro_default.md\tkiro-always\n"
                "symlink-file\t~/.kiro/steering/agents.md\tshared/AGENTS.md\tkiro\n"
-               "symlink-file\t~/.kiro/steering/kg.md\tproviders/kiro/steering/kg.md\tkiro\n").encode("utf-8")
-        agent = (b"---\nresources:\n  - file://AGENTS.md\n  - file://memory/*.md\n"
-                 b"  - \"file://{{PLAYBOOK_ROOT}}/memory/*.md\"\nwelcomeMessage: x\n---\nBody words here now\n")
+               "symlink-file\t~/.kiro/steering/kg.md\tproviders/kiro/steering/kg.md\tkiro\n"
+               "symlink-file\t~/.kiro/steering/ref.md\tproviders/kiro/steering/ref.md\tkiro\n"
+               "symlink-file\t~/.kiro/steering/playbook-user-memory.md\tmemory/MEMORY.md\tkiro\n").encode("utf-8")
+        agent = (b"---\nresources:\n  - file://README.md\n  - \"file://{{PLAYBOOK_ROOT}}/docs/*.md\"\n"
+                 b"  - skill://~/.kiro/skills/**/SKILL.md\nwelcomeMessage: x\n---\nBody words here now\n")
         r = repo("totals", {
-            "shared/AGENTS.md": b"a b c", "inventory.tsv": inv, "memory/MEMORY.md": b"m1 m2",
+            "shared/AGENTS.md": b"a b c", "inventory.tsv": inv, "memory/MEMORY.md": b"m1 m2", "docs/d.md": b"d1 d2",
+            "docs/sub/x.md": b"not counted by the one-level glob",
+            "providers/kiro/steering/ref.md": b"---\ninclusion: auto\ndescription: on demand\n---\nref words here\n",
             "memory/topics/t.md": b"not counted by the one-level glob", "providers/kiro/agents/kiro_default.md": agent,
             "shared/skills/qa/SKILL.md": b"---\nname: qa\ndescription: one two three\n---\nbody body body\n",
             "shared/skills/qb/SKILL.md": b"---\nname: qb\ndescription: \"four five\"\n---\nx\n",
@@ -395,21 +497,35 @@ def selftest():
                     "skill descriptions=5 over 2 skills)", repr(t[:1]))
         chk("TOTAL: codex and gemini count their one file", t[1] == "TOTAL\tcodex\t8 words\t(AGENTS.md=3; skill descriptions=5 over 2 skills)"
             and t[2] == "TOTAL\tgemini\t8 words\t(GEMINI.md=3; skill descriptions=5 over 2 skills)", repr(t[1:3]))
-        chk("TOTAL: kiro counts the agent definition, its PLAYBOOK_ROOT resources, steering (a missing file adds 0) and "
-            "the standalone Kiro skill, not an overlay folder",
-            t[3] == "TOTAL\tkiro\t%d words\t(agents/kiro_default.md=%d, memory/MEMORY.md=2, steering/agents.md=3, "
-                    "steering/kg.md=missing; skill descriptions=6 over 3 skills)" % (agent_words + 2 + 3 + 6, agent_words)
+        chk("TOTAL: kiro counts the agent definition, its PLAYBOOK_ROOT resources, always-loaded steering (a missing "
+            "file adds 0, an inclusion: auto file is listed, not counted), a memory link and the standalone Kiro skill",
+            t[3] == "TOTAL\tkiro\t%d words\t(agents/kiro_default.md=%d, docs/d.md=2, steering/agents.md=3, "
+                    "steering/kg.md=missing, steering/ref.md=auto, steering/playbook-user-memory.md=2; "
+                    "skill descriptions=6 over 3 skills)" % (agent_words + 2 + 3 + 2 + 6, agent_words)
             and len(t) == 4, repr(t[3:]))
+        res = ["RESOURCES\tkiro\t5 chars in 1 files\t(limits 99000 chars, 32 files, 50000 per file; not counted: file://README.md)"]
         rc, out, err = run([r], (("shared/AGENTS.md", 2),))
-        chk("TOTAL lines follow an OVER run's REMEDIATION and do not change its exit code",
-            rc == 1 and out[0].startswith("OVER") and out[2] == REMEDIATION and out[3:] == t and not err, "%s %r" % (rc, out))
+        chk("TOTAL and RESOURCES lines follow an OVER run's REMEDIATION and do not change its exit code",
+            rc == 1 and out[0].startswith("OVER") and out[2] == REMEDIATION and out[3:] == t + res and not err, "%s %r" % (rc, out))
         rc, out, err = run([r], (("shared/AGENTS.md", 99),))
-        chk("TOTAL lines follow SUMMARY on a passing run, exit 0", rc == 0 and out[1].startswith("SUMMARY") and out[2:] == t,
-            "%s %r" % (rc, out))
+        chk("TOTAL and RESOURCES lines follow SUMMARY on a passing run, exit 0",
+            rc == 0 and out[1].startswith("SUMMARY") and out[2:] == t + res, "%s %r" % (rc, out))
+        # RESOURCES: a declaration Kiro already loads itself, a file over 50,000 chars and a total over the cap fail
+        dup = (b"---\nresources:\n  - file://AGENTS.md\n  - file://~/.kiro/steering/*.md\n"
+               b"  - \"file://{{PLAYBOOK_ROOT}}/memory/*.md\"\n  - \"file://{{PLAYBOOK_ROOT}}/big/*.md\"\n---\nx\n")
+        rd = repo("resources-over", {"shared/AGENTS.md": b"a", "inventory.tsv": inv, "providers/kiro/agents/kiro_default.md": dup,
+                                     "big/a.md": b"x" * 50001, "big/b.md": b"y" * 49000})
+        rc, out, err = run([rd], (("shared/AGENTS.md", 99),))
+        over = [l for l in out if l.startswith("OVER\tkiro-resources")]
+        chk("RESOURCES: duplicates, an over-long file and an over-cap total each print OVER and exit 1",
+            rc == 1 and not err and len(over) == 5
+            and sum("\tduplicate\t" in l for l in over) == 3 and any("\tfile\tbig/a.md=50001" in l for l in over)
+            and any("\ttotal\t99001 chars in 2 files" in l for l in over), "%s %r" % (rc, out))
         r2 = repo("totals-noinv", {"shared/AGENTS.md": b"a b c"})
         rc, out, err = run([r2], (("shared/AGENTS.md", 99),))
-        chk("a failure computing TOTAL is a WARN line, never an error",
-            rc == 0 and not err and len(out) == 3 and out[2].startswith("WARN\tTOTAL not computed (ManifestError: ERROR: manifest not found"), repr(out))
+        chk("a failure computing TOTAL or RESOURCES is a WARN line, never an error",
+            rc == 0 and not err and len(out) == 4 and out[2].startswith("WARN\tTOTAL not computed (ManifestError: ERROR: manifest not found")
+            and out[3].startswith("WARN\tRESOURCES not computed"), repr(out))
         r3 = repo("totals-crlf", {"shared/AGENTS.md": b"a b c", "inventory.tsv": b"symlink-file\t~/.codex/AGENTS.md\tshared/AGENTS.md\tcodex\r\n",
                                   "shared/skills/qa/SKILL.md": b"---\r\ndescription: one two\r\n---\r\n"})
         t3 = total_lines(r3)

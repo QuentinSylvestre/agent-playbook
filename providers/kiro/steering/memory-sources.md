@@ -1,3 +1,8 @@
+---
+inclusion: auto
+name: memory-sources
+description: "Read when finding, mining or counting kiro-cli session transcripts, for a /qdream sweep or a search of past sessions."
+---
 ## Memory Sources — v3 Sessions
 
 `/qdream` full mode discovers this file by globbing `providers/*/steering/memory-sources.md`; it documents kiro-cli v3 session discovery and extraction. kiro-cli v2 is retired: its session format is described in `providers/kiro/reference/kiro-cli-v2-memory-sources.md` (on demand, never deployed), which a sweep must be handed explicitly if old v2 sessions are to be harvested.

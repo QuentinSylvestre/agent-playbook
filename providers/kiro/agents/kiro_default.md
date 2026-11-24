@@ -16,14 +16,9 @@ mcpServers:
       - getVisibleJiraProjects
       - atlassianUserInfo
 resources:
-  - file://AGENTS.md
   - file://README.md
-  - file://memory/*.md
-  - file://.kiro/steering/**/*.md
   - skill://.kiro/skills/**/SKILL.md
   - skill://~/.kiro/skills/**/SKILL.md
-  - file://~/.kiro/steering/*.md
-  - "file://{{PLAYBOOK_ROOT}}/memory/*.md"
 welcomeMessage: "kiro_default (v3) loaded."
 ---
 

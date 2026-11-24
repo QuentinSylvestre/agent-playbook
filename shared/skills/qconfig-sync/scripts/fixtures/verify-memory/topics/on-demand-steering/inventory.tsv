@@ -1,0 +1,4 @@
+symlink-file	~/.kiro/steering/local-data.md	providers/kiro/steering/local-data.md	kiro
+symlink-file	~/.kiro/steering/powershell-syntax.md	providers/kiro/steering/powershell-syntax.md	kiro
+symlink-file	~/.kiro/steering/always-marked.md	providers/kiro/steering/always-marked.md	kiro
+symlink-file	~/.kiro/steering/playbook-user-memory.md	memory/MEMORY.md	kiro
