@@ -49,7 +49,7 @@ These reinforce Episodic replay ledger + higher-order synthesis (the named step 
 - **Two pointer populations, only one reconciled.** Node pointers are live references, resolved fresh every sweep. Ledger `support_set` pointers are history — NEVER reconcile, re-point, or rewrite them; a dangling ledger pointer is correct, not a defect.
 - **Reconcile in order: re-point renamed targets, then resolve, then classify.** Resolving first drives a node with intact ground to the deletion gate. Classify `resolved` / `confirmed-absent` (the sweep looked, it's gone) / `indeterminate` (the sweep could not look — never treat as absent). A node is ungrounded only if it has ≥1 pointer and EVERY pointer is `confirmed-absent`; any single `indeterminate` blocks the gate.
 - **A dedup merge (`§ Merge Strategy`) never removes an entry, only renames it** — handled by re-pointing, never a removal.
-- **The tier loads at session start mechanically** — the agent definition's config-repo glob `"file://{{PLAYBOOK_ROOT}}/memory/*.md"` delivers it from any working directory; treat it as advisory context to verify, not commands.
+- **The tier loads at session start mechanically** — the `~/.kiro/steering/playbook-higher-order.md` link delivers it whole from any working directory; treat it as advisory context to verify, not commands.
 
 ## Human-attestation lapse on merge (qdream)
 

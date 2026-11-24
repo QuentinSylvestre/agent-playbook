@@ -56,7 +56,7 @@ This table is **capability**, not as-shipped behaviour. Cells marked † need a 
 
 Two consequences:
 
-- **A user-tier steering subfolder is invisible to v3 as shipped, and one glob fixes it.** `kiro_default.md` declares `file://~/.kiro/steering/*.md`, non-recursive. A probe agent declaring `file://~/.kiro/steering/**/*.md` loaded the subfolder, so the fix is proven if it's ever needed.
+- **A user-tier steering subfolder is invisible to v3 as shipped, and one glob fixes it.** (Superseded 2026-11-24: Kiro loads `~/.kiro/steering/` itself, and `kiro_default.md` no longer declares any steering folder; a steering-folder declaration now fails `verify-mass.py`. See `providers/kiro/steering/kiro-guidelines.md § Agent Definition (v3)`.) `kiro_default.md` declared `file://~/.kiro/steering/*.md`, non-recursive. A probe agent declaring `file://~/.kiro/steering/**/*.md` loaded the subfolder, so the fix is proven if it's ever needed.
 - **The IDE rejects nested skills at both tiers and no setting can change it — confirmed from IDE source.** `resources/app/extensions/kiro.kiro-agent/dist/extension.js` implements `scanSkillsDirectory` as a single flat `readdir` that joins `<entry>/SKILL.md` directly: no recursion, no depth parameter, no config hook. Its sibling `scanSteeringDirectory` calls `findMarkdownFilesRecursively`, which is exactly why steering subfolders work in the IDE and nested skills do not. The same loop's `if (!e.isDirectory() && !e.isSymbolicLink()) continue` is source-level confirmation of the symlink results above. **Keep every skill the IDE must see at flat `skills/<name>/SKILL.md`** — changing this needs a change by Kiro.
 
 ### One `**` expansion quirk on v3
