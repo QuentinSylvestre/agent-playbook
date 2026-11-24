@@ -69,6 +69,9 @@ FAIL rules (exit 1):
   topic-citation       a `## Topics` row of <repo>/memory/MEMORY.md with no always-loaded citer (the port of
                        verify-topics, below). The detail keeps verify-topics' MISSING token and wording:
                        "MISSING <topic> <detail>".
+  topic-unindexed      a <repo>/memory/topics/*.md file that no `## Topics` row names (the reverse of
+                       topic-citation): a topic file without a row is never checked and never found.
+                       Not run under --topics, which reads no topic file.
   unreadable           an in-scope file other than <repo>/memory/MEMORY.md that is not UTF-8 text (invalid
                        UTF-8, a UTF-16 byte-order mark, or a NUL byte): the guard ran and the file is
                        defective. <repo>/memory/MEMORY.md and inventory.tsv instead exit 2, as in
@@ -430,6 +433,17 @@ def rule_topic_citation(mf, ctx):
     return [("FAIL", no, "MISSING %s %s" % (topic, detail)) for no, topic, detail in ctx["topic_missing"]]
 
 
+def rule_topic_unindexed(mf, ctx):
+    """FAIL: a memory/topics/*.md file that no `## Topics` row names (topic-citation's reverse)."""
+    if mf.kind != "topic" or mf.label in ctx["topic_indexed"]:
+        return []
+    return [("FAIL", 0, UNINDEXED_DETAIL % mf.label)]
+
+
+# An exact match: a row whose path differs only in case or a ./ prefix does not count.
+UNINDEXED_DETAIL = "no row in the '## Topics' table of memory/MEMORY.md names exactly `%s`"
+
+
 def rule_unreadable(mf, ctx):
     """FAIL: an in-scope file that is not UTF-8 text (reported by the loader)."""
     return []  # emitted by run() while it reads the files; this entry keeps the rule name in the registry
@@ -531,6 +545,7 @@ RULES = (
     ("conflict-marker", rule_conflict_marker),
     ("heading-duplicate", rule_heading_duplicate),
     ("topic-citation", rule_topic_citation),
+    ("topic-unindexed", rule_topic_unindexed),
     ("unreadable", rule_unreadable),
     ("missing-field", rule_missing_field),
     ("signal-incomplete", rule_signal_incomplete),
@@ -581,7 +596,8 @@ def accepted_sources(inv_lines):
 
 
 def topic_check(ME, repo, mem_data, inv_data):
-    """-> [(line_no, topic, detail)] for every MISSING row, in table order. Raises CouldNotRun."""
+    """-> ([(line_no, topic, detail)] for every MISSING row, in table order; {every row's topic path}).
+    Raises CouldNotRun."""
     inv = accepted_sources(read_lines(inv_data))
     mem_lines = read_lines(mem_data)
     secs = ME.sections(mem_data.decode("utf-8"))
@@ -602,7 +618,7 @@ def topic_check(ME, repo, mem_data, inv_data):
             return not os.path.isfile(os.path.join(repo, p[:-len("SKILL.md")] + "OVERLAY.md"))
         return p in inv
 
-    missing, datarows, header = [], 0, False
+    missing, datarows, header, indexed = [], 0, False, set()
     for no, row in rows:
         body = row[1:]
         if body.endswith("|"):
@@ -618,6 +634,7 @@ def topic_check(ME, repo, mem_data, inv_data):
         if not m:
             raise CouldNotRun("malformed Topics row (first cell is not one backticked path): %s" % row)
         topic = trim(m.group(1))
+        indexed.add(topic)
         last = cells[2]
         datarows += 1
         passed, details = None, []
@@ -650,7 +667,7 @@ def topic_check(ME, repo, mem_data, inv_data):
     # neither, the parser found no table, which must not pass as "every topic cited".
     if datarows == 0 and not header:
         raise CouldNotRun("the '## Topics' table has no data rows")
-    return missing
+    return missing, indexed
 
 
 # ---------------------------------------------------------------------------
@@ -704,7 +721,8 @@ def run(argv, disabled=()):
         if not_utf8(inv_data):
             raise CouldNotRun("inventory.tsv is not UTF-8 text (invalid UTF-8, UTF-16 byte-order mark or NUL byte)")
         ME = _load("memory_entries", "memory-entries.py")
-        ctx = {"ME": ME, "user_headings": {}, "topic_missing": topic_check(ME, repo, mem_data, inv_data)}
+        topic_missing, topic_indexed = topic_check(ME, repo, mem_data, inv_data)
+        ctx = {"ME": ME, "user_headings": {}, "topic_missing": topic_missing, "topic_indexed": topic_indexed}
         out, skips = [], []
         files = [MemFile(ME, "memory/MEMORY.md", mem_data.decode("utf-8"), "root")]
         scan_order = ["memory/MEMORY.md"]
@@ -740,6 +758,9 @@ def run(argv, disabled=()):
                     if "unreadable" not in disabled:
                         out.append(("FAIL", label, 0, "unreadable",
                                     "not UTF-8 text (invalid UTF-8, UTF-16 byte-order mark or NUL byte)"))
+                    # A topic file that cannot be read is still checked for its Topics row.
+                    if kind == "topic" and "topic-unindexed" not in disabled and label not in topic_indexed:
+                        out.append(("FAIL", label, 0, "topic-unindexed", UNINDEXED_DETAIL % label))
                     continue
                 files.append(MemFile(ME, label, data.decode("utf-8"), kind))
         rules = [r for r in RULES if r[0] not in disabled]
@@ -892,6 +913,7 @@ MUTATIONS = (
     ("heading duplicated across user-tier files", "memory/topics/alpha.md", "### Alpha entry\n", "### Fixture feedback entry one\n", "heading-duplicate", "FAIL"),
     ("heading duplicated within a store", "STORE", "### Store entry two\n", "### Store entry one\n", "heading-duplicate", "FAIL"),
     ("higher-order node sharing a base heading is clean", "memory/HIGHER_ORDER.md", "### Fixture node\n", "### Fixture feedback entry one\n", "heading-duplicate", None),
+    ("topic file with no Topics row", "memory/MEMORY.md", "| `memory/topics/alpha.md` | doing alpha work | `AGENTS.md` |\n", "", "topic-unindexed", "FAIL"),
     ("topic citer loses its reference", "AGENTS.md", "memory/topics/alpha.md", "memory/topics/other.md", "topic-citation", "FAIL"),
     ("topic file not UTF-8", "memory/topics/alpha.md", "Alpha entry", "Alpha \udcff entry", "unreadable", "FAIL"),
     ("missing Why", "memory/MEMORY.md", "**Why**: the feedback reason.\n", "", "missing-field", "WARN"),
