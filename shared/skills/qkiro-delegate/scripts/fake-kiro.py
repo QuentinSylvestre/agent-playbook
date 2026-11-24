@@ -8,6 +8,7 @@ It reads <cwd>/scenario.json (optional): {"mode_reply": "...", "model_reply": ".
   SAY <text>                      send an agent message
   PERM <capability> <kind> <title> | <rawInput JSON>
                                   ask permission, then say ALLOWED, or REFUSED when not allowed
+  TOOL <title>                    send a tool_call that asks no permission
   SLEEP <seconds>                 wait, ending early with stopReason "cancelled" on session/cancel
   STUBBORN <seconds>              wait and ignore session/cancel
   ECHO_TOKEN                      say the token the driver supplied, in a tool_call title and a permission request
@@ -138,6 +139,8 @@ def main(argv):
                 capability, kind, title = (head.strip().split(" ", 2) + ["", ""])[:3]
                 ok = ask(sid, capability, kind, title, json.loads(raw) if raw.strip() else {})
                 say(sid, ("ALLOWED" if ok else "REFUSED") + ": " + title + "\n")
+            elif line.startswith("TOOL "):  # a tool call that asks no permission (a trusted tool)
+                update(sid, sessionUpdate="tool_call", toolCallId="tc-t", status="in_progress", title=line[5:])
             elif line.startswith("SLEEP "):
                 end = time.time() + float(line[6:])
                 while time.time() < end:

@@ -67,7 +67,11 @@ Permission policy (<work>/policy.json, optional):
   policy's "default". No policy file allows everything; a policy file that is unreadable or invalid rejects
   everything (a broken tightening never fails open). A request in a shape the rules cannot read matches no rule. Every request and decision is logged, and each refusal is appended to the turn's out file.
   The policy only matters when the bound mode asks: kiro_default on a machine whose permissions.yaml says
-  `all: allow` never sends a request, so the delegate then runs with the user's full privileges.
+  `all: allow` never sends a request, so the delegate then runs with the user's full privileges. When policy.json
+  exists and a turn makes tool calls but receives no permission request, the turn's out file and events.log say
+  so ("policy decided none of them"). Shell commands are read from rawInput.command, consent.triggeringResource and
+  consent.resource (kiro-cli 3.5.0 puts only the first command of a compound one in triggeringResource), with the
+  title as a fallback when none is set, and an allow rule must match every one of them.
 """
 import argparse
 import json
@@ -215,8 +219,11 @@ def request_facts(params, session_cwd):
     is_shell = capability == "shell"
     commands, paths = [], []
     if is_shell:
-        for c in (raw.get("command"), consent.get("triggeringResource")):
-            if isinstance(c, str) and c.strip():
+        # Every field that carries the command text. kiro-cli 3.5.0 puts the full text in consent.resource, and only
+        # the first command of a compound one in triggeringResource; checking that alone let `git status; rm x` pass a
+        # `git` allow prefix. The title is a fallback only: a descriptive title would fail every allow rule.
+        for c in (raw.get("command"), consent.get("triggeringResource"), consent.get("resource")):
+            if isinstance(c, str) and c.strip() and c.strip() not in commands:
                 commands.append(c.strip())
         if not commands and title:
             commands.append(re.sub(r"^(?i:running):\s*", "", title).strip())
@@ -504,6 +511,8 @@ class Driver:
         self.out = None
         self.stream = StreamRedactor(self.red)
         self.refusals = 0
+        self.turn_tools = 0
+        self.turn_permissions = 0
         self.kiro_path = None
         self.state = "starting"
         self.job = None
@@ -858,6 +867,8 @@ class Driver:
                         self.write_out(c.get("text", ""))
                 elif kind in ("tool_call", "tool_call_update"):
                     st, ttl = u.get("status"), u.get("title")
+                    if kind == "tool_call":
+                        self.turn_tools += 1
                     if kind == "tool_call" or st in ("completed", "failed"):
                         self.log("TOOL %s %s %s" % (kind, st, self.clip(str(ttl), 200)))
                         if st == "failed":
@@ -1010,6 +1021,7 @@ class Driver:
             self.send({"jsonrpc": "2.0", "id": rid, "error": {"code": -32000, "message": "token fetch failed"}})
 
     def on_permission(self, rid, params):
+        self.turn_permissions += 1
         policy, err = load_policy(self.work / "policy.json")
         allow, reason = decide(policy, err, params, self.cwd)
         facts = request_facts(params, self.cwd)
@@ -1065,6 +1077,7 @@ class Driver:
     def run_turn(self, path):
         self.assert_config()
         self.turn = int(path.stem)
+        self.turn_tools = self.turn_permissions = 0
         text = path.read_text(encoding="utf-8-sig")
         self.out = open(self.work / "out" / path.with_suffix(".txt").name, "w", encoding="utf-8")
         self.stream = StreamRedactor(self.red)
@@ -1087,6 +1100,18 @@ class Driver:
             self.out = None
             raise Fail("turn %d got an error reply: %s" % (self.turn, err))
         stop = r["result"].get("stopReason")
+        try:
+            has_policy = (self.work / "policy.json").exists()
+        except OSError:
+            has_policy = False
+        if has_policy and self.turn_tools and not self.turn_permissions:
+            # A policy only applies when kiro-cli asks; under permissions.yaml `all: allow` it never does.
+            note = ("[warning: policy.json is present but kiro-cli asked no permission for any of the %d tool call(s) of "
+                    "this turn, so the policy decided none of them. Kiro may trust some tools without asking; if a call "
+                    "should have been checked, the bound agent does not ask (permissions.yaml `all: allow`): bind one "
+                    "that asks, or give it a read-only tool allowlist]" % self.turn_tools)
+            self.write_out_line(note)
+            self.log("POLICY NOT APPLIED turn %d: %d tool call(s), 0 permission requests" % (self.turn, self.turn_tools))
         self.write_out_line("[end of turn: %s]" % stop)
         self.out.write(self.stream.flush())
         self.out.close()

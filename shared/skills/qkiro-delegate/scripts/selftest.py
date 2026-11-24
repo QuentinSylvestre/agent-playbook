@@ -427,6 +427,25 @@ def scenarios(root, mod):
     (empty / "in").mkdir(parents=True)
     chk("waiter: no prompt file exits 5", waiter(empty, timeout=1)[0] == 5)
 
+    # A policy that never applied: tool calls but no permission request in the turn -> a warning line; a turn
+    # that asked, or a run with no policy file, gets none.
+    warn = "policy decided none of them"
+    proc, work, cwd = start(root, "policy-unused", policy={"allow": [{"capability": "shell", "command_prefix": "echo"}]})
+    send(work, 1, "TOOL Read file\nSAY done")
+    rc, _ = waiter(work)
+    send(work, 2, "TOOL Read file\nPERM shell execute Running: echo hi | {\"command\": \"echo hi\"}\nSAY done")
+    rc2, _ = waiter(work, turn=2)
+    finish(proc, work)
+    chk("policy-unused: a turn with a tool call and no permission request warns", rc == 0 and warn in read(work / "out" / "001.txt"),
+        read(work / "out" / "001.txt"))
+    chk("policy-unused: the counters reset per turn, and a turn that asked does not warn",
+        rc2 == 0 and warn not in read(work / "out" / "002.txt"), read(work / "out" / "002.txt"))
+    proc, work, cwd = start(root, "policy-absent")
+    send(work, 1, "TOOL Read file\nSAY done")
+    rc, _ = waiter(work)
+    finish(proc, work)
+    chk("policy-absent: no policy file, no warning", rc == 0 and warn not in read(work / "out" / "001.txt"), read(work / "out" / "001.txt"))
+
     # 5. No secret reaches a file.
     proc, work, cwd = start(root, "secret", policy={"allow": [{"capability": "shell", "command_prefix": "echo"}]})
     send(work, 1, "ECHO_TOKEN\nECHO_ARN\nSAY done")
@@ -1341,6 +1360,12 @@ def unit(mod, root):
     chk("unit: second prefix of the list", dec(allow, sh("git  diff   HEAD")))
     for bad in ("git status; rm x", "git status | cat", "git status > f", "git status `id`", "git status $(id)", "git status\nrm x"):
         chk("unit: control characters defeat an allow prefix: %r" % bad, not dec(allow, sh(bad)))
+    # The kiro-cli 3.5.0 shape: no rawInput.command, the full text in consent.resource and the title, only the first
+    # command in triggeringResource.
+    k35 = lambda c, first: req("shell", "execute", c, {}, resource=c, trig=first)
+    chk("unit: a compound command is refused when triggeringResource holds only its first part",
+        not dec(allow, k35("git status; rm -rf x", "git status")))
+    chk("unit: a simple command in the kiro-cli 3.5.0 shape is allowed", dec(allow, k35("git status --short", "git status --short")))
     chk("unit: the capability must match", not dec(allow, req("fs_write", "edit", "git status", {"command": "git status"})))
     chk("unit: a rule's keys are ANDed", not dec({"allow": [{"capability": "shell", "kind": "read", "command_prefix": "git"}]}, sh("git log")))
     deny_seg = {"allow": [{"capability": "shell"}], "deny": [{"command_prefix": "git push"}]}
