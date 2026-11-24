@@ -858,8 +858,10 @@ class Driver:
                 self.send({"jsonrpc": "2.0", "id": rid, "error": {"code": -32601, "message": "not supported by this client"}})
         elif "method" in msg:
             m, p = msg["method"], msg.get("params") or {}
+            p = p if isinstance(p, dict) else {}
             if m == "session/update":
                 u = p.get("update") or {}
+                u = u if isinstance(u, dict) else {}
                 kind = u.get("sessionUpdate")
                 if kind == "agent_message_chunk":
                     c = u.get("content") or {}
@@ -1092,8 +1094,8 @@ class Driver:
             self.out.close()
             self.out = None
             raise
-        if "result" not in r:
-            err = self.clip(r.get("error"), 500)
+        if not isinstance(r.get("result"), dict):
+            err = self.clip(r.get("error") if "error" in r else "reply result is %r" % (r.get("result"),), 500)
             self.write_out_line("[turn %d errored: %s]" % (self.turn, err))
             self.out.write(self.stream.flush())
             self.out.close()
