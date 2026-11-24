@@ -21,7 +21,7 @@ Apply the playbook's canonical review personas, persona-selection rules, sub-age
 | Security auditor | Authentication, authorization, input validation (injection surfaces), secrets, attack surface (CORS/CSP defaults, timing attacks, mass assignment) |
 | Performance engineer | Latency, throughput, memory (leaks, cleanup), algorithmic complexity (N+1, redundant work), caching, missed concurrency (TOCTOU) |
 | End-user advocate | Usability, error messages, edge cases from user perspective, accessibility |
-| Reliability engineer | Failure modes, error handling (silent swallowing), recovery (timeouts, retries, circuit-breakers), observability, resource leaks |
+| Reliability engineer | Failure modes, error handling (silent swallowing), recovery (timeouts, retries, circuit-breakers), idempotency (a re-run, or a crash midway, leaves a correct state), observability, resource leaks |
 | Maintainability reviewer | Code clarity, naming, coupling (leaky abstractions), test coverage, future extensibility (redundant state, reuse) |
 | Domain expert | Business logic correctness, domain terminology, regulatory compliance |
 | Senior engineer | Cross-cutting integration health, plan/intent compliance, code completeness (no dead code or dangling wiring, cleanup paths), test adequacy (failure-mode coverage; a negative or acceptance check that could not fail), broad pragmatism |

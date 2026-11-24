@@ -364,6 +364,8 @@ If confirmed, immediately ask one follow-up: "What concrete behaviors must remai
 
 Each bullet states one concrete behavior. Freeform prose — no EARS notation.
 
+**Same defect elsewhere.** Once the root cause is known, search the codebase for the same defect shape, such as the same call pattern or the same missing check. Fix the hits inside the plan's scope. List the others under `## Follow-up Work (Deferred)` as reported, not fixed, per `shared/AGENTS.md § Core Principles` (bugs outside the task are reported, not repaired).
+
 ---
 
 ## Doc & Test Guidelines

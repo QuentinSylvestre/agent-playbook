@@ -86,7 +86,7 @@ Steps:
    - Check if related entry already exists (update vs create).
    - Apply write-time quality gates from `shared/skills/qdream/memory-rules.md`.
    - Include the verbatim evidence quote that grounds the signal as prose within the proposal (in the `Why` or `Source`), not as a separate structured field — lightweight has no cross-validation verifier to consume a structured `evidence_quote`, so the quote is user-facing context and the standard proposal template is left unchanged.
-   - Present using the standard proposal format. Wait for user decision.
+   - Present all proposals in one message, numbered, each in the standard proposal format. Ask for one typed reply covering every number (for example `1 Save, 2 Skip, 3 Edit: <change>`). A number the reply leaves out stays undecided: re-ask for it, never default it.
 6. Report: entries proposed, accepted, skipped. End it with the `count` lines: run `<python> <skill-dir>/scripts/dream-manifest.py count --state <config-repo>/memory/.dream-state.json --repo <config-repo>` (read-only) and print its `sweep due:` and `memory budget:` lines verbatim; on a non-zero exit or without an interpreter print `sweep due: unknown (<reason>)` and `memory budget: unknown (<reason>)`.
 
 ---
