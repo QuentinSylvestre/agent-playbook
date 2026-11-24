@@ -210,7 +210,8 @@ At each start, resume, `/clear` and compaction the hook injects:
 - the user and higher-order entries marked ⚠, one line each with their file:
   an entry whose `Source` line cites a file that changed in git after its
   `Verified` date (a path named only in prose is not checked);
-- the `## Topics` rows;
+- the `## Topics` rows, unless the user memory link delivers `memory/MEMORY.md`,
+  which carries the same table;
 - the project memory tier in full when it fits, otherwise its heading index.
   The project tier gets the rest of the cap.
 

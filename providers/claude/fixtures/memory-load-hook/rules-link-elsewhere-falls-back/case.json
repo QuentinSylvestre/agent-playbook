@@ -11,6 +11,8 @@
     "Higher-order memory: delivered in full via ~/.claude/rules (",
     "/cfg/memory/HIGHER_ORDER.md): delivered in full by the rules link.",
     "- User entry one",
+    "Topics (on demand",
+    "memory/topics/git.md — a non-trivial git operation",
     "playbook-user-memory.md does not resolve to"
   ],
   "absent": [

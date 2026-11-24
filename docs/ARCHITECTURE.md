@@ -60,7 +60,7 @@ five write-time gates before they are saved
 
 At session start, Claude Code loads the user and higher-order tiers in full through links in
 `~/.claude/rules`, and its `SessionStart` hook (`providers/claude/memory-load-hook.py`) injects
-the Topics index, the project tier (in full when it fits, else its heading index), and a heading
+the Topics index when the user tier's link does not deliver it (the delivered file carries it), the project tier (in full when it fits, else its heading index), and a heading
 index for any tier its rules link does not deliver. Kiro loads them through steering resources.
 
 ## Stores and the resolver

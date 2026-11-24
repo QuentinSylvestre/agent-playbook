@@ -12,7 +12,8 @@ under a character cap (default 9,500; Claude Code saves anything over about
      mark, one line each with the file path; for a tier that is not, its heading
      index (the config repo's user `memory/MEMORY.md`, by section, then
      `memory/HIGHER_ORDER.md`), marks inline;
-  4. the `## Topics` rows of user memory (path and trigger), one line each;
+  4. the `## Topics` rows of user memory (path and trigger), one line each, unless the user tier is
+     delivered by its rules link (the delivered file holds the same table);
   5. then the project tier in full when the remaining budget holds it,
      otherwise its heading index.
 
@@ -747,11 +748,18 @@ def build(cwd, config_repo, cap=DEFAULT_CAP, deadline=None, helpers=None, rules_
     proj_reserve = proj_head if proj_head and proj_text is None else \
         proj_head + ident_line + [proj_title_index] + proj_tail
     delivered = [t for t, _n in RULES_LINKS if t in rules_links]
+    if "user" in delivered:
+        # The delivered MEMORY.md carries its own Topics table: repeating the rows here costs cap for nothing.
+        topics_block = []
     if delivered:
         # A tier its rules link delivers is in context already: only its path and its marked entries, one
         # line each with the file it is in, go out here; a tier that is not delivered keeps its index.
-        fixed = head + ["%s memory (%s): delivered in full by the rules link." % (labels[t], tiers[t][0])
-                        for t in delivered]
+        # The user line also names the base of the delivered Topics table's paths, which the rules file
+        # (read as ~/.claude/rules/playbook-user-memory.md) does not state.
+        fixed = head + ["%s memory (%s): delivered in full by the rules link.%s" % (
+            labels[t], tiers[t][0],
+            " Its Topics paths are relative to %s." % config_repo if t == "user" else "")
+            for t in delivered]
         flagged = [(True, "- %s (%s)" % (h, tiers[t][0]), tiers[t][0]) for t in delivered
                    for i, (_s, h, _b) in enumerate(tiers[t][2]) if h is not None and (t, i) in marked]
         if "higher-order" in delivered:
