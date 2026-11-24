@@ -110,6 +110,21 @@ def _run_selftest() -> int:
             snap.sort()
             return snap
 
+        def snapdiff(self, before):
+            # Name what differs from `before`, so a failing write-nothing check says what changed instead
+            # of only that something did. Added or removed paths come first: a write also changes its
+            # parent directory's mtime, and that directory sorts before the file that was written.
+            after = self.snapshot()
+            b, a = {p: (m, s) for p, m, s in before}, {p: (m, s) for p, m, s in after}
+            for p in sorted(set(a) - set(b)):
+                return "added: %s" % p
+            for p in sorted(set(b) - set(a)):
+                return "removed: %s" % p
+            for p in sorted(b):
+                if b.get(p) != a.get(p):
+                    return "first difference: %s before=%r after=%r" % (p, b.get(p), a.get(p))
+            return ""
+
     def fill_creds(text):
         # built at run time so no credential-shaped URL sits in the repo
         return (text.replace("{CRED4}", "user:123/" + "45@").replace("{CRED5}", "u:p@" + "ss/x@")
@@ -645,7 +660,7 @@ def _run_selftest() -> int:
         identity(rr)
         scan_stores()
         find(w.systemp)
-        chk("read-only:find-would-create-scan-write-nothing", w.snapshot() == snap0)
+        chk("read-only:find-would-create-scan-write-nothing", w.snapshot() == snap0, w.snapdiff(snap0))
 
         # --- would_create_path predicts find_or_create ---
         w.new_stores()
@@ -1089,11 +1104,11 @@ def _run_selftest() -> int:
         rrt, wrt = find_or_create(rt_repo), would_create_path(rt_repo)
         chk("round-trip:identity-that-does-not-read-back-is-failed-and-nothing-created",
             rrt.status == "failed" and wrt.status == "failed" and "STORE" in rrt.reason and "nothing was created" in rrt.reason
-            and len(w.dirs()) == n0 and w.snapshot() == snap0, "%r %r" % (rrt, wrt))
+            and len(w.dirs()) == n0 and w.snapshot() == snap0, "%r %r %s" % (rrt, wrt, w.snapdiff(snap0)))
         rt2 = w.repo(w.area("rt2") / "r", url="https://github.com/o/rtc.git")
         n0, snap0 = len(w.dirs()), w.snapshot()
         chk("round-trip:create-with-a-newline-subpath-is-failed-and-writes-nothing",
-            create(rt2, "x\ny").status == "failed" and len(w.dirs()) == n0 and w.snapshot() == snap0)
+            create(rt2, "x\ny").status == "failed" and len(w.dirs()) == n0 and w.snapshot() == snap0, w.snapdiff(snap0))
 
         # a temp file deleted between the write and the link (a stale-temp cleanup after a long suspend) is retried
         w.new_stores()
@@ -1272,7 +1287,7 @@ def _run_selftest() -> int:
                 if res.status != "failed":
                     bad.append((label, fn.__name__, res))
         chk("validation:empty-and-non-string-input-is-failed-everywhere", not bad, repr(bad[:3]))
-        chk("validation:bad-input-writes-nothing", len(w.dirs()) == n0 and w.snapshot() == snap0)
+        chk("validation:bad-input-writes-nothing", len(w.dirs()) == n0 and w.snapshot() == snap0, w.snapdiff(snap0))
         ghost_sub = vr / "ghost-sub"
         gres = {fn.__name__: fn(ghost_sub) for fn in (find_or_create, would_create_path, create)}
         chk("validation:missing-folder-is-none-and-nothing-created", all(x.status == "none" and "does not exist" in x.reason for x in gres.values())
