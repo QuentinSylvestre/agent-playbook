@@ -392,6 +392,8 @@ New sessions do not generate REVISIT markers — they follow the Sub-agent unava
 
 Before declaring the implementation complete, enumerate all `(deferred from Phase N)` entries across the plan. Any that remain unchecked at the final review are treated as blockers requiring user decision: mark resolved, convert to a follow-up plan, or escalate. Do NOT silently accept unsatisfied deferrals.
 
+Also enumerate every execution-contingent item the plan recorded in its Risk Assessment table or open questions (`shared/skills/qplan/SKILL.md` Step 2, Open items). For each, record beside the item the result of the phase or probe named to settle it. An item whose phase ran without settling it, or whose result leaves a choice open, is a blocker requiring user decision, like an unchecked deferral.
+
 #### Auto-fix loop
 
 Apply auto-fixable fixes (a fix that changes a test expectation follows Step 6's **Justify every changed test expectation**), then re-run review per `/qreview`'s Sub-agent fan-out rules. Max 2 cycles. **Ready state**: no unresolved High findings and no auto-fixable findings remain. Stop early if ready state is reached.
