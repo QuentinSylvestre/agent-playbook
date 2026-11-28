@@ -220,7 +220,7 @@ After writing or revising the plan, run a review cycle using **one sub-agent per
 
 Persona selection follows `/qreview`'s Persona-selection rules for the `/qplan Step 4` call sites, including the Light-tier persona-count exception and its scoping. A plan already in flight keeps its original persona set.
 
-**Gap-critic lens** (Standard/Major, Architect persona): When constructing the Architect persona's spawn brief, append this lens instruction: "In addition to evaluating structural fitness, explicitly identify missing steps, uncovered risks, unaddressed edge cases, and mitigations the plan should include but doesn't. Focus on what's absent, not just what's present."
+**Gap-critic lens** (Standard/Major, Architect persona): When constructing the Architect persona's spawn brief, append this lens instruction: "In addition to evaluating structural fitness, explicitly identify missing steps, uncovered risks, unaddressed edge cases, and mitigations the plan should include but doesn't. Focus on what's absent, not just what's present. For each new utility, helper, module or script the plan creates, search the codebase for an existing equivalent and report any match with its path."
 
 #### Review standards
 
